@@ -1,0 +1,29 @@
+{
+ "label": "indic5-quick",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-192343",
+ "artifacts": "research/evals/20261109-192343-indic5-quick",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 75.64,
+ "scores": {
+  "D": 0.8537,
+  "E": 0.7988,
+  "P": 0.503,
+  "C": 0.8
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9455,
+  "indic_fpr": 0.0357,
+  "flow_f1": 0.8034,
+  "explain_s_per_item": 8.21,
+  "peak_rss_gb": 2.218,
+  "decode_tps": 19.4207,
+  "model": "llama32-1b-qlora"
+ }
+}

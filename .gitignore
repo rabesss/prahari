@@ -10,3 +10,4 @@ __pycache__/
 # trained artifacts are rebuilt by candidates/*/train.py
 candidates/*/artifacts/*.joblib
 !candidates/BEST/artifacts/*.joblib
+!candidates/indic1/artifacts/*.joblib
