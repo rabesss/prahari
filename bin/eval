@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# bin/eval <candidate-dir> [--repeats N] [--label L] [--quick]
+# Proxy score for the PS3 entry. Runs on Oracle only (no cloud boxes, $0). Evals are queued one at a time.
+# The last stdout line is a JSON summary. Artifacts: research/evals/<stamp>-<label>/; ledger: research/evals/ledger.jsonl.
+set -euo pipefail
+P="$(cd "$(dirname "$0")/.." && pwd)"
+free_gb=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+if [ "${free_gb:-0}" -lt 3 ]; then
+  echo '{"score":null,"failures":[],"infra_errors":["disk_low: under 3 GB free on /"],"promotable":false}'
+  exit 2
+fi
+exec "$P/.venv/bin/python" -I "$P/eval/run_eval.py" "$@"

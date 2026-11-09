@@ -1,0 +1,18 @@
+{
+  "llama32-1b-qlora": {
+    "family": "llama",
+    "pte": "/var/tmp/arm-bharat-ai-soc-models/qlora/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte",
+    "tokenizer": "/var/tmp/arm-bharat-ai-soc-models/qlora/tokenizer.model",
+    "source": "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET",
+    "licence": "Llama 3.2 Community License",
+    "notes": "Official Meta export: INT4 group-32 weights, 8-bit dynamic activations, QLoRA-adapted, XNNPACK."
+  },
+  "llama32-1b-spinquant": {
+    "family": "llama",
+    "pte": "/var/tmp/arm-bharat-ai-soc-models/spinquant/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte",
+    "tokenizer": "/var/tmp/arm-bharat-ai-soc-models/spinquant/tokenizer.model",
+    "source": "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET",
+    "licence": "Llama 3.2 Community License",
+    "notes": "Official Meta export: SpinQuant rotations, INT4 weights, 8-bit dynamic activations, XNNPACK."
+  }
+}

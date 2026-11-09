@@ -1,0 +1,29 @@
+{
+ "label": "baseline",
+ "candidate": "candidates/BEST",
+ "stamp": "20261109-183806",
+ "artifacts": "research/evals/20261109-183806-baseline",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 69.33,
+ "scores": {
+  "D": 0.672,
+  "E": 0.7511,
+  "P": 0.5195,
+  "C": 0.8
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9601,
+  "url_f1": 0.9945,
+  "indic_f1": 0.7406,
+  "indic_fpr": 0.5,
+  "flow_f1": 0.8034,
+  "explain_s_per_item": 7.78,
+  "peak_rss_gb": 2.22,
+  "decode_tps": 19.209,
+  "model": "llama32-1b-qlora"
+ }
+}

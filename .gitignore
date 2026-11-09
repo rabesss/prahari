@@ -1,0 +1,12 @@
+.venv/
+data/
+.hillclimb/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pte
+*.bin
+*.safetensors
+# trained artifacts are rebuilt by candidates/*/train.py
+candidates/*/artifacts/*.joblib
+!candidates/BEST/artifacts/*.joblib

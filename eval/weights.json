@@ -1,0 +1,8 @@
+{
+  "top": {"D": 0.30, "E": 0.25, "P": 0.20, "C": 0.25},
+  "D": {"sms": 0.20, "url": 0.15, "indic": 0.40, "flow": 0.25},
+  "E": {"verdict": 0.30, "mention": 0.20, "forbidden": 0.15, "fabrication": 0.15, "actions": 0.10, "length": 0.10},
+  "P": {"explain_latency": 0.50, "peak_rss": 0.25, "detector_latency": 0.15, "size": 0.10},
+  "C": {"offline": 0.25, "tests": 0.15, "app": 0.20, "docs": 0.40},
+  "gate_cap": 20
+}

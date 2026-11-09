@@ -1,0 +1,255 @@
+{
+ "detection": {
+  "sms": {
+   "f1": 0.9601,
+   "precision": 0.9688,
+   "recall": 0.9515,
+   "fpr": 0.0062,
+   "invalid": 0,
+   "n": 1162,
+   "score": 0.9601,
+   "items_per_s": 515.8
+  },
+  "url": {
+   "f1": 0.9945,
+   "precision": 1.0,
+   "recall": 0.9891,
+   "fpr": 0.0,
+   "invalid": 0,
+   "n": 7997,
+   "score": 0.9945,
+   "items_per_s": 2662.1
+  },
+  "indic": {
+   "f1": 0.7406,
+   "precision": 0.6382,
+   "recall": 0.8821,
+   "fpr": 0.5,
+   "invalid": 0,
+   "n": 280,
+   "score": 0.3703,
+   "items_per_s": 139.7
+  },
+  "indic_breakdown": {
+   "cat:appointment": {
+    "n": 8,
+    "acc": 0.25
+   },
+   "cat:bank_security": {
+    "n": 9,
+    "acc": 0.722
+   },
+   "cat:bank_txn_alert": {
+    "n": 9,
+    "acc": 0.556
+   },
+   "cat:college_notice": {
+    "n": 10,
+    "acc": 0.8
+   },
+   "cat:courier_customs": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:credit_card_reward": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:crypto_investment": {
+    "n": 9,
+    "acc": 0.889
+   },
+   "cat:delivery_update": {
+    "n": 9,
+    "acc": 0.611
+   },
+   "cat:digital_arrest": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:electricity_disconnection": {
+    "n": 7,
+    "acc": 0.929
+   },
+   "cat:employment_notice": {
+    "n": 8,
+    "acc": 0.688
+   },
+   "cat:fake_customer_care": {
+    "n": 10,
+    "acc": 0.85
+   },
+   "cat:fake_job_task": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:family_chat": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:govt_notice": {
+    "n": 8,
+    "acc": 0.5
+   },
+   "cat:insurance_reminder": {
+    "n": 10,
+    "acc": 0.3
+   },
+   "cat:kyc_update": {
+    "n": 9,
+    "acc": 0.778
+   },
+   "cat:loan_app": {
+    "n": 10,
+    "acc": 0.9
+   },
+   "cat:lottery_kbc": {
+    "n": 7,
+    "acc": 0.714
+   },
+   "cat:otp_theft": {
+    "n": 7,
+    "acc": 0.714
+   },
+   "cat:parcel_pickup": {
+    "n": 8,
+    "acc": 0.438
+   },
+   "cat:promo_legit": {
+    "n": 9,
+    "acc": 0.0
+   },
+   "cat:real_otp": {
+    "n": 9,
+    "acc": 0.944
+   },
+   "cat:refund_tax": {
+    "n": 10,
+    "acc": 0.8
+   },
+   "cat:sextortion_threat": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:sim_block": {
+    "n": 9,
+    "acc": 0.889
+   },
+   "cat:subscription_receipt": {
+    "n": 8,
+    "acc": 0.438
+   },
+   "cat:telecom_recharge": {
+    "n": 9,
+    "acc": 0.222
+   },
+   "cat:transit_update": {
+    "n": 8,
+    "acc": 0.188
+   },
+   "cat:upi_collect_request": {
+    "n": 7,
+    "acc": 0.857
+   },
+   "cat:upi_credit_alert": {
+    "n": 8,
+    "acc": 0.875
+   },
+   "cat:utility_bill_legit": {
+    "n": 10,
+    "acc": 0.2
+   },
+   "hard:False": {
+    "n": 107,
+    "acc": 0.631
+   },
+   "hard:True": {
+    "n": 173,
+    "acc": 0.728
+   },
+   "lang:en": {
+    "n": 165,
+    "acc": 0.733
+   },
+   "lang:hi": {
+    "n": 28,
+    "acc": 0.464
+   },
+   "lang:hinglish": {
+    "n": 75,
+    "acc": 0.673
+   },
+   "lang:mixed": {
+    "n": 12,
+    "acc": 0.75
+   }
+  },
+  "flow": {
+   "f1": 0.8034,
+   "precision": 0.9699,
+   "recall": 0.6857,
+   "fpr": 0.0281,
+   "invalid": 0,
+   "n": 22544,
+   "score": 0.7306,
+   "items_per_s": 6917.5
+  }
+ },
+ "explanation": {
+  "n": 28,
+  "valid": 28,
+  "llm_plausible": 28,
+  "check_rates": {
+   "verdict": 0.682,
+   "mention": 0.357,
+   "forbidden": 0.929,
+   "fabrication": 1.0,
+   "actions": 0.929,
+   "length": 0.929
+  },
+  "by_kind": {
+   "sms": 0.752,
+   "url": 0.763,
+   "flow": 0.672,
+   "injection": 0.79
+  }
+ },
+ "performance": {
+  "explain_s_per_item": 7.78,
+  "explain_wall_s": [
+   208.852,
+   217.725
+  ],
+  "peak_rss_gb": 2.22,
+  "detector_ms_per_item": 0.376,
+  "size_gb": 1.184,
+  "parts": {
+   "explain_latency": 0.408,
+   "peak_rss": 0.39,
+   "detector_latency": 1.0,
+   "size": 0.68
+  },
+  "llm_median": {
+   "prompt_tokens": 196,
+   "generated_tokens": 79,
+   "prefill_tps": 85.7988,
+   "decode_tps": 19.209
+  }
+ },
+ "compliance": {
+  "gate": {
+   "llama_family": true,
+   "executorch_pte_loaded": true,
+   "llm_stats_plausible": true,
+   "pass": true
+  },
+  "parts": {
+   "offline": 1.0,
+   "tests": 1.0,
+   "app": 1.0,
+   "docs": 0.5
+  },
+  "net_violations": 0,
+  "file_violations": 0
+ }
+}
