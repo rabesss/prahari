@@ -38,3 +38,4 @@ One line per `bin/eval` run (appended automatically). Add a short note after a l
 - 20261109-203912 `indic31-full-utility` score=86.23 D=0.9144 E=0.8129 P=0.6736 C=1.0 fail=0 quick=False
 - 20261109-204514 `indic32-full-verdictpin` score=86.06 D=0.9144 E=0.8057 P=0.6741 C=1.0 fail=0 quick=False
 - Final recommendation: `candidates/indic1`, full run `20261109-203912-indic31-full-utility` score=86.23. The 86.06 verdict-pin run was reverted; prompt and candidate are back to the 86.23 configuration. See research/REPORT.md.
+- 20261109-205138 `final-verify` score=84.4 D=0.9144 E=0.7738 P=0.6313 C=1.0 fail=0 quick=True
