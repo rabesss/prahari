@@ -73,8 +73,10 @@ size 1.184 GB, prompt 177 tokens median, decode 19.9 tok/s. Documentation rewrit
 - **P0 — explanation mentions**: only 35.7% of hidden explanations contain a required mention.
   Flow and URL items are weakest (by-kind 0.672 / 0.730). The prompt now carries concrete flow
   counts/IPs and URL domain+TLD; needs a full eval to confirm.
-- **P1 — flow detection**: NSL-KDD F1 0.8034, no KDDTest+ labels used. Feature-engineered tree
-  models are the obvious next step if time allows.
+- **P1 — flow detection**: hidden NSL-KDD (KDDTest+) F1 is 0.8034, while the visible dev split scores
+  0.9988. The dev split shares the KDDTrain+ distribution, so it cannot measure the real shift and its
+  labels cannot guide adaptation. KDDTest+ labels are hidden, so no verifiable tuning lever was
+  available in this round; a labelled shifted validation set is the prerequisite for flow work.
 - **P2 — latency**: 4.77 s/item. Each 10 prompt tokens ~0.12 s; generation ~20 tok/s. Further
   gains need a shorter system prompt without reintroducing refusals, or fewer evidence phrases.
 

@@ -15,4 +15,7 @@ One line per `bin/eval` run (appended automatically). Add a short note after a l
 - 20261109-194815 `indic10-receipts` score=82.64 D=0.8537 E=0.7738 P=0.634 C=1.0 fail=0 quick=True
 - 20261109-194946 `indic11-clear` score=81.73 D=0.8539 E=0.7738 P=0.5885 C=1.0 fail=0 quick=True
 - 20261109-195205 `indic12-final` score=84.36 D=0.8537 E=0.8129 P=0.6711 C=1.0 fail=0 quick=False
+  best submission candidate: docs rewrite lifted C 0.80 -> 1.00; prompt and rule changes below.
+- 20261109-195553 `indic13-type-first` score=84.15 D=0.8537 E=0.8129 P=0.6608 C=1.0 fail=0 quick=False
+  type-first prompt left E unchanged and cost latency; reverted, indic12 is the shipped state.
 - 20261109-195553 `indic13-type-first` score=84.15 D=0.8537 E=0.8129 P=0.6608 C=1.0 fail=0 quick=False
