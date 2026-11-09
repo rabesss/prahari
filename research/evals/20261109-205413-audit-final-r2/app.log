@@ -1,0 +1,1 @@
+[{"verdict": "malicious", "score": 0.9397, "evidence": ["threatens to block, cut or suspend an account, SIM, connection or bill", "asks you to verify or update personal, PAN or KYC details", "the domain sbi-kyc.in-verify.top imitates 'sbi' and uses .top, a throwaway registry"]}, {"verdict": "benign", "score": 0.2656, "evidence": ["the domain irctc.co.in is an official domain"]}]

@@ -39,11 +39,12 @@ and tokenizer. Evaluation used the controller's `bin/eval` proxy only.
 
 ## Results
 
-The best full proxy run scored **86.23** (D 0.9144, E 0.8129, P 0.6736, C 1.0). Detection: SMS
-F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0), indic F1 0.967 (FPR 0.0071, no penalty), flow F1
-0.8265 (FPR 0.0299, penalised score 0.7444). Explanation checks on 28 items: 28 valid, verdict
-0.829, mention 0.357, forbidden 1.0, fabrication 1.0, actions 0.929, length 1.0. The starting
-baseline scored 69.33. The Indian-context rule layer lifted indic F1 from 0.7406 to 0.967 without
+The authoritative two-repeat proxy run scored **85.84** (D 0.9144, E 0.8129, P 0.6541, C 1.0);
+the same tree scored 86.23 in a single-repeat run, the difference being the slower of the two
+latency repeats (5.06 s vs 4.75 s). Detection: SMS F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0),
+indic F1 0.967 (FPR 0.0071, no penalty), flow F1 0.8265 (FPR 0.0299, penalised score 0.7444).
+Explanation checks on 28 items: 28 valid, verdict 0.829, mention 0.357, forbidden 1.0, fabrication
+1.0, actions 0.929, length 1.0. The starting baseline scored 69.33. The Indian-context rule layer lifted indic F1 from 0.7406 to 0.967 without
 regressing English SMS. Two decision-policy changes mattered: a routine utility-bill gate that
 treats plain-host reminders with no threat or secret request as genuine (cutting indic FPR from
 3.57% to 0.71%), and a flow threshold of 0.10 that catches more KDDTest+ attacks while keeping FPR
@@ -51,11 +52,12 @@ near 3%.
 
 ## Performance on Arm
 
-Measured by `bin/eval` on the Oracle A1 host (2× Neoverse-N1, about 11 GB RAM): explanation latency
-4.75 s per item for the full 28-item set, peak RSS 2.211 GB, decode 20.2 tokens/s, prefill about
-83.6 tokens/s, median prompt 177 tokens and 39 generated tokens. Detector latency is 0.376 ms per
-item, and the candidate bundle (code plus model artifacts) is 1.184 GB including the shared 1.1 GB
-Llama PTE. The UI and CLI run offline; no network calls are made after import.
+Measured by `bin/eval --repeats 2` on the Oracle A1 host (2× Neoverse-N1, about 11 GB RAM):
+explanation latency 5.06 s per item over two repeats (4.75 s in the single-repeat run), peak RSS
+2.210 GB, decode 20.2 tokens/s, prefill about 84.9 tokens/s, median prompt 177 tokens and 39
+generated tokens. Detector latency is 0.376 ms per item, and the candidate bundle (code plus model
+artifacts) is 1.184 GB including the shared 1.1 GB Llama PTE. The UI and CLI run offline; no
+network calls are made after import.
 
 ## Limitations
 

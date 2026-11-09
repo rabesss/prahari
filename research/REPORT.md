@@ -2,23 +2,27 @@
 
 ## Current best
 
-**Candidate:** `candidates/indic1` (the only promoted candidate; `candidates/BEST` is the 69.33
-baseline and must not be edited in place).
+**Candidate:** `candidates/indic1` (the best candidate; `candidates/BEST` is the 69.33 baseline
+and must not be edited in place).
 
-**Full `bin/eval` proxy:** **86.23** — D 0.9144, E 0.8129, P 0.6736, C 1.0, promotable, no
-failures or infra errors. Evidence: `research/evals/20261109-203912-indic31-full-utility/`.
+**Full `bin/eval` proxy (`--repeats 2`):** **85.84** — D 0.9144, E 0.8129, P 0.6541, C 1.0,
+promotable, no failures or infra errors. Evidence:
+`research/evals/20261109-205413-audit-final-r2/`. A single-repeat full run of the same tree scored
+86.23 (P 0.6736, 4.75 s/item); the 0.39 gap is the slower of the two latency repeats (5.06 s),
+inside the brief's noise band.
 
 | Run | Score | D | E | P | C |
 |---|---|---|---|---|---|
 | baseline `BEST` | 69.33 | 0.6720 | 0.7511 | 0.5195 | 0.80 |
 | rule layer (`indic16-full`) | 84.36 | 0.8563 | 0.8129 | 0.6673 | 1.00 |
-| utility gate + flow 0.10 (`indic31-full-utility`) | **86.23** | **0.9144** | **0.8129** | **0.6736** | **1.00** |
+| utility gate + flow 0.10, single (`indic31-full-utility`) | 86.23 | 0.9144 | 0.8129 | 0.6736 | 1.00 |
+| same tree, authoritative two repeats (`audit-final-r2`) | **85.84** | **0.9144** | **0.8129** | **0.6541** | **1.00** |
 
 Detection at the current best: SMS F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0), indic F1 0.967
 (FPR 0.0071, no penalty), flow F1 0.8265 (FPR 0.0299, penalised score 0.7444). Explanation on 28
 items: 28 valid and plausible, verdict 0.829, mention 0.357, forbidden 1.0, fabrication 1.0,
-actions 0.929, length 1.0. Performance: 4.75 s/item, peak RSS 2.211 GB, decode 20.2 tok/s, prefill
-83.6 tok/s, detector 0.376 ms/item, bundle 1.184 GB.
+actions 0.929, length 1.0. Performance: 5.06 s/item over two repeats (4.75 single), peak RSS 2.210
+GB, decode 20.2 tok/s, prefill 84.9 tok/s, detector 0.376 ms/item, bundle 1.184 GB.
 
 ## What worked
 
@@ -67,15 +71,16 @@ actions 0.929, length 1.0. Performance: 4.75 s/item, peak RSS 2.211 GB, decode 2
 - **P1 — flow distribution shift.** F1 0.8265 with FPR 2.99% costs about 9% through the FPR
   penalty. More feature engineering or class weighting could help, but every change needs a full
   eval because precision is already 0.97.
-- **P2 — latency and memory.** 4.75 s/item and 2.211 GB peak RSS on 2× Neoverse-N1. Re-measure on
-  the actual demo hardware (Pi 5 or phone) before the live demo; the bundle includes the shared
-  1.1 GB Llama PTE.
-- **P2 — docs must track the final run.** Candidate REPORT/README currently quote 86.23; update
-  them if the owner runs a different final eval.
+- **P2 — latency and memory.** 5.06 s/item over two repeats (4.75 single) and 2.210 GB peak RSS on
+  2× Neoverse-N1. Re-measure on the actual demo hardware (Pi 5 or phone) before the live demo; the
+  bundle includes the shared 1.1 GB Llama PTE.
+- **P2 — docs must track the final run.** Candidate REPORT/README currently quote the two-repeat
+  result (85.84, single 86.23); update them if the owner runs a different final eval.
 
 ## Evidence paths
 
-- Best full run: `research/evals/20261109-203912-indic31-full-utility/` (summary, details, logs).
+- Authoritative two-repeat run: `research/evals/20261109-205413-audit-final-r2/`.
+- Best single-repeat run: `research/evals/20261109-203912-indic31-full-utility/`.
 - Rule-layer full run: `research/evals/20261109-200745-indic16-full/`.
 - Baseline: `research/evals/20261109-183806-baseline/`.
 - Flow threshold trials: `research/evals/20261109-201032-indic17-flow040/`,
@@ -88,7 +93,8 @@ actions 0.929, length 1.0. Performance: 4.75 s/item, peak RSS 2.211 GB, decode 2
 
 ## Recommendation and submission steps
 
-Submit **`candidates/indic1`** (86.23 full proxy), not the 69.33 `candidates/BEST`.
+Submit **`candidates/indic1`** (85.84 two-repeat proxy, 86.23 single), not the 69.33
+`candidates/BEST`.
 
 1. Copy the candidate tree to the submission repo root so that `bin/predict`, `bin/explain`,
    `bin/app`, `triage/`, `app/`, `artifacts/`, `tests/`, `config.json`, `train.py`, `README.md`,

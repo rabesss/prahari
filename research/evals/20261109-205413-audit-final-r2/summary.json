@@ -1,0 +1,29 @@
+{
+ "label": "audit-final-r2",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-205413",
+ "artifacts": "research/evals/20261109-205413-audit-final-r2",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 85.84,
+ "scores": {
+  "D": 0.9144,
+  "E": 0.8129,
+  "P": 0.6541,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.967,
+  "indic_fpr": 0.0071,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.06,
+  "peak_rss_gb": 2.21,
+  "decode_tps": 20.2387,
+  "model": "llama32-1b-qlora"
+ }
+}
