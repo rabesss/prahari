@@ -7,7 +7,7 @@ __pycache__/
 *.pte
 *.bin
 *.safetensors
-# trained artifacts are rebuilt by candidates/*/train.py
+# candidates rebuild artifacts with train.py; BEST and indic1 ship built joblib for reproducible submission
 candidates/*/artifacts/*.joblib
 !candidates/BEST/artifacts/*.joblib
 !candidates/indic1/artifacts/*.joblib

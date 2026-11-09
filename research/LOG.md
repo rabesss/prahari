@@ -18,4 +18,3 @@ One line per `bin/eval` run (appended automatically). Add a short note after a l
   best submission candidate: docs rewrite lifted C 0.80 -> 1.00; prompt and rule changes below.
 - 20261109-195553 `indic13-type-first` score=84.15 D=0.8537 E=0.8129 P=0.6608 C=1.0 fail=0 quick=False
   type-first prompt left E unchanged and cost latency; reverted, indic12 is the shipped state.
-- 20261109-195553 `indic13-type-first` score=84.15 D=0.8537 E=0.8129 P=0.6608 C=1.0 fail=0 quick=False

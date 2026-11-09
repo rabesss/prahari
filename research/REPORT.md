@@ -23,8 +23,9 @@ size 1.184 GB, prompt 177 tokens median, decode 19.9 tok/s. Documentation rewrit
    (OTP/PIN demand, UPI collect pressure, KYC threat, fake authority, prize, job/task, screen share)
    plus protection mechanics genuine alerts use ("never ask for OTP", "no fee is needed", official
    app pointer, routine receipt/bill wording). Combined with the SMS TF-IDF probability this moved
-   indic F1 from 0.7406 to 0.9455 (FPR 0.5% -> 3.57%) with no English SMS regression (0.9601 ->
-   0.9613).
+   indic F1 from 0.7406 to 0.9455 with no English SMS regression (0.9601 -> 0.9613). The trade is
+   explicit: FPR rose from 0.57% to 3.57%, which the proxy's per-point penalty turns into a 13% cut
+   on the indic F1; indic's 0.40 weight still makes the move strongly net-positive.
 2. **Injection detection** for the explain task's `injection` kind: explicit instruction-override
    patterns classify it as malicious with a named reason.
 3. **Compact, protective Llama prompt**: system prompt keeps the "cautious cyber-safety assistant
@@ -71,8 +72,9 @@ size 1.184 GB, prompt 177 tokens median, decode 19.9 tok/s. Documentation rewrit
   the per-point penalty. 5 of 140 benign messages are flagged. Remaining headroom is larger than
   any latency win.
 - **P0 — explanation mentions**: only 35.7% of hidden explanations contain a required mention.
-  Flow and URL items are weakest (by-kind 0.672 / 0.730). The prompt now carries concrete flow
-  counts/IPs and URL domain+TLD; needs a full eval to confirm.
+  Flow and URL items are weakest (by-kind 0.672 / 0.730). The prompt carries concrete flow counts/IPs
+  and URL domain+TLD; indic12-final ran with them and E/mention were unchanged (0.8129 / 0.357), so
+  the remaining mention gap is model behaviour, not missing evidence.
 - **P1 — flow detection**: hidden NSL-KDD (KDDTest+) F1 is 0.8034, while the visible dev split scores
   0.9988. The dev split shares the KDDTrain+ distribution, so it cannot measure the real shift and its
   labels cannot guide adaptation. KDDTest+ labels are hidden, so no verifiable tuning lever was
