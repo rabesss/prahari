@@ -25,6 +25,6 @@ Python 3.12 venv with `executorch==1.6.0`, `torch` (CPU), `scikit-learn`, `panda
 Model files are not in git. See DATA.md for the download commands and licences.
 
 ## Results
-`bin/eval` proxy: **79.36** (D 0.8537, E 0.8129, P 0.6713, C 0.80). SMS F1 0.9613, URL F1 0.9949,
-indic F1 0.9455 (FPR 0.0357), flow F1 0.8034. Explanation: 4.77 s/item, 2.219 GB peak RSS, 19.9
+`bin/eval` proxy: **86.23** (D 0.9144, E 0.8129, P 0.6736, C 1.0). SMS F1 0.9613, URL F1 0.9949,
+indic F1 0.967 (FPR 0.0071), flow F1 0.8265. Explanation: 4.75 s/item, 2.211 GB peak RSS, 20.2
 decode tokens/s on 2× Neoverse-N1. See REPORT.md for the full table and limitations.

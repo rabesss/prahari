@@ -39,28 +39,34 @@ and tokenizer. Evaluation used the controller's `bin/eval` proxy only.
 
 ## Results
 
-The best full proxy run scored **79.36** (D 0.8537, E 0.8129, P 0.6713, C 0.80). Detection: SMS
-F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0), indic F1 0.9455 (FPR 0.0357, penalised score
-0.8239), flow F1 0.8034. Explanation checks on 28 items: 28 valid, verdict 0.829, mention 0.357,
-forbidden 1.0, fabrication 1.0, actions 0.929, length 1.0. The starting baseline scored 69.33. The
-Indian-context rule layer lifted indic F1 from 0.7406 to 0.9455 without regressing English SMS.
+The best full proxy run scored **86.23** (D 0.9144, E 0.8129, P 0.6736, C 1.0). Detection: SMS
+F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0), indic F1 0.967 (FPR 0.0071, no penalty), flow F1
+0.8265 (FPR 0.0299, penalised score 0.7444). Explanation checks on 28 items: 28 valid, verdict
+0.829, mention 0.357, forbidden 1.0, fabrication 1.0, actions 0.929, length 1.0. The starting
+baseline scored 69.33. The Indian-context rule layer lifted indic F1 from 0.7406 to 0.967 without
+regressing English SMS. Two decision-policy changes mattered: a routine utility-bill gate that
+treats plain-host reminders with no threat or secret request as genuine (cutting indic FPR from
+3.57% to 0.71%), and a flow threshold of 0.10 that catches more KDDTest+ attacks while keeping FPR
+near 3%.
 
 ## Performance on Arm
 
 Measured by `bin/eval` on the Oracle A1 host (2× Neoverse-N1, about 11 GB RAM): explanation latency
-4.77 s per item for the full 28-item set, peak RSS 2.219 GB, decode 19.9 tokens/s, prefill about
-84.7 tokens/s, median prompt 176 tokens and 39 generated tokens. Detector latency is 0.376 ms per
+4.75 s per item for the full 28-item set, peak RSS 2.211 GB, decode 20.2 tokens/s, prefill about
+83.6 tokens/s, median prompt 177 tokens and 39 generated tokens. Detector latency is 0.376 ms per
 item, and the candidate bundle (code plus model artifacts) is 1.184 GB including the shared 1.1 GB
 Llama PTE. The UI and CLI run offline; no network calls are made after import.
 
 ## Limitations
 
 The 1B model sometimes paraphrases instead of naming a required concept, so mention coverage is
-35.7%; a larger model or a grounded template would help. Indic FPR is 3.57% on hard negatives, mostly
-bank-security and crypto-benign messages, and costs about 13% of indic F1 through the proxy penalty.
-Flow detection uses KDDTrain+ only, so the real KDDTest+ distribution shift leaves F1 at 0.8034.
-Rules cover English, Hindi and Hinglish patterns, not every Indic script. The explanation model can
-still produce a wrong detail; deterministic guards catch fabricated domains and long numbers.
+35.7%; a larger model or a grounded template would help. Indic FPR is now 0.71%, but Hindi recall
+remains weak (0.679 accuracy on the 28 Hindi rows) and bank-security, KYC and refund scams still
+miss about two rows each. The utility gate deliberately treats a plain-host reminder with no threat
+or secret request as routine; a scam that avoids threat words and uses a plain domain can still
+pass. Flow detection uses KDDTrain+ only, so the KDDTest+ shift leaves F1 at 0.8265. Rules cover
+English, Hindi and Hinglish patterns, not every Indic script. The explanation model can still
+produce a wrong detail; deterministic guards catch fabricated domains and long numbers.
 
 ## Responsible AI, privacy and safety
 

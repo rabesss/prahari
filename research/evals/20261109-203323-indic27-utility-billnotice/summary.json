@@ -1,0 +1,29 @@
+{
+ "label": "indic27-utility-billnotice",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-203323",
+ "artifacts": "research/evals/20261109-203323-indic27-utility-billnotice",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 82.62,
+ "scores": {
+  "D": 0.8598,
+  "E": 0.7738,
+  "P": 0.6241,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9531,
+  "indic_fpr": 0.0357,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.58,
+  "peak_rss_gb": 2.21,
+  "decode_tps": 20.5263,
+  "model": "llama32-1b-qlora"
+ }
+}

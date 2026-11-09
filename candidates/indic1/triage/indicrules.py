@@ -29,6 +29,10 @@ REQUESTS = [
      r"\s*(fee|charge|amount|cost)|(processing|registration|verification|activation|shipping|customs|"
      r"delivery|release|reset)[^.;!?।\n]{0,12}(rs\.?|₹|inr|\d)"
      r"|(rs\.?|₹|inr)\s?\d[^.;!?।\n]{0,25}(fee|charge|deposit|registration|shipping|customs)"
+     r"|(?:₹|rs\.?|inr)\s?\d{1,7}[^.;!?।\n]{0,40}"
+     r"\b(pay|paid|bhej\w*|jama\w*|transfer|deposit)\b"
+     r"|\b(pay|bhej\w*|jama\w*|transfer)\b[^.;!?।\n]{0,20}"
+     r"\b(karo|kare|karke|kar do|kar dena|dena|do)\b"
      r"|collect request|कलेक्ट अनुरोध|भुगतान अनुरोध|अनुरोध स्वीकार|outstanding (balance|amount|dues)",
      "asks you to pay or approve a money request"),
     ("block_threat",
@@ -38,7 +42,9 @@ REQUESTS = [
      r"खाता|सिम|सेवा|बिजली)\b"
      r"|\b(account|sim|card|connection|number|electricity|power|bill|खाता|सिम|बिजली)\b"
      r"[^.;!?।\n]{0,50}(will be|ho gaya|हो जाएगा|हो गया|हो रहा|हो गई)[^.;!?।\n]{0,30}"
-     r"(block|cut|suspend|deactiv\w*|disconnect\w*|closed|reject\w*|बंद|निलंबित)",
+     r"(block|cut|suspend|deactiv\w*|disconnect\w*|closed|reject\w*|बंद|निलंबित)"
+     r"|\b(account|card|sim|service|connection|number|खाता|सिम|कार्ड)\b"
+     r"[^.;!?।\n]{0,20}\b(block|blocked|band|बंद)\b",
      "threatens to block, cut or suspend an account, SIM, connection or bill"),
     ("collect_pressure",
      r"(collect request|कलेक्ट अनुरोध|payment request|भुगतान अनुरोध|request awaits approval|"
@@ -85,7 +91,8 @@ REQUESTS = [
      "asks you to open a link or fill a form"),
     ("verify_details",
      r"\bkyc\b|सत्यापन|सत्यापित|\bverify (your|the|account|investment|details)\b|\bverification\b|"
-     r"अपडेट|update (your|the) (details|account|kyc|sim|pan)|pan card|aadhaar|itr",
+     r"अपडेट|update (your|the) (details|account|kyc|sim|pan)|pan card|aadhaar|itr|"
+     r"details (update|verify|verification)|detail update",
      "asks you to verify or update personal, PAN or KYC details"),
     ("new_number",
      r"\b(call|contact|whatsapp|sampark|संपर्क)\b[^.;!?।\n]{0,30}(\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}",
@@ -221,6 +228,21 @@ def indicators(text):
     strong = strong or ("prize_offer" in names and "click_link" in names)
     strong = strong or ("new_number" in names and
                         bool(names & {"money_request", "prize_offer", "click_link", "verify_details"}))
+    strong = strong or ("money_request" in names and re.search(r"parcel|customs|पार्सल|कस्टम", t)
+                        and not official_host)
+    if re.search(r"[\u0900-\u097F]", t):
+        strong = strong or ("verify_details" in names and
+                            bool(names & {"urgency", "block_threat", "keep_access", "new_number"}))
+    if (re.search(r"\b(bill|electricity|water|gas|broadband|consumer|autopay)\b", t)
+            and _hosts(t) and not risky_host
+            and not (names & {"block_threat", "urgency", "verify_details", "secret_request",
+                              "collect_pressure", "new_number", "screen_share", "authority_threat"})
+            and not re.search(r"\b(block|blocked|disconnect\w*|cut[- ]?off|suspend\w*|deactivat\w*|"
+                              r"verify|kyc|otp|pin|cvv|password)\b", t)):
+        # A plain-host utility message with no threat, no secret request and no deadline
+        # reads like a routine reminder, not a disconnection scam.
+        strong = bool(names & STRONG)
+        prot = max(prot, 0.8)
     return ev, score, prot, strong
 
 

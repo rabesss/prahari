@@ -1,0 +1,254 @@
+{
+ "detection": {
+  "sms": {
+   "f1": 0.9587,
+   "precision": 0.9712,
+   "recall": 0.9464,
+   "fpr": 0.0057,
+   "invalid": 0,
+   "n": 1162,
+   "score": 0.9587,
+   "items_per_s": 463.7
+  },
+  "url": {
+   "f1": 0.9949,
+   "precision": 1.0,
+   "recall": 0.9899,
+   "fpr": 0.0,
+   "invalid": 0,
+   "n": 7997,
+   "score": 0.9949,
+   "items_per_s": 2662.1
+  },
+  "indic": {
+   "f1": 0.9493,
+   "precision": 0.9632,
+   "recall": 0.9357,
+   "fpr": 0.0357,
+   "invalid": 0,
+   "n": 280,
+   "score": 0.8272,
+   "items_per_s": 139.8
+  },
+  "indic_breakdown": {
+   "cat:appointment": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:bank_security": {
+    "n": 9,
+    "acc": 0.778
+   },
+   "cat:bank_txn_alert": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:college_notice": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:courier_customs": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:credit_card_reward": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:crypto_investment": {
+    "n": 9,
+    "acc": 0.889
+   },
+   "cat:delivery_update": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:digital_arrest": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:electricity_disconnection": {
+    "n": 7,
+    "acc": 1.0
+   },
+   "cat:employment_notice": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:fake_customer_care": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:fake_job_task": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:family_chat": {
+    "n": 9,
+    "acc": 0.889
+   },
+   "cat:govt_notice": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:insurance_reminder": {
+    "n": 10,
+    "acc": 1.0
+   },
+   "cat:kyc_update": {
+    "n": 9,
+    "acc": 0.778
+   },
+   "cat:loan_app": {
+    "n": 10,
+    "acc": 0.9
+   },
+   "cat:lottery_kbc": {
+    "n": 7,
+    "acc": 1.0
+   },
+   "cat:otp_theft": {
+    "n": 7,
+    "acc": 1.0
+   },
+   "cat:parcel_pickup": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:promo_legit": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:real_otp": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:refund_tax": {
+    "n": 10,
+    "acc": 0.8
+   },
+   "cat:sextortion_threat": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:sim_block": {
+    "n": 9,
+    "acc": 0.889
+   },
+   "cat:subscription_receipt": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:telecom_recharge": {
+    "n": 9,
+    "acc": 1.0
+   },
+   "cat:transit_update": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:upi_collect_request": {
+    "n": 7,
+    "acc": 1.0
+   },
+   "cat:upi_credit_alert": {
+    "n": 8,
+    "acc": 1.0
+   },
+   "cat:utility_bill_legit": {
+    "n": 10,
+    "acc": 0.6
+   },
+   "hard:False": {
+    "n": 107,
+    "acc": 0.981
+   },
+   "hard:True": {
+    "n": 173,
+    "acc": 0.931
+   },
+   "lang:en": {
+    "n": 165,
+    "acc": 0.97
+   },
+   "lang:hi": {
+    "n": 28,
+    "acc": 0.679
+   },
+   "lang:hinglish": {
+    "n": 75,
+    "acc": 1.0
+   },
+   "lang:mixed": {
+    "n": 12,
+    "acc": 1.0
+   }
+  },
+  "flow": {
+   "f1": 0.8265,
+   "precision": 0.9696,
+   "recall": 0.7202,
+   "fpr": 0.0299,
+   "invalid": 0,
+   "n": 22544,
+   "score": 0.7444,
+   "items_per_s": 7497.2
+  }
+ },
+ "explanation": {
+  "n": 8,
+  "valid": 8,
+  "llm_plausible": 8,
+  "check_rates": {
+   "verdict": 0.662,
+   "mention": 0.25,
+   "forbidden": 1.0,
+   "fabrication": 1.0,
+   "actions": 0.875,
+   "length": 1.0
+  },
+  "by_kind": {
+   "sms": 0.775,
+   "url": 0.695,
+   "flow": 0.4,
+   "injection": 1.0
+  }
+ },
+ "performance": {
+  "explain_s_per_item": 5.84,
+  "explain_wall_s": [
+   46.751
+  ],
+  "peak_rss_gb": 2.21,
+  "detector_ms_per_item": 0.376,
+  "size_gb": 1.184,
+  "parts": {
+   "explain_latency": 0.586,
+   "peak_rss": 0.395,
+   "detector_latency": 1.0,
+   "size": 0.68
+  },
+  "llm_median": {
+   "prompt_tokens": 177,
+   "generated_tokens": 39,
+   "prefill_tps": 83.8196,
+   "decode_tps": 20.3975
+  }
+ },
+ "compliance": {
+  "gate": {
+   "llama_family": true,
+   "executorch_pte_loaded": true,
+   "llm_stats_plausible": true,
+   "pass": true
+  },
+  "parts": {
+   "offline": 1.0,
+   "tests": 1.0,
+   "app": 1.0,
+   "docs": 1.0
+  },
+  "net_violations": 0,
+  "file_violations": 0
+ }
+}

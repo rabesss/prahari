@@ -1,0 +1,29 @@
+{
+ "label": "indic21-flow010",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-201603",
+ "artifacts": "research/evals/20261109-201603-indic21-flow010",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 82.34,
+ "scores": {
+  "D": 0.8598,
+  "E": 0.7738,
+  "P": 0.6098,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9531,
+  "indic_fpr": 0.0357,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.83,
+  "peak_rss_gb": 2.213,
+  "decode_tps": 20.5047,
+  "model": "llama32-1b-qlora"
+ }
+}

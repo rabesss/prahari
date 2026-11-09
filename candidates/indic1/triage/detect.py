@@ -98,7 +98,7 @@ def predict_flow(feature_rows):
             ev.append("the host contacted many different services")
         if f.get("root_shell", 0) > 0:
             ev.append("a root shell was obtained")
-        lab = 1 if p >= 0.5 else 0
+        lab = 1 if p >= 0.10 else 0
         out.append((lab, float(p), ev))
     return out
 

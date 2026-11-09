@@ -1,0 +1,29 @@
+{
+ "label": "indic29-utility-txn",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-203609",
+ "artifacts": "research/evals/20261109-203609-indic29-utility-txn",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 81.34,
+ "scores": {
+  "D": 0.858,
+  "E": 0.7362,
+  "P": 0.6095,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9587,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9493,
+  "indic_fpr": 0.0357,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.84,
+  "peak_rss_gb": 2.21,
+  "decode_tps": 20.3975,
+  "model": "llama32-1b-qlora"
+ }
+}

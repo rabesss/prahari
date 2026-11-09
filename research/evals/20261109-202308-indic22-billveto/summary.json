@@ -1,0 +1,29 @@
+{
+ "label": "indic22-billveto",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-202308",
+ "artifacts": "research/evals/20261109-202308-indic22-billveto",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 82.4,
+ "scores": {
+  "D": 0.8598,
+  "E": 0.7738,
+  "P": 0.6132,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9531,
+  "indic_fpr": 0.0357,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.77,
+  "peak_rss_gb": 2.212,
+  "decode_tps": 20.4724,
+  "model": "llama32-1b-qlora"
+ }
+}

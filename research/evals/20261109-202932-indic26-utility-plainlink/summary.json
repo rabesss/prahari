@@ -1,0 +1,29 @@
+{
+ "label": "indic26-utility-plainlink",
+ "candidate": "candidates/indic1",
+ "stamp": "20261109-202932",
+ "artifacts": "research/evals/20261109-202932-indic26-utility-plainlink",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 84.55,
+ "scores": {
+  "D": 0.9144,
+  "E": 0.7738,
+  "P": 0.6388,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9613,
+  "url_f1": 0.9949,
+  "indic_f1": 0.967,
+  "indic_fpr": 0.0071,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.32,
+  "peak_rss_gb": 2.208,
+  "decode_tps": 20.155,
+  "model": "llama32-1b-qlora"
+ }
+}
