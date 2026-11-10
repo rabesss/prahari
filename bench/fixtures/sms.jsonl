@@ -1,0 +1,28 @@
+{"id": "sms-fixture-01", "input": "Your KYC expires tonight. Send your OTP to this number now.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-02", "input": "UPI refund pending: approve the collect request and enter your PIN.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-03", "input": "Electricity will be disconnected today; pay reconnection charge at power-update.example.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-04", "input": "Courier held at customs. Pay release fee using the link delivery-help.example.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-05", "input": "Police case registered, transfer money to this account to avoid arrest.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-06", "input": "You won a prize. Pay a processing fee before we release it.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-07", "input": "Install this remote access app so our bank agent can verify you.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-08", "input": "Your SIM will be blocked unless you share your Aadhaar and OTP now.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-09", "input": "Job offer: deposit a registration fee to begin paid tasks.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-10", "input": "Bank se bol rahe hain, apna OTP bhejo warna account band hoga.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-11", "input": "Bijli bill pending hai, turant personal UPI par payment karo.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-12", "input": "Courier release karne ke liye pehle customs fee bhejo.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-13", "input": "UPI cashback lene ke liye PIN batao aur collect approve karo.", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-14", "input": "आपका खाता बंद होगा, तुरंत अपना ओटीपी भेजें।", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-15", "input": "बिजली काटने से बचने के लिए इस लिंक पर भुगतान करें।", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-16", "input": "इनाम पाने के लिए पहले शुल्क जमा करें।", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "sms-fixture-17", "input": "Your login OTP is 458103. Never share it with anyone.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-18", "input": "INR 750 debited from your account. If unrecognised contact your bank using its official app.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-19", "input": "Your electricity bill is ready in the official utility app.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-20", "input": "Your parcel is ready for collection at the reception desk. No fee is due.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-21", "input": "Your KYC update is complete. We never request a PIN by message.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-22", "input": "Kal lunch ke liye ghar aa jana, train time bhej dena.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-23", "input": "आपका बिजली बिल तैयार है। भुगतान आधिकारिक ऐप से करें।", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-24", "input": "आपकी यात्रा कल सुबह सात बजे है।", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-25", "input": "Your appointment has moved to Friday afternoon.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-26", "input": "A new bank statement is available in your usual app.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-27", "input": "Limited offer at your local bakery this weekend.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "sms-fixture-28", "input": "Received your parcel, thank you for the book.", "expect": 0, "rationale": "Ordinary message or legitimate destination."}

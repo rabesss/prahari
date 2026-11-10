@@ -1,0 +1,879 @@
+{
+  "note": "Fixture gate flags are provisional: aarch64 confirmed; first x86 CI run must independently confirm before relying on them. Stress rows gate only if correct on reference.",
+  "fixtures": {
+    "flow.jsonl": {
+      "sha256": "8fafb54a501d3a7df7385cf03aa930521e42dc12d5964521cce50bfbf5254bb7",
+      "n": 6,
+      "rows": {
+        "flow-fixture-01": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "flow-fixture-02": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "flow-fixture-03": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "flow-fixture-04": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "flow-fixture-05": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "flow-fixture-06": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        }
+      }
+    },
+    "sms.jsonl": {
+      "sha256": "2226b48c0ddceccf49b6ef85efa6447f88d5e8b92cb91e92719ce63d95b63a5d",
+      "n": 28,
+      "rows": {
+        "sms-fixture-01": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-02": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-03": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-04": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-05": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-06": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-07": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-08": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-09": {
+          "expect": 1,
+          "prediction": 0,
+          "gate": false
+        },
+        "sms-fixture-10": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-11": {
+          "expect": 1,
+          "prediction": 0,
+          "gate": false
+        },
+        "sms-fixture-12": {
+          "expect": 1,
+          "prediction": 0,
+          "gate": false
+        },
+        "sms-fixture-13": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-14": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-15": {
+          "expect": 1,
+          "prediction": 0,
+          "gate": false
+        },
+        "sms-fixture-16": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "sms-fixture-17": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-18": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-19": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-20": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-21": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-22": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-23": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-24": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-25": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-26": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "sms-fixture-27": {
+          "expect": 0,
+          "prediction": "uncertain",
+          "gate": false
+        },
+        "sms-fixture-28": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        }
+      }
+    },
+    "url.jsonl": {
+      "sha256": "4343baf7fa803af0a40f0b50fe69e3cc10718c26f9a999b599692a7404db5b29",
+      "n": 24,
+      "rows": {
+        "url-fixture-01": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-02": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-03": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-04": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-05": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-06": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-07": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-08": {
+          "expect": 0,
+          "prediction": 1,
+          "gate": false
+        },
+        "url-fixture-09": {
+          "expect": 0,
+          "prediction": "uncertain",
+          "gate": false
+        },
+        "url-fixture-10": {
+          "expect": 0,
+          "prediction": 1,
+          "gate": false
+        },
+        "url-fixture-11": {
+          "expect": 0,
+          "prediction": 0,
+          "gate": true
+        },
+        "url-fixture-12": {
+          "expect": 0,
+          "prediction": 1,
+          "gate": false
+        },
+        "url-fixture-13": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-14": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-15": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-16": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-17": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-18": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-19": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-20": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-21": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-22": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-23": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        },
+        "url-fixture-24": {
+          "expect": 1,
+          "prediction": 1,
+          "gate": true
+        }
+      }
+    }
+  },
+  "stress": {
+    "hi_mix.jsonl": {
+      "sha256": "57b60c0df6c3781e05998e01fb77ce48836b57a8f36c8b6f4acd56e6d4a65748",
+      "n": 21,
+      "rows": {
+        "h01": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h02": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h03": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h04": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h05": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h06": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h07": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h08": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h09": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h10": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h11": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h12": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h13": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h14": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "h15": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "m01": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m02": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m03": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m04": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m05": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m06": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "mixed.jsonl": {
+      "sha256": "c1d6d5e94061323fc79587a2857929c8f65c51017db1afd1aa686e96e4faf13f",
+      "n": 30,
+      "rows": {
+        "b01": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b02": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b03": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b04": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b05": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b06": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b07": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b08": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b09": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b10": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b11": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b12": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b13": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b14": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b15": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b16": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b17": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b18": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b19": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b20": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "m01": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m02": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m03": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m04": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m05": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m06": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m07": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m08": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m09": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m10": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "protective.jsonl": {
+      "sha256": "ad3eb3b823955366983732c66c80390d5db43825333250eb6b5a6fd503cac558",
+      "n": 40,
+      "rows": {
+        "b01": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b02": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b03": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b04": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b05": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b06": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b07": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b08": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b09": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b10": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b11": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b12": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b13": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b14": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b15": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b16": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b17": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b18": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b19": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b20": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b21": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b22": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b23": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b24": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b25": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b26": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b27": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b28": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b29": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "b30": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "m31": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m32": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m33": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m34": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m35": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m36": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m37": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m38": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m39": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "m40": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        }
+      }
+    }
+  }
+}

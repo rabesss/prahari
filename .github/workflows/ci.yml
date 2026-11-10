@@ -1,0 +1,95 @@
+name: Detector regression
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install detector dependencies
+        run: python -m pip install -r bench/requirements-ci.txt
+      - name: Set interpreter
+        run: echo "HC_PY=$(command -v python)" >> "$GITHUB_ENV"
+      - name: Candidate tests
+        id: candidate
+        run: python -m pytest -q candidates/BEST/tests
+      - name: Scorer tests
+        id: scorer
+        if: always()
+        run: python eval/test_scorer.py
+      - name: Benchmark tests
+        id: tests
+        if: always()
+        run: python -m pytest -q bench/tests
+      - name: App selftest
+        id: selftest
+        if: always()
+        run: candidates/BEST/bin/app --selftest
+      - name: Fixture gate and detector smoke
+        id: fixtures
+        if: always()
+        run: set -o pipefail; python bench/gate.py | tee "$RUNNER_TEMP/fixtures.txt"
+      - name: Stress gate
+        id: stress
+        if: always()
+        run: set -o pipefail; python bench/stress.py | tee "$RUNNER_TEMP/stress.txt"
+      - name: Readiness heuristics
+        id: readiness
+        if: always()
+        run: set -o pipefail; python bench/readiness.py | tee "$RUNNER_TEMP/readiness.txt"
+      - name: Advisory disclosure audit
+        id: audit
+        if: always()
+        continue-on-error: true
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          set -o pipefail
+          if [ "$EVENT_NAME" = pull_request ]; then base="$PR_BASE"; else base="$PUSH_BASE"; fi
+          if [ "$base" = 0000000000000000000000000000000000000000 ]; then
+            echo 'Audit SKIPPED: no previous push SHA' | tee "$RUNNER_TEMP/audit.txt"
+          elif [ -z "$base" ]; then
+            echo 'Audit FAIL: range base unavailable' | tee "$RUNNER_TEMP/audit.txt"
+            exit 1
+          else
+            python bench/audit_push.py "$base" "$GITHUB_SHA" | tee "$RUNNER_TEMP/audit.txt"
+          fi
+      - name: Job summary
+        if: always()
+        env:
+          FIXTURES: ${{ steps.fixtures.outcome }}
+          STRESS: ${{ steps.stress.outcome }}
+          READINESS: ${{ steps.readiness.outcome }}
+          AUDIT: ${{ steps.audit.outcome }}
+        run: |
+          {
+            echo '| Check | Outcome |'
+            echo '|---|---|'
+            printf '| Fixtures | %s |\n' "$FIXTURES"
+            printf '| Stress | %s |\n' "$STRESS"
+            printf '| Readiness (heuristic) | %s |\n' "$READINESS"
+            printf '| Disclosure audit (advisory) | %s |\n' "$AUDIT"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload aggregate check logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detector-checks
+          path: |
+            ${{ runner.temp }}/fixtures.txt
+            ${{ runner.temp }}/stress.txt
+            ${{ runner.temp }}/readiness.txt
+            ${{ runner.temp }}/audit.txt
+          if-no-files-found: ignore

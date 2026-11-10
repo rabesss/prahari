@@ -1,0 +1,98 @@
+{
+  "title": "development split measurements (visible dev data; indic dev was used for tuning)",
+  "date": "2026-11-10",
+  "environment": "Arm cloud VM (Neoverse-N1)",
+  "candidate": "candidates/BEST",
+  "tasks": {
+    "sms": {
+      "BEST": {
+        "f1": 0.887,
+        "precision": 0.9623,
+        "recall": 0.8226,
+        "fpr": 0.0058,
+        "invalid": 0,
+        "n": 607,
+        "score": 0.887,
+        "wall_s": 3.228,
+        "peak_rss_mb": 219.7,
+        "abstentions": 5,
+        "d_score": 0.887
+      },
+      "keyword": {
+        "f1": 0.3158,
+        "precision": 0.8571,
+        "recall": 0.1935,
+        "fpr": 0.0058,
+        "invalid": 0,
+        "n": 607,
+        "score": 0.3158,
+        "wall_s": 0.005,
+        "peak_rss_mb": 17.3,
+        "abstentions": 0,
+        "d_score": 0.3158
+      },
+      "note": "visible dev"
+    },
+    "indic": {
+      "BEST": {
+        "f1": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "fpr": 0.0,
+        "invalid": 0,
+        "n": 64,
+        "score": 1.0,
+        "wall_s": 2.759,
+        "peak_rss_mb": 218.7,
+        "abstentions": 0,
+        "d_score": 1.0
+      },
+      "keyword": {
+        "f1": 0.5946,
+        "precision": 0.5238,
+        "recall": 0.6875,
+        "fpr": 0.625,
+        "invalid": 0,
+        "n": 64,
+        "score": 0.2973,
+        "wall_s": 0.001,
+        "peak_rss_mb": 19.1,
+        "abstentions": 0,
+        "d_score": 0.2973
+      },
+      "note": "tuning set, optimistic"
+    },
+    "flow": {
+      "BEST": {
+        "f1": 0.9985,
+        "precision": 0.9975,
+        "recall": 0.9995,
+        "fpr": 0.0022,
+        "invalid": 0,
+        "n": 12700,
+        "score": 0.9985,
+        "wall_s": 2.476,
+        "peak_rss_mb": 227.7,
+        "abstentions": 0,
+        "d_score": 0.9985
+      },
+      "keyword": {
+        "f1": 0.7525,
+        "precision": 0.9831,
+        "recall": 0.6095,
+        "fpr": 0.0092,
+        "invalid": 0,
+        "n": 12700,
+        "score": 0.7525,
+        "wall_s": 0.032,
+        "peak_rss_mb": 112.9,
+        "abstentions": 0,
+        "d_score": 0.7525
+      },
+      "note": "visible dev"
+    }
+  },
+  "errors": {
+    "url": "invalid input IDs or file"
+  }
+}

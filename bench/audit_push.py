@@ -6,6 +6,7 @@
 import argparse
 from collections import deque
 import json
+import os
 import re
 import signal
 import subprocess
@@ -95,8 +96,8 @@ class Matcher:
 def hidden_matchers():
     # Only invoked by the controller. Missing or malformed input fails closed.
     root = Path('/var/tmp/arm-bharat-ai-soc-data/hidden')
-    paths = sorted(root.glob('*.jsonl'))
-    if not paths or not any('explain' in p.name for p in paths):
+    paths = [root / name for name in ('sms_test.jsonl', 'url_test.jsonl', 'indic_test.jsonl', 'flow_test.jsonl', 'explain_set.jsonl')]
+    if any(not path.is_file() for path in paths):
         raise ValueError('hidden check input unavailable')
     ids, texts = set(), set()
     for path in paths:
@@ -111,7 +112,7 @@ def hidden_matchers():
                     value = norm(row[key])
                     if len(value) >= 25: texts.add(value)
     if not ids or not texts: raise ValueError('hidden check input incomplete')
-    return Matcher(ids), Matcher(texts)
+    return Matcher(ids | texts)
 
 
 def main():
@@ -126,7 +127,8 @@ def main():
         if args.hidden_check:
             def timeout(_signum, _frame): raise TimeoutError('hidden check exceeded 10 minutes')
             signal.signal(signal.SIGALRM, timeout); signal.alarm(600)
-            ids, texts = hidden_matchers()
+            os.nice(10)
+            matcher = hidden_matchers()
         else: print('hidden check SKIPPED (allowlist mode)')
         failures = set(); artifacts = set(); seen = set(); blob_cache = {}; hidden_hits = set()
         for commit in commits:
@@ -162,7 +164,7 @@ def main():
                 if args.hidden_check:
                     try: decoded = data.decode('utf-8')
                     except UnicodeError: fail('hidden check undecodable text'); continue
-                    if ids.contains(decoded.lower()) or texts.contains(norm(decoded)): hidden_hits.add(path); fail('hidden-content match')
+                    if matcher.contains(decoded.lower()) or matcher.contains(norm(decoded)): hidden_hits.add(path); fail('hidden-content match')
         for path, oid, size in sorted(artifacts): print(f'ARTIFACT {path} blob={oid} bytes={size}')
         for path, rule in sorted(failures): print(f'FAIL {path}: {rule}')
         if args.hidden_check: print(f'hidden check: {len(hidden_hits)} matched paths')
