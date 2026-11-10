@@ -17,6 +17,8 @@ Run from the repo root:
 .venv/bin/python research/stress/loco.py     # leave-one-category-out on data/train+dev indic
 ```
 
-A row is wrong if the detector answers the opposite label or `uncertain`. The suites are small and
-hand-written; they do not replace the controller's hidden set, and results on them are reported as
-supporting evidence only.
+A row is wrong if the detector answers the opposite label or `uncertain`. The runner counts a malicious
+row answered `uncertain` as a miss, and a benign row answered `uncertain` as wrong but not a false alarm;
+`uncertain` is printed separately. This is stricter than `bin/eval`, where `uncertain` earns half credit,
+so the suite numbers are a lower bound on credit. The suites are small and hand-written; they do not
+replace the controller's hidden set, and results on them are reported as supporting evidence only.

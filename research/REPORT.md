@@ -76,7 +76,8 @@ points in total.
   0/10 false positives (`research/evals`-independent script in `research/stress/loco.py`).
 - **Blind paraphrase suites** (authored after the rules were frozen, never used for training):
   `protective` 40 cases, Hindi/Hinglish benign/scam 21, mixed English/Hindi 30. All correct on the final
-  tree. Suites and runner are in `research/stress/`.
+  tree. The runner counts `uncertain` as wrong for either label (stricter than `bin/eval`, where it earns
+  half credit); the final tree produced zero uncertain answers. Suites and runner are in `research/stress/`.
 - These suites deliberately use unseen wording ("nothing to pay", "no fee is charged", "रिफंड आ गया"),
   not slot swaps of set A.
 

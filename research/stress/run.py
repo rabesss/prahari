@@ -18,19 +18,30 @@ SUITES = ("protective.jsonl", "hi_mix.jsonl", "mixed.jsonl")
 for name in SUITES:
     rows = [json.loads(l) for l in open(Path(__file__).parent / name, encoding="utf-8") if l.strip()]
     res = detect.predict_text([r["text"] for r in rows])
-    tp = fp = tn = fn = 0
+    tp = fp = tn = fn = un_pos = un_ben = 0
     wrong = []
     for r, (lab, _, _) in zip(rows, res):
-        want, got = bool(r["label"]), lab == 1
-        if want and got:
-            tp += 1
-        elif want:
-            fn += 1
-            wrong.append(r["id"])
-        elif got:
-            fp += 1
-            wrong.append(r["id"])
+        want = bool(r["label"])
+        if want:
+            if lab == 1:
+                tp += 1
+            else:
+                fn += 1
+                if lab == "uncertain":
+                    un_pos += 1
+                wrong.append(r["id"])
         else:
-            tn += 1
-    print(f"{name:20s} F1={2 * tp / max(1, 2 * tp + fp + fn):.4f} "
-          f"recall={tp}/{tp + fn} false_pos={fp}/{fp + tn} wrong={wrong}")
+            if lab == 0:
+                tn += 1
+            elif lab == 1:
+                fp += 1
+                wrong.append(r["id"])
+            else:
+                # README: "uncertain" is a wrong answer on benign rows too, but it is not a
+                # false alarm; keep it out of fp and in the benign denominator.
+                un_ben += 1
+                wrong.append(r["id"])
+    benign = fp + tn + un_ben
+    print(f"{name:20s} F1={2 * tp / max(1, 2 * tp + fp + fn + un_pos):.4f} "
+          f"recall={tp}/{tp + fn + un_pos} false_pos={fp}/{benign} "
+          f"uncertain={un_pos + un_ben} wrong={wrong}")

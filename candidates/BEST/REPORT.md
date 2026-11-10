@@ -104,7 +104,9 @@ accuracy 0.875 on B.
   10/10, every benign category 0 false positives. This removes the "memorised set A wording"
   explanation.
 - **Three blind paraphrase suites** authored after the rules were frozen: 40 protective-clause
-  cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct. They use
+  cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct, with zero
+  `uncertain` answers (the runner counts `uncertain` as wrong for either label, stricter than
+  `bin/eval`'s half credit). They use
   unseen wording ("nothing to pay", "no fee is charged", "रिफंड आ गया", "running late by 15
   minutes"), not slot swaps. Sources and runner: `research/stress/` at the repo root.
 - **Flow signatures** fire on 75 of 74,112 normal train+dev rows (0.10%) and cover the

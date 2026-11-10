@@ -6,6 +6,8 @@
 | Mendeley SMS Phishing Dataset (5,971 msgs) | train/test (SMS) | CC BY 4.0 | https://data.mendeley.com/datasets/f45bkkt8pr |
 | PhiUSIIL Phishing URL Dataset | train/test (URLs) | CC BY 4.0 | https://archive.ics.uci.edu/dataset/967 |
 | NSL-KDD | train/test (flows) | research use (UNB); not redistributed | https://www.unb.ca/cic/datasets/nsl.html |
+| HF Indian Multilingual Scam Message Dataset (karanverma19) | seed rows in `train/indic_seed.jsonl` | Apache-2.0 | https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset |
+| HF Hinglish & English Financial Scam/Fraud Text Dataset (bolewara) | seed rows in `train/indic_seed.jsonl` | CC BY 4.0 | https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset |
 | Indian-context synthetic messages | evaluation only | original work (this project) | generated for this project |
 | Llama 3.2 1B Instruct QLoRA INT4 .pte | explanations | Llama 3.2 Community License | https://huggingface.co/executorch-community |
 
