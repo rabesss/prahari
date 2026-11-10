@@ -1,7 +1,8 @@
-# Python 3.12 on aarch64 Linux. CPU-only; no CUDA.
+# Python 3.12 on aarch64 Linux, CPU only. Versions match the tested shared venv.
 executorch==1.6.0
-torch
-scikit-learn
-pandas
-joblib
-pytest
+torch==2.15.0
+scikit-learn==1.9.1
+pandas==3.1.1
+numpy==2.5.4
+joblib==1.6.0
+pytest==9.2.0

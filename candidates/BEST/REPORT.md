@@ -12,7 +12,9 @@ network at inference time.
 
 ## Architecture
 
-Two stages run entirely on the device.
+Two stages run entirely on the device. This is the mentor's reference pipeline - feature
+extraction, then rule/ML detectors, then risk fusion, then Llama via ExecuTorch explaining -
+implemented on the CPU; the Performance section lists where each stage runs and what it costs.
 
 **Stage one — mechanism layer over small models.** The scikit-learn models score the wording (SMS
 TF-IDF, URL character n-grams, NSL-KDD flows). The mechanism layer decides what the message asks the

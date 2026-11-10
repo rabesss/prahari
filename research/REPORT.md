@@ -86,9 +86,14 @@ points in total.
   description as malicious (the round-1 brief lists "a beaconing flow ... safe" as a failure) and gives
   benign flow descriptions an evidence phrase. D identical (0.9024), E 0.8875 -> 0.8973 (flow by-kind
   0.787 -> 0.856), P 0.6701 -> 0.655 under host co-tenant load, total 87.60. The 0.06 gap is inside the
-  brief's 0.5 noise band, so it was not promoted over 87.66; the tree is kept as `candidates/gen6`.
-- **`gen6`** = gen4 plus a prompt instruction to copy the evidence phrases (plural) and a 15-35 word
-  length hint. Confirmed at 87.33 (stamp `20261110-084926`): mention fell 0.536 -> 0.464, forbidden
+  brief's 0.5 noise band, so it was not promoted over 87.66 and its candidate tree was not kept.
+  The diff is two local edits: `predict_flow_text` counts any indicator other than `rejected` as
+  malicious (so a lone beaconing description is malicious) and short-circuits benign descriptions to
+  concept-bearing evidence; `BENIGN_FLOW` adds scheduled/backup/single-port/login-succeeded terms.
+  The evaluated tree is preserved in stamp `20261110-083519`; `candidates/gen5` (SpinQuant) and
+  `candidates/gen6` (rejected prompt) were removed.
+- **`gen6`** = a copy of gen4 plus a prompt instruction to copy the evidence phrases (plural) and a
+  15-35 word length hint; its diff was not kept. Confirmed at 87.33 (stamp `20261110-084926`): mention fell 0.536 -> 0.464, forbidden
   1.0 -> 0.964, length rose 0.946 -> 1.0; E 0.8866. Rejected and deleted. Copying several phrases
   makes the 1B model drift from the required concept, so the single-phrase instruction stays.
 - Host note: other agents share the 2-vCPU box (`droid`/`codex` bursts), so PSI latency readings swing
