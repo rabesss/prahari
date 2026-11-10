@@ -1,3 +1,6 @@
+> **Historical (round 1, 9 Nov).** Superseded by the round-2 brief: scores below use the old eval and set A,
+> which `indic1` overfit (set B score 0.443). The worker rewrites this report for round 2.
+
 # Research report: PS3 Kavach Lite (9 Nov 2026)
 
 ## Current best
@@ -110,5 +113,5 @@ Submit **`candidates/indic1`** (85.84 two-repeat proxy, 86.23 single), not the 6
    and the offline/ExecuTorch metadata.
 5. Use `candidates/indic1/REPORT.md` as the report source; it has the required sections (Problem,
    Architecture, Models, Datasets, Results, Performance, Limitations, Responsible AI).
-6. The owner performs the portal registration, form and payment; agents never submit, register or
-   publish. The repo may stay private during development; decide visibility before 23 Nov.
+6. Agents never submit, register or publish. The repo may stay private during development; the owner
+   decides visibility before 23 Nov.

@@ -4,7 +4,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from . import rules
+from . import indicrules, rules
 
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 _cache = {}
@@ -20,7 +20,7 @@ def _model(name):
     return _cache[name]
 
 
-def _decide(p, ev, lo=0.35, hi=0.65):
+def _decide(p, ev, lo=0.32, hi=0.60):
     strong = sum(1 for n, _ in ev if n in STRONG)
     if any(n == "official_domain" for n, _ in ev) and strong == 0:
         p = min(p, 0.5)
@@ -32,14 +32,33 @@ def _decide(p, ev, lo=0.35, hi=0.65):
     return "uncertain", p
 
 
+def _text_decision(p, score, prot, strong):
+    """Combine the TF-IDF probability with the Indian-context request/protection evidence.
+
+    Strong scam mechanics (a secret to hand over, a collect request, a paid "job", a payment
+    tied to a link or deadline) lift even a Hindi message the English model has never seen.
+    Protection phrases genuine alerts use ("we never ask for OTP", "no customs fee") pull a
+    suspicious-looking receipt back down; two independent protection phrases clear it.
+    """
+    if strong:
+        return max(p, 0.80)
+    if prot >= 1.6:
+        return min(p, 0.20)
+    if prot >= 0.8:
+        return min(p, 0.25)
+    return p
+
+
 def predict_text(texts):
     m = _model("sms")
     ps = m.predict_proba(texts)[:, 1]
     out = []
     for t, p in zip(texts, ps):
-        ev = rules.text_indicators(t)
-        lab, s = _decide(float(p), ev)
-        out.append((lab, s, [d for _, d in ev]))
+        ind_ev, score, prot, strong = indicrules.indicators(t)
+        p = _text_decision(float(p), score, prot, strong)
+        ev = list(ind_ev) if ind_ev else rules.text_indicators(t)
+        lab, s = _decide(p, [], lo=0.32, hi=0.60)
+        out.append((lab, s, [d for _, d in ev][:6]))
     return out
 
 
@@ -79,7 +98,7 @@ def predict_flow(feature_rows):
             ev.append("the host contacted many different services")
         if f.get("root_shell", 0) > 0:
             ev.append("a root shell was obtained")
-        lab = 1 if p >= 0.5 else 0
+        lab = 1 if p >= 0.10 else 0
         out.append((lab, float(p), ev))
     return out
 
@@ -96,4 +115,8 @@ def classify_any(kind, inp):
         return predict_url([inp])[0]
     if kind == "flow":
         return predict_flow_text(inp)
+    if kind == "injection":
+        inj = rules.injection_indicators(inp)
+        if inj:
+            return 1, 0.95, [d for _, d in inj]
     return predict_text([inp])[0]

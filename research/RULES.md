@@ -72,16 +72,16 @@ proxy above; novelty and the demo (14%) are human-judged and not scored.
 - **D (detection quality, validation):** hidden test sets for SMS (UCI + Mendeley), URLs (PhiUSIIL), an **Indian-context hard set** (the
   largest weight) and NSL-KDD flows (official KDDTest+). Per task, F1 is multiplied by a false-positive penalty, because false alerts cost
   non-expert users.
-- **E (plain-language explanation and remediation):** deterministic checks on a hidden explain set covering verdict correctness, required
-  concepts, forbidden or hallucinated content (US-centric terms, injected tokens), no invented URLs or phone numbers, safe actions, and length.
+- **E (plain-language explanation and remediation):** deterministic checks on a hidden explain set covering verdict correctness, agreement between the text and the truth,
+  required concepts (with close synonyms), forbidden or hallucinated content (US-centric terms, injected tokens), no invented URLs or phone numbers, safe actions, and length.
 - **P (performance and optimisation on Arm):** measured on Oracle's Neoverse-N1, the same Cortex-A76 class as the Pi 5: explain latency, peak
   RSS, detector throughput and footprint.
 - **C (compliance, offline, completeness, docs):** a hard gate that a Llama-family `.pte` is actually loaded by ExecuTorch (checked in
   /proc), otherwise the score is capped at 20; plus the offline guard, tests, an app self-test, and README/REPORT/DATA completeness.
 - **Known gaps:** no human judging of novelty, clarity or demo quality; the PhiUSIIL URL test is easy (legitimate rows are mostly bare
-  homepages); the Indian set is synthetic and templated (320 generated messages, 20 categories; its `.invalid` link hosts are
-  rewritten to realistic TLDs to remove a label leak; a second unseen 320-message set is kept by the controller to
-  detect overfitting); the explain set is small (28 items), so an E change under about 0.04 is noise; Oracle is not a Pi 5 (similar
+  homepages); the Indian set is synthetic and templated (320-message sets from one generator: set A, now visible for training, and set B, the hidden test since round 2;
+  their `.invalid` link hosts are rewritten to realistic TLDs, but link presence still predicts the label; a third set C from a
+  different spec, with balanced links and lengths, is kept by the controller as the final overfitting check); the explain set is small (28 items), so an E change under about 0.04 is noise; Oracle is not a Pi 5 (similar
   cores, different memory system, and other jobs share the machine); the offline guard is an in-process proxy, and the real proof is airplane
   mode on the device.
 

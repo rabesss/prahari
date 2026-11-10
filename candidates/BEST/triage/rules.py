@@ -99,6 +99,20 @@ def text_indicators(text):
     return ev
 
 
+INJECTION_RULES = [
+    ("prompt_injection", r"ignore\s+(all\s+|any\s+)?(previous|prior|above|earlier)\s+(rules|instructions|prompts)"
+     r"|disregard\s+(the\s+)?(previous|above|earlier|system)\s+(rules|instructions|prompt)"
+     r"|forget\s+(your\s+)?(rules|instructions)|you are now\s+(a|an|the)\s+"
+     r"|system prompt|reply\s+(with\s+)?safe\b|return\s+(the\s+)?label\s+(as\s+)?safe"
+     r"|act as\s+(a|an|the)\s+(admin|system|developer|assistant)", "tries to inject instructions into the assistant"),
+]
+
+
+def injection_indicators(text):
+    t = text.lower()
+    return [(n, d) for n, p, d in INJECTION_RULES if re.search(p, t)]
+
+
 FLOW_RULES = [
     ("port_scan", r"\b(\d{2,} (different|distinct) ports|port scan|many ports|sequential ports)\b", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(\d{2,} failed (logins?|login attempts|password)|brute.?force|repeated failed)\b", "many failed logins look like password guessing"),

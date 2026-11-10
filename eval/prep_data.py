@@ -141,20 +141,25 @@ def realhost(text, key):
 
 
 def indic():
-    rows = [json.loads(l) for l in open(INDIC / "msgs_A.jsonl", encoding="utf-8") if l.strip()]
-    for r in rows:
-        r["text"] = realhost(r["text"], r["id"])
-    out = {"dev": [], "test": []}
+    """Round 2 rotation: set A (seen in round 1) is visible -- 3/4 train, 1/4 dev, stratified by label and category;
+    set B (a second generator run, never shown) is the hidden test. Set C stays with the controller as a final holdout."""
+    def load(name):
+        rows = [json.loads(l) for l in open(INDIC / name, encoding="utf-8") if l.strip()]
+        for r in rows:
+            r["text"] = realhost(r["text"], r["id"])
+        return rows
+    keep = lambda r: {"id": r["id"], "text": r["text"], "label": r["label"],
+                      "category": r.get("category"), "lang": r.get("lang"), "hard": r.get("hard")}
+    out = {"train": [], "dev": [], "test": []}
     rng = random.Random(SEED)
+    rows = load("msgs_A.jsonl")
     rng.shuffle(rows)
-    for lab in (0, 1):
-        grp = [r for r in rows if r["label"] == lab]
-        out["dev"] += grp[:20]
-        out["test"] += grp[20:]
-    for s in out:
-        out[s] = [{"id": r["id"], "text": r["text"], "label": r["label"],
-                   "category": r.get("category"), "lang": r.get("lang"), "hard": r.get("hard")}
-                  for r in out[s]]
+    for cat in sorted({r.get("category") for r in rows}, key=str):
+        grp = [r for r in rows if r.get("category") == cat]
+        k = max(1, len(grp) // 4)
+        out["dev"] += [keep(r) for r in grp[:k]]
+        out["train"] += [keep(r) for r in grp[k:]]
+    out["test"] = [{k: v for k, v in keep(r).items() if k != "category"} for r in load("msgs_B.jsonl")]
     return out
 
 
@@ -162,7 +167,7 @@ def seed():
     """Small public Indian/Hinglish seed sets -> data/train/indic_seed.jsonl (training only).
     Rows whose normalised text appears in any SMS split or the hidden Indian test set are dropped."""
     block = set()
-    for p in [HIDDEN / "sms_test.jsonl", HIDDEN / "indic_test.jsonl", VIS / "dev" / "indic.jsonl",
+    for p in [HIDDEN / "sms_test.jsonl", HIDDEN / "indic_test.jsonl", VIS / "dev" / "indic.jsonl", VIS / "train" / "indic.jsonl",
               VIS / "dev" / "sms.jsonl", VIS / "train" / "sms.jsonl"]:
         if p.exists():
             block |= {norm(json.loads(l)["text"]) for l in open(p, encoding="utf-8") if l.strip()}
