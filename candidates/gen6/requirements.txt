@@ -1,7 +1,0 @@
-# Python 3.12 on aarch64 Linux. CPU-only; no CUDA.
-executorch==1.6.0
-torch
-scikit-learn
-pandas
-joblib
-pytest

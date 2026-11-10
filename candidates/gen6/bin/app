@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Local web UI (127.0.0.1 only).  bin/app --selftest | bin/app [--port 8765]
-set -euo pipefail
-C="$(cd "$(dirname "$0")/.." && pwd)"
-PY="${HC_PY:-$C/../../.venv/bin/python}"
-PYTHONPATH="$C${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m app.server "$@"

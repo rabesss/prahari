@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Contract entry point (see project AGENTS.md). Uses the shared project venv unless HC_PY is set.
-set -euo pipefail
-C="$(cd "$(dirname "$0")/.." && pwd)"
-PY="${HC_PY:-$C/../../.venv/bin/python}"
-PYTHONPATH="$C${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m triage.cli explain "$@"

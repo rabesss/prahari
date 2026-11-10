@@ -1,5 +1,0 @@
-{
-  "model": "llama32-1b-qlora",
-  "max_new_tokens": 40,
-  "temperature": 0.0
-}
