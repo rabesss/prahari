@@ -53,7 +53,7 @@ STATUS = [re.compile(p) for p in (
 # Data-shaped lines inside code/docs: JSON records with dataset keys, or wide CSV rows.
 DATA_LINE = re.compile(r'^\s*[\[{].*"(?:label|text|url|features|attack|input)"\s*:|^\s*[^\s,()\[\]{}=]*(?:,[^,()\[\]{}=\n]*){9,}$', re.M)
 DATA_LINE_LIMIT = 20
-# A single-line dump (one JSON array of many records) is one data line, so also count record keys: two per row.
+# A single-line dump (one JSON array of many records) is one data line, so also count record keys: about two per row.
 RECORD_KEY = re.compile(r'"(?:label|text|url|features|attack|input)"\s*:')
 UNICODE_ESCAPE = re.compile(r'\\u([0-9a-fA-F]{4})')
 
@@ -64,7 +64,14 @@ def unescape(text):
 
 
 def data_shaped(text, limit):
-    return len(DATA_LINE.findall(text)) >= limit or len(RECORD_KEY.findall(text)) >= 4 * limit
+    text = unescape(text)
+    return len(DATA_LINE.findall(text)) >= limit or len(RECORD_KEY.findall(text)) >= 2 * limit
+
+
+def secret_hit(data):
+    """Secret scan on the raw bytes and, if JSON-escaped, on the unescaped text."""
+    if SECRET.search(data): return True
+    return b'\\u' in data and bool(SECRET.search(unescape(data.decode('utf-8', 'replace')).encode('utf-8')))
 MAX_INT = 2 ** 53
 MAX_LEAVES = 5000
 MAX_MESSAGE = 8000
@@ -184,6 +191,7 @@ def inflate(data):
     """Return the bytes to scan: a zlib stream (joblib compress=True) decompressed, or an uncompressed pickle as is.
     Any other encoding (gzip, lzma, bz2, ...) would hide its content from the scan, so it is rejected."""
     if data[:1] == b'\x80':
+        if len(data) < 3 or data[1] not in (2, 3, 4, 5) or data[-1:] != b'.': raise ValueError('artifact is not a well-formed pickle')
         return data
     if data[:1] != b'\x78':
         raise ValueError('artifact is neither a zlib stream nor an uncompressed pickle')
@@ -306,7 +314,7 @@ def main():
             message = git('cat-file', 'commit', commit, binary=True).split(b'\n\n', 1)[-1]
             label = f'<commit message {commit[:12]}>'
             if len(message) > MAX_MESSAGE: failures.add((label, 'message size limit'))
-            if SECRET.search(message): failures.add((label, 'secret pattern'))
+            if secret_hit(message): failures.add((label, 'secret pattern'))
             try: text = message.decode('utf-8')
             except UnicodeError: failures.add((label, 'undecodable message')); text = ''
             text = unescape(text)
@@ -345,12 +353,12 @@ def main():
                     artifacts.add((path, oid, size))
                     try: data = inflate(data)
                     except (ValueError, zlib.error): fail('artifact undecodable'); continue
-                    if SECRET.search(data): fail('secret pattern')
+                    if secret_hit(data): fail('secret pattern')
                     if ITEM_ID.search(data.decode('latin-1')): fail('item id in artifact')
                     hit = args.hidden_check and corpus_hit(data.decode('utf-8', 'replace'), oid)
                     if hit: hidden_hits.add(path); fail(hit)
                     continue
-                if SECRET.search(data): fail('secret pattern')
+                if secret_hit(data): fail('secret pattern')
                 if rule in ('eval JSON', 'ledger') and not valid_json(data, rule == 'ledger'): fail('eval JSON leaf/array/id policy')
                 if rule == 'config' and not config_ok(data): fail('config JSON policy')
                 if rule == 'synthetic' and not synth_ok(path, data): fail('synthetic schema policy')

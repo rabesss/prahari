@@ -59,7 +59,11 @@ def main():
     path = root / ACCEPTED
     allowed = accepted(json.loads(path.read_text()) if path.exists() else None) - accepted(at(a.base, ACCEPTED))
     before, after = gated(old), gated(new)
-    lost = sorted(k for k, expect in before.items() if k not in after or after[k] != expect)
+    def worse(old, new):
+        """Label changed, or (stress) correct dropped; correct going False -> True is an improvement."""
+        if isinstance(old, tuple): return new[0] != old[0] or (old[1] and not new[1])
+        return new != old
+    lost = sorted(k for k, expect in before.items() if k not in after or worse(expect, after[k]))
     failures = [x for x in lost if x not in allowed]
     for suite, name, row in lost:
         print(f"RATCHET {'accepted' if (suite, name, row) in allowed else 'FAIL'} downgrade {suite}/{name}/{row}")

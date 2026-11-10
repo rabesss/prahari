@@ -234,3 +234,20 @@ def test_unescape_reveals_escaped_text():
     sys.path.insert(0, str(AUDIT.parent)); import audit_push
     escaped = ''.join(f'\\u{ord(c):04x}' for c in 'please send your otp code now')
     assert audit_push.unescape(f'["{escaped}"]') == '["please send your otp code now"]'
+
+
+# Round-3 review follow-ups (Grok 4.7, DeepSeek V4.1 Flash, CodeRabbit).
+def test_escaped_secret_fails(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/config.json', b'{"k": "\\u0067hp_' + b'A' * 30 + b'"}')
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'secret pattern' in r.stdout
+
+def test_pickle_prefixed_gzip_fails(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/artifacts/m.joblib', b'\x80' + _gzip.compress(b'model ' + TRAIL_ID))
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'artifact undecodable' in r.stdout
+
+def test_one_line_dump_threshold_matches_rows(tmp_path):
+    rows = _json.dumps([{'id': f'r{i}', 'text': f'row {i}', 'label': i % 2} for i in range(25)]).encode()
+    base = setup_repo(tmp_path); add(tmp_path, 'docs/notes.md', rows + b'\n')
+    assert 'data-shaped code/docs content' in audit(tmp_path, base).stdout

@@ -51,7 +51,7 @@ fail-closed path/content policy, and never prints matched contents:
 - code and docs only at the top level or under `candidates/`, `research/`,
   `bench/`, `docs/`, `eval/`, `bin/`, `models/` and `.github/workflows/`
   (never `data/`); `.txt` only as `requirements*.txt`; 20 or more data-shaped
-  lines (JSON records with dataset keys, wide CSV rows) or 80 or more dataset keys
+  lines (JSON records with dataset keys, wide CSV rows) or 40 or more dataset keys
   (a one-line record dump) fail; JSON `\uXXXX` escapes are undone before the id and
   hidden checks;
 - config JSON is parsed strictly (no duplicate keys, NaN or item ids);
@@ -60,8 +60,8 @@ fail-closed path/content policy, and never prints matched contents:
 - logs: only exact status lines and, in `app.log`, selftest results with scores
   in [0, 1];
 - synthetic suites: fixed key sets and at most 500 rows;
-- detector artifacts are listed and must be an uncompressed pickle or one complete
-  zlib stream with no trailing bytes (gzip, lzma and other encodings fail); the inflated bytes are scanned for item ids and secrets;
+- detector artifacts are listed and must be a well-formed uncompressed pickle
+  (protocol 2-5) or one complete zlib stream with no trailing bytes (gzip, lzma and other encodings fail); the inflated bytes are scanned for item ids and secrets;
 - commit messages: at most 8 KB, no secrets, item ids or data-shaped lines;
 - item ids include the hidden split formats, explain-set `X-NN` and Indian set
   `B-NNNN`;

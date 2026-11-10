@@ -146,6 +146,7 @@ def test_ratchet_relabel_is_a_downgrade(tmp_path, monkeypatch):
 
 SLOW = '''#!/usr/bin/env python3
 import os, subprocess, sys, time
+# Write the pid before anything slow so a loaded runner still records it inside the timeout.
 child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
 open(os.environ['PIDFILE'], 'w').write(str(child.pid))
 time.sleep(60)
@@ -158,9 +159,13 @@ def test_predict_timeout_kills_tree(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='exceeded'):
         common.predict(c, 'sms', [{'id': 'a', 'text': 'hi'}])
     pid = int(pidfile.read_text())
-    import time as _t; _t.sleep(0.5)
-    with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)
+    import time as _t
+    for _ in range(50):
+        try: os.kill(pid, 0)
+        except ProcessLookupError: break
+        _t.sleep(0.1)
+    else:
+        pytest.fail('child process still alive')
 
 
 def test_predict_env_strips_cloud_credentials(monkeypatch, tmp_path):
@@ -191,3 +196,29 @@ def test_ratchet_dropping_stress_correct_is_a_downgrade(tmp_path, monkeypatch):
     base = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
     (repo / 'bench/reference.json').write_text(ref({'label': 1, 'prediction': 0, 'gate': True}))
     assert _ratchet(repo, monkeypatch, base) == 1  # (Grok 4.7) gate kept, correct dropped
+
+
+def test_ratchet_stress_correct_gain_is_not_a_downgrade(tmp_path, monkeypatch):
+    repo = tmp_path; (repo / 'bench').mkdir()
+    _git(repo, 'init', '-q'); _git(repo, 'config', 'user.email', 't@example.invalid'); _git(repo, 'config', 'user.name', 'T')
+    ref = lambda row: json.dumps({'fixtures': {}, 'stress': {'s.jsonl': {'rows': {'h1': row}}}})
+    (repo / 'bench/reference.json').write_text(ref({'label': 1, 'prediction': 0, 'gate': True}))
+    _git(repo, 'add', '.'); _git(repo, 'commit', '-qm', 'ref')
+    base = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
+    (repo / 'bench/reference.json').write_text(ref({'label': 1, 'prediction': 1, 'correct': True, 'gate': True}))
+    assert _ratchet(repo, monkeypatch, base) == 0
+
+
+INVALID = FAKE.replace("'label': 0}) + ", "'label': 2}) + ")
+
+
+def test_run_invalid_labels_recorded_per_task(tmp_path, monkeypatch):
+    import run
+    assert INVALID != FAKE
+    c = tmp_path / 'inv'; (c / 'bin').mkdir(parents=True); p = c / 'bin/predict'; p.write_text(INVALID); p.chmod(0o755)
+    dev = tmp_path / 'dev'; dev.mkdir()
+    (dev / 'sms.jsonl').write_text(json.dumps({'id': 'a', 'text': 'hi', 'label': 0}) + '\n')
+    prefix = tmp_path / 'out' / 'r'
+    monkeypatch.setattr(sys, 'argv', ['run.py', '--cand', str(c), '--data', str(dev), '--output-prefix', str(prefix)])
+    assert run.main() == 1
+    assert 'invalid labels' in json.loads(prefix.with_suffix('.json').read_text())['errors']['sms']

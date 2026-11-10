@@ -31,12 +31,16 @@ def main():
         field=FIELDS[task]
         try:
             pred, perf=predict(a.cand,task,[{'id':r['id'],field:r[field]} for r in data])
-        except (ValueError, RuntimeError, KeyError) as exc:
+        except (ValueError, RuntimeError, KeyError, OSError) as exc:
             errors[task]=f'predict failed ({type(exc).__name__})'
+            print(exc,file=sys.stderr,flush=True)  # console only (stderr tail); the report keeps the class name
             print(f'BENCH {task}: FAIL predict failed ({type(exc).__name__})',flush=True)
             continue
         invalid=sum(not valid_label(x) for x in pred.values())
-        if invalid: raise ValueError(f'{task}: {invalid} invalid labels')
+        if invalid:
+            errors[task]=f'{invalid} invalid labels'
+            print(f'BENCH {task}: FAIL {invalid} invalid labels',flush=True)
+            continue
         metrics=det_metrics(gold,pred); metrics.update(perf,abstentions=sum(x=='uncertain' for x in pred.values()),d_score=metrics['score'])
         start=time.monotonic(); before=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         bp={r['id']:keyword(task,r) for r in data}; bm=det_metrics(gold,bp); bm.update(wall_s=round(time.monotonic()-start,3),peak_rss_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,1),abstentions=0,d_score=bm['score'],invalid=0)
