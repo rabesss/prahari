@@ -111,18 +111,19 @@ points in total.
   to 0.536 when the prompt was trimmed. A stricter grounding prompt would trade latency for mention.
 - **P1 — flow shift.** Hidden flow is the KDDTest+ distribution; recall is about 0.72 before the new
   signatures. Novel attack types (apache2, mscan, snmpget) still look normal to a KDDTrain+ model.
-- **P1 — SMS/indic trade.** Aggressive benign routing costs some British ad-spam recall (dev F1 0.887
-  vs 0.962); hidden sms F1 is expected near 0.88-0.89. The indic weight (0.40 vs 0.20) and the FPR
+- **P1 — SMS/indic trade.** Aggressive benign routing costs some British ad-spam recall (dev F1 0.9667
+  vs 0.978 on the old path); hidden sms F1 measured 0.9015. The indic weight (0.40 vs 0.20) and the FPR
   penalty make this trade clearly positive.
 - **P1 — Arabic-script and other Indic languages** are still outside the pattern coverage; the
   character n-gram model is the only fallback.
 
 ## Recommendation and owner steps
 
-1. Promote `candidates/gen2` (or the renamed final copy) using the full-run stamp above.
-2. Owner-side checks from the repo root: `pytest candidates/gen2/tests`, `bin/app --selftest`,
-   `bin/app --demo`, and `bin/eval <candidate> --repeats 2` if a fresh stamp is wanted.
+1. `candidates/BEST` is already promoted (stamp `20261110-081343-gen2-full-r2b`, gate +6.10 over
+   81.56); nothing to do. The previous BEST is `candidates/BEST_prev_gen2-r2b`.
+2. Owner-side checks from the repo root: `pytest candidates/BEST/tests`, `bin/app --selftest`,
+   `bin/app --demo`, and `bin/eval candidates/BEST --repeats 2` if a fresh stamp is wanted.
 3. Record the demo with the local UI: electricity/OTP SMS, genuine bank debit alert, lookalike URL,
    port scan, prompt-injection text. Show verdict, evidence, actions, offline and ExecuTorch metrics.
-4. `candidates/gen2/REPORT.md` is the app report; this file is the research record.
+4. `candidates/BEST/REPORT.md` is the app report; this file is the research record.
 5. Agents never submit, register or publish. Visibility stays with the owner.
