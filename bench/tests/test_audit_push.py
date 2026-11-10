@@ -167,3 +167,45 @@ def test_controller_paths_flagged(tmp_path):
     base = setup_repo(tmp_path); add(tmp_path, 'eval/run_eval.py', b'print(1)\n')
     r = audit(tmp_path, base)
     assert r.returncode == 0 and 'CONTROLLER-OWNED changed (review): eval/run_eval.py' in r.stdout
+
+
+# Round-2 review regressions (DeepSeek V4.1 Flash, CodeRabbit).
+import json as _json
+import zlib as _zlib
+
+TRAIL_ID = b'sms-0123' + b'abcdef'
+
+@pytest.mark.parametrize('blob', [
+    _zlib.compress(b'harmless') + b'\n' + TRAIL_ID,          # trailing bytes after the stream
+    _zlib.compress(b'harmless') + _zlib.compress(TRAIL_ID),   # second concatenated stream
+    _zlib.compress(b'harmless' * 100)[:-6],                   # truncated stream
+], ids=['trailing', 'concatenated', 'truncated'])
+def test_artifact_must_be_one_complete_stream(tmp_path, blob):
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/artifacts/m.joblib', blob)
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'artifact undecodable' in r.stdout
+
+def test_artifact_secret_scanned_after_inflate(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/artifacts/m.joblib', _zlib.compress(b'k=ghp_' + b'A' * 30))
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'secret pattern' in r.stdout
+
+def test_single_line_record_array_fails(tmp_path):
+    rows = _json.dumps([{'text': f'row {i}', 'label': i % 2} for i in range(200)]).encode()
+    base = setup_repo(tmp_path); add(tmp_path, 'docs/notes.md', rows + b'\n')
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'data-shaped code/docs content' in r.stdout
+
+def test_escaped_id_in_message_fails(tmp_path):
+    base = setup_repo(tmp_path)
+    (tmp_path / 'a.py').write_text('x = 1\n'); git(tmp_path, 'add', '.')
+    git(tmp_path, 'commit', '-qm', 'debug {"id": "\\u0073ms-0123' + 'abcdef"}')
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'item id or data-shaped message' in r.stdout
+
+def test_controller_deletion_listed(tmp_path):
+    base0 = setup_repo(tmp_path); add(tmp_path, 'eval/guard/sitecustomize.py', b'x = 1\n')
+    base = git(tmp_path, 'rev-parse', 'HEAD')
+    git(tmp_path, 'rm', '-q', 'eval/guard/sitecustomize.py'); git(tmp_path, 'commit', '-qm', 'drop guard')
+    r = audit(tmp_path, base)
+    assert 'CONTROLLER-OWNED deleted (review): eval/guard/sitecustomize.py' in r.stdout

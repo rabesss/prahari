@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import tempfile
 import time
@@ -40,10 +41,12 @@ DATA = Path('/var/tmp/arm-bharat-ai-soc-data')
 EVROOT = Path('/var/tmp/arm-bharat-ai-soc-eval')
 FIELDS = {'sms': 'text', 'indic': 'text', 'url': 'url', 'flow': 'features'}
 TIMEOUT_S = 900
+CREDENTIAL_PREFIXES = ('BOXD', 'SAIL', 'OPENAI', 'ANTHROPIC', 'GH_', 'GITHUB', 'AWS_', 'AZURE_', 'GOOGLE_', 'GCP_', 'GCLOUD',
+                       'CLOUDSDK_', 'HF_', 'HUGGING_FACE', 'CF_', 'CLOUDFLARE')
 
 def sandbox_env(guard_log):
     """Mirror bin/eval: no cloud/GitHub credentials, offline guard, loopback-only proxies, hidden paths denied."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('BOXD', 'SAIL', 'OPENAI', 'ANTHROPIC', 'GH_', 'GITHUB'))}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(CREDENTIAL_PREFIXES)}
     env.update({
         'PYTHONPATH': str(ROOT / 'eval' / 'guard'), 'HC_GUARD_LOG': str(guard_log),
         'HC_GUARD_DENY_PATHS': f"{DATA / 'hidden'}:{DATA / 'indic'}:{EVROOT / 'private'}",
@@ -66,14 +69,20 @@ def predict(cand, task, input_rows):
         inp.write_text(''.join(json.dumps(r, ensure_ascii=False)+'\n' for r in input_rows), encoding='utf-8')
         cmd = [str(cand / 'bin/predict'), '--task', 'sms' if task == 'indic' else task, '--in', str(inp), '--out', str(out)]
         start = time.monotonic()
+        # Own session so a timeout kills bin/predict's whole tree, not only /usr/bin/time (as bin/eval does).
+        proc = subprocess.Popen(['/usr/bin/time', '-f', '%M', '-o', str(timing), *cmd], cwd=cand, env=sandbox_env(guard),
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
         try:
-            subprocess.run(['/usr/bin/time', '-f', '%M', '-o', str(timing), *cmd], cwd=cand, env=sandbox_env(guard), check=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=TIMEOUT_S)
-        except subprocess.CalledProcessError as exc:
-            tail = exc.stderr.decode('utf-8', 'replace')[-2000:]
-            raise RuntimeError(f'{task}: bin/predict exited {exc.returncode}; stderr tail:\n{tail}') from None
+            _, err = proc.communicate(timeout=TIMEOUT_S)
         except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL); proc.communicate()
             raise RuntimeError(f'{task}: bin/predict exceeded {TIMEOUT_S}s') from None
+        finally:
+            try: os.killpg(proc.pid, signal.SIGKILL)  # reap stragglers left by a candidate that exited
+            except OSError: pass
+        if proc.returncode:
+            tail = err.decode('utf-8', 'replace')[-2000:]
+            raise RuntimeError(f'{task}: bin/predict exited {proc.returncode}; stderr tail:\n{tail}')
         wall = time.monotonic() - start
         predictions = rows(out)
         mapped = {r['id']: r.get('label') for r in predictions}

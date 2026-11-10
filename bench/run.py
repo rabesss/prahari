@@ -28,7 +28,13 @@ def main():
             continue
         if any(type(r.get('label')) is not int or r['label'] not in (0,1) for r in data): raise ValueError('invalid gold labels')
         gold={r['id']:r['label'] for r in data}
-        field=FIELDS[task]; pred, perf=predict(a.cand,task,[{'id':r['id'],field:r[field]} for r in data])
+        field=FIELDS[task]
+        try:
+            pred, perf=predict(a.cand,task,[{'id':r['id'],field:r[field]} for r in data])
+        except (ValueError, RuntimeError, KeyError) as exc:
+            errors[task]=f'predict failed ({type(exc).__name__})'
+            print(f'BENCH {task}: FAIL predict failed ({type(exc).__name__})',flush=True)
+            continue
         invalid=sum(not valid_label(x) for x in pred.values())
         if invalid: raise ValueError(f'{task}: {invalid} invalid labels')
         metrics=det_metrics(gold,pred); metrics.update(perf,abstentions=sum(x=='uncertain' for x in pred.values()),d_score=metrics['score'])

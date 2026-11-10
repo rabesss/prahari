@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Reference ratchet: a row that gated at <base> must still gate in the working-tree bench/reference.json.
 
-A regenerated reference could otherwise silently ungate rows in the same change that breaks them. A downgrade is
+A regenerated reference could otherwise silently ungate rows in the same change that breaks them. A relabelled row (changed expect/label)
+also counts as a downgrade. A downgrade is
 allowed only when bench/accepted_downgrades.json gains an entry for it in this range (entries already present at
 <base> do not count again), so every downgrade is a reviewable diff line.
 """
@@ -35,11 +36,12 @@ def accepted(value):
 
 
 def gated(reference):
-    out = set()
-    for suite in ('fixtures', 'stress'):
+    """{(suite, file, row): expected label} for every gating row; a changed expectation counts as a downgrade."""
+    out = {}
+    for suite, key in (('fixtures', 'expect'), ('stress', 'label')):
         for name, entry in (reference or {}).get(suite, {}).items():
             for row, v in entry.get('rows', {}).items():
-                if v.get('gate'): out.add((suite, name, row))
+                if v.get('gate'): out[(suite, name, row)] = v.get(key)
     return out
 
 
@@ -55,11 +57,12 @@ def main():
     new = json.loads((root / REF).read_text())
     path = root / ACCEPTED
     allowed = accepted(json.loads(path.read_text()) if path.exists() else None) - accepted(at(a.base, ACCEPTED))
-    lost = sorted(gated(old) - gated(new))
+    before, after = gated(old), gated(new)
+    lost = sorted(k for k, expect in before.items() if k not in after or after[k] != expect)
     failures = [x for x in lost if x not in allowed]
     for suite, name, row in lost:
         print(f"RATCHET {'accepted' if (suite, name, row) in allowed else 'FAIL'} downgrade {suite}/{name}/{row}")
-    print(f"RATCHET {'FAIL' if failures else 'PASS'}: {len(gated(old))} gated at base, {len(gated(new))} now, {len(lost)} downgraded")
+    print(f"RATCHET {'FAIL' if failures else 'PASS'}: {len(before)} gated at base, {len(after)} now, {len(lost)} downgraded")
     return 1 if failures else 0
 
 

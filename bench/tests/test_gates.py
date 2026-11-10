@@ -129,3 +129,54 @@ def test_ratchet(tmp_path, monkeypatch):
     head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
     (repo / 'bench/reference.json').write_text(_ref(False))
     assert _ratchet(repo, monkeypatch, head) == 1  # an entry already present at base does not cover a new downgrade
+
+
+# Round-2 review regressions: ratchet relabel (DeepSeek V4.1 Flash), timeout kills the tree (CodeRabbit, DeepSeek),
+# per-task predict failure keeps the report (CodeRabbit).
+def test_ratchet_relabel_is_a_downgrade(tmp_path, monkeypatch):
+    repo = tmp_path; (repo / 'bench').mkdir()
+    _git(repo, 'init', '-q'); _git(repo, 'config', 'user.email', 't@example.invalid'); _git(repo, 'config', 'user.name', 'T')
+    ref = lambda e: json.dumps({'fixtures': {'sms.jsonl': {'rows': {'x': {'expect': e, 'prediction': e, 'gate': True}}}},
+                                'stress': {'s.jsonl': {'rows': {'h1': {'label': 1, 'prediction': 1, 'correct': True, 'gate': True}}}}})
+    (repo / 'bench/reference.json').write_text(ref(1)); _git(repo, 'add', '.'); _git(repo, 'commit', '-qm', 'ref')
+    base = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
+    (repo / 'bench/reference.json').write_text(ref(0))
+    assert _ratchet(repo, monkeypatch, base) == 1
+
+
+SLOW = '''#!/usr/bin/env python3
+import os, subprocess, sys, time
+child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
+open(os.environ['PIDFILE'], 'w').write(str(child.pid))
+time.sleep(60)
+'''
+
+
+def test_predict_timeout_kills_tree(tmp_path, monkeypatch):
+    c = tmp_path / 'slow'; (c / 'bin').mkdir(parents=True); p = c / 'bin/predict'; p.write_text(SLOW); p.chmod(0o755)
+    pidfile = tmp_path / 'pid'; monkeypatch.setenv('PIDFILE', str(pidfile)); monkeypatch.setattr(common, 'TIMEOUT_S', 3)
+    with pytest.raises(RuntimeError, match='exceeded'):
+        common.predict(c, 'sms', [{'id': 'a', 'text': 'hi'}])
+    pid = int(pidfile.read_text())
+    import time as _t; _t.sleep(0.5)
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+def test_predict_env_strips_cloud_credentials(monkeypatch, tmp_path):
+    for k in ('AWS_SECRET_ACCESS_KEY', 'HF_TOKEN', 'GOOGLE_APPLICATION_CREDENTIALS', 'AZURE_CLIENT_SECRET', 'HUGGING_FACE_HUB_TOKEN'):
+        monkeypatch.setenv(k, 'x')
+    env = common.sandbox_env(tmp_path / 'g.log')
+    assert not {'AWS_SECRET_ACCESS_KEY', 'HF_TOKEN', 'GOOGLE_APPLICATION_CREDENTIALS', 'AZURE_CLIENT_SECRET', 'HUGGING_FACE_HUB_TOKEN'} & set(env)
+    assert env['HF_HUB_OFFLINE'] == '1'
+
+
+def test_run_records_predict_failure_and_writes_report(tmp_path, monkeypatch):
+    import run
+    dev = tmp_path / 'dev'; dev.mkdir()
+    (dev / 'sms.jsonl').write_text(json.dumps({'id': 'a', 'text': 'hi', 'label': 0}) + '\n')
+    prefix = tmp_path / 'out' / 'r'
+    monkeypatch.setattr(sys, 'argv', ['run.py', '--cand', str(fake(tmp_path, 'fail')), '--data', str(dev), '--output-prefix', str(prefix)])
+    assert run.main() == 1
+    report = json.loads(prefix.with_suffix('.json').read_text())
+    assert 'RuntimeError' in report['errors']['sms']

@@ -53,6 +53,18 @@ STATUS = [re.compile(p) for p in (
 # Data-shaped lines inside code/docs: JSON records with dataset keys, or wide CSV rows.
 DATA_LINE = re.compile(r'^\s*[\[{].*"(?:label|text|url|features|attack|input)"\s*:|^[^\s,()\[\]{}=]*(?:,[^,()\[\]{}=\n]*){9,}$', re.M)
 DATA_LINE_LIMIT = 20
+# A single-line dump (one JSON array of many records) is one data line, so also count record keys: two per row.
+RECORD_KEY = re.compile(r'"(?:label|text|url|features|attack|input)"\s*:')
+UNICODE_ESCAPE = re.compile(r'\\u([0-9a-fA-F]{4})')
+
+
+def unescape(text):
+    """Undo JSON \\uXXXX escapes so an escaped id or text is still seen."""
+    return UNICODE_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text) if '\\u' in text else text
+
+
+def data_shaped(text, limit):
+    return len(DATA_LINE.findall(text)) >= limit or len(RECORD_KEY.findall(text)) >= 4 * limit
 MAX_INT = 2 ** 53
 MAX_LEAVES = 5000
 MAX_MESSAGE = 8000
@@ -175,6 +187,7 @@ def inflate(data):
     d = zlib.decompressobj()
     out = d.decompress(data, MAX_INFLATE)
     if d.unconsumed_tail: raise ValueError('artifact inflates beyond limit')
+    if not d.eof or d.unused_data: raise ValueError('artifact is not one complete zlib stream')
     return out
 
 
@@ -285,7 +298,7 @@ def main():
                 if visible_matcher.contains(n): return None if oid in allowed else f'visible dataset text match (blob={oid})'
                 return None
         else: print('hidden check SKIPPED (allowlist mode)')
-        failures = set(); artifacts = set(); controller = set(); seen = set(); blob_cache = {}; hidden_hits = set()
+        failures = set(); artifacts = set(); controller = set(); deleted = set(); seen = set(); blob_cache = {}; hidden_hits = set()
         for commit in commits:
             message = git('cat-file', 'commit', commit, binary=True).split(b'\n\n', 1)[-1]
             label = f'<commit message {commit[:12]}>'
@@ -293,15 +306,19 @@ def main():
             if SECRET.search(message): failures.add((label, 'secret pattern'))
             try: text = message.decode('utf-8')
             except UnicodeError: failures.add((label, 'undecodable message')); text = ''
-            if ITEM_ID.search(text) or len(DATA_LINE.findall(text)) >= 3: failures.add((label, 'item id or data-shaped message'))
+            text = unescape(text)
+            if ITEM_ID.search(text) or data_shaped(text, 3): failures.add((label, 'item id or data-shaped message'))
             hit = args.hidden_check and text and corpus_hit(text)
             if hit: hidden_hits.add(label); failures.add((label, hit))
             # -m includes merge changes relative to every parent, --root covers root commits.
-            raw = git('diff-tree', '--root', '-m', '--no-commit-id', '-r', '--no-renames', '--diff-filter=ACMT', '--raw', '-z', commit, binary=True)
+            raw = git('diff-tree', '--root', '-m', '--no-commit-id', '-r', '--no-renames', '--diff-filter=ACMTD', '--raw', '-z', commit, binary=True)
             fields = raw.split(b'\0'); i = 0
             while i < len(fields) and fields[i]:
                 meta = fields[i].decode('ascii').split(); path = fields[i+1].decode('utf-8', 'surrogateescape'); i += 2
                 mode, oid = meta[1], meta[3]
+                if meta[4] == 'D':
+                    if CONTROLLER.fullmatch(path): deleted.add(path)
+                    continue
                 key = (path, oid, mode)
                 if key in seen: continue
                 seen.add(key)
@@ -325,6 +342,7 @@ def main():
                     artifacts.add((path, oid, size))
                     try: data = inflate(data)
                     except (ValueError, zlib.error): fail('artifact undecodable'); continue
+                    if SECRET.search(data): fail('secret pattern')
                     if ITEM_ID.search(data.decode('latin-1')): fail('item id in artifact')
                     hit = args.hidden_check and corpus_hit(data.decode('utf-8', 'replace'), oid)
                     if hit: hidden_hits.add(path); fail(hit)
@@ -336,7 +354,7 @@ def main():
                 if rule == 'code/docs':
                     try: text = data.decode('utf-8')
                     except UnicodeError: fail('undecodable code/docs'); continue
-                    if len(DATA_LINE.findall(text)) >= DATA_LINE_LIMIT: fail('data-shaped code/docs content')
+                    if data_shaped(text, DATA_LINE_LIMIT): fail('data-shaped code/docs content')
                 if rule == 'eval log':
                     try: lines = data.decode('utf-8').splitlines()
                     except UnicodeError: lines = ['<invalid>']
@@ -346,10 +364,12 @@ def main():
                     try: decoded = data.decode('utf-8')
                     except UnicodeError: fail('hidden check undecodable text'); continue
                     extra = json_strings(data) if path.endswith(('.json', '.jsonl')) else ''
-                    hit = corpus_hit(decoded, oid) or (extra and corpus_hit(extra, oid))
+                    plain = unescape(decoded)
+                    hit = corpus_hit(decoded, oid) or (plain != decoded and corpus_hit(plain, oid)) or (extra and corpus_hit(extra, oid))
                     if hit: hidden_hits.add(path); fail(hit)
         for path, oid, size in sorted(artifacts): print(f'ARTIFACT {path} blob={oid} bytes={size}')
         for path in sorted(controller): print(f'CONTROLLER-OWNED changed (review): {path}')
+        for path in sorted(deleted): print(f'CONTROLLER-OWNED deleted (review): {path}')
         for path, rule in sorted(failures): print(f'FAIL {path}: {rule}')
         if args.hidden_check: print(f'hidden check: {len(hidden_hits)} matched paths')
         print(f'audited {base}..{head}: {len(commits)} commits, {len(seen)} path/blob entries; {len(failures)} failure(s)')

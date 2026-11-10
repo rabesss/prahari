@@ -12,14 +12,14 @@ Fixture flags that agree on aarch64 are provisional until the first x86 CI run
 confirms each row; investigate differences before treating them as portable.
 Timing and detector artifact size are informational, not gates.
 `python bench/ratchet.py BASE` (CI, gating) fails when a row that gated in
-`reference.json` at `BASE` no longer gates, so a regenerated reference cannot
-silently ungate a regression. To accept a downgrade, add an entry
+`reference.json` at `BASE` no longer gates or has a different expected label, so
+a regenerated or relabelled reference cannot silently ungate a regression. To accept a downgrade, add an entry
 `{"suite", "file", "row", "reason"}` to `bench/accepted_downgrades.json` under
 `downgrades` in the same change; entries already present at `BASE` do not count again.
 
 Candidates run in a sandbox that mirrors `bin/eval`: working directory is the
-candidate, a temporary directory outside the repository, a 900 s timeout,
-cloud/GitHub credential variables removed, loopback-only proxies, offline flags,
+candidate, a temporary directory outside the repository, a 900 s timeout that
+kills the whole process tree, cloud/GitHub/Hugging Face credential variables removed, loopback-only proxies, offline flags,
 and the `eval/guard` import hook with the hidden and private paths denied. Only
 `id` and the task field reach `bin/predict`; gold labels never do. On failure the
 stderr tail is printed.
@@ -50,19 +50,22 @@ fail-closed path/content policy, and never prints matched contents:
 - code and docs only at the top level or under `candidates/`, `research/`,
   `bench/`, `docs/`, `eval/`, `bin/`, `models/` and `.github/workflows/`
   (never `data/`); `.txt` only as `requirements*.txt`; 20 or more data-shaped
-  lines (JSON records with dataset keys, wide CSV rows) fail;
+  lines (JSON records with dataset keys, wide CSV rows) or 80 or more dataset keys
+  (a one-line record dump) fail; JSON `\uXXXX` escapes are undone before the id and
+  hidden checks;
 - config JSON is parsed strictly (no duplicate keys, NaN or item ids);
 - eval JSON: duplicate keys, integers of 2^53 or more, non-finite numbers,
   arrays of arrays, arrays over 50 items and documents over 5000 leaves fail;
 - logs: only exact status lines and, in `app.log`, selftest results with scores
   in [0, 1];
 - synthetic suites: fixed key sets and at most 500 rows;
-- detector artifacts are listed, zlib-inflated and scanned for item ids;
+- detector artifacts are listed and must be one complete zlib stream with no
+  trailing bytes; the inflated bytes are scanned for item ids and secrets;
 - commit messages: at most 8 KB, no secrets, item ids or data-shaped lines;
 - item ids include the hidden split formats, explain-set `X-NN` and Indian set
   `B-NNNN`;
-- changes to controller-owned paths (`bin/eval`, `eval/`, `models/registry.json`,
-  `bench/`, `.github/`) are printed for review; the audit is a disclosure gate,
+- changes to and deletions of controller-owned paths (`bin/eval`, `eval/`,
+  `models/registry.json`, `bench/`, `.github/`) are printed for review; the audit is a disclosure gate,
   not an integrity gate.
 Exit 1 means policy failures; exit 2 means the audit could not run (including a
 base that is not an ancestor).
