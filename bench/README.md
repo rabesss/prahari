@@ -11,6 +11,18 @@ promotion, then review every changed flag and reference before committing.
 Fixture flags that agree on aarch64 are provisional until the first x86 CI run
 confirms each row; investigate differences before treating them as portable.
 Timing and detector artifact size are informational, not gates.
+`python bench/ratchet.py BASE` (CI, gating) fails when a row that gated in
+`reference.json` at `BASE` no longer gates, so a regenerated reference cannot
+silently ungate a regression. To accept a downgrade, add an entry
+`{"suite", "file", "row", "reason"}` to `bench/accepted_downgrades.json` under
+`downgrades` in the same change; entries already present at `BASE` do not count again.
+
+Candidates run in a sandbox that mirrors `bin/eval`: working directory is the
+candidate, a temporary directory outside the repository, a 900 s timeout,
+cloud/GitHub credential variables removed, loopback-only proxies, offline flags,
+and the `eval/guard` import hook with the hidden and private paths denied. Only
+`id` and the task field reach `bin/predict`; gold labels never do. On failure the
+stderr tail is printed.
 
 `python bench/readiness.py [candidate]` provides **HEURISTIC** checks only. A
 pass does not establish safety, offline operation, competition eligibility,
@@ -33,15 +45,40 @@ Private eval aggregates may be published only under the disclosure policy below.
 ## Disclosure and controller sync
 
 `python bench/audit_push.py BASE SHA` examines every added/modified historical
-blob on an ancestral, complete range using a fail-closed path/content policy.
-It lists detector artifacts, rejects unsupported paths, scans for common secret
-patterns, constrains eval records and logs, and never prints matched contents.
+blob and every commit message on an ancestral, complete range using a
+fail-closed path/content policy, and never prints matched contents:
+- code and docs only at the top level or under `candidates/`, `research/`,
+  `bench/`, `docs/`, `eval/`, `bin/`, `models/` and `.github/workflows/`
+  (never `data/`); `.txt` only as `requirements*.txt`; 20 or more data-shaped
+  lines (JSON records with dataset keys, wide CSV rows) fail;
+- config JSON is parsed strictly (no duplicate keys, NaN or item ids);
+- eval JSON: duplicate keys, integers of 2^53 or more, non-finite numbers,
+  arrays of arrays, arrays over 50 items and documents over 5000 leaves fail;
+- logs: only exact status lines and, in `app.log`, selftest results with scores
+  in [0, 1];
+- synthetic suites: fixed key sets and at most 500 rows;
+- detector artifacts are listed, zlib-inflated and scanned for item ids;
+- commit messages: at most 8 KB, no secrets, item ids or data-shaped lines;
+- item ids include the hidden split formats, explain-set `X-NN` and Indian set
+  `B-NNNN`;
+- changes to controller-owned paths (`bin/eval`, `eval/`, `models/registry.json`,
+  `bench/`, `.github/`) are printed for review; the audit is a disclosure gate,
+  not an integrity gate.
+Exit 1 means policy failures; exit 2 means the audit could not run (including a
+base that is not an ancestor).
 This does not prove absence of secrets, personal data, hidden content, or
 training data in serialized artifacts. A joblib model's provenance must be
 reviewed by the owner. CI runs the allowlist audit as an advisory; failures must
 be investigated, not assumed safe. Only the controller may run the optional
 `--hidden-check` on the appropriately provisioned Oracle host, under `nice`;
-it is secondary and cannot prove absence of leaks. Do not send hidden inputs,
+it matches hidden ids and normalised hidden and visible third-party texts of 25
+or more characters (also inside JSON-decoded strings, commit messages and
+inflated artifacts). Flow rows are numeric and are covered by the path and
+data-shape rules instead. A hidden match always fails. A visible-text match
+fails unless that exact blob is listed with a reason in
+`bench/hidden_check_allow.json` (read from the controller's own checkout);
+any edit to the blob needs a fresh review. It is secondary and cannot prove
+absence of leaks. Do not send hidden inputs,
 per-item hidden predictions, explanations, private evaluation files, raw data,
 model weights or credentials to the repository.
 

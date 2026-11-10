@@ -26,32 +26,64 @@ def rows(path, dedupe=None):
         for r in result:
             if r['id'] in conflict or r['id'] in seen: continue
             seen.add(r['id']); kept.append(r)
-        dedupe.update(duplicates_dropped=len(result) - len(kept) - sum(ids.count(i) for i in conflict), conflicting_ids_dropped=len(conflict))
+        conflicting_rows = sum(ids.count(i) for i in conflict)
+        dedupe.update(duplicates_dropped=len(result) - len(kept) - conflicting_rows, conflicting_ids_dropped=len(conflict),
+                      conflicting_rows_dropped=conflicting_rows)
         result = kept
     return result
 
 def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
-def valid_label(value): return type(value) is int and value in (0, 1) or value == 'uncertain' and isinstance(value, str)
+def valid_label(value): return (type(value) is int and value in (0, 1)) or (isinstance(value, str) and value == 'uncertain')
+
+DATA = Path('/var/tmp/arm-bharat-ai-soc-data')
+EVROOT = Path('/var/tmp/arm-bharat-ai-soc-eval')
+FIELDS = {'sms': 'text', 'indic': 'text', 'url': 'url', 'flow': 'features'}
+TIMEOUT_S = 900
+
+def sandbox_env(guard_log):
+    """Mirror bin/eval: no cloud/GitHub credentials, offline guard, loopback-only proxies, hidden paths denied."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('BOXD', 'SAIL', 'OPENAI', 'ANTHROPIC', 'GH_', 'GITHUB'))}
+    env.update({
+        'PYTHONPATH': str(ROOT / 'eval' / 'guard'), 'HC_GUARD_LOG': str(guard_log),
+        'HC_GUARD_DENY_PATHS': f"{DATA / 'hidden'}:{DATA / 'indic'}:{EVROOT / 'private'}",
+        'HC_MODEL_REGISTRY': str(ROOT / 'models' / 'registry.json'),
+        'http_proxy': 'http://127.0.0.1:9', 'https_proxy': 'http://127.0.0.1:9',
+        'HTTP_PROXY': 'http://127.0.0.1:9', 'HTTPS_PROXY': 'http://127.0.0.1:9', 'no_proxy': '127.0.0.1,localhost',
+        'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1', 'OMP_NUM_THREADS': env.get('OMP_NUM_THREADS', '2'),
+    })
+    return env
 
 def predict(cand, task, input_rows):
+    """Run cand/bin/predict on {id, field} rows only (gold labels never reach the candidate)."""
+    field = FIELDS[task]
+    if any(set(r) != {'id', field} for r in input_rows): raise ValueError(f'predict input must hold only id and {field}')
     ids = [r['id'] for r in input_rows]
     if len(ids) != len(set(ids)): raise ValueError('duplicate input ids')
-    with tempfile.TemporaryDirectory(prefix='.bench-', dir=ROOT) as temp:
-        inp, out, timing = (Path(temp) / x for x in ('in.jsonl','out.jsonl','time.txt'))
+    cand = Path(cand).resolve()
+    with tempfile.TemporaryDirectory(prefix='kavach-bench-') as temp:
+        inp, out, timing, guard = (Path(temp) / x for x in ('in.jsonl', 'out.jsonl', 'time.txt', 'guard.log'))
         inp.write_text(''.join(json.dumps(r, ensure_ascii=False)+'\n' for r in input_rows), encoding='utf-8')
-        cmd = [str(Path(cand).resolve() / 'bin/predict'), '--task', 'sms' if task == 'indic' else task, '--in', str(inp), '--out', str(out)]
+        cmd = [str(cand / 'bin/predict'), '--task', 'sms' if task == 'indic' else task, '--in', str(inp), '--out', str(out)]
         start = time.monotonic()
-        subprocess.run(['/usr/bin/time','-f','%M','-o',str(timing),*cmd], cwd=ROOT, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            subprocess.run(['/usr/bin/time', '-f', '%M', '-o', str(timing), *cmd], cwd=cand, env=sandbox_env(guard), check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=TIMEOUT_S)
+        except subprocess.CalledProcessError as exc:
+            tail = exc.stderr.decode('utf-8', 'replace')[-2000:]
+            raise RuntimeError(f'{task}: bin/predict exited {exc.returncode}; stderr tail:\n{tail}') from None
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f'{task}: bin/predict exceeded {TIMEOUT_S}s') from None
         wall = time.monotonic() - start
         predictions = rows(out)
         mapped = {r['id']: r.get('label') for r in predictions}
         if set(mapped) != set(ids) or len(predictions) != len(ids): raise ValueError('prediction IDs do not equal input IDs')
         invalid = sum(not valid_label(v) for v in mapped.values())
-        return mapped, {'wall_s': round(wall, 3), 'peak_rss_mb': round(int(timing.read_text().strip()) / 1024, 1), 'invalid': invalid}
+        blocked = sum(1 for line in guard.read_text().splitlines() if line.strip()) if guard.exists() else 0
+        return mapped, {'wall_s': round(wall, 3), 'peak_rss_mb': round(int(timing.read_text().strip()) / 1024, 1), 'invalid': invalid, 'guard_events': blocked}
 
 def fixture_inputs(task, data):
-    field = {'sms':'text','url':'url','flow':'features'}[task]
+    field = FIELDS[task]
     return [{'id':r['id'], field:r['input']} for r in data]
 
 def stable_ids(data):

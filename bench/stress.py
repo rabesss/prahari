@@ -34,6 +34,6 @@ def main():
     if not a.record and set(reference) != {p.name for p in SUITES}: failures.append('stress suites changed: regenerate reference')
     for error in failures: print('FAIL',error)
     if a.record: print('STRESS_JSON '+json.dumps(result, ensure_ascii=False))
-    print('STRESS '+('FAIL' if failures else 'PASS')); return bool(failures)
+    print('STRESS '+('FAIL' if failures else 'PASS')); return 1 if failures else 0
 
 if __name__ == '__main__': sys.exit(main())

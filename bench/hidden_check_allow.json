@@ -1,0 +1,34 @@
+{
+ "visible_text_blobs": [
+  {
+   "blob": "17caa15a3ff910382a3729cf309ac47dc39a9107",
+   "path": "candidates/*/tests/test_basic.py",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "203b8811db9c08c8514b0ef163341671165269a0",
+   "path": "candidates/*/tests/test_basic.py",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "35c4e609836e6ad64e65a28a5b8190d83637df8f",
+   "path": "candidates/*/tests/test_basic.py",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "49a87c101b47435fc26e661d1c0c46eb535aa2ba",
+   "path": "research/REPORT.md",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "b2a6536293ef28022fc2936ab66ab963a7a2620f",
+   "path": "research/REPORT.md",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "b37cef38fceca4c432170ecffa28e14e9ea263b2",
+   "path": "research/REPORT.md",
+   "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  }
+ ]
+}

@@ -7,7 +7,7 @@ from pathlib import Path
 import resource
 import sys
 import time
-from common import ROOT, predict, rows, valid_label
+from common import FIELDS, ROOT, predict, rows, valid_label
 sys.path.insert(0,str(ROOT))
 from eval.run_eval import det_metrics
 from bench.baselines.keyword import label as keyword
@@ -23,12 +23,12 @@ def main():
         try:
             dd={}; data=rows(data_dir/(task+'.jsonl'), dedupe=dd)
         except (ValueError, OSError) as exc:
-            errors[task]='invalid input IDs or file'
-            print(f'BENCH {task}: FAIL invalid input IDs or file',flush=True)
+            errors[task]=f'invalid input IDs or file ({type(exc).__name__})'
+            print(f'BENCH {task}: FAIL invalid input IDs or file ({type(exc).__name__})',flush=True)
             continue
         if any(type(r.get('label')) is not int or r['label'] not in (0,1) for r in data): raise ValueError('invalid gold labels')
         gold={r['id']:r['label'] for r in data}
-        pred, perf=predict(a.cand,task,data)
+        field=FIELDS[task]; pred, perf=predict(a.cand,task,[{'id':r['id'],field:r[field]} for r in data])
         invalid=sum(not valid_label(x) for x in pred.values())
         if invalid: raise ValueError(f'{task}: {invalid} invalid labels')
         metrics=det_metrics(gold,pred); metrics.update(perf,abstentions=sum(x=='uncertain' for x in pred.values()),d_score=metrics['score'])
@@ -44,8 +44,8 @@ def main():
     for task,items in report['tasks'].items():
         for model in ('BEST','keyword'):
             m=items[model]; lines.append(f"| {task} | {model} | {m['n']} | {m['f1']} | {m['precision']} | {m['recall']} | {m['fpr']} | {m['abstentions']} | {m['invalid']} | {m['d_score']} | {m['wall_s']} | {m['peak_rss_mb']} |")
-    for task in errors: lines.append(f'| {task} | unavailable: invalid input IDs or file | | | | | | | | | | |')
+    for task,why in errors.items(): lines.append(f'| {task} | unavailable: {why} | | | | | | | | | | |')
     out.with_suffix('.md').write_text('\n'.join(lines)+'\n')
     print('BENCH '+('FAIL' if errors else 'PASS')+' (aggregate reports written)')
-    return bool(errors)
+    return 1 if errors else 0
 if __name__=='__main__': sys.exit(main())

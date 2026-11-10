@@ -40,3 +40,92 @@ def test_readiness_detects_sources_open_and_certainty(tmp_path):
     assert any('bolewara' in x for x in issues)
     assert any('link opening' in x for x in issues)
     assert any('certainty phrase' in x for x in issues)
+
+
+# Round-1 review regressions: predict sandbox and contract (DeepSeek V4.1 Flash, Grok 4.7), reference ratchet (Grok 4.7).
+import os
+import subprocess
+import pytest
+import common
+import ratchet
+
+FAKE = '''#!/usr/bin/env python3
+import json, os, sys
+a = sys.argv; inp = a[a.index('--in') + 1]; out = a[a.index('--out') + 1]
+rows = [json.loads(x) for x in open(inp)]
+mode = os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+assert os.getcwd() == os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+assert not any(k.startswith(('GITHUB', 'GH_', 'OPENAI')) for k in os.environ)
+if mode == 'fail': sys.stderr.write('boom-detail'); sys.exit(3)
+ids = [r['id'] for r in rows]
+if mode == 'dup': ids = ids + ids[:1]
+if mode == 'missing': ids = ids[1:]
+if mode == 'extra': ids = ids + ['zzz']
+with open(out, 'w') as f:
+    for i in ids: f.write(json.dumps({'id': i, 'label': 0}) + '\\n')
+'''
+
+
+def fake(tmp_path, mode):
+    c = tmp_path / mode; (c / 'bin').mkdir(parents=True); p = c / 'bin/predict'; p.write_text(FAKE); p.chmod(0o755)
+    return c
+
+
+def test_predict_ok_and_sandboxed(tmp_path, monkeypatch):
+    monkeypatch.setenv('GITHUB_TOKEN', 'x'); monkeypatch.setenv('OPENAI_API_KEY', 'x')
+    pred, stats = common.predict(fake(tmp_path, 'ok'), 'sms', [{'id': 'a', 'text': 'hi'}, {'id': 'b', 'text': 'yo'}])
+    assert pred == {'a': 0, 'b': 0} and stats['invalid'] == 0
+
+
+@pytest.mark.parametrize('mode', ['dup', 'missing', 'extra'])
+def test_predict_id_mismatch(tmp_path, mode):
+    with pytest.raises(ValueError):
+        common.predict(fake(tmp_path, mode), 'sms', [{'id': 'a', 'text': 'hi'}, {'id': 'b', 'text': 'yo'}])
+
+
+def test_predict_surfaces_stderr(tmp_path):
+    with pytest.raises(RuntimeError, match='boom-detail'):
+        common.predict(fake(tmp_path, 'fail'), 'sms', [{'id': 'a', 'text': 'hi'}])
+
+
+def test_predict_rejects_gold_label(tmp_path):
+    with pytest.raises(ValueError, match='only id'):
+        common.predict(fake(tmp_path, 'ok'), 'sms', [{'id': 'a', 'text': 'hi', 'label': 1}])
+
+
+def test_dedupe_counts(tmp_path):
+    f = tmp_path / 'd.jsonl'
+    f.write_text(''.join(json.dumps(r) + '\n' for r in [{'id': 'a', 'label': 0}, {'id': 'a', 'label': 0}, {'id': 'b', 'label': 0}, {'id': 'b', 'label': 1}, {'id': 'c', 'label': 1}]))
+    stats = {}; kept = common.rows(f, dedupe=stats)
+    assert [r['id'] for r in kept] == ['a', 'c']
+    assert stats == {'duplicates_dropped': 1, 'conflicting_ids_dropped': 1, 'conflicting_rows_dropped': 2}
+
+
+def _git(repo, *args):
+    subprocess.run(['git', *args], cwd=repo, check=True, capture_output=True)
+
+
+def _ref(gate_x):
+    return json.dumps({'fixtures': {'sms.jsonl': {'rows': {'x': {'gate': gate_x}, 'y': {'gate': False}}}}, 'stress': {}})
+
+
+def _ratchet(repo, monkeypatch, base):
+    monkeypatch.setattr(sys, 'argv', ['ratchet.py', base, '--root', str(repo)])
+    return ratchet.main()
+
+
+def test_ratchet(tmp_path, monkeypatch):
+    repo = tmp_path; (repo / 'bench').mkdir()
+    _git(repo, 'init', '-q'); _git(repo, 'config', 'user.email', 't@example.invalid'); _git(repo, 'config', 'user.name', 'T')
+    (repo / 'bench/reference.json').write_text(_ref(True)); _git(repo, 'add', '.'); _git(repo, 'commit', '-qm', 'ref')
+    base = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
+    assert _ratchet(repo, monkeypatch, base) == 0
+    (repo / 'bench/reference.json').write_text(_ref(False))
+    assert _ratchet(repo, monkeypatch, base) == 1
+    (repo / 'bench/accepted_downgrades.json').write_text(json.dumps({'downgrades': [{'suite': 'fixtures', 'file': 'sms.jsonl', 'row': 'x', 'reason': 'fixture rewritten'}]}))
+    assert _ratchet(repo, monkeypatch, base) == 0
+    _git(repo, 'add', '.'); _git(repo, 'commit', '-qm', 'accept')
+    (repo / 'bench/reference.json').write_text(_ref(True)); _git(repo, 'commit', '-qam', 'regate')
+    head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
+    (repo / 'bench/reference.json').write_text(_ref(False))
+    assert _ratchet(repo, monkeypatch, head) == 1  # an entry already present at base does not cover a new downgrade

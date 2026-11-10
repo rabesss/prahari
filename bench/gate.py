@@ -37,6 +37,6 @@ def main():
     if not a.record and set(reference)!={p.name for p in FIXTURES}: failures.append('fixture files changed: regenerate reference')
     for error in failures: print('FAIL',error)
     if a.record: print('FIXTURE_JSON '+json.dumps(result, ensure_ascii=False))
-    print('FIXTURES '+('FAIL' if failures else 'PASS')); return bool(failures)
+    print('FIXTURES '+('FAIL' if failures else 'PASS')); return 1 if failures else 0
 
 if __name__=='__main__': sys.exit(main())
