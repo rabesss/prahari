@@ -82,7 +82,14 @@ baseline scored 81.56 on the same proxy; the round-1 entry scored 85.84 on the p
 Explanation checks on 28 items: 28 valid, verdict 0.9, consistency 0.964, mention 0.536, forbidden
 1.0, fabrication 1.0, actions 0.929, length 0.946.
 
-### Generalisation checks (local, before the final hidden run)
+## Generalisation
+
+Round 1 was the cautionary case: per-template Indian rules scored indic F1 0.967 on the visible set A
+but only 0.443 on the rotated set B (F1 0.886, FPR 12.8%), and Hindi accuracy fell to 0.22. The rules
+had memorised set A's wording. Round 2 replaces them with scam *mechanisms* (request-vs-statement
+framing, secret/payment/threat/lookalike mechanics) over char n-gram features, so unseen Hinglish and
+Hindi spellings still land on the same features: hidden indic F1 is 0.9665 with FPR 1.25% and Hindi
+accuracy 0.875 on B.
 
 - **Leave-one-category-out** on the visible Indian set (train on 15 categories plus the SMS corpus,
   test the held-out category, benign and malicious): **macro F1 1.0**; every malicious category
@@ -94,6 +101,10 @@ Explanation checks on 28 items: 28 valid, verdict 0.9, consistency 0.964, mentio
   minutes"), not slot swaps. Sources and runner: `research/stress/` at the repo root.
 - **Flow signatures** fire on 75 of 74,112 normal train+dev rows (0.10%) and cover the
   guess_passwd/teardrop/pod families; hidden flow F1 moved 0.8265 -> 0.8505.
+
+Remaining risk: 1.25% FPR is not zero, hidden SMS recall is 0.852, and Hindi is the weakest language at
+0.875. A scam that asks for nothing and only states a false fact can still pass. The report does not
+claim the set-B result proves generalisation to set C, which the controller scores separately.
 
 ## Performance on Arm
 
@@ -114,6 +125,29 @@ detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
 states a false fact can pass. The explanation model can still produce a wrong detail; deterministic
 guards catch fabricated domains and long numbers, not wrong advice.
+
+## Demo plan
+
+The demo device is **oracle-a1**, an Arm-based Linux VM (aarch64, 2x Neoverse-N1, about 11 GB RAM),
+the same core class the rules list for Arm-based Linux devices; the owner is confirming with the
+organisers that a cloud VM counts. Networking cannot be switched off wholesale because the owner
+reaches the box through an SSH tunnel, and `unshare -rn` is not permitted on this host
+(`/proc/self/uid_map`: Operation not permitted). The offline proof is therefore the controller's
+import-time guard, which is what `bin/eval` injects: it blocks non-loopback connects/DNS and logs the
+attempt. `tests/test_offline.py` shows that a socket connect fails under the guard while
+`bin/predict` still classifies the lookalike URL correctly.
+
+Three-minute video script:
+
+1. `uname -m` (aarch64) and `lscpu` (Neoverse-N1), `free -h` and `df -h`.
+2. Offline detections through the CLI: `bin/app --demo` runs six preset items (SMS electricity/OTP
+   scam, genuine bank debit alert, lookalike URL, official IRCTC URL, port-scan flow, prompt-injection
+   text). It prints verdict, evidence, the Llama explanation, latency and RSS, and writes
+   `demo_output.json`. Show the guard blocking a connect first.
+3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
+   a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
+4. State that everything runs on the local CPU through ExecuTorch, with no network after import, and
+   read the measured 4.72 s/item, 2.26 GB peak RSS and 20.1 decode tokens/s.
 
 ## Responsible AI, privacy and safety
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from . import indicrules, rules
+from . import indicrules, mech, rules, textmodel
 
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 _cache = {}
@@ -49,11 +49,56 @@ def _text_decision(p, score, prot, strong):
     return p
 
 
+_indic = None
+
+
+def indic_model():
+    global _indic
+    if _indic is None:
+        _indic = joblib.load(ART / "indic.joblib")
+    return _indic
+
+
 def predict_text(texts):
+    """Detect scams in SMS and Indian-context messages.
+
+    Indian-language and Indian-context messages go through the Indic model and the mechanism
+    layer, where the verdict follows what the message asks the reader to do. Everything else keeps
+    the generic English SMS model path unchanged, so the British SMS corpus behaviour is intact.
+    """
     m = _model("sms")
     ps = m.predict_proba(texts)[:, 1]
+    ana = {}
+    idx = []
+    for i, t in enumerate(texts):
+        a = mech.analyze(t)
+        ana[i] = a
+        strong_safe = {"transaction_receipt", "otp_notification", "protective", "official_channel",
+                       "bill_notice", "appointment_notice"} & set(a["safe"])
+        if mech.indic_context(t) or strong_safe:
+            idx.append(i)
+    pi = {}
+    if idx:
+        p_ind = textmodel.prob(indic_model(), [texts[i] for i in idx])
+        pi = dict(zip(idx, p_ind.tolist()))
     out = []
-    for t, p in zip(texts, ps):
+    for i, (t, p) in enumerate(zip(texts, ps)):
+        if i in pi:
+            a = ana[i]
+            lab, s, _ = mech.decide(float(pi[i]), a)
+            ev = mech.evidence(a) or [d for _, d in rules.text_indicators(t)]
+            out.append((lab, s, ev[:6]))
+            continue
+        a = ana[i]
+        decisive = [n for n, _ in a["harm"] if n in mech.DECISIVE]
+        benign_note = not a["harm"] and (a["official_channel"] or a["receipt"] or a["bill"]
+                                        or a["appointment"] or a["notice"])
+        if decisive:
+            out.append((1, max(float(p), 0.85), mech.evidence(a)[:6]))
+            continue
+        if benign_note:
+            out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
+            continue
         ind_ev, score, prot, strong = indicrules.indicators(t)
         p = _text_decision(float(p), score, prot, strong)
         ev = list(ind_ev) if ind_ev else rules.text_indicators(t)
@@ -90,6 +135,15 @@ def predict_flow(feature_rows):
     out = []
     for f, p in zip(feature_rows, ps):
         ev = []
+        if f.get("num_failed_logins", 0) > 0:
+            ev.append("failed login attempts recorded on the connection")
+            p = max(float(p), 0.90)
+        if f.get("wrong_fragment", 0) > 0:
+            ev.append("malformed packet fragments, typical of a teardrop or pod flood")
+            p = max(float(p), 0.90)
+        if f.get("land", 0) > 0:
+            ev.append("source and destination are the same host and port")
+            p = max(float(p), 0.90)
         if f.get("serror_rate", 0) > 0.5:
             ev.append("most connections were half-open (SYN errors)")
         if f.get("num_failed_logins", 0) > 0:
@@ -105,7 +159,9 @@ def predict_flow(feature_rows):
 
 def predict_flow_text(text):
     ev = rules.flow_text_indicators(text)
-    lab = 1 if any(n != "rejected" for n, _ in ev) else ("uncertain" if ev else 0)
+    if rules.BENIGN_FLOW.search(text) and not any(n in ("root", "flood") for n, _ in ev):
+        return 0, 0.35, [d for _, d in ev[:1]]
+    lab = 1 if any(n not in ("rejected", "beaconing") for n, _ in ev) else ("uncertain" if ev else 0)
     return lab, (0.9 if lab == 1 else 0.5 if ev else 0.1), [d for _, d in ev]
 
 

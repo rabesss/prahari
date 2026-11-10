@@ -18,6 +18,7 @@ HERE = Path(__file__).resolve().parent
 DATA = HERE.parents[1] / "data"
 ART = HERE / "artifacts"
 sys.path.insert(0, str(HERE))
+from triage import mech, textmodel  # noqa: E402
 from triage.detect import FLOW_CAT, flow_matrix  # noqa: E402
 
 
@@ -42,6 +43,18 @@ def main():
         ind = load("dev", "indic")
         print("indic dev F1", round(f1_score([r["label"] for r in ind], m.predict([r["text"] for r in ind])), 4))
     joblib.dump(m, ART / "sms.joblib", compress=3)
+
+    # Indic-context detector: visible Indian set + seed + the English SMS corpus, mechanism features.
+    ind = load("train", "indic")
+    seed = load("train", "indic_seed")
+    tr_i, y_i = [r["text"] for r in ind + seed + tr], [r["label"] for r in ind + seed + tr]
+    ib = textmodel.fit(tr_i, y_i)
+    if (DATA / "dev" / "indic.jsonl").exists():
+        dv_i = load("dev", "indic")
+        pr = textmodel.prob(ib, [r["text"] for r in dv_i])
+        labs = [mech.decide(float(p), mech.analyze(r["text"]))[0] for r, p in zip(dv_i, pr)]
+        print("indic dev F1", round(f1_score([r["label"] for r in dv_i], labs), 4))
+    joblib.dump(ib, ART / "indic.joblib", compress=3)
 
     tr, dv = load("train", "url"), load("dev", "url")
     u = make_pipeline(TfidfVectorizer(analyzer="char", ngram_range=(3, 5), min_df=3, sublinear_tf=True, max_features=200000),

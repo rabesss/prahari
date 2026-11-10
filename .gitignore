@@ -11,4 +11,3 @@ __pycache__/
 candidates/*/artifacts/*.joblib
 !candidates/BEST/artifacts/*.joblib
 !candidates/indic1/artifacts/*.joblib
-!candidates/gen2/artifacts/*.joblib

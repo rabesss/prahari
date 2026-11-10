@@ -23,7 +23,8 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. Nothin
 ## Run
 ```sh
 bin/app --selftest                 # quick check
-bin/app --demo                     # six end-to-end detections with Llama explanations
+bin/app --demo                     # six detections; prints verdict/evidence/explanation/latency/RSS,
+                                   # writes demo_output.json
 bin/app --port 8765                # web UI on http://127.0.0.1:8765
 bin/predict --task sms --in in.jsonl --out out.jsonl
 bin/explain --in items.jsonl --out explained.jsonl

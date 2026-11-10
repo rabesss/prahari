@@ -45,6 +45,7 @@ def find_urls(text):
 
 
 def host_of(url):
+    url = re.sub(r"[\u200b-\u200f\u2060\ufeff\u00ad]", "", url)
     u = url if "://" in url else "http://" + url
     try:
         return (urlparse(u).hostname or "").lower()
@@ -66,6 +67,12 @@ def url_indicators(url):
         return ev
     reg = registrable(host)
     official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES)
+    if "xn--" in host:
+        ev.append(("punycode", f"the domain {host} uses punycode, which can hide a lookalike name"))
+    if any(ord(c) > 127 for c in host):
+        ev.append(("homoglyph", f"the domain {host} mixes in non-Latin characters to imitate a name"))
+    if re.search(r"[\u200b-\u200f\u2060\ufeff\u00ad]", url):
+        ev.append(("hidden_chars", "the link contains invisible characters that hide its real host"))
     if re.fullmatch(r"[\d.]+", host):
         ev.append(("ip_host", f"the link points to a raw IP address ({host})"))
     if reg in SHORTENERS:
@@ -114,12 +121,21 @@ def injection_indicators(text):
 
 
 FLOW_RULES = [
-    ("port_scan", r"\b(\d{2,} (different|distinct) ports|port scan|many ports|sequential ports)\b", "connections to many ports look like a port scan"),
-    ("brute_force", r"\b(\d{2,} failed (logins?|login attempts|password)|brute.?force|repeated failed)\b", "many failed logins look like password guessing"),
-    ("flood", r"\b(syn flood|\d{3,} (syn|half-open|connections) (packets )?(per|in|within)|flood|ddos|dos)\b", "a burst of connections looks like a flood / denial-of-service attempt"),
+    ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
+                  r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
+    ("brute_force", r"\b(\d+\s+(failed\s+)?(login|password)\s+(attempts?|failures?)|failed\s+(logins?|passwords?)|"
+                    r"brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
+    ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
+              r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
+    ("beaconing", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?|"
+                  r"beacon\w*|command\s+and\s+control|\bc2\b)", "connections repeat at a fixed interval, like beaconing"),
     ("rejected", r"\b(rejected|reset|rst|refused|s0)\b", "most connections were rejected or reset"),
     ("root", r"\b(root shell|su attempt|privilege)\b", "the session tried to gain root privileges"),
 ]
+
+
+BENIGN_FLOW = re.compile(r"\b(software update|update check|routine|normal|expected|scheduled backup|"
+                         r"heartbeat|legitimate|official)\b", re.I)
 
 
 def flow_text_indicators(text):

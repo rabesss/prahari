@@ -54,3 +54,5 @@ from 10.94% to 1.25% (F1 0.9665, Hindi accuracy 0.875 vs 0.22 in round 1); flow 
 three blind paraphrase suites, 0 errors). Trade accepted: hidden SMS recall 0.852 because British
 ad-spam uses the same protective phrases as genuine Indian notices. Report: `research/REPORT.md`;
 app report: `candidates/gen2/REPORT.md`. Owner still owns submission; nothing was pushed or published.
+
+- Promotion (gate): `gen2-r2b` full score 87.66 (stamp `20261110-081343-gen2-full-r2b`; earlier full run 86.97 with identical detection) beats previous BEST full 81.56 (stamp `20261110-064323-baseline-r2`) by 6.10 (>0.5); promotable, no failures. Leave-one-category-out on visible set A: macro F1 1.0, not dropped (round-1 `indic1` had no LOCO number in LOG; this is the first measured value). `candidates/BEST` is now the gen2 tree; the previous BEST is kept as `candidates/BEST_prev_gen2-r2b`.
