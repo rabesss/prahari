@@ -20,6 +20,16 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. Nothin
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
 
+## Setup (one command on a fresh aarch64 Linux box)
+```sh
+python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+bin/app --selftest        # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
+```
+The Python package, entry scripts and joblib detectors in this directory are the **compiled application**
+for Phase 1: `bin/app` is the single documented entry (UI, `--demo`, `--selftest`), and `bin/predict` /
+`bin/explain` are the batch entry points. The Llama `.pte` and tokenizer are read from the model registry
+(`models/registry.json`, `llama32-1b-qlora`); model files are not committed.
+
 ## Run
 ```sh
 bin/app --selftest                 # quick check

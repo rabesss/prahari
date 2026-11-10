@@ -42,6 +42,21 @@ def test_fullwidth_pin_is_normalised():
     assert lab == 1
 
 
+def test_shortener_flagged():
+    names = [n for n, _ in rules.url_indicators("https://bit.ly/3xYzAbC")]
+    assert "shortener" in names
+
+
+def test_subdomain_injection_flagged():
+    names = [n for n, _ in rules.url_indicators("http://sbi.co.in.evil.top/login")]
+    assert "brand_lookalike" in names and "risky_tld" in names
+
+
+def test_at_sign_hides_destination():
+    names = [n for n, _ in rules.url_indicators("http://sbi.com@evil.top/")]
+    assert "at_sign" in names
+
+
 def test_punycode_and_homoglyph_domains_flagged():
     for url in ("http://xn--sbi-9ba.com/login", "http://sbi\u0441.com/login"):
         names = [n for n, _ in rules.url_indicators(url)]

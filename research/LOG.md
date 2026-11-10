@@ -56,3 +56,5 @@ ad-spam uses the same protective phrases as genuine Indian notices. Report: `res
 app report: `candidates/gen2/REPORT.md`. Owner still owns submission; nothing was pushed or published.
 
 - Promotion (gate): `gen2-r2b` full score 87.66 (stamp `20261110-081343-gen2-full-r2b`; earlier full run 86.97 with identical detection) beats previous BEST full 81.56 (stamp `20261110-064323-baseline-r2`) by 6.10 (>0.5); promotable, no failures. Leave-one-category-out on visible set A: macro F1 1.0, not dropped (round-1 `indic1` had no LOCO number in LOG; this is the first measured value). `candidates/BEST` is now the gen2 tree; the previous BEST is kept as `candidates/BEST_prev_gen2-r2b`.
+- 20261110-083519 `gen4-flowtext` score=87.6 D=0.9024 E=0.8973 P=0.655 C=1.0 fail=0 quick=False
+- Note on `20261110-083519 gen4-flowtext`: flow-explanation variant (beaconing malicious, benign flow evidence) E 0.8875 -> 0.8973, flow by-kind 0.787 -> 0.856, D identical; 87.60 vs 87.66 is latency noise under co-tenant load, not promoted. Kept as `candidates/gen6` with an additional plural-evidence prompt for the next confirm run.

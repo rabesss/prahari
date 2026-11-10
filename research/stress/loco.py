@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CAND = ROOT / "candidates" / "gen2"
+CAND = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "candidates" / "gen2"
 sys.path.insert(0, str(CAND))
 
 from sklearn.metrics import f1_score  # noqa: E402

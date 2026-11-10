@@ -82,6 +82,12 @@ baseline scored 81.56 on the same proxy; the round-1 entry scored 85.84 on the p
 Explanation checks on 28 items: 28 valid, verdict 0.9, consistency 0.964, mention 0.536, forbidden
 1.0, fabrication 1.0, actions 0.929, length 0.946.
 
+A flow-explanation variant was also scored: it treats a lone beaconing description as malicious
+(round 1 called a beaconing flow safe) and gives benign flow descriptions an evidence phrase. It
+raised E from 0.8875 to 0.8973 (flow by-kind 0.787 to 0.856) with identical detection (D 0.9024);
+its overall 87.60 was 0.06 below, inside the latency noise band, so it was not promoted over the
+87.66 run.
+
 ## Generalisation
 
 Round 1 was the cautionary case: per-template Indian rules scored indic F1 0.967 on the visible set A
@@ -113,6 +119,17 @@ explanation latency **4.72 s per item** over two repeats (130.4 s and 132.2 s fo
 2.256 GB, decode 20.1 tokens/s, prefill 82.5 tokens/s, median prompt 199 tokens and 34 generated
 tokens. Detector latency is 0.407 ms per item. The candidate bundle is 1.186 GB including the shared
 1.1 GB Llama PTE. The UI, CLI and demo run offline; no network calls are made after import.
+
+| Component | Configuration measured |
+|---|---|
+| Demo box | aarch64 Oracle A1 VM, 2 vCPU Neoverse-N1, about 11 GB RAM, Ubuntu 24.04, no GPU |
+| Detectors | scikit-learn / joblib on the CPU; 0.407 ms per item for all four tasks |
+| Explanation model | `llama32-1b-qlora`: Llama 3.2 1B Instruct, INT4 group-32 weights, 8-bit dynamic activations, XNNPACK backend, ExecuTorch 1.6 |
+| Decoding | greedy (temperature 0), max 40 new tokens, context from the `.pte` |
+| Measured run | prefill 82.5 tokens/s, decode 20.1 tokens/s, 4.72 s/item over 28 items, peak RSS 2.256 GB |
+
+The registry's `llama32-1b-spinquant` entry was also measured on this box (about 58-63 prefill and
+12-13.5 decode tokens/s under mixed co-tenant load), slower than `qlora`, so `qlora` stays configured.
 
 ## Limitations
 

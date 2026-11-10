@@ -1,0 +1,29 @@
+{
+ "label": "gen4-flowtext",
+ "candidate": "candidates/gen4",
+ "stamp": "20261110-083519",
+ "artifacts": "research/evals/20261110-083519-gen4-flowtext",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 87.6,
+ "scores": {
+  "D": 0.9024,
+  "E": 0.8973,
+  "P": 0.655,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9015,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9665,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8505,
+  "explain_s_per_item": 4.96,
+  "peak_rss_gb": 2.256,
+  "decode_tps": 19.9795,
+  "model": "llama32-1b-qlora"
+ }
+}
