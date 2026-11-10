@@ -1,0 +1,1 @@
+[{"verdict": "malicious", "score": 1.0, "evidence": ["asks you to share a PIN, OTP, card or account detail", "threatens to block, cut or freeze an account, SIM or connection", "the domain sbi-kyc.in-verify.top imitates 'sbi' on .top"]}, {"verdict": "benign", "score": 0.2656, "evidence": ["the domain irctc.co.in is an official domain"]}]

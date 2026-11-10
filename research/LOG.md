@@ -41,3 +41,16 @@ One line per `bin/eval` run (appended automatically). Add a short note after a l
 - 20261109-205138 `final-verify` score=84.4 D=0.9144 E=0.7738 P=0.6313 C=1.0 fail=0 quick=True
 - 20261109-205413 `audit-final-r2` score=85.84 D=0.9144 E=0.8129 P=0.6541 C=1.0 fail=0 quick=False
 - 20261110-064323 `baseline-r2` score=81.56 D=0.7048 E=0.8964 P=0.6505 C=1.0 fail=0 quick=False
+- 20261110-072454 `gen2-quick` score=78.47 D=0.7112 E=0.8406 P=0.5561 C=1.0 fail=0 quick=True
+- 20261110-073218 `gen2-quick2` score=80.79 D=0.7521 E=0.8406 P=0.6104 C=1.0 fail=0 quick=True
+- 20261110-074008 `gen2-quick3` score=84.73 D=0.8915 E=0.8406 P=0.5986 C=1.0 fail=0 quick=True
+- 20261110-080445 `gen2-full-r2` score=86.97 D=0.9024 E=0.8929 P=0.6289 C=1.0 fail=0 quick=False
+- 20261110-081343 `gen2-full-r2b` score=87.66 D=0.9024 E=0.8875 P=0.6701 C=1.0 fail=0 quick=False
+
+Round-2 candidate: `candidates/gen2`, authoritative run `20261110-081343-gen2-full-r2b` score=87.66
+(D 0.9024, E 0.8875, P 0.6701, C 1.0). Mechanism layer and strong-cue routing cut hidden indic FPR
+from 10.94% to 1.25% (F1 0.9665, Hindi accuracy 0.875 vs 0.22 in round 1); flow signatures moved F1
+0.8265 -> 0.8505. Generalisation evidence: `research/stress/` (leave-one-category-out macro F1 1.0;
+three blind paraphrase suites, 0 errors). Trade accepted: hidden SMS recall 0.852 because British
+ad-spam uses the same protective phrases as genuine Indian notices. Report: `research/REPORT.md`;
+app report: `candidates/gen2/REPORT.md`. Owner still owns submission; nothing was pushed or published.

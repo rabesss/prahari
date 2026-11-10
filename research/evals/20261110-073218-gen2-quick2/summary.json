@@ -1,0 +1,29 @@
+{
+ "label": "gen2-quick2",
+ "candidate": "candidates/gen2",
+ "stamp": "20261110-073218",
+ "artifacts": "research/evals/20261110-073218-gen2-quick2",
+ "quick": true,
+ "queued_s": 0.0,
+ "score": 80.79,
+ "scores": {
+  "D": 0.7521,
+  "E": 0.8406,
+  "P": 0.6104,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": false,
+ "headline": {
+  "sms_f1": 0.9415,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9325,
+  "indic_fpr": 0.0875,
+  "flow_f1": 0.8265,
+  "explain_s_per_item": 5.72,
+  "peak_rss_gb": 2.256,
+  "decode_tps": 20.624,
+  "model": "llama32-1b-qlora"
+ }
+}

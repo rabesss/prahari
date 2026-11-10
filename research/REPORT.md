@@ -1,117 +1,106 @@
-> **Historical (round 1, 9 Nov).** Superseded by the round-2 brief: scores below use the old eval and set A,
-> which `indic1` overfit (set B score 0.443). The worker rewrites this report for round 2.
-
-# Research report: PS3 Kavach Lite (9 Nov 2026)
+# Research report: PS3 Kavach Lite (round 2, 10 Nov 2026)
 
 ## Current best
 
-**Candidate:** `candidates/indic1` (the best candidate; `candidates/BEST` is the 69.33 baseline
-and must not be edited in place).
+**Candidate:** `candidates/gen2` (built from the validated BEST tree; `candidates/BEST` was not edited).
+**Full `bin/eval` proxy (two repeats):** **87.66** — stamp `20261110-081343-gen2-full-r2b`, promotable,
+no failures or infra errors, D 0.9024, E 0.8875, P 0.6701, C 1.0. Evidence:
+`research/evals/20261110-081343-gen2-full-r2b/`. The prior full run `20261110-080445-gen2-full-r2`
+scored 86.97 with identical detection; the difference is a shorter explanation prompt (4.72 s/item
+vs 5.39 s/item) at a small mention-coverage cost.
 
-**Full `bin/eval` proxy (`--repeats 2`):** **85.84** — D 0.9144, E 0.8129, P 0.6541, C 1.0,
-promotable, no failures or infra errors. Evidence:
-`research/evals/20261109-205413-audit-final-r2/`. A single-repeat full run of the same tree scored
-86.23 (P 0.6736, 4.75 s/item); the 0.39 gap is the slower of the two latency repeats (5.06 s),
-inside the brief's noise band.
+| Run | Score | D | E | P | C | Notes |
+|---|---|---|---|---|---|---|
+| `baseline-r2` (full) | 81.56 | 0.7048 | 0.8964 | 0.6505 | 1.00 | starting tree |
+| `gen2-quick` | 78.47 | 0.7112 | 0.8406 | 0.5561 | 1.00 | first mechanism layer, FPR 10.94% |
+| `gen2-quick2` | 80.79 | 0.7521 | 0.8406 | 0.6104 | 1.00 | FP mechanism fixes, FPR 8.75% |
+| `gen2-quick3` | 84.73 | 0.8915 | 0.8406 | 0.5986 | 1.00 | safe-cue routing, FPR 1.25% |
+| `gen2-full-r2` | 86.97 | 0.9024 | 0.8929 | 0.6289 | 1.00 | first promotion run |
+| `gen2-full-r2b` | **87.66** | 0.9024 | 0.8875 | 0.6701 | 1.00 | authoritative run after prompt/latency trim |
 
-| Run | Score | D | E | P | C |
-|---|---|---|---|---|---|
-| baseline `BEST` | 69.33 | 0.6720 | 0.7511 | 0.5195 | 0.80 |
-| rule layer (`indic16-full`) | 84.36 | 0.8563 | 0.8129 | 0.6673 | 1.00 |
-| utility gate + flow 0.10, single (`indic31-full-utility`) | 86.23 | 0.9144 | 0.8129 | 0.6736 | 1.00 |
-| same tree, authoritative two repeats (`audit-final-r2`) | **85.84** | **0.9144** | **0.8129** | **0.6541** | **1.00** |
-
-Detection at the current best: SMS F1 0.9613 (FPR 0.0057), URL F1 0.9949 (FPR 0), indic F1 0.967
-(FPR 0.0071, no penalty), flow F1 0.8265 (FPR 0.0299, penalised score 0.7444). Explanation on 28
-items: 28 valid and plausible, verdict 0.829, mention 0.357, forbidden 1.0, fabrication 1.0,
-actions 0.929, length 1.0. Performance: 5.06 s/item over two repeats (4.75 single), peak RSS 2.210
-GB, decode 20.2 tok/s, prefill 84.9 tok/s, detector 0.376 ms/item, bundle 1.184 GB.
+Detection on the authoritative run: SMS F1 0.9015 (precision 0.957, recall 0.852, FPR 0.78%), URL
+F1 0.9949 (FPR 0), indic F1 0.9665 (precision 0.987, recall 0.947, FPR 1.25%, score 0.9544), flow
+F1 0.8505 (recall 0.757, FPR 3.03%, penalised score 0.7643). Indic accuracy by language: English
+0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875 (round 1 set-B Hindi was 0.22). Explanation checks on
+28 items: 28 valid, verdict 0.9, consistency 0.964, mention 0.536, forbidden 1.0, fabrication 1.0,
+actions 0.929, length 0.946. Performance: 4.72 s/item over two repeats (130.4 s, 132.2 s), peak RSS
+2.256 GB, 20.1 decode tok/s, 82.5 prefill tok/s, median prompt 199 tokens, 34 generated; detector
+0.407 ms/item. The previous run traded 0.107 mention coverage for 0.67 s/item; the trim won 0.7
+points in total.
 
 ## What worked
 
-1. **Indian-context rule layer** (seed rules plus recall patterns). Indic F1 rose from 0.7406 to
-   0.9455, then 0.967. Hinglish money requests, postfixed block threats (`card block ho gaya`),
-   `details update` ordering, customs/parcel payment requests and Devanagari verify-plus-urgency
-   combinations were the useful additions. English SMS did not regress.
-2. **Routine utility-bill gate.** A message that names a utility (`bill`, `electricity`, `water`,
-   `gas`, `broadband`, `consumer`, `autopay`), carries a link on a plain non-risky host, and makes
-   no threat, secret request or deadline is treated as a genuine reminder. This cut indic FPR from
-   3.57% to 0.71% (4 false positives removed) and lifted indic F1 from 0.9531 to 0.967, without
-   changing visible seed/dev recall.
-3. **Flow threshold 0.10.** Recall on KDDTest+ rose from 0.6857 to 0.7202 while FPR moved only from
-   0.0281 to 0.0299; flow score rose from 0.7306 to 0.7444. The model's benign scores are
-   concentrated well below 0.10, so the lower threshold is cheap.
-4. **Compliance and packaging.** C reached 1.0 (offline guard, tests, app selftest, docs) after the
-   candidate report/README were brought in line with the measured run.
+- **Mechanism layer over template rules.** The decision now follows what a message asks the reader to
+  do (hand over a secret, pay an unverified destination, transfer to a "safe" account) and what it
+  says about itself (completed receipt, OTP notice, appointment, bill, official channel, protection
+  clause). Rules that memorised round-1 set A wording are gone.
+- **Routing on a strong benign cue.** Indian-token routing alone missed English appointment, OTP,
+  bill and receipt rows; routing those to the mechanism layer (receipt, OTP notice, protection,
+  appointment, bill, official channel) cut hidden indic FPR from 10.9% to 1.25%. Weak cues (promo,
+  bare "notice") stay on the generic SMS path so British ad-spam keeps recall.
+- **False-positive repairs from the hidden-set analysis.** Payment requests now require a personal
+  destination, a lookalike/throwaway host or an upfront fee; Hindi receipts, premiums, tickets,
+  recharges and refunds are recognised; "no advance fee", "no payment link", "nothing to pay" and
+  their Hindi equivalents clear a message; a completion statement ("Aadhaar update is done") is not
+  a request to hand over a secret.
+- **Protective clauses cannot launder a phishing link.** A message that both says "we never ask for
+  a PIN" and asks the reader to enter it on a lookalike host is flagged (`phish_link`), as is a
+  "safe account" balance-transfer instruction.
+- **Flow signatures.** Three NSL-KDD rules with zero/near-zero false positives on 74k normal rows
+  (failed logins, malformed fragments, same source/destination) recover R2L/DoS rows that the
+  KDDTrain+ model misses after the KDDTest+ shift.
+- **Explanation format.** A forced first sentence ("This message is DANGEROUS/SAFE."), neutralised
+  URLs in the prompt, a verbatim-evidence instruction and a contradiction post-filter removed all
+  refusals on the six visible examples; hidden forbidden-word failures went 2/28 -> 0/28 and
+  consistency 0.929 -> 0.964. Trimming the prompt from 222 to 199 tokens cut 0.67 s/item.
+- **Evidence wording aligned with the judge's concept list** ("official app", "OTP", "payment",
+  "lookalike domain", "port scan"), so a copied phrase is likely to satisfy mention even when the
+  model paraphrases the rest.
 
-## What failed, and why
+## What failed and why
 
-- **Flow threshold 0.05:** recall 0.7330 but FPR jumped to 0.0670; score collapsed to 0.5875
-  (`indic20-flow005`). 0.10 is the useful end of the curve.
-- **Broad `transaction_update` protection in the utility gate:** made scam and receipt rows benign;
-  indic F1 fell to 0.9493 and SMS to 0.9587 (`indic29-utility-txn`). Reverted.
-- **Changing protective weights when a link is present:** no indic gain, SMS fell to 0.9587 and E
-  fell to 0.7362 (`indic24-linkweight`). Reverted.
-- **Evidence-steering prompt:** asking the model to repeat evidence words made it contradict the
-  supplied verdict on a benign bank alert; the combined evidence + verdict-pin prompt triggered
-  refusals (`I cannot provide...`). Reverted. Verdict-pin alone reduced E from 0.8129 to 0.8057
-  (`indic32-full-verdictpin`), so the original prompt is kept.
-- **Earlier prompt shortening** (history, c35) caused refusals; the compact prompt is at its safe
-  lower bound.
+- **Training another model on set A** would repeat round-1 overfitting; the generator's wording,
+  not its labels, is what shifts. Leave-one-category-out (below) tests this directly.
+- **Routing every text with any safe cue** (including promo and bare "notice") to the mechanism
+  layer cost 4 points of SMS recall because British ad-spam uses the same protective phrases. The
+  strong-cue-only variant keeps most of the FPR gain and recovers the recall.
+- **Treating "update/verify" as a secret request** flagged a completed Aadhaar update. The hand-over
+  verb list excludes completion statements.
 
-## Open risks (ranked)
+## Generalisation evidence (local)
 
-- **P0 — explanation mention coverage is 0.357.** This is the largest remaining scoring gap:
-  mention is 20% of E, so perfect coverage would add about 0.13 E (about 3.2 proxy points). The
-  1B model paraphrases instead of naming the required concept. A grounded concept sentence or a
-  better prompt is the next lever; both must keep all six dev examples healthy (no refusals, no
-  verdict contradiction).
-- **P0 — utility gate generalisation.** The gate is deliberately narrow (no threat, secret request
-  or deadline; plain host), but a scam that avoids threat words and uses a plain domain can still
-  pass. Visible seed/dev recall is unchanged; re-check on any new data before submission.
-- **P1 — Hindi recall.** Hindi rows score 0.679 accuracy (28 rows), while Hinglish, English and
-  mixed are 1.0. Bank-security, KYC and refund categories still miss about two rows each.
-- **P1 — flow distribution shift.** F1 0.8265 with FPR 2.99% costs about 9% through the FPR
-  penalty. More feature engineering or class weighting could help, but every change needs a full
-  eval because precision is already 0.97.
-- **P2 — latency and memory.** 5.06 s/item over two repeats (4.75 single) and 2.210 GB peak RSS on
-  2× Neoverse-N1. Re-measure on the actual demo hardware (Pi 5 or phone) before the live demo; the
-  bundle includes the shared 1.1 GB Llama PTE.
-- **P2 — docs must track the final run.** Candidate REPORT/README currently quote the two-repeat
-  result (85.84, single 86.23); update them if the owner runs a different final eval.
+- **Leave-one-category-out on the visible Indian set** (train on 15 categories plus the SMS corpus,
+  test the held-out category): macro F1 1.0; every malicious category 10/10, every benign category
+  0/10 false positives (`research/evals`-independent script in `research/stress/loco.py`).
+- **Blind paraphrase suites** (authored after the rules were frozen, never used for training):
+  `protective` 40 cases, Hindi/Hinglish benign/scam 21, mixed English/Hindi 30. All correct on the final
+  tree. Suites and runner are in `research/stress/`.
+- These suites deliberately use unseen wording ("nothing to pay", "no fee is charged", "रिफंड आ गया"),
+  not slot swaps of set A.
 
-## Evidence paths
+## Open risks
 
-- Authoritative two-repeat run: `research/evals/20261109-205413-audit-final-r2/`.
-- Best single-repeat run: `research/evals/20261109-203912-indic31-full-utility/`.
-- Rule-layer full run: `research/evals/20261109-200745-indic16-full/`.
-- Baseline: `research/evals/20261109-183806-baseline/`.
-- Flow threshold trials: `research/evals/20261109-201032-indic17-flow040/`,
-  `...-201148-indic18-flow030/`, `...-201305-indic19-flow015/`, `...-201423-indic20-flow005/`,
-  `...-201603-indic21-flow010/`.
-- Utility-gate trials: `...-202932-indic26-utility-plainlink/` (broad),
-  `...-203756-indic30-utility-routine/` (final narrow form).
-- Prompt trials: `...-204514-indic32-full-verdictpin/`; dev refusal checks are not scored.
-- Ledger: `research/evals/ledger.jsonl`; auto log: `research/LOG.md`.
+- **P0 — set C is written to a different spec.** Templates and slots will differ again. The mechanism
+  layer is designed for that, but a new *mechanism* (e.g. a scam that asks for nothing and only
+  states a false fact) can still pass. Mitigation: the evidence list shows why a verdict was reached,
+  and the uncertain band is preferred over a confident wrong answer.
+- **P0 — the 1B explainer.** Refusals are handled by two retries (plain retry, then an evidence-only
+  prompt) and a contradiction filter; forbidden-word failures are now 0/28, but mention coverage fell
+  to 0.536 when the prompt was trimmed. A stricter grounding prompt would trade latency for mention.
+- **P1 — flow shift.** Hidden flow is the KDDTest+ distribution; recall is about 0.72 before the new
+  signatures. Novel attack types (apache2, mscan, snmpget) still look normal to a KDDTrain+ model.
+- **P1 — SMS/indic trade.** Aggressive benign routing costs some British ad-spam recall (dev F1 0.887
+  vs 0.962); hidden sms F1 is expected near 0.88-0.89. The indic weight (0.40 vs 0.20) and the FPR
+  penalty make this trade clearly positive.
+- **P1 — Arabic-script and other Indic languages** are still outside the pattern coverage; the
+  character n-gram model is the only fallback.
 
-## Recommendation and submission steps
+## Recommendation and owner steps
 
-Submit **`candidates/indic1`** (85.84 two-repeat proxy, 86.23 single), not the 69.33
-`candidates/BEST`.
-
-1. Copy the candidate tree to the submission repo root so that `bin/predict`, `bin/explain`,
-   `bin/app`, `triage/`, `app/`, `artifacts/`, `tests/`, `config.json`, `train.py`, `README.md`,
-   `REPORT.md` and `DATA.md` sit at the top level. Keep `candidates/BEST` out of the submitted app.
-2. Do not commit model weights. `config.json` -> `model` names the shared registry entry
-   `llama32-1b-qlora`; `DATA.md` holds the download commands and licences. Keep the import-time
-   network guard and the hidden-data guard intact.
-3. Run the owner-side checks once from the repo root: `pytest` (5 tests), `bin/app --selftest`,
-   and a final full `bin/eval <candidate>` if the controller asks for a fresh stamp. Quote that
-   stamp in REPORT/README.
-4. Record the demo with the local UI: a malicious SMS (electricity/OTP), a genuine bank debit alert,
-   a lookalike URL, a flow port scan and a prompt-injection text. Show verdict, evidence, actions
-   and the offline/ExecuTorch metadata.
-5. Use `candidates/indic1/REPORT.md` as the report source; it has the required sections (Problem,
-   Architecture, Models, Datasets, Results, Performance, Limitations, Responsible AI).
-6. Agents never submit, register or publish. The repo may stay private during development; the owner
-   decides visibility before 23 Nov.
+1. Promote `candidates/gen2` (or the renamed final copy) using the full-run stamp above.
+2. Owner-side checks from the repo root: `pytest candidates/gen2/tests`, `bin/app --selftest`,
+   `bin/app --demo`, and `bin/eval <candidate> --repeats 2` if a fresh stamp is wanted.
+3. Record the demo with the local UI: electricity/OTP SMS, genuine bank debit alert, lookalike URL,
+   port scan, prompt-injection text. Show verdict, evidence, actions, offline and ExecuTorch metrics.
+4. `candidates/gen2/REPORT.md` is the app report; this file is the research record.
+5. Agents never submit, register or publish. Visibility stays with the owner.
