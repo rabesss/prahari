@@ -18,6 +18,7 @@ CONFIG = re.compile(r'^(?:candidates/[^/]+/config\.json|models/registry\.json|ev
 ARTIFACT = re.compile(r'^candidates/[^/]+/artifacts/[^/]+\.joblib$')
 RECORD = re.compile(r'^research/evals/[^/]+/(summary|details)\.json$')
 LOG = re.compile(r'^research/evals/[^/]+/(run|app|tests|guard)\.log$')
+RESULT = re.compile(r'^bench/results/[^/]+\.json$')
 SYNTH = re.compile(r'^(?:research/stress|bench/fixtures)/[^/]+\.jsonl$')
 ITEM_ID = re.compile(r'(?:\b(?:sms|url|flow|ind|indic|ex|exp)[-_][0-9a-f]{6,}\b|\bflow-te-\d+\b)', re.I)
 # Construct patterns without embedding token-shaped examples in this source.
@@ -29,6 +30,28 @@ STATUS = [re.compile(p) for p in (
     r'^\d+ passed(?:, \d+ (?:skipped|warnings?))? in \d+(?:\.\d+)?s\s*$',
     r'^(?:SELFTEST|selftest)\s*(?::|=)?\s*OK\s*$',
 )]
+
+
+SELFTEST_KEYS = {'verdict', 'score', 'evidence'}
+
+
+def selftest_line(line):
+    """bin/app --selftest prints one JSON list of results for the presets hard-coded in candidates/*/app/server.py."""
+    try:
+        value = json.loads(line)
+    except ValueError:
+        return False
+    if not isinstance(value, list) or not 1 <= len(value) <= 5:
+        return False
+    for r in value:
+        if not isinstance(r, dict) or not set(r) <= SELFTEST_KEYS or r.get('verdict') not in ('malicious', 'benign', 'uncertain'):
+            return False
+        if type(r.get('score')) not in (int, float):
+            return False
+        ev = r.get('evidence', [])
+        if not isinstance(ev, list) or len(ev) > 10 or any(not isinstance(e, str) or len(e) > 200 or ITEM_ID.search(e) for e in ev):
+            return False
+    return True
 
 
 def git(*args, binary=False):
@@ -144,7 +167,7 @@ def main():
                 def fail(rule): failures.add((path, rule))
                 if mode not in ('100644', '100755'):
                     fail('non-regular blob'); continue
-                rules = [('code/docs', CODE.fullmatch(path)), ('config', CONFIG.fullmatch(path)), ('artifact', ARTIFACT.fullmatch(path)), ('eval JSON', RECORD.fullmatch(path)), ('eval log', LOG.fullmatch(path)), ('ledger', path == 'research/evals/ledger.jsonl'), ('synthetic', SYNTH.fullmatch(path))]
+                rules = [('code/docs', CODE.fullmatch(path)), ('config', CONFIG.fullmatch(path)), ('artifact', ARTIFACT.fullmatch(path)), ('eval JSON', RECORD.fullmatch(path) or RESULT.fullmatch(path)), ('eval log', LOG.fullmatch(path)), ('ledger', path == 'research/evals/ledger.jsonl'), ('synthetic', SYNTH.fullmatch(path))]
                 matched = [name for name, match in rules if match]
                 if len(matched) != 1:
                     fail('path not uniquely allowlisted'); continue
@@ -160,7 +183,8 @@ def main():
                 if rule == 'eval log':
                     try: lines = data.decode('utf-8').splitlines()
                     except UnicodeError: lines = ['<invalid>']
-                    if any(not any(rx.fullmatch(line) for rx in STATUS) for line in lines): fail('non-status log line')
+                    is_app = path.endswith('/app.log')
+                    if any(not (any(rx.fullmatch(line) for rx in STATUS) or (is_app and selftest_line(line))) for line in lines): fail('non-status log line')
                 if args.hidden_check:
                     try: decoded = data.decode('utf-8')
                     except UnicodeError: fail('hidden check undecodable text'); continue

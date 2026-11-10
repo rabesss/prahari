@@ -9,13 +9,25 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
-def rows(path):
+def rows(path, dedupe=None):
+    """Strict by default. With dedupe={} (a stats dict), rows sharing an id and label keep the first copy and
+    ids with conflicting labels are dropped; counts are recorded in the dict (dev data quirk, e.g. repeated URLs)."""
     with open(path, encoding='utf-8') as f:
         result = [json.loads(line) for line in f if line.strip()]
     if not result: raise ValueError(f'empty input: {path}')
     ids = [r.get('id') for r in result]
-    if any(not isinstance(i, str) or not i for i in ids) or len(set(ids)) != len(ids):
-        raise ValueError(f'missing or duplicate input ids: {path}')
+    if any(not isinstance(i, str) or not i for i in ids): raise ValueError(f'missing input ids: {path}')
+    if len(set(ids)) != len(ids):
+        if dedupe is None: raise ValueError(f'duplicate input ids: {path}')
+        labels = {}
+        for r in result: labels.setdefault(r['id'], set()).add(json.dumps(r.get('label')))
+        conflict = {i for i, s in labels.items() if len(s) > 1}
+        seen, kept = set(), []
+        for r in result:
+            if r['id'] in conflict or r['id'] in seen: continue
+            seen.add(r['id']); kept.append(r)
+        dedupe.update(duplicates_dropped=len(result) - len(kept) - sum(ids.count(i) for i in conflict), conflicting_ids_dropped=len(conflict))
+        result = kept
     return result
 
 def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()

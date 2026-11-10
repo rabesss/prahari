@@ -13,8 +13,8 @@
         "invalid": 0,
         "n": 607,
         "score": 0.887,
-        "wall_s": 3.228,
-        "peak_rss_mb": 219.7,
+        "wall_s": 3.231,
+        "peak_rss_mb": 219.8,
         "abstentions": 5,
         "d_score": 0.887
       },
@@ -27,11 +27,45 @@
         "n": 607,
         "score": 0.3158,
         "wall_s": 0.005,
-        "peak_rss_mb": 17.3,
+        "peak_rss_mb": 19.7,
         "abstentions": 0,
         "d_score": 0.3158
       },
-      "note": "visible dev"
+      "note": "visible dev",
+      "dedupe": {}
+    },
+    "url": {
+      "BEST": {
+        "f1": 0.9967,
+        "precision": 1.0,
+        "recall": 0.9935,
+        "fpr": 0.0,
+        "invalid": 0,
+        "n": 3998,
+        "score": 0.9967,
+        "wall_s": 2.704,
+        "peak_rss_mb": 211.7,
+        "abstentions": 4,
+        "d_score": 0.9967
+      },
+      "keyword": {
+        "f1": 0.1283,
+        "precision": 1.0,
+        "recall": 0.0686,
+        "fpr": 0.0,
+        "invalid": 0,
+        "n": 3998,
+        "score": 0.1283,
+        "wall_s": 0.032,
+        "peak_rss_mb": 23.2,
+        "abstentions": 0,
+        "d_score": 0.1283
+      },
+      "note": "visible dev",
+      "dedupe": {
+        "duplicates_dropped": 2,
+        "conflicting_ids_dropped": 0
+      }
     },
     "indic": {
       "BEST": {
@@ -42,7 +76,7 @@
         "invalid": 0,
         "n": 64,
         "score": 1.0,
-        "wall_s": 2.759,
+        "wall_s": 2.702,
         "peak_rss_mb": 218.7,
         "abstentions": 0,
         "d_score": 1.0
@@ -56,11 +90,12 @@
         "n": 64,
         "score": 0.2973,
         "wall_s": 0.001,
-        "peak_rss_mb": 19.1,
+        "peak_rss_mb": 23.2,
         "abstentions": 0,
         "d_score": 0.2973
       },
-      "note": "tuning set, optimistic"
+      "note": "tuning set, optimistic",
+      "dedupe": {}
     },
     "flow": {
       "BEST": {
@@ -71,8 +106,8 @@
         "invalid": 0,
         "n": 12700,
         "score": 0.9985,
-        "wall_s": 2.476,
-        "peak_rss_mb": 227.7,
+        "wall_s": 2.486,
+        "peak_rss_mb": 227.4,
         "abstentions": 0,
         "d_score": 0.9985
       },
@@ -84,15 +119,14 @@
         "invalid": 0,
         "n": 12700,
         "score": 0.7525,
-        "wall_s": 0.032,
-        "peak_rss_mb": 112.9,
+        "wall_s": 0.029,
+        "peak_rss_mb": 110.2,
         "abstentions": 0,
         "d_score": 0.7525
       },
-      "note": "visible dev"
+      "note": "visible dev",
+      "dedupe": {}
     }
   },
-  "errors": {
-    "url": "invalid input IDs or file"
-  }
+  "errors": {}
 }

@@ -53,3 +53,25 @@ def test_intermediate_blob_is_checked(tmp_path):
     base = setup_repo(tmp_path); add(tmp_path, 'data.csv', b'private\n')
     git(tmp_path, 'rm', '-q', 'data.csv'); git(tmp_path, 'commit', '-qm', 'remove')
     assert audit(tmp_path, base).returncode != 0
+
+SELFTEST_OK = b'[{"verdict": "malicious", "score": 1.0, "evidence": ["the domain ends in .top"]}, {"verdict": "benign", "score": 0.27, "evidence": []}]\n'
+
+def test_selftest_app_log_allowed(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'research/evals/r1/app.log', SELFTEST_OK)
+    assert audit(tmp_path, base).returncode == 0
+
+@pytest.mark.parametrize('path,content', [
+    ('research/evals/r1/app.log', b'[{"verdict": "malicious", "score": 1.0, "text": "raw message"}]\n'),
+    ('research/evals/r1/app.log', b'[{"verdict": "malicious", "score": 1.0, "evidence": ["sms-0123abcd"]}]\n'),
+    ('research/evals/r1/run.log', SELFTEST_OK),
+])
+def test_selftest_shape_only_in_app_log(tmp_path, path, content):
+    base = setup_repo(tmp_path); add(tmp_path, path, content)
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'non-status log line' in r.stdout
+
+def test_bench_result_json_allowed_and_checked(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'bench/results/oracle-a1-x.json', b'{"tasks": {"sms": {"f1": 0.9}}}\n')
+    assert audit(tmp_path, base).returncode == 0
+    add(tmp_path, 'bench/results/oracle-a1-y.json', b'{"ids": ["url-0123abcdef"]}\n')
+    assert 'eval JSON' in audit(tmp_path, base).stdout

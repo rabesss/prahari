@@ -21,7 +21,7 @@ def main():
     errors={}
     for task in ('sms','url','indic','flow'):
         try:
-            data=rows(data_dir/(task+'.jsonl'))
+            dd={}; data=rows(data_dir/(task+'.jsonl'), dedupe=dd)
         except (ValueError, OSError) as exc:
             errors[task]='invalid input IDs or file'
             print(f'BENCH {task}: FAIL invalid input IDs or file',flush=True)
@@ -34,7 +34,7 @@ def main():
         metrics=det_metrics(gold,pred); metrics.update(perf,abstentions=sum(x=='uncertain' for x in pred.values()),d_score=metrics['score'])
         start=time.monotonic(); before=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         bp={r['id']:keyword(task,r) for r in data}; bm=det_metrics(gold,bp); bm.update(wall_s=round(time.monotonic()-start,3),peak_rss_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,1),abstentions=0,d_score=bm['score'],invalid=0)
-        report['tasks'][task]={'BEST':metrics,'keyword':bm,'note':'tuning set, optimistic' if task=='indic' else 'visible dev'}
+        report['tasks'][task]={'BEST':metrics,'keyword':bm,'note':'tuning set, optimistic' if task=='indic' else 'visible dev','dedupe':dd}
         print(f"BENCH {task}: n={len(data)} BEST F1={metrics['f1']} D={metrics['d_score']} FPR={metrics['fpr']} abstentions={metrics['abstentions']} keyword F1={bm['f1']} D={bm['d_score']} FPR={bm['fpr']}",flush=True)
     report['errors']=errors
     out=Path(a.output_prefix) if a.output_prefix else ROOT/'bench/results'/('oracle-a1-'+str(date.today()))

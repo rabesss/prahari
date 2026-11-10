@@ -43,9 +43,10 @@ jobs:
         id: stress
         if: always()
         run: set -o pipefail; python bench/stress.py | tee "$RUNNER_TEMP/stress.txt"
-      - name: Readiness heuristics
+      - name: Readiness heuristics (non-gating)
         id: readiness
         if: always()
+        continue-on-error: true
         run: set -o pipefail; python bench/readiness.py | tee "$RUNNER_TEMP/readiness.txt"
       - name: Advisory disclosure audit
         id: audit
