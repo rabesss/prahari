@@ -2,7 +2,9 @@
 
 ## Current best
 
-**Candidate:** `candidates/gen2` (built from the validated BEST tree; `candidates/BEST` was not edited).
+**Candidate:** `candidates/gen2`, promoted to **`candidates/BEST`** under the gate below; the working
+copy stays in `candidates/gen2`, and the previous BEST is `candidates/BEST_prev_gen2-r2b` (81.56 on
+the round-2 proxy).
 **Full `bin/eval` proxy (two repeats):** **87.66** — stamp `20261110-081343-gen2-full-r2b`, promotable,
 no failures or infra errors, D 0.9024, E 0.8875, P 0.6701, C 1.0. Evidence:
 `research/evals/20261110-081343-gen2-full-r2b/`. The prior full run `20261110-080445-gen2-full-r2`
