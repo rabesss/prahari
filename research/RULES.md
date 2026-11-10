@@ -40,7 +40,18 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 ## 4. Submission (human-only: the owner submits)
 - Phase 1 deliverables: "report, source code and demo"; PS3 lists "Source code", "Application", "Demonstration video",
   "Technical report". [S] The project "must be hosted on GitHub and submitted using the challenge submission form". [S]
-- Unknown publicly [U]: form fields, report template or page limit, video length or format, and whether the repo must be public.
+- Registration email (29 Oct, to the owner) [S]: PS3 assigned; submit "initial solution, source code, demo and report" by
+  23 Nov 2026; the submission form "will be shared in the 1st or 2nd week of November, 2026" by email. No portal or login exists.
+- PS3 mentoring video (Dr. Vijay Kumar, IIT Delhi, linked from that email) [S]: deliverables are source code on GitHub with
+  setup instructions, a working compiled application ("such as an Android APK or a Linux executable"), a demo video
+  "showing three detection on the actual device working offline", and a technical report (hardware setup, model
+  configuration, measured performance). "Test your system on the actual device such as the Android phone, Raspberry Pi 5
+  ... or another arm-based Linux device. Do not rely on the laptop simulation." Show where each model runs. Focus on one main
+  use case and keep it modular. Never auto-click links; never claim predictions are always correct. Evaluation: detection
+  quality (accuracy, false alarms), on-device performance (response time, memory, offline), user effectiveness.
+- PS3 training session: 12 Nov 2026, 17:00-18:00 (timezone unstated, probably IST); the owner attends [S].
+- Still unknown [U]: the cutoff hour and timezone, form fields, report template or page limit, video length or format, and
+  whether the repo must be public. Whether an Arm cloud VM counts as "the actual device" is unconfirmed [U].
 - Questions to organisers go to tech-queries@armbharatchallenge.com with "PS3" in the subject. [S] (Not contacted; that is the owner's call.)
 
 ## 5. IP, data and disqualification risks
