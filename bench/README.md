@@ -12,7 +12,8 @@ Fixture flags that agree on aarch64 are provisional until the first x86 CI run
 confirms each row; investigate differences before treating them as portable.
 Timing and detector artifact size are informational, not gates.
 `python bench/ratchet.py BASE` (CI, gating) fails when a row that gated in
-`reference.json` at `BASE` no longer gates or has a different expected label, so
+`reference.json` at `BASE` no longer gates, has a different expected label or (stress) is no longer marked
+correct, so
 a regenerated or relabelled reference cannot silently ungate a regression. To accept a downgrade, add an entry
 `{"suite", "file", "row", "reason"}` to `bench/accepted_downgrades.json` under
 `downgrades` in the same change; entries already present at `BASE` do not count again.
@@ -59,8 +60,8 @@ fail-closed path/content policy, and never prints matched contents:
 - logs: only exact status lines and, in `app.log`, selftest results with scores
   in [0, 1];
 - synthetic suites: fixed key sets and at most 500 rows;
-- detector artifacts are listed and must be one complete zlib stream with no
-  trailing bytes; the inflated bytes are scanned for item ids and secrets;
+- detector artifacts are listed and must be an uncompressed pickle or one complete
+  zlib stream with no trailing bytes (gzip, lzma and other encodings fail); the inflated bytes are scanned for item ids and secrets;
 - commit messages: at most 8 KB, no secrets, item ids or data-shaped lines;
 - item ids include the hidden split formats, explain-set `X-NN` and Indian set
   `B-NNNN`;

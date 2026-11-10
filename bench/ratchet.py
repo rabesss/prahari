@@ -36,12 +36,13 @@ def accepted(value):
 
 
 def gated(reference):
-    """{(suite, file, row): expected label} for every gating row; a changed expectation counts as a downgrade."""
+    """{(suite, file, row): expectation} for every gating row; a changed expectation counts as a downgrade.
+    A stress row gates only while it is also correct (bench/stress.py), so its expectation includes that flag."""
     out = {}
     for suite, key in (('fixtures', 'expect'), ('stress', 'label')):
         for name, entry in (reference or {}).get(suite, {}).items():
             for row, v in entry.get('rows', {}).items():
-                if v.get('gate'): out[(suite, name, row)] = v.get(key)
+                if v.get('gate'): out[(suite, name, row)] = (v.get(key), bool(v.get('correct'))) if suite == 'stress' else v.get(key)
     return out
 
 

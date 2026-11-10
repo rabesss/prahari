@@ -180,3 +180,14 @@ def test_run_records_predict_failure_and_writes_report(tmp_path, monkeypatch):
     assert run.main() == 1
     report = json.loads(prefix.with_suffix('.json').read_text())
     assert 'RuntimeError' in report['errors']['sms']
+
+
+def test_ratchet_dropping_stress_correct_is_a_downgrade(tmp_path, monkeypatch):
+    repo = tmp_path; (repo / 'bench').mkdir()
+    _git(repo, 'init', '-q'); _git(repo, 'config', 'user.email', 't@example.invalid'); _git(repo, 'config', 'user.name', 'T')
+    ref = lambda row: json.dumps({'fixtures': {}, 'stress': {'s.jsonl': {'rows': {'h1': row}}}})
+    (repo / 'bench/reference.json').write_text(ref({'label': 1, 'prediction': 1, 'correct': True, 'gate': True}))
+    _git(repo, 'add', '.'); _git(repo, 'commit', '-qm', 'ref')
+    base = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, capture_output=True, text=True).stdout.strip()
+    (repo / 'bench/reference.json').write_text(ref({'label': 1, 'prediction': 0, 'gate': True}))
+    assert _ratchet(repo, monkeypatch, base) == 1  # (Grok 4.7) gate kept, correct dropped

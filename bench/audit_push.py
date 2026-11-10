@@ -51,7 +51,7 @@ STATUS = [re.compile(p) for p in (
     r'(?:SELFTEST|selftest)\s*(?::|=)?\s*OK\s*',
 )]
 # Data-shaped lines inside code/docs: JSON records with dataset keys, or wide CSV rows.
-DATA_LINE = re.compile(r'^\s*[\[{].*"(?:label|text|url|features|attack|input)"\s*:|^[^\s,()\[\]{}=]*(?:,[^,()\[\]{}=\n]*){9,}$', re.M)
+DATA_LINE = re.compile(r'^\s*[\[{].*"(?:label|text|url|features|attack|input)"\s*:|^\s*[^\s,()\[\]{}=]*(?:,[^,()\[\]{}=\n]*){9,}$', re.M)
 DATA_LINE_LIMIT = 20
 # A single-line dump (one JSON array of many records) is one data line, so also count record keys: two per row.
 RECORD_KEY = re.compile(r'"(?:label|text|url|features|attack|input)"\s*:')
@@ -181,9 +181,12 @@ def json_strings(data):
 
 
 def inflate(data):
-    """joblib files here are zlib streams; return the decompressed bytes, or the raw bytes if not zlib."""
-    if data[:1] != b'\x78':
+    """Return the bytes to scan: a zlib stream (joblib compress=True) decompressed, or an uncompressed pickle as is.
+    Any other encoding (gzip, lzma, bz2, ...) would hide its content from the scan, so it is rejected."""
+    if data[:1] == b'\x80':
         return data
+    if data[:1] != b'\x78':
+        raise ValueError('artifact is neither a zlib stream nor an uncompressed pickle')
     d = zlib.decompressobj()
     out = d.decompress(data, MAX_INFLATE)
     if d.unconsumed_tail: raise ValueError('artifact inflates beyond limit')

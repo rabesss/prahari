@@ -209,3 +209,28 @@ def test_controller_deletion_listed(tmp_path):
     git(tmp_path, 'rm', '-q', 'eval/guard/sitecustomize.py'); git(tmp_path, 'commit', '-qm', 'drop guard')
     r = audit(tmp_path, base)
     assert 'CONTROLLER-OWNED deleted (review): eval/guard/sitecustomize.py' in r.stdout
+
+
+# Round-2 review regressions (Grok 4.7).
+import gzip as _gzip
+
+def test_non_zlib_artifact_fails(tmp_path):
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/artifacts/m.joblib', _gzip.compress(b'model ' + TRAIL_ID))
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'artifact undecodable' in r.stdout
+
+def test_raw_pickle_artifact_allowed(tmp_path):
+    import pickle
+    base = setup_repo(tmp_path); add(tmp_path, 'candidates/x/artifacts/m.joblib', pickle.dumps({'w': [0.5, 0.25]}, protocol=4))
+    assert audit(tmp_path, base).returncode == 0
+
+def test_indented_csv_counts_as_data(tmp_path):
+    line = b'    0,tcp,http,SF,181,5450,0,0,0,0,0,1,0,0\n'
+    base = setup_repo(tmp_path); add(tmp_path, 'docs/dump.md', line * 25)
+    r = audit(tmp_path, base)
+    assert r.returncode == 1 and 'data-shaped code/docs content' in r.stdout
+
+def test_unescape_reveals_escaped_text():
+    sys.path.insert(0, str(AUDIT.parent)); import audit_push
+    escaped = ''.join(f'\\u{ord(c):04x}' for c in 'please send your otp code now')
+    assert audit_push.unescape(f'["{escaped}"]') == '["please send your otp code now"]'
