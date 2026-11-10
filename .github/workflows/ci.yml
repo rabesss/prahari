@@ -1,0 +1,127 @@
+name: Detector regression
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions pinned to the commits behind checkout v4, setup-python v5 and upload-artifact v4.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install detector dependencies
+        run: python -m pip install -r bench/requirements-ci.txt
+      - name: Set interpreter
+        run: echo "HC_PY=$(command -v python)" >> "$GITHUB_ENV"
+      - name: Resolve commit range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          git rev-parse --verify "$GITHUB_SHA^{commit}" > /dev/null
+          if [ "$EVENT_NAME" = pull_request ]; then
+            head="$PR_HEAD"
+            # The PR's own commits: from where it forked, even when the base branch has moved on.
+            base="$(git merge-base "$PR_BASE" "$head")" || { echo "range base unavailable: no merge-base of $PR_BASE and $head"; exit 1; }
+          else
+            head="$GITHUB_SHA"; base="$PUSH_BASE"
+            # New branch (all-zero before) or a force-push (old tip unfetchable or not an ancestor): fall back to main.
+            forced=
+            if [ -z "$base" ] || [ "$base" = 0000000000000000000000000000000000000000 ]; then base=
+            elif ! git rev-parse -q --verify "$base^{commit}" > /dev/null || ! git merge-base --is-ancestor "$base" "$head"; then base=; forced=1; fi
+            if [ -z "$base" ]; then
+              git rev-parse -q --verify origin/main > /dev/null || { echo 'range base unavailable: origin/main missing'; exit 1; }
+              base="$(git merge-base origin/main "$head")" || { echo 'range base unavailable: no merge-base with origin/main'; exit 1; }
+            fi
+            # A force-push onto main's tip (e.g. to main itself) leaves an empty range and a vacuous audit/ratchet: fail loudly.
+            if [ -n "$forced" ] && [ "$base" = "$head" ]; then echo 'range base unavailable: force-push left an empty range against origin/main'; exit 1; fi
+          fi
+          git rev-parse --verify "$base^{commit}" > /dev/null; git rev-parse --verify "$head^{commit}" > /dev/null
+          echo "RANGE_BASE=$base" >> "$GITHUB_ENV"; echo "RANGE_HEAD=$head" >> "$GITHUB_ENV"
+          echo "range $base..$head"
+      - name: Advisory disclosure audit
+        id: audit
+        continue-on-error: true
+        run: set -o pipefail; python bench/audit_push.py "$RANGE_BASE" "$RANGE_HEAD" | tee "$RUNNER_TEMP/audit.txt"
+      - name: Reference ratchet
+        id: ratchet
+        if: always() && steps.range.outcome == 'success'
+        run: set -o pipefail; python bench/ratchet.py "$RANGE_BASE" | tee "$RUNNER_TEMP/ratchet.txt"
+      - name: Fixture gate and detector smoke
+        id: fixtures
+        if: always()
+        run: set -o pipefail; python bench/gate.py | tee "$RUNNER_TEMP/fixtures.txt"
+      - name: Stress gate
+        id: stress
+        if: always()
+        run: set -o pipefail; python bench/stress.py | tee "$RUNNER_TEMP/stress.txt"
+      - name: Candidate tests
+        id: candidate
+        if: always()
+        run: python -m pytest -q candidates/BEST/tests
+      - name: Scorer tests
+        id: scorer
+        if: always()
+        run: python eval/test_scorer.py
+      - name: Benchmark tests
+        id: tests
+        if: always()
+        run: python -m pytest -q bench/tests
+      - name: App selftest
+        id: selftest
+        if: always()
+        run: candidates/BEST/bin/app --selftest
+      - name: Tree unchanged by checks
+        id: clean
+        if: always()
+        run: |
+          dirty="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$dirty" ]; then echo "$dirty"; echo 'checks modified the tree'; exit 1; fi
+      - name: Readiness heuristics (non-gating)
+        id: readiness
+        if: always()
+        continue-on-error: true
+        run: set -o pipefail; python bench/readiness.py | tee "$RUNNER_TEMP/readiness.txt"
+      - name: Job summary
+        if: always()
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          RATCHET: ${{ steps.ratchet.outcome }}
+          FIXTURES: ${{ steps.fixtures.outcome }}
+          STRESS: ${{ steps.stress.outcome }}
+          CLEAN: ${{ steps.clean.outcome }}
+          READINESS: ${{ steps.readiness.outcome }}
+        run: |
+          {
+            echo '| Check | Outcome |'
+            echo '|---|---|'
+            printf '| Disclosure audit (advisory) | %s |\n' "$AUDIT"
+            printf '| Reference ratchet | %s |\n' "$RATCHET"
+            printf '| Fixtures | %s |\n' "$FIXTURES"
+            printf '| Stress | %s |\n' "$STRESS"
+            printf '| Tree unchanged | %s |\n' "$CLEAN"
+            printf '| Readiness (heuristic) | %s |\n' "$READINESS"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload aggregate check logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: detector-checks
+          path: |
+            ${{ runner.temp }}/audit.txt
+            ${{ runner.temp }}/ratchet.txt
+            ${{ runner.temp }}/fixtures.txt
+            ${{ runner.temp }}/stress.txt
+            ${{ runner.temp }}/readiness.txt
+          if-no-files-found: ignore

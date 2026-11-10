@@ -1,0 +1,24 @@
+{"id": "url-fixture-01", "input": "https://www.irctc.co.in/nget/train-search", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-02", "input": "https://www.rbi.org.in/", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-03", "input": "https://www.india.gov.in/", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-04", "input": "https://www.wikipedia.org/wiki/India", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-05", "input": "https://www.amazon.in/orders", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-06", "input": "https://www.indiapost.gov.in/", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-07", "input": "https://www.sbi.co.in/", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-08", "input": "https://example.org/docs", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-09", "input": "https://www.google.com/search?q=weather", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-10", "input": "https://github.com/python/cpython", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-11", "input": "https://www.nic.in/", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-12", "input": "https://example.com/help", "expect": 0, "rationale": "Ordinary message or legitimate destination."}
+{"id": "url-fixture-13", "input": "http://sbi-login.example/verify", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-14", "input": "http://rbi-support.example/otp", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-15", "input": "https://irctc.co.in.ticket-refund.example/login", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-16", "input": "https://amazon.in.refund-claim.example/pay", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-17", "input": "http://secure-bank-update.example/kyc", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-18", "input": "http://upi-pin-reset.example/collect", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-19", "input": "http://india-post-delivery.example/customs", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-20", "input": "http://pay-electricity-bill.example/verify", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-21", "input": "http://192.0.2.17/login", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-22", "input": "http://account-security.example/password", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-23", "input": "https://xn--paypa1-security.example/login", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
+{"id": "url-fixture-24", "input": "http://parcel-release.example/pay", "expect": 1, "rationale": "Requests secrets, fees or a deceptive action."}
