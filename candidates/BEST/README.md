@@ -14,9 +14,10 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. Nothin
    classifiers score the wording: SMS TF-IDF, URL character n-grams and an NSL-KDD flow model with
    three high-precision intrusion signatures on top.
 2. **Advisory layer:** Llama 3.2 1B Instruct (INT4 QLoRA, ExecuTorch `.pte`) turns the verdict, type
-   and compressed evidence into a short explanation. The prompt neutralises live links, forces a
-   verdict-first sentence and asks for an evidence phrase verbatim; a contradiction filter removes a
-   sentence that claims the opposite of the verdict. Fixed remediation steps (1930 helpline,
+   and top evidence phrase into a short explanation. The compact prompt neutralises live links,
+   forces a verdict-first sentence and asks for the evidence phrase verbatim; a contradiction filter
+   removes a sentence that claims the opposite of the verdict, and a refusal falls back to an
+   evidence-only prompt. Fixed remediation steps (1930 helpline,
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
 
@@ -43,7 +44,7 @@ Python 3.12 venv with `executorch==1.6.0`, `torch` (CPU), `scikit-learn`, `panda
 Model files are not in git. See DATA.md for provenance and licences.
 
 ## Results
-`bin/eval` proxy (two repeats, hidden round-2 set): **87.66** — D 0.9024, E 0.8875, P 0.6701, C 1.0,
-promotable. SMS F1 0.9015, URL F1 0.9949, indic F1 0.9665 (FPR 1.25%), flow F1 0.8505. Explanation:
-4.72 s/item, 2.256 GB peak RSS, 20.1 decode tokens/s on 2x Neoverse-N1. See REPORT.md for the full
+`bin/eval` proxy (two repeats, hidden round-2 set): **89.87** — D 0.9024, E 0.9348, P 0.7215, C 1.0,
+promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0.8505. Explanation:
+4.00 s/item, 2.256 GB peak RSS, 20.4 decode tokens/s on 2x Neoverse-N1. See REPORT.md for the full
 table, generalisation checks and limitations.

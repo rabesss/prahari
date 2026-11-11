@@ -1,0 +1,29 @@
+{
+ "label": "best-pair-1111",
+ "candidate": "candidates/BEST",
+ "stamp": "20261111-063239",
+ "artifacts": "research/evals/20261111-063239-best-pair-1111",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 82.84,
+ "scores": {
+  "D": 0.9024,
+  "E": 0.8875,
+  "P": 0.4288,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9015,
+  "url_f1": 0.9949,
+  "indic_f1": 0.9665,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8505,
+  "explain_s_per_item": 10.26,
+  "peak_rss_gb": 2.256,
+  "decode_tps": 10.8354,
+  "model": "llama32-1b-qlora"
+ }
+}
