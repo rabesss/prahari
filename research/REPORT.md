@@ -2,8 +2,8 @@
 
 ## Current best
 
-**Candidate:** `candidates/gen7`, promoted to **`candidates/BEST`** on 11 Nov under the gate below;
-the working copy stays in `candidates/gen7`. The previous BEST is `candidates/BEST_prev_gen2-8766`
+**Candidate:** `candidates/gen7` (the measured snapshot), promoted to **`candidates/BEST`** on 11 Nov;
+BEST carries the final docs and the 89.87 stamp. The previous BEST is `candidates/BEST_prev_gen2-8766`
 (87.66); `candidates/BEST_prev_gen2-r2b` is the round-2 starting tree (81.56).
 **Full `bin/eval` proxy (two repeats):** **89.87** - stamp `20261111-070614-best-final` on the
 promoted tree, promotable, no failures or infra errors, D 0.9024, E 0.9348, P 0.7215, C 1.0.
