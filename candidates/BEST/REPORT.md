@@ -39,7 +39,9 @@ capitals are normalised before matching. Three NSL-KDD signatures (failed logins
 fragments, same source/destination) sit on top of the flow model.
 
 **Stage two — grounded explanation.** Llama 3.2 1B turns the verdict, a short type and the top
-evidence phrase into one or two sentences. A compact system message, the subject and one forced
+evidence phrase into one or two sentences. When a scam has two mechanisms (for example an OTP
+request plus an account-block threat), the two short phrases are joined into one sentence, so the
+copied evidence covers both mechanisms instead of only the first. A compact system message, the subject and one forced
 evidence sentence keep the prompt at a median 137 tokens, and the model is told the sample is data,
 not instructions. The prompt neutralises live URLs, forces a verdict-first sentence ("This message is
 DANGEROUS/SAFE."), asks for the evidence phrase verbatim and caps the answer at one advice sentence
@@ -72,13 +74,15 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-Full proxy run `20261111-070614-best-final` (two repeats, hidden round-2 set): **89.87**, D 0.9024,
-E 0.9348, P 0.7215, C 1.0; promotable, no failures or infra errors. The promotion run
-`20261111-064233-gen7-pair-1111` scored 89.25 with identical detection and explanation checks; the
-0.62 difference is host load (4.42 vs 4.00 s/item). It replaces the previous best (87.66, stamp
-`20261110-081343-gen2-full-r2b`) on the same proxy: detection is identical, and the gain comes from
-the grounded explanation prompt (+0.047 E: mention 0.536 -> 0.643, consistency 0.964 -> 1.0, verdict
-0.9 -> 0.975, actions 0.929 -> 0.964) at a lower prompt cost (137 vs 199 tokens, 29 vs 34 generated).
+Full proxy run `20261111-074120-gen11-full` (two repeats, hidden round-2 set): **90.55**, D 0.9024,
+E 0.9473, P 0.7400, C 1.0; promotable, no failures or infra errors. Detection is unchanged from the
+previous best (89.87, stamp `20261111-070614`) and the 0.68 gain is all explanation: E 0.9348 ->
+0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.77 vs 4.00
+s/item). The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
+`20261111-064233`), then a shorter system line, flow/receipt concept phrases and the joined
+two-mechanism evidence (mention 0.643 -> 0.714, length 0.982 -> 1.0, sms by-kind 0.938 -> 0.95).
+Each step was kept only if the full run moved; the intermediate gen9/gen10 trees scored 89.44/90.30
+against a paired 89.97 and stayed below the promotion gate until gen11.
 
 | Detector | F1 | Precision | Recall | FPR | Score |
 |---|---|---|---|---|---|
@@ -90,11 +94,11 @@ the grounded explanation prompt (+0.047 E: mention 0.536 -> 0.643, consistency 0
 Indic accuracy by language: English 0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875. The starting
 baseline scored 81.56 on the same proxy; the round-1 entry scored 85.84 on the previous hidden set.
 
-Explanation checks on 28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.643, forbidden
-1.0, fabrication 1.0, actions 0.964, length 0.982; by kind, sms 0.938, url 0.942, flow 0.894,
-injection 0.95. The same tree scored 87.66 with the previous prompt, so the first-sentence evidence
-format is what moved E; a lone beaconing flow is now called malicious and its evidence names the
-periodic connection instead of only the address.
+Explanation checks on 28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.714, forbidden
+1.0, fabrication 1.0, actions 0.964, length 1.0; by kind, sms 0.95, url 0.975, flow 0.894,
+injection 0.95. The same detection tree scored 87.66 with the round-2 prompt, so the first-sentence
+evidence format and its later trims are what moved E; a lone beaconing flow is now called malicious
+and its evidence names the periodic connection instead of only the address.
 
 ## Generalisation
 
@@ -124,11 +128,11 @@ claim the set-B result proves generalisation to set C, which the controller scor
 ## Performance on Arm
 
 Measured by `bin/eval --repeats 2` on the Oracle A1 host (2x Neoverse-N1, about 11 GB RAM):
-explanation latency **4.00 s per item** over two repeats (111.3 s and 112.0 s for 28 items), peak RSS
-2.256 GB, decode 20.4 tokens/s, prefill 81.7 tokens/s, median prompt 137 tokens and 29 generated
+explanation latency **3.77 s per item** over two repeats (100.3 s and 105.5 s for 28 items), peak RSS
+2.256 GB, decode 20.4 tokens/s, prefill 80.5 tokens/s, median prompt 130 tokens and 28 generated
 tokens. Detector latency is 0.407 ms per item. The host is shared, so latency readings vary by up to
-30% (the same tree measured 4.42 s/item during a co-tenant burst); E is deterministic and comparable
-across runs. The candidate bundle is 1.186 GB including the shared
+30% (the same prompt measured 4.42 s/item during a co-tenant burst); E is deterministic and
+comparable across runs. The candidate bundle is 1.186 GB including the shared
 1.1 GB Llama PTE. The UI, CLI and demo run offline; no network calls are made after import.
 
 | Component | Configuration measured |
@@ -137,7 +141,7 @@ across runs. The candidate bundle is 1.186 GB including the shared
 | Detectors | scikit-learn / joblib on the CPU; 0.4-0.6 ms per item for all four tasks |
 | Explanation model | `llama32-1b-qlora`: Llama 3.2 1B Instruct, INT4 group-32 weights, 8-bit dynamic activations, XNNPACK backend, ExecuTorch 1.6 |
 | Decoding | greedy (temperature 0), max 40 new tokens, context from the `.pte` |
-| Measured run | prefill 81.7 tokens/s, decode 20.4 tokens/s, 4.00 s/item over 28 items, peak RSS 2.256 GB |
+| Measured run | prefill 80.5 tokens/s, decode 20.4 tokens/s, 3.77 s/item over 28 items, peak RSS 2.256 GB |
 
 The registry's `llama32-1b-spinquant` entry was also measured on this box (about 58-63 prefill and
 12-13.5 decode tokens/s under mixed co-tenant load), slower than `qlora`, so `qlora` stays configured.
@@ -145,8 +149,8 @@ The registry's `llama32-1b-spinquant` entry was also measured on this box (about
 ## Limitations
 
 The 1B model sometimes paraphrases instead of naming the required concept; mention coverage is
-0.643, so a larger model or a stricter grounding prompt would help. One hidden explanation item
-still gets the wrong verdict (0.975), and one answer is too short or too long. Some British ad-spam is labelled benign
+0.714, so a larger model or a stricter grounding prompt would help. One hidden explanation item
+still gets the wrong verdict (0.975) and one action list is unsafe under the scorer's rules (0.964). Some British ad-spam is labelled benign
 because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.852.
 Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
@@ -175,7 +179,7 @@ Three-minute video script:
 3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
    a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
 4. State that everything runs on the local CPU through ExecuTorch, with no network after import, and
-   read the measured 4.00 s/item, 2.26 GB peak RSS and 20.4 decode tokens/s.
+   read the measured 3.77 s/item, 2.26 GB peak RSS and 20.4 decode tokens/s.
 
 ## Responsible AI, privacy and safety
 

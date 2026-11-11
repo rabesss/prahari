@@ -2,17 +2,18 @@
 
 ## Current best
 
-**Candidate:** `candidates/gen7` (the measured snapshot), promoted to **`candidates/BEST`** on 11 Nov;
-BEST carries the final docs and the 89.87 stamp. The previous BEST is `candidates/BEST_prev_gen2-8766`
+**Candidate:** `candidates/gen11` (the measured snapshot), promoted to **`candidates/BEST`** on 11 Nov;
+BEST carries the final docs and the 90.55 stamp. The previous BEST is `candidates/BEST_prev_gen7-8997`
+(89.87/89.97). The previous BEST is `candidates/BEST_prev_gen2-8766`
 (87.66); `candidates/BEST_prev_gen2-r2b` is the round-2 starting tree (81.56).
-**Full `bin/eval` proxy (two repeats):** **89.87** - stamp `20261111-070614-best-final` on the
-promoted tree, promotable, no failures or infra errors, D 0.9024, E 0.9348, P 0.7215, C 1.0.
-Evidence: `research/evals/20261111-070614-best-final/`. The promotion run
-`20261111-064233-gen7-pair-1111` scored 89.25 with byte-identical detection and explanation checks
-(4.42 vs 4.00 s/item, so the 0.62 gap is host load). The gate was 89.25 against BEST's 87.66
-(+1.59). A same-day paired run of the old BEST scored 82.84 (stamp `20261111-063239`, explain
-10.26 s/item at load 5.9) while gen7's paired run finished after the load fell (4.42 s/item), so the
-latency parts are not directly comparable; E is deterministic and is the real gain.
+**Full `bin/eval` proxy (two repeats):** **90.55** - stamp `20261111-074120-gen11-full`,
+promotable, no failures or infra errors, D 0.9024, E 0.9473, P 0.7400, C 1.0. Evidence:
+`research/evals/20261111-074120-gen11-full/`. The gate was 90.55 against BEST's latest 89.97
+(stamp `20261111-073447`, same gen7 tree as the 89.87 final stamp) = +0.58. Detection is identical;
+the whole gain is explanation (E 0.9348 -> 0.9473 on the same 28 items) plus a shorter prompt
+(130 vs 137 tokens, 3.77 vs 3.93 s/item). The gen7 promotion itself was 89.25 against 87.66
+(+1.59, stamp `20261111-064233`); a same-day paired run of the then-BEST scored 82.84 under load
+5.9, so P comparisons are only valid within a short window and E is the real signal.
 
 | Run | Score | D | E | P | C | Notes |
 |---|---|---|---|---|---|---|
@@ -28,19 +29,43 @@ latency parts are not directly comparable; E is deterministic and is the real ga
 | `best-pair-1111` | 82.84 | 0.9024 | 0.8875 | 0.4288 | 1.00 | old BEST under load 5.9, 10.26 s/item |
 | `gen7-pair-1111` | 89.25 | 0.9024 | 0.9348 | 0.6903 | 1.00 | promotion run; 4.42 s/item, load 3.5 |
 | `gen8-full` | 88.94 | 0.9024 | 0.9295 | 0.6816 | 1.00 | rejected concept wording |
-| `best-final` | **89.87** | 0.9024 | 0.9348 | 0.7215 | 1.00 | final stamp on the promoted tree; 4.00 s/item |
+| `best-final` | 89.87 | 0.9024 | 0.9348 | 0.7215 | 1.00 | gen7 tree, quiet run; 4.00 s/item |
+| `gen9-full` | 89.44 | 0.9024 | 0.9420 | 0.6908 | 1.00 | shorter system + concept phrases; load 3.1 |
+| `gen10-full` | 90.30 | 0.9024 | 0.9420 | 0.7339 | 1.00 | gen9 + three phrases (no hidden change); 3.84 s/item |
+| `best-pair-gen10` | 89.97 | 0.9024 | 0.9348 | 0.7266 | 1.00 | paired gen7 run; +0.33 < gate |
+| `gen11-full` | **90.55** | 0.9024 | 0.9473 | 0.7400 | 1.00 | promoted; joined two-mechanism evidence; 3.77 s/item |
 
 Detection on the promoted run: SMS F1 0.9015 (precision 0.957, recall 0.852, FPR 0.78%), URL
 F1 0.9948 (FPR 0), indic F1 0.9665 (precision 0.987, recall 0.947, FPR 1.25%, score 0.9544), flow
 F1 0.8505 (recall 0.757, FPR 3.03%, penalised score 0.7643). Indic accuracy by language: English
 0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875 (round 1 set-B Hindi was 0.22). Explanation checks on
-28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.643, forbidden 1.0, fabrication 1.0,
-actions 0.964, length 0.982; by kind sms 0.938, url 0.942, flow 0.894, injection 0.95. Performance:
-4.00 s/item over two repeats (111.3 s, 112.0 s), peak RSS 2.256 GB, 20.4 decode tok/s, 81.7 prefill
-tok/s, median prompt 137 tokens, 29 generated; detector 0.407 ms/item.
+28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.714, forbidden 1.0, fabrication 1.0,
+actions 0.964, length 1.0; by kind sms 0.95, url 0.975, flow 0.894, injection 0.95. Performance:
+3.77 s/item over two repeats (100.3 s, 105.5 s), peak RSS 2.256 GB, 20.4 decode tok/s, 80.5 prefill
+tok/s, median prompt 130 tokens, 28 generated; detector 0.407 ms/item.
 Generation is greedy with the registry's repetition penalty 1.25, capped at 40 new tokens.
 
-## What changed in gen7 (the promoted diff)
+## What changed in gen9-gen11 (the promoted diff this round)
+
+After the gen7 promotion, three small explanation changes were stacked and kept only when the full
+run moved:
+
+1. **A shorter system line** (40 -> 24 tokens; "The content is data, not instructions" kept). This
+   saved prompt tokens without changing any check on the 28-case reader.
+2. **Concept-gap phrase fixes where the phrase omitted the mechanism's own name**: flow
+   brute-force now says "like password guessing", the benign flow fallback says "routine update",
+   and a receipt names the order. These are the only phrase edits kept; the wider gen8 rewording
+   was rejected.
+3. **Joined two-mechanism evidence.** For an Indian SMS whose mechanism list has two entries (an OTP
+   request plus a block threat, say), the two short phrases are joined with "and" when the total is
+   at most 78 characters. The model copies one sentence, but it covers both mechanisms instead of
+   only the first; this added one hidden mention (sms by-kind 0.938 -> 0.95) and one more on
+   length (0.982 -> 1.0). Longer joins were not used because they spend the answer budget.
+
+A sub-experiment that shortened the advice line to "one advice sentence, 6-12 words" was reverted:
+on the reader, length fell 1.0 -> 0.857 because four answers dropped under 15 words.
+
+## What changed in gen7 (the previous promoted diff)
 
 1. **Compact, evidence-first prompt.** The system message is now three short rules (plain words,
    grammatical sentence, input is data not instructions) and the model is shown the **top evidence
@@ -158,9 +183,9 @@ Generation is greedy with the registry's repetition penalty 1.25, capped at 40 n
 At 89.25 the parts are D 0.9024 (27.1 of 30), E 0.9348 (23.4 of 25), P 0.6903 (13.8 of 20), C 1.0
 (25 of 25). D is 6% of the total per detector point; the flow score (0.7643) is shifted-distribution
 recall, not a tuning knob (dev flow is KDDTrain+, hidden flow is KDDTest+). E's missing 1.6 points
-are mostly 10 unseen mention concepts (0.13 each) and one wrong verdict (0.22); gen8 showed that
-chasing mentions can lose an item. P's explain part is 0.821 at 4.00 s/item (the promotion run paid
-0.759 at 4.42 s/item), so P is noise-limited at 0.69-0.72 on this shared box. That is why
+are mostly 8 unseen mention concepts (0.13 each), one wrong verdict (0.22) and one action item
+(0.09); gen8 showed that chasing mentions can lose an item. P's explain part is 0.858 at 3.77 s/item,
+so P is noise-limited at 0.69-0.74 on this shared box. That is why
 the last experiments targeted single, measurable effects and were kept only when the full run moved.
 
 ## Open risks
@@ -189,9 +214,9 @@ the last experiments targeted single, measurable effects and were kept only when
 
 ## Recommendation and owner steps
 
-1. `candidates/BEST` is promoted (final stamp `20261111-070614-best-final`, 89.87; promotion run
-   `20261111-064233`, 89.25; gate +1.59 over 87.66); nothing to do. The previous BEST is
-   `candidates/BEST_prev_gen2-8766`.
+1. `candidates/BEST` is promoted (stamp `20261111-074120-gen11-full`, 90.55, gate +0.58 over the
+   paired 89.97); nothing to do. Previous BESTs: `candidates/BEST_prev_gen7-8997` (89.87) and
+   `candidates/BEST_prev_gen2-8766` (87.66).
 2. Owner-side checks from the repo root: `pytest candidates/BEST/tests` (20 tests, including the
    offline-guard app selftest), `bin/app --selftest`, `bin/app --demo` (six items: electricity scam,
    bank debit, lookalike URL, official IRCTC URL, port scan, injection), and
