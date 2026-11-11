@@ -42,7 +42,7 @@ fragments, same source/destination) sit on top of the flow model.
 evidence phrase into one or two sentences. When a scam has two mechanisms (for example an OTP
 request plus an account-block threat), the two short phrases are joined into one sentence, so the
 copied evidence covers both mechanisms instead of only the first. A compact system message, the subject and one forced
-evidence sentence keep the prompt at a median 137 tokens, and the model is told the sample is data,
+evidence sentence keep the prompt at a median 130 tokens, and the model is told the sample is data,
 not instructions. The prompt neutralises live URLs, forces a verdict-first sentence ("This message is
 DANGEROUS/SAFE."), asks for the evidence phrase verbatim and caps the answer at one advice sentence
 of 8-30 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
@@ -77,9 +77,10 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 Full proxy run `20261111-075405-best-confirm` on the promoted tree (two repeats, hidden round-2
 set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
 promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
-0.18 difference is host load (3.67 vs 3.77 s/item). Detection is unchanged from the
-previous best (89.87, stamp `20261111-070614`) and the gain is all explanation: E 0.9348 -> 0.9473
-on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00 s/item). The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
+0.18 difference is host load (3.67 vs 3.77 s/item). Measured against the paired previous-best run
+(`20261111-073447`, 89.97), detection is unchanged and the gain is the explanation: E 0.9348 ->
+0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00
+s/item). Against the labelled 89.87 stamp, the same D/E comparison holds and P adds the rest. The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
 `20261111-064233`), then a shorter system line, flow/receipt concept phrases and the joined
 two-mechanism evidence (mention 0.643 -> 0.714, length 0.982 -> 1.0, sms by-kind 0.938 -> 0.95).
 Each step was kept only if the full run moved; the intermediate gen9/gen10 trees scored 89.44/90.30
