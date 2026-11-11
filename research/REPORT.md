@@ -176,6 +176,11 @@ the last experiments targeted single, measurable effects and were kept only when
   budget (gen6 showed that adding instructions reduces compliance).
 - **P1 — flow shift.** Hidden flow is the KDDTest+ distribution; recall is about 0.72 before the new
   signatures. Novel attack types (apache2, mscan, snmpget) still look normal to a KDDTrain+ model.
+  `data/dev/flow.jsonl` is 10% of KDDTrain+ (`eval/prep_data.py` buckets by id), not KDDTest+, so a
+  dev threshold sweep cannot predict the hidden FPR. A sweep scored through quick `bin/eval` runs
+  *would* read the hidden KDDTest+ metrics, which is exactly the test-set fitting that cost round 1;
+  it was considered and rejected. The flow threshold stays 0.5, and the three signatures are the
+  only flow changes, justified by behaviour rather than by a hidden score.
 - **P1 — SMS/indic trade.** Aggressive benign routing costs some British ad-spam recall (dev F1 0.9667
   vs 0.978 on the old path); hidden sms F1 measured 0.9015. The indic weight (0.40 vs 0.20) and the FPR
   penalty make this trade clearly positive.
