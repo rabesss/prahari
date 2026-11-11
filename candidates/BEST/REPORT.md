@@ -74,11 +74,12 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-Full proxy run `20261111-074120-gen11-full` (two repeats, hidden round-2 set): **90.55**, D 0.9024,
-E 0.9473, P 0.7400, C 1.0; promotable, no failures or infra errors. Detection is unchanged from the
-previous best (89.87, stamp `20261111-070614`) and the 0.68 gain is all explanation: E 0.9348 ->
-0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.77 vs 4.00
-s/item). The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
+Full proxy run `20261111-075405-best-confirm` on the promoted tree (two repeats, hidden round-2
+set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
+promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
+0.18 difference is host load (3.67 vs 3.77 s/item). Detection is unchanged from the
+previous best (89.87, stamp `20261111-070614`) and the gain is all explanation: E 0.9348 -> 0.9473
+on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00 s/item). The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
 `20261111-064233`), then a shorter system line, flow/receipt concept phrases and the joined
 two-mechanism evidence (mention 0.643 -> 0.714, length 0.982 -> 1.0, sms by-kind 0.938 -> 0.95).
 Each step was kept only if the full run moved; the intermediate gen9/gen10 trees scored 89.44/90.30
@@ -128,8 +129,8 @@ claim the set-B result proves generalisation to set C, which the controller scor
 ## Performance on Arm
 
 Measured by `bin/eval --repeats 2` on the Oracle A1 host (2x Neoverse-N1, about 11 GB RAM):
-explanation latency **3.77 s per item** over two repeats (100.3 s and 105.5 s for 28 items), peak RSS
-2.256 GB, decode 20.4 tokens/s, prefill 80.5 tokens/s, median prompt 130 tokens and 28 generated
+explanation latency **3.67 s per item** over two repeats (99.8 s and 102.6 s for 28 items), peak RSS
+2.256 GB, decode 20.8 tokens/s, prefill 82.5 tokens/s, median prompt 130 tokens and 28 generated
 tokens. Detector latency is 0.407 ms per item. The host is shared, so latency readings vary by up to
 30% (the same prompt measured 4.42 s/item during a co-tenant burst); E is deterministic and
 comparable across runs. The candidate bundle is 1.186 GB including the shared
@@ -141,7 +142,7 @@ comparable across runs. The candidate bundle is 1.186 GB including the shared
 | Detectors | scikit-learn / joblib on the CPU; 0.4-0.6 ms per item for all four tasks |
 | Explanation model | `llama32-1b-qlora`: Llama 3.2 1B Instruct, INT4 group-32 weights, 8-bit dynamic activations, XNNPACK backend, ExecuTorch 1.6 |
 | Decoding | greedy (temperature 0), max 40 new tokens, context from the `.pte` |
-| Measured run | prefill 80.5 tokens/s, decode 20.4 tokens/s, 3.77 s/item over 28 items, peak RSS 2.256 GB |
+| Measured run | prefill 82.5 tokens/s, decode 20.8 tokens/s, 3.67 s/item over 28 items, peak RSS 2.256 GB |
 
 The registry's `llama32-1b-spinquant` entry was also measured on this box (about 58-63 prefill and
 12-13.5 decode tokens/s under mixed co-tenant load), slower than `qlora`, so `qlora` stays configured.
@@ -179,7 +180,7 @@ Three-minute video script:
 3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
    a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
 4. State that everything runs on the local CPU through ExecuTorch, with no network after import, and
-   read the measured 3.77 s/item, 2.26 GB peak RSS and 20.4 decode tokens/s.
+   read the measured 3.67 s/item, 2.26 GB peak RSS and 20.8 decode tokens/s.
 
 ## Responsible AI, privacy and safety
 

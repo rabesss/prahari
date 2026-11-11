@@ -6,10 +6,13 @@
 BEST carries the final docs and the 90.55 stamp. The previous BEST is `candidates/BEST_prev_gen7-8997`
 (89.87/89.97). The previous BEST is `candidates/BEST_prev_gen2-8766`
 (87.66); `candidates/BEST_prev_gen2-r2b` is the round-2 starting tree (81.56).
-**Full `bin/eval` proxy (two repeats):** **90.55** - stamp `20261111-074120-gen11-full`,
-promotable, no failures or infra errors, D 0.9024, E 0.9473, P 0.7400, C 1.0. Evidence:
-`research/evals/20261111-074120-gen11-full/`. The gate was 90.55 against BEST's latest 89.97
-(stamp `20261111-073447`, same gen7 tree as the 89.87 final stamp) = +0.58. Detection is identical;
+**Full `bin/eval` proxy (two repeats):** **90.73** - confirming stamp `20261111-075405-best-confirm`
+on the promoted tree, promotable, no failures or infra errors, D 0.9024, E 0.9473, P 0.7486, C 1.0.
+Evidence: `research/evals/20261111-075405-best-confirm/`. The promotion run
+`20261111-074120-gen11-full` scored 90.55 with identical detection and checks (3.67 vs 3.77 s/item,
+so the 0.18 is load). The gate was 90.55 against BEST's latest 89.97
+(stamp `20261111-073447`, same gen7 tree as the 89.87 final stamp) = +0.58; the confirming run on
+the promoted copy is 90.73. Detection is identical;
 the whole gain is explanation (E 0.9348 -> 0.9473 on the same 28 items) plus a shorter prompt
 (130 vs 137 tokens, 3.77 vs 3.93 s/item). The gen7 promotion itself was 89.25 against 87.66
 (+1.59, stamp `20261111-064233`); a same-day paired run of the then-BEST scored 82.84 under load
@@ -33,7 +36,9 @@ the whole gain is explanation (E 0.9348 -> 0.9473 on the same 28 items) plus a s
 | `gen9-full` | 89.44 | 0.9024 | 0.9420 | 0.6908 | 1.00 | shorter system + concept phrases; load 3.1 |
 | `gen10-full` | 90.30 | 0.9024 | 0.9420 | 0.7339 | 1.00 | gen9 + three phrases (no hidden change); 3.84 s/item |
 | `best-pair-gen10` | 89.97 | 0.9024 | 0.9348 | 0.7266 | 1.00 | paired gen7 run; +0.33 < gate |
-| `gen11-full` | **90.55** | 0.9024 | 0.9473 | 0.7400 | 1.00 | promoted; joined two-mechanism evidence; 3.77 s/item |
+| `gen11-full` | 90.55 | 0.9024 | 0.9473 | 0.7400 | 1.00 | promotion run; joined two-mechanism evidence |
+| `gen12-full` | 90.69 | 0.9024 | 0.9473 | 0.7468 | 1.00 | neutral (E identical); tree deleted |
+| `best-confirm` | **90.73** | 0.9024 | 0.9473 | 0.7486 | 1.00 | final stamp on the promoted tree; 3.67 s/item |
 
 Detection on the promoted run: SMS F1 0.9015 (precision 0.957, recall 0.852, FPR 0.78%), URL
 F1 0.9948 (FPR 0), indic F1 0.9665 (precision 0.987, recall 0.947, FPR 1.25%, score 0.9544), flow
@@ -41,7 +46,7 @@ F1 0.8505 (recall 0.757, FPR 3.03%, penalised score 0.7643). Indic accuracy by l
 0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875 (round 1 set-B Hindi was 0.22). Explanation checks on
 28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.714, forbidden 1.0, fabrication 1.0,
 actions 0.964, length 1.0; by kind sms 0.95, url 0.975, flow 0.894, injection 0.95. Performance:
-3.77 s/item over two repeats (100.3 s, 105.5 s), peak RSS 2.256 GB, 20.4 decode tok/s, 80.5 prefill
+3.67 s/item over two repeats (99.8 s, 102.6 s), peak RSS 2.256 GB, 20.8 decode tok/s, 82.5 prefill
 tok/s, median prompt 130 tokens, 28 generated; detector 0.407 ms/item.
 Generation is greedy with the registry's repetition penalty 1.25, capped at 40 new tokens.
 
@@ -214,9 +219,9 @@ the last experiments targeted single, measurable effects and were kept only when
 
 ## Recommendation and owner steps
 
-1. `candidates/BEST` is promoted (stamp `20261111-074120-gen11-full`, 90.55, gate +0.58 over the
-   paired 89.97); nothing to do. Previous BESTs: `candidates/BEST_prev_gen7-8997` (89.87) and
-   `candidates/BEST_prev_gen2-8766` (87.66).
+1. `candidates/BEST` is promoted (confirming stamp `20261111-075405-best-confirm`, 90.73;
+   promotion run 90.55, gate +0.58 over the paired 89.97); nothing to do. Previous BESTs:
+   `candidates/BEST_prev_gen7-8997` (89.87) and `candidates/BEST_prev_gen2-8766` (87.66).
 2. Owner-side checks from the repo root: `pytest candidates/BEST/tests` (20 tests, including the
    offline-guard app selftest), `bin/app --selftest`, `bin/app --demo` (six items: electricity scam,
    bank debit, lookalike URL, official IRCTC URL, port scan, injection), and
