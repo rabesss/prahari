@@ -1,0 +1,29 @@
+{
+ "label": "gen7-pair-1111",
+ "candidate": "candidates/gen7",
+ "stamp": "20261111-064233",
+ "artifacts": "research/evals/20261111-064233-gen7-pair-1111",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 89.25,
+ "scores": {
+  "D": 0.9024,
+  "E": 0.9348,
+  "P": 0.6903,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9015,
+  "url_f1": 0.9948,
+  "indic_f1": 0.9665,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8505,
+  "explain_s_per_item": 4.42,
+  "peak_rss_gb": 2.256,
+  "decode_tps": 18.6589,
+  "model": "llama32-1b-qlora"
+ }
+}

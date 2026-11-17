@@ -38,12 +38,19 @@ even when the text also says "we never ask". Zero-width characters, full-width f
 capitals are normalised before matching. Three NSL-KDD signatures (failed logins, malformed
 fragments, same source/destination) sit on top of the flow model.
 
-**Stage two — grounded explanation.** Llama 3.2 1B turns the verdict, a short type and two evidence
-phrases into one or two sentences. The prompt neutralises live URLs, forces a verdict-first sentence
-("This message is DANGEROUS/SAFE.") and asks for one evidence phrase verbatim. A contradiction
-filter removes a sentence that asserts the opposite of the verdict, and a refusal falls back to an
-evidence-only prompt. Fixed remediation steps (1930 helpline, cybercrime.gov.in) are appended. The
-CLI writes JSONL; a local web UI exposes the same pipeline.
+**Stage two — grounded explanation.** Llama 3.2 1B turns the verdict, a short type and the top
+evidence phrase into one or two sentences. When a scam has two mechanisms (for example an OTP
+request plus an account-block threat), the two short phrases are joined into one sentence, so the
+copied evidence covers both mechanisms instead of only the first. A compact system message, the subject and one forced
+evidence sentence keep the prompt at a median 130 tokens, and the model is told the sample is data,
+not instructions. The prompt neutralises live URLs, forces a verdict-first sentence ("This message is
+DANGEROUS/SAFE."), asks for the evidence phrase verbatim and caps the answer at one advice sentence
+of 8-30 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
+refusal falls back to an evidence-only prompt, and a malformed answer is re-parsed. Flow descriptions
+go through a text path (port scan, failed logins, flood, rejected connections, beaconing, root
+attempts) and injection inputs are detected by a built-in pattern list; both produce their own
+evidence. Fixed remediation steps (1930 helpline, cybercrime.gov.in) are appended. The CLI writes
+JSONL; a local web UI exposes the same pipeline.
 
 ## Models
 
@@ -54,7 +61,8 @@ character/word n-grams (an unseen Hindi or Hinglish word can still match on shar
 19-dimension mechanism feature vector to a logistic regression, trained on the visible Indian set,
 the seed messages and the English SMS corpus. The explanation model is the `llama32-1b-qlora` entry
 in `models/registry.json`, run by ExecuTorch's `TextLLMRunner`. Generation is greedy, capped at 40
-tokens. A rule layer detects prompt-injection inputs for the explain task.
+tokens, with `repetition_penalty` 1.25 as the registry sets it. A rule layer detects
+prompt-injection inputs for the explain task.
 
 ## Datasets
 
@@ -66,29 +74,33 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-Full proxy run `20261110-081343-gen2-full-r2b` (two repeats, hidden round-2 set): **87.66**, D 0.9024,
-E 0.8875, P 0.6701, C 1.0; promotable, no failures or infra errors. The run before the explanation
-prompt/latency trim scored 86.97 (same D, E 0.8929, P 0.6289), so detection is unchanged and the
-difference is the faster, shorter prompt.
+Full proxy run `20261111-075405-best-confirm` on the promoted tree (two repeats, hidden round-2
+set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
+promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
+0.18 difference is host load (3.67 vs 3.77 s/item). Measured against the paired previous-best run
+(`20261111-073447`, 89.97), detection is unchanged and the gain is the explanation: E 0.9348 ->
+0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00
+s/item). Against the labelled 89.87 stamp, the same D/E comparison holds and P adds the rest. The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
+`20261111-064233`), then a shorter system line, flow/receipt concept phrases and the joined
+two-mechanism evidence (mention 0.643 -> 0.714, length 0.982 -> 1.0, sms by-kind 0.938 -> 0.95).
+Each step was kept only if the full run moved; the intermediate gen9/gen10 trees scored 89.44/90.30
+against a paired 89.97 and stayed below the promotion gate until gen11.
 
 | Detector | F1 | Precision | Recall | FPR | Score |
 |---|---|---|---|---|---|
 | SMS | 0.9015 | 0.957 | 0.852 | 0.0078 | 0.9015 |
-| URL | 0.9949 | 1.000 | 0.9899 | 0.0000 | 0.9949 |
+| URL | 0.9948 | 1.000 | 0.9896 | 0.0000 | 0.9948 |
 | Indic | 0.9665 | 0.987 | 0.9469 | 0.0125 | 0.9544 |
 | Flow | 0.8505 | 0.9706 | 0.7568 | 0.0303 | 0.7643 |
 
 Indic accuracy by language: English 0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875. The starting
 baseline scored 81.56 on the same proxy; the round-1 entry scored 85.84 on the previous hidden set.
 
-Explanation checks on 28 items: 28 valid, verdict 0.9, consistency 0.964, mention 0.536, forbidden
-1.0, fabrication 1.0, actions 0.929, length 0.946.
-
-A flow-explanation variant was also scored: it treats a lone beaconing description as malicious
-(round 1 called a beaconing flow safe) and gives benign flow descriptions an evidence phrase. It
-raised E from 0.8875 to 0.8973 (flow by-kind 0.787 to 0.856) with identical detection (D 0.9024);
-its overall 87.60 was 0.06 below, inside the latency noise band, so it was not promoted over the
-87.66 run.
+Explanation checks on 28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.714, forbidden
+1.0, fabrication 1.0, actions 0.964, length 1.0; by kind, sms 0.95, url 0.975, flow 0.894,
+injection 0.95. The same detection tree scored 87.66 with the round-2 prompt, so the first-sentence
+evidence format and its later trims are what moved E; a lone beaconing flow is now called malicious
+and its evidence names the periodic connection instead of only the address.
 
 ## Generalisation
 
@@ -99,12 +111,13 @@ framing, secret/payment/threat/lookalike mechanics) over char n-gram features, s
 Hindi spellings still land on the same features: hidden indic F1 is 0.9665 with FPR 1.25% and Hindi
 accuracy 0.875 on B.
 
-- **Leave-one-category-out** on the visible Indian set (train on 15 categories plus the SMS corpus,
-  test the held-out category, benign and malicious): **macro F1 1.0**; every malicious category
-  10/10, every benign category 0 false positives. This removes the "memorised set A wording"
-  explanation.
+- **Leave-one-category-out** on the visible Indian set (32 categories; train on all but one, test the
+  held-out category, benign and malicious): **macro F1 1.0** (32/32 categories). This removes the
+  "memorised set A wording" explanation.
 - **Three blind paraphrase suites** authored after the rules were frozen: 40 protective-clause
-  cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct. They use
+  cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct, with zero
+  `uncertain` answers (the runner counts `uncertain` as wrong for either label, stricter than
+  `bin/eval`'s half credit). They use
   unseen wording ("nothing to pay", "no fee is charged", "रिफंड आ गया", "running late by 15
   minutes"), not slot swaps. Sources and runner: `research/stress/` at the repo root.
 - **Flow signatures** fire on 75 of 74,112 normal train+dev rows (0.10%) and cover the
@@ -117,18 +130,20 @@ claim the set-B result proves generalisation to set C, which the controller scor
 ## Performance on Arm
 
 Measured by `bin/eval --repeats 2` on the Oracle A1 host (2x Neoverse-N1, about 11 GB RAM):
-explanation latency **4.72 s per item** over two repeats (130.4 s and 132.2 s for 28 items), peak RSS
-2.256 GB, decode 20.1 tokens/s, prefill 82.5 tokens/s, median prompt 199 tokens and 34 generated
-tokens. Detector latency is 0.407 ms per item. The candidate bundle is 1.186 GB including the shared
+explanation latency **3.67 s per item** over two repeats (99.8 s and 102.6 s for 28 items), peak RSS
+2.256 GB, decode 20.8 tokens/s, prefill 82.5 tokens/s, median prompt 130 tokens and 28 generated
+tokens. Detector latency is 0.407 ms per item. The host is shared, so latency readings vary by up to
+30% (the same prompt measured 4.42 s/item during a co-tenant burst); E is deterministic and
+comparable across runs. The candidate bundle is 1.186 GB including the shared
 1.1 GB Llama PTE. The UI, CLI and demo run offline; no network calls are made after import.
 
 | Component | Configuration measured |
 |---|---|
 | Demo box | aarch64 Oracle A1 VM, 2 vCPU Neoverse-N1, about 11 GB RAM, Ubuntu 24.04, no GPU |
-| Detectors | scikit-learn / joblib on the CPU; 0.407 ms per item for all four tasks |
+| Detectors | scikit-learn / joblib on the CPU; 0.4-0.6 ms per item for all four tasks |
 | Explanation model | `llama32-1b-qlora`: Llama 3.2 1B Instruct, INT4 group-32 weights, 8-bit dynamic activations, XNNPACK backend, ExecuTorch 1.6 |
 | Decoding | greedy (temperature 0), max 40 new tokens, context from the `.pte` |
-| Measured run | prefill 82.5 tokens/s, decode 20.1 tokens/s, 4.72 s/item over 28 items, peak RSS 2.256 GB |
+| Measured run | prefill 82.5 tokens/s, decode 20.8 tokens/s, 3.67 s/item over 28 items, peak RSS 2.256 GB |
 
 The registry's `llama32-1b-spinquant` entry was also measured on this box (about 58-63 prefill and
 12-13.5 decode tokens/s under mixed co-tenant load), slower than `qlora`, so `qlora` stays configured.
@@ -136,8 +151,8 @@ The registry's `llama32-1b-spinquant` entry was also measured on this box (about
 ## Limitations
 
 The 1B model sometimes paraphrases instead of naming the required concept; mention coverage is
-0.536, so a larger model or a stricter grounding prompt would help. Two hidden explanation items
-still get the wrong verdict, which also costs consistency. Some British ad-spam is labelled benign
+0.714, so a larger model or a stricter grounding prompt would help. One hidden explanation item
+still gets the wrong verdict (0.975) and one action list is unsafe under the scorer's rules (0.964). Some British ad-spam is labelled benign
 because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.852.
 Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
@@ -159,14 +174,14 @@ attempt. `tests/test_offline.py` shows that a socket connect fails under the gua
 Three-minute video script:
 
 1. `uname -m` (aarch64) and `lscpu` (Neoverse-N1), `free -h` and `df -h`.
-2. Offline detections through the CLI: `bin/app --demo` runs six preset items (SMS electricity/OTP
-   scam, genuine bank debit alert, lookalike URL, official IRCTC URL, port-scan flow, prompt-injection
-   text). It prints verdict, evidence, the Llama explanation, latency and RSS, and writes
+2. Offline detections through the CLI: `bin/app --demo` runs six preset items (electricity
+   disconnection scam SMS, genuine bank debit alert SMS, lookalike URL, official IRCTC URL, port-scan
+   flow, prompt-injection text classified through the injection path). It prints verdict, evidence, the Llama explanation, latency and RSS, and writes
    `demo_output.json`. Show the guard blocking a connect first.
 3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
    a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
 4. State that everything runs on the local CPU through ExecuTorch, with no network after import, and
-   read the measured 4.72 s/item, 2.26 GB peak RSS and 20.1 decode tokens/s.
+   read the measured 3.67 s/item, 2.26 GB peak RSS and 20.8 decode tokens/s.
 
 ## Responsible AI, privacy and safety
 

@@ -66,3 +66,38 @@ def test_punycode_and_homoglyph_domains_flagged():
 def test_hindi_receipt_is_benign():
     (lab, _, _), = detect.predict_text(["आपका रिफंड 1,299 रुपये खाते में आ गया है।"])
     assert lab != 1
+
+
+def test_beaconing_flow_is_malicious():
+    lab, _, ev = detect.classify_any(
+        "flow", "outbound https connection every 30 seconds to 203.0.113.9, small upload, then idle")
+    assert lab == 1 and ev
+
+
+def test_scheduled_backup_flow_is_benign():
+    lab, _, _ = detect.classify_any(
+        "flow", "scheduled backup to the nas every night at 2 am over ssh, completed successfully")
+    assert lab == 0
+
+
+def test_official_bank_url_is_not_flagged():
+    (lab, _, ev), = detect.predict_url(["https://www.icicibank.com/personal-banking/accounts"])
+    assert lab == 0 and ev == ["the domain icicibank.com is an official domain"]
+
+
+def test_otp_share_request_flagged():
+    for text in ("Reschedule by sharing the OTP with the driver at 9812345670.",
+                 "Your OTP is 123456. Share it with our agent to complete KYC."):
+        (lab, _, ev), = detect.predict_text([text])
+        assert lab == 1 and ev
+
+
+def test_explain_cases_file_is_complete():
+    import json
+    path = Path(__file__).parent / "explain_cases.jsonl"
+    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(rows) >= 20
+    assert {r["kind"] for r in rows} == {"sms", "url", "flow", "injection"}
+    assert len({r["id"] for r in rows}) == len(rows)
+    for r in rows:
+        assert r["label"] in (0, 1) and r["input"].strip() and r["required_mentions"]

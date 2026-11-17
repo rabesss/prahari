@@ -1,0 +1,128 @@
+{
+ "detection": {
+  "sms": {
+   "f1": 0.9015,
+   "precision": 0.957,
+   "recall": 0.852,
+   "fpr": 0.0078,
+   "invalid": 0,
+   "n": 1162,
+   "score": 0.9015,
+   "items_per_s": 289.7
+  },
+  "url": {
+   "f1": 0.9948,
+   "precision": 1.0,
+   "recall": 0.9896,
+   "fpr": 0.0,
+   "invalid": 0,
+   "n": 7997,
+   "score": 0.9948,
+   "items_per_s": 1773.6
+  },
+  "indic": {
+   "f1": 0.9665,
+   "precision": 0.987,
+   "recall": 0.9469,
+   "fpr": 0.0125,
+   "invalid": 0,
+   "n": 320,
+   "score": 0.9544,
+   "items_per_s": 79.8
+  },
+  "indic_breakdown": {
+   "hard:False": {
+    "n": 127,
+    "acc": 0.972
+   },
+   "hard:True": {
+    "n": 193,
+    "acc": 0.964
+   },
+   "lang:en": {
+    "n": 192,
+    "acc": 0.977
+   },
+   "lang:hi": {
+    "n": 32,
+    "acc": 0.875
+   },
+   "lang:hinglish": {
+    "n": 80,
+    "acc": 0.975
+   },
+   "lang:mixed": {
+    "n": 16,
+    "acc": 1.0
+   }
+  },
+  "flow": {
+   "f1": 0.8505,
+   "precision": 0.9706,
+   "recall": 0.7568,
+   "fpr": 0.0303,
+   "invalid": 0,
+   "n": 22544,
+   "score": 0.7643,
+   "items_per_s": 6424.6
+  }
+ },
+ "explanation": {
+  "n": 28,
+  "valid": 28,
+  "llm_plausible": 28,
+  "check_rates": {
+   "verdict": 0.975,
+   "consistency": 1.0,
+   "mention": 0.571,
+   "forbidden": 1.0,
+   "fabrication": 1.0,
+   "actions": 0.964,
+   "length": 0.964
+  },
+  "by_kind": {
+   "sms": 0.938,
+   "url": 0.942,
+   "flow": 0.806,
+   "injection": 0.95
+  }
+ },
+ "performance": {
+  "explain_s_per_item": 7.18,
+  "explain_wall_s": [
+   190.726,
+   200.998
+  ],
+  "peak_rss_gb": 2.253,
+  "detector_ms_per_item": 0.564,
+  "size_gb": 1.186,
+  "parts": {
+   "explain_latency": 0.458,
+   "peak_rss": 0.373,
+   "detector_latency": 1.0,
+   "size": 0.678
+  },
+  "llm_median": {
+   "prompt_tokens": 137,
+   "generated_tokens": 29,
+   "prefill_tps": 49.0062,
+   "decode_tps": 11.8973
+  }
+ },
+ "compliance": {
+  "gate": {
+   "llama_family": true,
+   "executorch_pte_loaded": true,
+   "llm_stats_plausible": true,
+   "pass": true
+  },
+  "parts": {
+   "offline": 1.0,
+   "tests": 1.0,
+   "app": 1.0,
+   "docs": 1.0
+  },
+  "net_violations": 0,
+  "file_violations": 0
+ }
+}
