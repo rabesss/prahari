@@ -103,9 +103,17 @@ The 28-item automated explanation evaluation reported 28 valid outputs; verdict 
 
 ### Worked example for the recorded demo
 
-**[example output to be inserted from the demo recording]**
+Recorded on 17 November 2026 with `bin/app --demo` on the Oracle A1 Neoverse-N1 VM (visible preset input; full output in the demo recording). Input (SMS): *"Dear customer, your electricity connection will be disconnected tonight. Pay Rs 499 now at http://bses-bill-update.top or the meter will be cut."*
 
-The visible `--demo` presets in the current application are in English, and no saved visible Hinglish preset output containing a detector verdict, evidence, actual Llama explanation and actions was found in the inspected records. A Hinglish example must be recorded and checked before those fields are included. Do not substitute generated or hidden-set output. The separate [demo shot list](demo-script.md) includes the input, an honest network replay and the text-rule path.
+| Field | Output |
+|:--|:--|
+| Detector verdict | malicious, score 1.0, category "a payment fraud" |
+| Evidence | asks for a payment to a personal number, account or unverified link; threatens to block, cut or freeze an account, SIM or connection; the domain bses-bill-update.top uses .top, common for throwaway scam sites |
+| Llama 3.2 1B explanation (ExecuTorch, on-device) | "This message is DANGEROUS: asks for a payment to an unverified account or link. Do not click on any suspicious links or send money." |
+| Actions | Do not click the link or reply to the message. Never share OTP, UPI PIN, CVV or passwords with anyone. Report it at cybercrime.gov.in or call the national helpline 1930, and use Sanchar Saathi Chakshu to report the sender. |
+| Llama run | 133 prompt tokens, 31 generated; prefill 75.0 tok/s, decode 21.5 tok/s; 5.6 s generation |
+
+This first item of the run includes the one-time model load (13.2 s end to end); the remaining five demo items took 2.9–6.9 s each, at 2.30 GB RSS. A Hinglish example will be added once recorded.
 
 ### Offline use
 
