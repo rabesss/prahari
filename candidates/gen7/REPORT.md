@@ -1,6 +1,6 @@
 > This directory is the exact tree measured at 89.25 (stamp `20261111-064233`). The promoted, documented copy with the 89.87 final stamp is `candidates/BEST`; the numbers in this file are from the earlier gen2 docs.
 
-# Kavach Lite — on-device scam triage for Indian users
+# Prahari — on-device scam triage for Indian users
 
 ## Problem
 
@@ -9,7 +9,7 @@ credentials and money. Genuine bank, delivery and utility alerts look similar, a
 can arrive in English, Hinglish or Devanagari. A useful assistant must separate scams from these
 hard negatives without sending private content to a cloud. The Bharat AI-SoC PS3 brief asks for an
 on-device cybersecurity assistant that runs on Arm hardware, explains its decision, and stays useful
-offline. Kavach Lite answers that: local detectors plus a small Llama explanation model, with no
+offline. Prahari answers that: local detectors plus a small Llama explanation model, with no
 network at inference time.
 
 ## Architecture

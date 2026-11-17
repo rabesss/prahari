@@ -1,6 +1,6 @@
 > This directory is the exact tree measured at 90.55 (stamp `20261111-074120`). The promoted, documented copy is `candidates/BEST`; the numbers in this file are the gen7-era docs.
 
-# Kavach Lite: offline scam and phishing triage on Arm
+# Prahari: offline scam and phishing triage on Arm
 
 Bharat AI-SoC Challenge 2026, PS3 entry. It checks SMS/WhatsApp messages, web links and network-event
 records **entirely on the device**. It flags scams, phishing and intrusions, then explains the verdict in plain

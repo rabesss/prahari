@@ -1,4 +1,4 @@
-# Kavach Lite — on-device scam triage for Indian users
+# Prahari — on-device scam triage for Indian users
 
 ## Problem
 
@@ -7,7 +7,7 @@ credentials and money. Genuine bank, delivery and utility alerts look similar, a
 can arrive in English, Hinglish or Devanagari. A useful assistant must separate scams from these
 hard negatives without sending private content to a cloud. The Bharat AI-SoC PS3 brief asks for an
 on-device cybersecurity assistant that runs on Arm hardware, explains its decision, and stays useful
-offline. Kavach Lite answers that: local detectors plus a small Llama explanation model, with no
+offline. Prahari answers that: local detectors plus a small Llama explanation model, with no
 network at inference time.
 
 ## Architecture
@@ -112,8 +112,7 @@ Hindi spellings still land on the same features: hidden indic F1 is 0.9665 with 
 accuracy 0.875 on B.
 
 - **Leave-one-category-out** on the visible Indian set (32 categories; train on all but one, test the
-  held-out category, benign and malicious): **macro F1 1.0** (32/32 categories). This removes the
-  "memorised set A wording" explanation.
+  held-out category, benign and malicious): **reported F1 1.0** (32 categories). The script computes pooled binary F1 despite its "macro F1" label; it does not establish real-world generalisation.
 - **Three blind paraphrase suites** authored after the rules were frozen: 40 protective-clause
   cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct, with zero
   `uncertain` answers (the runner counts `uncertain` as wrong for either label, stricter than
@@ -135,7 +134,7 @@ explanation latency **3.67 s per item** over two repeats (99.8 s and 102.6 s for
 tokens. Detector latency is 0.407 ms per item. The host is shared, so latency readings vary by up to
 30% (the same prompt measured 4.42 s/item during a co-tenant burst); E is deterministic and
 comparable across runs. The candidate bundle is 1.186 GB including the shared
-1.1 GB Llama PTE. The UI, CLI and demo run offline; no network calls are made after import.
+1.1 GB Llama PTE. The evaluator runs with an import-time network guard. Normal app operation does not itself install that guard; an external egress block is needed to demonstrate offline operation.
 
 | Component | Configuration measured |
 |---|---|
@@ -152,7 +151,7 @@ The registry's `llama32-1b-spinquant` entry was also measured on this box (about
 
 The 1B model sometimes paraphrases instead of naming the required concept; mention coverage is
 0.714, so a larger model or a stricter grounding prompt would help. One hidden explanation item
-still gets the wrong verdict (0.975) and one action list is unsafe under the scorer's rules (0.964). Some British ad-spam is labelled benign
+still answers `uncertain` (verdict 0.975; `uncertain` scores 0.3) and one action list fails the scorer's action check (0.964). Some British ad-spam is labelled benign
 because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.852.
 Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
@@ -185,9 +184,12 @@ Three-minute video script:
 
 ## Responsible AI, privacy and safety
 
-All processing is local: no message, URL or flow leaves the device, and the import-time guard blocks
-network access. Outputs are advisory, evidence is shown instead of hidden scores, and the UI tells
+The intended processing is local. The evaluation import-time guard blocks network access; normal app startup does not install that guard. Outputs are advisory, evidence is shown instead of hidden scores, and the UI tells
 users to verify with the official app. Advice never asks for secrets or clicks in message links, and
 scam advice points to cybercrime.gov.in and helpline 1930. The system has no access to OTPs,
 credentials or payment APIs. A human can always ignore the verdict, and the tool does not block
 communication by itself. The detector is not a substitute for reporting fraud to the bank or police.
+
+## Flow input distinction
+
+The UI and `--demo` classify descriptions with `predict_flow_text` rules. The trained NSL-KDD model accepts feature records via `bin/predict --task flow` as dataset replay. Live capture is not implemented. `bin/explain` reclassifies a flow description using text rules; its verdict can differ from the feature-model verdict and does not explain that verdict. See `docs/phase1/report.md` for the current report.

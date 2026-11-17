@@ -1,4 +1,4 @@
-# Kavach Lite — on-device scam triage for Indian users
+# Prahari — on-device scam triage for Indian users
 
 ## Problem
 
@@ -7,7 +7,7 @@ credentials and money. Genuine bank, delivery and utility alerts look similar, a
 can arrive in English, Hinglish or Devanagari. A useful assistant must separate scams from these
 hard negatives without sending private content to a cloud. The Bharat AI-SoC PS3 brief asks for an
 on-device cybersecurity assistant that runs on Arm hardware, explains its decision, and stays useful
-offline. Kavach Lite answers that: local detectors plus a small Llama explanation model, with no
+offline. Prahari answers that: local detectors plus a small Llama explanation model, with no
 network at inference time.
 
 ## Architecture

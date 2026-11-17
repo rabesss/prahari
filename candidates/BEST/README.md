@@ -1,8 +1,8 @@
-# Kavach Lite: offline scam and phishing triage on Arm
+# Prahari: offline scam and phishing triage on Arm
 
 Bharat AI-SoC Challenge 2026, PS3 entry. It checks SMS/WhatsApp messages, web links and network-event
-records **entirely on the device**. It flags scams, phishing and intrusions, then explains the verdict in plain
-language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. Nothing is sent to the internet.
+descriptions **entirely on the device**. It flags scams, phishing and intrusions, then explains the verdict in plain
+language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. The app uses local inference; use an external egress block for an offline demonstration.
 
 ## How it works
 1. **Mechanism layer (fast, explainable):** transparent rules decide what a message asks the reader to
@@ -23,8 +23,10 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. Nothin
 
 ## Setup (one command on a fresh aarch64 Linux box)
 ```sh
+# Full judge setup (venv at the repository root, model download, registry): see the top-level README.md.
+# Standalone: create the venv here and point the launcher at it.
 python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-bin/app --selftest        # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
+HC_PY="$PWD/.venv/bin/python" bin/app --selftest   # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
 ```
 The Python package, entry scripts and joblib detectors in this directory are the **compiled application**
 for Phase 1: `bin/app` is the single documented entry (UI, `--demo`, `--selftest`), and `bin/predict` /
@@ -44,7 +46,9 @@ Python 3.12 venv with `executorch==1.6.0`, `torch` (CPU), `scikit-learn`, `panda
 Model files are not in git. See DATA.md for provenance and licences.
 
 ## Results
-`bin/eval` proxy (two repeats, hidden round-2 set): **90.73** — D 0.9024, E 0.9473, P 0.7486, C 1.0,
+`bin/eval` proxy (two repeats, hidden round-2 set): 90.73 (internal proxy, not a judging score) — D 0.9024, E 0.9473, P 0.7486, C 1.0,
 promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0.8505. Explanation:
 3.67 s/item, 2.256 GB peak RSS, 20.8 decode tokens/s on 2x Neoverse-N1. See REPORT.md for the full
 table, generalisation checks and limitations.
+
+Network descriptions in the UI and demo use text rules; the trained flow model accepts NSL-KDD feature records through `bin/predict --task flow` as dataset replay. Live capture is not implemented. The explanation flow independently classifies text and can disagree with the trained model. See `../../docs/phase1/report.md`.
