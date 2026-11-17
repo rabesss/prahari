@@ -48,10 +48,16 @@ The demo generates explanations and reports latency and process peak RSS. `candi
 
 ## Repository map
 
-- [Technical report](docs/phase1/report.md), [PDF](docs/phase1/report.pdf), [evidence ledger](docs/phase1/EVIDENCE.md), [jury Q&A](docs/phase1/LIMITATIONS.md) and [shot list](docs/phase1/demo-script.md).
+- [Technical report](docs/phase1/report.md), [evidence ledger](docs/phase1/EVIDENCE.md), [jury Q&A](docs/phase1/LIMITATIONS.md) and [shot list](docs/phase1/demo-script.md).
 - [Application and detectors](candidates/BEST/); [data and model provenance](candidates/BEST/DATA.md); [visible benchmark](bench/README.md); [stress tests](research/stress/README.md).
 - [Challenge brief snapshot](docs/challenge-brief.md) and historical [research](research/).
 
 ## Licences and credits
 
 Third-party data and model sources and their stated licences are listed in [DATA.md](candidates/BEST/DATA.md). Llama weights and datasets are separately obtained and subject to their own terms. The repository currently has no identified project licence grant; obtain the owner's permission before reusing project code or artifacts. Prahari uses Python, scikit-learn, PyTorch and ExecuTorch; their respective upstream licences apply. Arm, Meta, the dataset authors and other upstream contributors retain their rights.
+
+To render the submission PDF locally (the PDF is ignored by Git and attached at submission):
+
+```sh
+pandoc docs/phase1/report.md -o docs/phase1/report.pdf --pdf-engine=xelatex
+```
