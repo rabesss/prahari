@@ -1,0 +1,29 @@
+{
+ "label": "gen10-full",
+ "candidate": "candidates/gen10",
+ "stamp": "20261111-072803",
+ "artifacts": "research/evals/20261111-072803-gen10-full",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 90.3,
+ "scores": {
+  "D": 0.9024,
+  "E": 0.942,
+  "P": 0.7339,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9015,
+  "url_f1": 0.9948,
+  "indic_f1": 0.9665,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8505,
+  "explain_s_per_item": 3.84,
+  "peak_rss_gb": 2.256,
+  "decode_tps": 19.6078,
+  "model": "llama32-1b-qlora"
+ }
+}

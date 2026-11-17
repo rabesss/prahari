@@ -23,7 +23,9 @@ def _model(name):
 def _decide(p, ev, lo=0.32, hi=0.60):
     strong = sum(1 for n, _ in ev if n in STRONG)
     if any(n == "official_domain" for n, _ in ev) and strong == 0:
-        p = min(p, 0.5)
+        # A known official domain with no other indicator is a strong safe signal: the URL model
+        # still fires on paths like /personal-banking because it never saw that brand's page.
+        p = min(p, 0.30 if len(ev) == 1 else 0.5)
     p = min(1.0, p + 0.1 * strong)
     if p >= hi:
         return 1, p
@@ -161,7 +163,9 @@ def predict_flow_text(text):
     ev = rules.flow_text_indicators(text)
     if rules.BENIGN_FLOW.search(text) and not any(n in ("root", "flood") for n, _ in ev):
         return 0, 0.35, [d for _, d in ev[:1]]
-    lab = 1 if any(n not in ("rejected", "beaconing") for n, _ in ev) else ("uncertain" if ev else 0)
+    # A lone beaconing description is command-and-control behaviour, not a harmless periodic job:
+    # a scheduled backup or update is already cleared by BENIGN_FLOW above.
+    lab = 1 if any(n != "rejected" for n, _ in ev) else ("uncertain" if ev else 0)
     return lab, (0.9 if lab == 1 else 0.5 if ev else 0.1), [d for _, d in ev]
 
 

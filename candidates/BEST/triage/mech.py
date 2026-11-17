@@ -133,7 +133,7 @@ SAFE = [
      r"(ho gaya|ho gayi|aa gaya|aa gayi|jama hua|successful|credited)|"
      r"जमा हुआ|प्राप्त हुआ|नवीनीकरण|डिलीवर हो गया|डिलीवर हुआ|पहुंच गया|सफलतापूर्वक|स्वीकार कर लिया|वेतन|रिटर्न)"),
     ("otp_notification",
-     r"((your|aapka|आपका)?\s*(otp|code|pin|password|कोड|ओटीपी|पिन)\s*(is|है)?\s*[:#-]?\s*\d{4,8})"
+     r"((your|aapka|आपका)?\s*(otp|code|pin|password|कोड|ओटीपी|पिन)(\s+for[^.;!?।\n]{0,20})?\s*(is|है)?\s*[:#-]?\s*\d{4,8})"
      r"|(code\s*(is)?\s*\d{4,8})|(\d{4,8}\s*(is your|aapka)\s*(otp|code))|"
      r"(\d{4,8}\s*(is|है)\s*(your|aapka|आपका)?\s*(one[- ]?time (password|code)|otp|verification code))"),
     ("protective",
@@ -284,8 +284,9 @@ def analyze(text):
     # A request for a secret only counts when the reader is asked to hand it over and the
     # channel is not a known official app/portal; a notification ("your code is 123456")
     # and a protection statement ("do not share") are excluded.
-    handover = (r"(share|send|reply|tell|give|enter|type|provide|submit|forward|confirm|verify|fill|"
-                r"read out|dictate|batao|bataen|bataein|bhejein|bhejo|daalein|daal|darj|"
+    handover = (r"(shar(e|ing)|send(ing)?|reply|tell(ing)?|giv(e|ing)|enter(ing)?|typ(e|ing)|"
+                r"provid(e|ing)|submit(ting)?|forward(ing)?|confirm(ing)?|verif(y|ying)|fill(ing)?|"
+                r"read out|dictat(e|ing)|batao|bataen|bataein|bhejein|bhejo|daalein|daal|darj|"
                 r"साझा|भेजें|बताएं|बताओ|डालें|दर्ज|दें|भरें|भरो)")
     phish_page = _clause_hit(r"(click|enter|login|log in|sign in|submit|verify|confirm|update|pay|share)"
                              r"[^.;!?।\n]{0,40}(link|page|site|portal|here|below|unlock|account|kyc|otp|"

@@ -1,0 +1,29 @@
+{
+ "label": "gen8-full",
+ "candidate": "candidates/gen8",
+ "stamp": "20261111-070120",
+ "artifacts": "research/evals/20261111-070120-gen8-full",
+ "quick": false,
+ "queued_s": 0.0,
+ "score": 88.94,
+ "scores": {
+  "D": 0.9024,
+  "E": 0.9295,
+  "P": 0.6816,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "promotable": true,
+ "headline": {
+  "sms_f1": 0.9015,
+  "url_f1": 0.9948,
+  "indic_f1": 0.9665,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8505,
+  "explain_s_per_item": 4.55,
+  "peak_rss_gb": 2.257,
+  "decode_tps": 19.5531,
+  "model": "llama32-1b-qlora"
+ }
+}
