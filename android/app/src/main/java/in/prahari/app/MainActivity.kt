@@ -121,5 +121,5 @@ class MainActivity : Activity() {
             runOnUiThread { output.text = result }
         }
     }
-    override fun onDestroy() { worker.shutdown(); super.onDestroy() }
+    override fun onDestroy() { worker.execute { module?.close(); module = null }; worker.shutdown(); super.onDestroy() }
 }
