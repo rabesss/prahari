@@ -23,8 +23,10 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. The ap
 
 ## Setup (one command on a fresh aarch64 Linux box)
 ```sh
+# Full judge setup (venv at the repository root, model download, registry): see the top-level README.md.
+# Standalone: create the venv here and point the launcher at it.
 python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-bin/app --selftest        # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
+HC_PY="$PWD/.venv/bin/python" bin/app --selftest   # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
 ```
 The Python package, entry scripts and joblib detectors in this directory are the **compiled application**
 for Phase 1: `bin/app` is the single documented entry (UI, `--demo`, `--selftest`), and `bin/predict` /

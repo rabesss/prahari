@@ -151,7 +151,7 @@ The registry's `llama32-1b-spinquant` entry was also measured on this box (about
 
 The 1B model sometimes paraphrases instead of naming the required concept; mention coverage is
 0.714, so a larger model or a stricter grounding prompt would help. One hidden explanation item
-still gets the wrong verdict (0.975) and one action list is unsafe under the scorer's rules (0.964). Some British ad-spam is labelled benign
+still answers `uncertain` (verdict 0.975; `uncertain` scores 0.3) and one action list fails the scorer's action check (0.964). Some British ad-spam is labelled benign
 because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.852.
 Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel

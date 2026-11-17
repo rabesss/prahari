@@ -14,12 +14,12 @@ Prahari is an Arm CPU prototype that helps people assess suspicious messages, li
 
 The following results are from the **11 November 2026** controller run on the specified Arm cloud VM and its separate evaluation, not a challenge judging score [S3]:
 
-- **0.407 ms/item** detector processing time; **3.67 s/item** explanation time over two runs of 28 items.
+- **0.407 ms/record** URL detector batch wall time (7,997 records in one batch); **3.67 s/item** explanation time over two runs of 28 items.
 - **2.256 GB** peak RSS during explanation; median prefill **82.5 tokens/s** and decode **20.8 tokens/s**.
 - URL false-positive rate **0.0000**, F1 **0.9948** on **7,997** records.
 - SMS false-positive rate **0.78%**, F1 **0.9015** on **1,162** records.
 - Hinglish accuracy **0.975** on **80** synthetic Indian-context items.
-- The automated fabrication check scored **1.0** on **28** explanations; the same checks recorded one verdict failure and one unsafe action [S2, S3].
+- The automated fabrication check scored **1.0** on **28** explanations; the same checks scored 27 of 28 verdicts correct with one answered `uncertain`, and one action list failed the action check [S2, S3].
 
 **What is not done yet.** Live network capture, a completed Android APK and a measured physical-phone run are still in progress or planned. The Arm results come from a shared cloud VM, and an independently blocked-egress demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
 
@@ -56,7 +56,7 @@ The message layer combines TF-IDF and a logistic classifier with Indian-context 
 
 ## Arm and ExecuTorch optimisation
 
-**Target and method.** The recorded deployment is an aarch64 Oracle A1 VM: two Neoverse-N1 vCPUs, approximately 11 GB RAM, Ubuntu 24.04 and no GPU [S2]. The controller ran `bin/eval candidates/BEST --repeats 2`; the 28 explanation items took 99.797 and 102.636 seconds in the two runs. The aggregate result was 3.67 s/item and 2.256 GB peak RSS. Detector processing was 0.407 ms/item. Median prompt and output lengths were 130 and 28 tokens respectively, with 82.5 prefill and 20.8 decode tokens/s [S3]. These are shared-host measurements; co-tenant load affects timing. Thread settings were not recorded in the cited results.
+**Target and method.** The recorded deployment is an aarch64 Oracle A1 VM: two Neoverse-N1 vCPUs, approximately 11 GB RAM, Ubuntu 24.04 and no GPU [S2]. The controller ran `bin/eval candidates/BEST --repeats 2`; the 28 explanation items took 99.797 and 102.636 seconds in the two runs. The aggregate result was 3.67 s/item and 2.256 GB peak RSS. The URL detector processed its 7,997-record batch at 0.407 ms per record (process wall time divided by records; not an interactive per-request latency). Median prompt and output lengths were 130 and 28 tokens respectively, with 82.5 prefill and 20.8 decode tokens/s [S3]. These are shared-host measurements; co-tenant load affects timing. Thread settings were not recorded in the cited results.
 
 **Model and backend.** Prahari uses the ExecuTorch 1.6.0 XNNPACK CPU backend with Llama 3.2 1B Instruct QLoRA: INT4 group-32 weights and 8-bit dynamic activations. This export was retained after a SpinQuant export measured about 58–63 prefill and 12–13.5 decode tokens/s on the same box under mixed co-tenant load; the QLoRA confirmation measured 82.5 and 20.8 tokens/s. The workloads and host load were not a controlled comparison, so the observations support the selection on this host, not a general speedup claim [S2, S3].
 
@@ -99,7 +99,7 @@ Prahari separates a detector's verdict from the explanation so that users can in
 
 The prompt identifies incoming content as data rather than instructions, neutralises live URLs, and requests a verdict-first explanation grounded in selected evidence. Injection patterns are recognised; refusal retries and a heuristic contradiction filter address some failure modes. These are practical guards, not a proof that untrusted content cannot influence generation or that advice is correct. The model can still make a wrong assertion or give unsafe advice [S2].
 
-The 28-item automated explanation evaluation reported 28 valid outputs; verdict 0.975, consistency 1.0, evidence mention 0.714, forbidden-content check 1.0, fabrication check 1.0, action check 0.964 and length check 1.0. The record identifies one wrong verdict and one unsafe action under the scorer's rules [S2, S3]. The fabrication and forbidden-content checks are limited checks, not a guarantee of truth or safety. Understanding by non-experts has not yet been independently measured.
+The 28-item automated explanation evaluation reported 28 valid outputs; verdict 0.975, consistency 1.0, evidence mention 0.714, forbidden-content check 1.0, fabrication check 1.0, action check 0.964 and length check 1.0. Under the scorer's rules this means 27 correct verdicts and one `uncertain` verdict (scored 0.3, none wrong), and one action list that failed the action check, which fails when an action is unsafe or when a malicious item lacks a protective action [S2, S3]. The fabrication and forbidden-content checks are limited checks, not a guarantee of truth or safety. Understanding by non-experts has not yet been independently measured.
 
 ### Worked example for the recorded demo
 

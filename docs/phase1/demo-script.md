@@ -24,14 +24,16 @@ This is a production plan, not evidence a recording, Android APK, real phone, or
 From the repository root, with the visible data already provisioned, create an input outside the repository. This selects only `id` and `features`, not the gold label. Review the applicable NSL-KDD terms before showing it.
 
 ```sh
-python - <<'PY'
+D=$(mktemp -d)
+python - "$D" <<'PY'
+import sys
 import json
 from pathlib import Path
 r = json.loads(Path('data/dev/flow.jsonl').open().readline())
-Path('/var/tmp/prahari-visible-flow.jsonl').write_text(json.dumps({'id': 'replay', 'features': r['features']}) + '\n')
+Path(sys.argv[1], 'flow.jsonl').write_text(json.dumps({'id': 'replay', 'features': r['features']}) + '\n')
 PY
-candidates/BEST/bin/predict --task flow --in /var/tmp/prahari-visible-flow.jsonl --out /var/tmp/prahari-visible-result.jsonl
-cat /var/tmp/prahari-visible-result.jsonl
+candidates/BEST/bin/predict --task flow --in "$D/flow.jsonl" --out "$D/result.jsonl"
+cat "$D/result.jsonl"
 ```
 
 The replay command outputs a numeric label (1 malicious, 0 benign), score and evidence. Model acquisition and the data-preparation pipeline are prerequisites; do not use hidden records.
