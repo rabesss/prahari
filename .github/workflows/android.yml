@@ -5,6 +5,11 @@ on:
       - 'android/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+    inputs:
+      source_apk:
+        description: Build an additional APK with the source-built 1.6 AAR
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -103,4 +108,52 @@ jobs:
         with:
           name: executorch-1.6.0-arm64-aar
           path: aar-output/
+          if-no-files-found: error
+
+  source-apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.source_apk
+    needs: executorch-aar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/setup-python@v5
+        id: python310
+        with: {python-version: '3.10'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.10.2'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: executorch-1.6.0-arm64-aar
+          path: aar-output
+      - name: Export and verify detectors
+        run: |
+          python -m pip install 'numpy==2.5.4' 'scipy==1.18.1' 'scikit-learn==1.9.1' 'pandas==3.1.1' 'joblib==1.6.0'
+          mkdir -p android/build/generated/python
+          cp -R candidates/BEST/triage android/build/generated/python/triage
+          python android/tools/export_models.py android/build/generated/python/models
+          python android/tools/test_parity.py android/build/generated/python/models
+          python android/tools/test_bridge.py
+      - name: Build 1.6 fallback APK
+        working-directory: android
+        env:
+          CHAQUOPY_BUILD_PYTHON: ${{ steps.python310.outputs.python-path }}
+        run: gradle --no-daemon :app:assembleDebug -PprahariAar="$GITHUB_WORKSPACE/aar-output/executorch.aar"
+      - name: Audit fallback manifest and permissions
+        run: |
+          python android/tools/check_manifest.py android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions android/app/build/outputs/apk/debug/app-debug.apk | tee /dev/stderr | (! grep -q 'android.permission.INTERNET')
+          stat -c 'Fallback APK size: %s bytes' android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prahari-debug-apk-executorch-1.6
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

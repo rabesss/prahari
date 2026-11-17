@@ -8,28 +8,21 @@ phone go decision.**
 
 ## Build
 
-The supported build is GitHub Actions (`Android spike`): the APK job generates detector JSON
-from the trusted checked-in joblib files with Python 3.12 and scikit-learn 1.9.1, runs parity and
-fake-runner tests, then builds a debug APK. Download the `prahari-debug-apk` artifact. Building
-locally requires the same Python reference environment, JDK 17, Android SDK 35, Gradle 8.10.2
-and the Chaquopy build Python 3.10; generate the inputs first:
-
-```sh
-python -m pip install numpy==2.5.4 scipy==1.18.1 scikit-learn==1.9.1 pandas==3.1.1 joblib==1.6.0
-mkdir -p android/build/generated/python
-cp -R candidates/BEST/triage android/build/generated/python/triage
-python android/tools/export_models.py android/build/generated/python/models
-python android/tools/test_parity.py android/build/generated/python/models
-python android/tools/test_bridge.py
-cd android
-gradle :app:assembleDebug
-```
+The build runs in GitHub Actions (`Android spike`). It generates detector JSON from the
+trusted checked-in joblib files using Python 3.12 and scikit-learn 1.9.1, runs parity and fake
+runner tests, and builds a debug APK. Download `prahari-debug-apk` from a successful run.
 
 The parallel `executorch-aar` job attempts an arm64 ExecuTorch v1.6.0 source AAR with XNNPACK
-and KleidiAI, caches the resulting AAR and uploads `executorch-1.6.0-arm64-aar`, including a
-build-time record. To try it only if the existing model fails on 1.5.1, download the AAR and build
-with `gradle :app:assembleDebug -PprahariAar=/absolute/path/executorch.aar`; this is a distinct
-APK that also needs phone testing. A successful source build is not evidence of model execution.
+and KleidiAI, caches the resulting AAR, and uploads `executorch-1.6.0-arm64-aar` with a build-time
+record. If the exact model fails to generate on 1.5.1, request an additional 1.6 APK through
+Actions, without running Gradle on the owner's PC:
+
+```sh
+gh workflow run android.yml --ref android/spike -f source_apk=true
+```
+
+Download `prahari-debug-apk-executorch-1.6` from that run. A successful AAR or APK build is not
+evidence of model execution: the fallback also needs phone testing.
 
 ## Model files
 
