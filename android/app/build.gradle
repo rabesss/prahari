@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.chaquo.python'
+}
+android {
+    namespace 'in.prahari.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'in.prahari.app'
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName '0.1-spike'
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    sourceSets { main { python.srcDirs = ['../python', '../build/generated/python'] } }
+}
+chaquopy {
+    defaultConfig {
+        version = '3.10'
+        pip { install 'numpy==1.26.2' }
+    }
+}
+dependencies {
+    if (project.hasProperty('prahariAar')) {
+        implementation files(project.property('prahariAar'))
+        implementation 'com.facebook.soloader:soloader:0.10.5'
+        implementation 'com.facebook.fbjni:fbjni:0.7.0'
+    } else {
+        implementation 'org.pytorch:executorch-android:1.5.1'
+    }
+}
