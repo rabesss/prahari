@@ -85,7 +85,7 @@ class MainActivity : Activity() {
             finally { runOnUiThread { check.isEnabled = true } }
         }
     }
-    // Public Java method callable by Chaquopy. This callback executes once per generated token.
+    // Public Java method callable by Chaquopy. JNI may combine token bytes into one UTF-8 callback.
     inner class Runner(private val pte: String, private val tokenizer: String) {
         fun generate(prompt: String): String {
             val m = module ?: LlmModule(pte, tokenizer, 0f).also { module = it }
@@ -103,9 +103,11 @@ class MainActivity : Activity() {
             }
             val config = LlmGenerationConfig.create().echo(false).seqLen(2048).temperature(0f).maxNewTokens(40).build()
             m.generate(prompt, config, cb)
-            val end = SystemClock.elapsedRealtime()
-            val stats = JSONObject().put("backend", "executorch").put("generated_tokens", count).put("raw", JSONObject(rawStats))
-            first?.let { stats.put("first_token_ms", it - start); if (count > 1 && end > it) stats.put("decode_tps", (count - 1) * 1000.0 / (end - it)) }
+            val nativeStats = JSONObject(rawStats)
+            val stats = JSONObject().put("backend", "executorch").put("raw", nativeStats)
+            if (nativeStats.has("generated_tokens")) stats.put("generated_tokens", nativeStats.getInt("generated_tokens"))
+            if (nativeStats.has("decode_token_per_sec")) stats.put("decode_tps", nativeStats.getDouble("decode_token_per_sec"))
+            first?.let { stats.put("first_token_ms", it - start) }
             return JSONObject().put("text", out.toString()).put("stats", stats).toString()
         }
     }
