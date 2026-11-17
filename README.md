@@ -1,22 +1,57 @@
-# arm-bharat-ai-soc
+# Prahari
 
-Private working repo for the owner's entry to the **Bharat AI-SoC Challenge 2026-27** (Arm + MeitY C2S + IIT Delhi, "Applied AI on SoC").
+Prahari is a prototype offline scam and phishing triage assistant for Arm Bharat AI-SoC Challenge 2026–27, PS3. Local detectors classify pasted messages and URLs; Llama 3.2 1B generates advice through ExecuTorch. A network text description is scored by rules; a separate trained model scores NSL-KDD feature records as dataset replay. Live traffic capture is not implemented. Results are advisory and can be wrong. The measured deployment is an Arm cloud VM, not a phone or an established edge-device demonstration.
 
-- Challenge page: https://arm-education.github.io/Arm-Developer-Labs/Bharat_AI_SoC_2026_27.html
-- Full brief snapshot: [docs/challenge-brief.md](docs/challenge-brief.md)
-- Support: support@armbharatchallenge.com; technical questions per problem statement: tech-queries@armbharatchallenge.com
+## Run on aarch64 Linux
 
-## Key dates (IST)
-- Phase 1 (Open Qualifying) submission: **Mon 23 Nov 2026**: report + source code + demo video, via the challenge submission form. Project must be hosted on GitHub.
-- Phase 1 results: mid-Dec 2026
-- Phase 2 (PoC) submission: 5 Feb 2027
-- Finals: 15-16 Feb 2027
+Use Python 3.12 and sufficient storage and RAM. The tested environment is described in [the report](docs/phase1/report.md); exact dependency availability on a fresh machine remains to be verified. Network access is needed for installation and model acquisition, not intended for inference.
 
-## Hard requirements (all problem statements)
-- A Llama-family model for the advisory/reasoning part, deployed on-device with **ExecuTorch**.
-- Runs on-device on Arm hardware (Android phone, Raspberry Pi 5 CPU-only, Pi 5 + AI HAT+, or other Arm Linux). If a Hailo NPU is used for vision, document the vision pipeline (HailoRT) separately from the Llama/ExecuTorch pipeline.
-- Deliverables: source code, application/interface, demo video, technical report.
-- Teams of 1-3, same college, with a faculty mentor.
+```sh
+python3.12 -m venv .venv
+. .venv/bin/activate
+pip install -r candidates/BEST/requirements.txt
+pip install 'huggingface_hub[cli]'
+```
 
-## Status
-See [docs/BRAINSTORM.md](docs/BRAINSTORM.md) for the current brainstorm and plan. Work is tracked with GitHub issues.
+Visit the [ExecuTorch-community Llama 3.2 1B QLoRA model page](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET), request access and accept the Llama 3.2 Community License and applicable terms. Authenticate with the Hugging Face CLI using your own access; do not commit credentials. Then acquire the PTE and tokenizer from that repository and verify the files against the following hashes, observed on oracle-a1 on 17 November 2026:
+
+```sh
+hf download executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET --local-dir "$PWD/.venv/models/qlora"
+sha256sum .venv/models/qlora/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte .venv/models/qlora/tokenizer.model
+```
+
+- PTE: `ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac`
+- Tokenizer: `82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55`
+
+Upstream files can change; stop if either hash differs and resolve the version before running. The committed registry contains paths specific to the measurement host. Create a local registry without modifying the tracked one:
+
+```sh
+python - <<'PY'
+import json
+from pathlib import Path
+r = json.loads(Path('models/registry.json').read_text())
+p = Path('.venv/models/qlora').resolve()
+r['llama32-1b-qlora']['pte'] = str(p / 'Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte')
+r['llama32-1b-qlora']['tokenizer'] = str(p / 'tokenizer.model')
+Path('.venv/prahari-registry.json').write_text(json.dumps(r, indent=2))
+PY
+export HC_PY="$PWD/.venv/bin/python" HC_MODEL_REGISTRY="$PWD/.venv/prahari-registry.json"
+```
+
+One-command demonstration after setup:
+
+```sh
+candidates/BEST/bin/app --demo --out .venv/demo-output.json
+```
+
+The demo generates explanations and reports latency and process peak RSS. `candidates/BEST/bin/app --selftest` checks detectors; `candidates/BEST/bin/app --port 8765` serves the UI on loopback. See the [demo script](docs/phase1/demo-script.md) for an offline proof and the separation between network paths. Normal execution does not itself enforce an egress block.
+
+## Repository map
+
+- [Technical report](docs/phase1/report.md), [PDF](docs/phase1/report.pdf), [evidence ledger](docs/phase1/EVIDENCE.md), [jury Q&A](docs/phase1/LIMITATIONS.md) and [shot list](docs/phase1/demo-script.md).
+- [Application and detectors](candidates/BEST/); [data and model provenance](candidates/BEST/DATA.md); [visible benchmark](bench/README.md); [stress tests](research/stress/README.md).
+- [Challenge brief snapshot](docs/challenge-brief.md) and historical [research](research/).
+
+## Licences and credits
+
+Third-party data and model sources and their stated licences are listed in [DATA.md](candidates/BEST/DATA.md). Llama weights and datasets are separately obtained and subject to their own terms. The repository currently has no identified project licence grant; obtain the owner's permission before reusing project code or artifacts. Prahari uses Python, scikit-learn, PyTorch and ExecuTorch; their respective upstream licences apply. Arm, Meta, the dataset authors and other upstream contributors retain their rights.

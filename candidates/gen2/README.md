@@ -1,4 +1,4 @@
-# Kavach Lite: offline scam and phishing triage on Arm
+# Prahari: offline scam and phishing triage on Arm
 
 Bharat AI-SoC Challenge 2026, PS3 entry. It checks SMS/WhatsApp messages, web links and network-event
 records **entirely on the device**. It flags scams, phishing and intrusions, then explains the verdict in plain
