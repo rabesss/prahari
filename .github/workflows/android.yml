@@ -82,6 +82,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/aar-output"
           echo "Start $(date -u +%FT%TZ)" | tee "$GITHUB_WORKSPACE/aar-output/build-time.txt"
           python -m pip install pyyaml 'cmake<4' ninja
+          python -m pip install --no-deps 'torch==2.15.0'
           sdkmanager 'ndk;28.2.13676358' 'cmake;3.22.1'
           export ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ANDROID_SDK="$ANDROID_HOME" BUILD_AAR_DIR="$GITHUB_WORKSPACE/aar-output"
           cd executorch

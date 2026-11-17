@@ -312,7 +312,14 @@ class Explainer:
         gc = self._GC(echo=False, max_new_tokens=int(self.cfg.get("max_new_tokens", 40)),
                       temperature=float(self.cfg.get("temperature", 0.0)))
         t0 = time.time()
-        self.runner.generate(prompt, gc, token_callback=out.append,
+        started = time.perf_counter()
+        first_token_ms = None
+        def on_token(token):
+            nonlocal first_token_ms
+            if first_token_ms is None:
+                first_token_ms = (time.perf_counter() - started) * 1000
+            out.append(token)
+        self.runner.generate(prompt, gc, token_callback=on_token,
                              stats_callback=lambda s: st.update(json.loads(s.to_json_string())))
         wall = (time.time() - t0) * 1000
         text = re.sub(r"<\|[^|]*\|>", "", "".join(out)).strip()
@@ -320,7 +327,7 @@ class Explainer:
         stats = {"backend": "executorch", "model": self.model_name,
                  "prompt_tokens": st.get("prompt_tokens"), "generated_tokens": st.get("generated_tokens"),
                  "prefill_tps": st.get("prefill_token_per_sec"), "decode_tps": st.get("decode_token_per_sec"),
-                 "first_token_ms": st.get("first_token_ms"), "gen_wall_ms": round(wall, 1)}
+                 "first_token_ms": first_token_ms, "gen_wall_ms": round(wall, 1)}
         return text, stats
 
 
