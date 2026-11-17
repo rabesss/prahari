@@ -19,6 +19,7 @@ android {
 chaquopy {
     defaultConfig {
         version = '3.10'
+        if (System.getenv('CHAQUOPY_BUILD_PYTHON')) buildPython System.getenv('CHAQUOPY_BUILD_PYTHON')
         pip { install 'numpy==1.26.2' }
     }
 }

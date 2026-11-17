@@ -15,7 +15,11 @@ jobs:
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - uses: actions/setup-python@v5
+        id: python310
+        with: {python-version: '3.10'}
+      - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.10.2'}
       - name: Install reference environment and export portable models
@@ -28,6 +32,8 @@ jobs:
           python android/tools/test_bridge.py
       - name: Assemble debug APK
         working-directory: android
+        env:
+          CHAQUOPY_BUILD_PYTHON: ${{ steps.python310.outputs.python-path }}
         run: gradle --no-daemon :app:assembleDebug
       - name: Audit merged manifest and APK permissions
         run: |
@@ -48,6 +54,7 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
       - name: Checkout ExecuTorch 1.6.0 and its submodules
         uses: actions/checkout@v4
         with:
@@ -68,7 +75,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/aar-output"
           echo "Start $(date -u +%FT%TZ)" | tee "$GITHUB_WORKSPACE/aar-output/build-time.txt"
-          python -m pip install pyyaml cmake ninja
+          python -m pip install pyyaml 'cmake<4' ninja
           sdkmanager 'ndk;28.2.13676358' 'cmake;3.22.1'
           export ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ANDROID_SDK="$ANDROID_HOME" BUILD_AAR_DIR="$GITHUB_WORKSPACE/aar-output"
           cd executorch-src
