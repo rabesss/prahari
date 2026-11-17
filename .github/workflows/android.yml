@@ -86,11 +86,12 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/aar-output"
           echo "Start $(date -u +%FT%TZ)" | tee "$GITHUB_WORKSPACE/aar-output/build-time.txt"
-          python -m pip install pyyaml 'cmake<4' ninja
+          python -m pip install pyyaml 'cmake<4' ninja typing_extensions sympy packaging jinja2 filelock networkx fsspec
           python -m pip install --no-deps 'torch==2.15.0'
           sdkmanager 'ndk;28.2.13676358' 'cmake;3.22.1'
           export ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ANDROID_SDK="$ANDROID_HOME" BUILD_AAR_DIR="$GITHUB_WORKSPACE/aar-output"
           cd executorch
+          export PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}"
           python - <<'PY'
           p='scripts/build_android_library.sh'
           s=open(p).read().replace('cmake . -DCMAKE_INSTALL_PREFIX=', 'cmake . -DEXECUTORCH_BUILD_XNNPACK=ON -DEXECUTORCH_XNNPACK_ENABLE_KLEIDI=ON -DCMAKE_INSTALL_PREFIX=')
