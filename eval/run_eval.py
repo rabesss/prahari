@@ -7,6 +7,7 @@ the controller-private dir (/var/tmp/arm-bharat-ai-soc-eval/private/), never und
 import argparse
 import datetime as dt
 import fcntl
+import hashlib
 import json
 import math
 import os
@@ -28,6 +29,7 @@ from proxy_v3 import conservative, grounding, measurements_ok, mean, total as v3
 PROJ = Path(__file__).resolve().parents[1]
 DATA = Path("/var/tmp/arm-bharat-ai-soc-data")
 HIDDEN = DATA / "hidden"
+INDIA_V2_SHA256 = "532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0"
 EVROOT = Path("/var/tmp/arm-bharat-ai-soc-eval")
 LOCK = EVROOT / "eval.lock"
 W = json.loads((PROJ / "eval" / "weights.json").read_text())
@@ -101,7 +103,10 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
         while p.poll() is None:
             if time.time() - t0 > timeout:
                 timed_out = True
-                os.killpg(p.pid, signal.SIGKILL)
+                try:
+                    os.killpg(p.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 break
             pids = tree_pids(p.pid)
             rss = tree_rss_kb(pids)
@@ -422,7 +427,11 @@ def run_once(a, run_index):
 
     india_path = HIDDEN / 'india_hidden_v2.jsonl'
     try:
+        if hashlib.sha256(india_path.read_bytes()).hexdigest() != INDIA_V2_SHA256:
+            raise ValueError('SHA-256 mismatch')
         india_rows = load_india(india_path)
+        if len(india_rows) != 400:
+            raise ValueError('expected 400 India v2 rows')
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         infra.append(f'adaptive India v2 data missing or invalid: {exc}')
         return finish(0.0, {})

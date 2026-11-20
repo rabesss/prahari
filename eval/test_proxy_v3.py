@@ -103,3 +103,22 @@ def test_process_timeout_and_measurement(tmp_path):
     assert result['rc'] != 0
     assert result['peak_rss_mb'] is not None
     assert not measurements_ok(1, 1, result['timed_out'])
+
+
+def test_corrupt_india_is_infra_failure(monkeypatch, tmp_path):
+    import argparse
+    import run_eval
+    cand = tmp_path / 'candidate'
+    (cand / 'bin').mkdir(parents=True)
+    (cand / 'bin/predict').touch()
+    (cand / 'bin/explain').touch()
+    (tmp_path / 'research/evals').mkdir(parents=True)
+    hidden = tmp_path / 'hidden'
+    hidden.mkdir()
+    (hidden / 'india_hidden_v2.jsonl').write_text('{}\n')
+    monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
+    monkeypatch.setattr(run_eval, 'HIDDEN', hidden)
+    monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
+    result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
+    assert not result['promotable']
+    assert any('SHA-256 mismatch' in e for e in result['infra_errors'])
