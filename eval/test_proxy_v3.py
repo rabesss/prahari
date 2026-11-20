@@ -283,6 +283,7 @@ def test_fake_completion_cannot_override_process_exit(tmp_path):
     env['PRAHARI_STAGE_STATUS'] = str(fake)
     code = f"import pathlib; pathlib.Path({str(fake)!r}).write_text('0'); raise SystemExit(7)"
     result = run_eval.run_proc([sys.executable, '-c', code], env, 5, tmp_path, tmp_path / 'proc.log', rss_method='systemd_scope')
+    assert fake.read_text() == '0'
     assert result['rc'] == 7
 
 
