@@ -158,9 +158,7 @@ def flow_text_indicators(text):
                          r"(?:or|nor)\s+(?:(?:a|an|any)\s+)?$", before):
                 continue
             if name == "brute_force":
-                left = re.split(r"[.;!?\n]", t[max(0, match.start() - 40):match.start()])[-1]
                 right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
-                clause = left + match.group() + right
                 count = re.search(r"\b\d[\d,]*\b", match.group())
                 digits = count.group().replace(',', '').lstrip('0') if count else None
                 if count and not digits:
@@ -168,7 +166,12 @@ def flow_text_indicators(text):
                 signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
                 if not signals and (not count or len(digits) < 2):
                     continue
-                if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause) and re.search(
+                success = re.search(r"\b(?:successful\s+login|login\s+(?:was\s+)?successful|"
+                                    r"login\s+succeeded|authenticated)\b", right)
+                positive = success and not re.search(r"\b(?:not|never|isn't|wasn't)\s+$", right[:success.start()])
+                excluded = success and (re.search(r"\bexclud(?:e|ed|ing)\s+$", right[:success.start()]) or
+                                        re.match(r"\s+(?:users|sessions)\s+excluded\b", right[success.end():]))
+                if positive and not excluded and re.search(
                         r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()):
                     description = "failed logins followed by a successful login (possible compromise)"
             found.append((name, description))

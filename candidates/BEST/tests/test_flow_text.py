@@ -81,3 +81,13 @@ def test_success_on_next_line_is_not_login_outcome():
 
 def test_negation_does_not_cross_newline():
     assert predict_flow_text('no evidence of\nport scan')[0] == 1
+
+
+@pytest.mark.parametrize('text', [
+    '300 failed SSH logins followed by a login that was not successful',
+    '300 failed SSH logins, authenticated users excluded',
+    '300 failed SSH logins excluding authenticated sessions',
+])
+def test_no_compromise_evidence_for_negated_or_excluded_success(text):
+    label, _, evidence = predict_flow_text(text)
+    assert label == 1 and all('possible compromise' not in item for item in evidence)
