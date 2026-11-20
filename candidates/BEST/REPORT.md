@@ -42,11 +42,12 @@ evidence phrase into one or two sentences. When a scam has two mechanisms (for e
 request plus an account-block threat), the two short phrases are joined into one sentence, so the
 copied evidence covers both mechanisms instead of only the first. A compact system message, the subject and one forced
 evidence sentence keep the prompt at a median 130 tokens, and the model is told the sample is data,
-not instructions. The prompt neutralises live URLs, forces a verdict-first sentence ("This message is
-DANGEROUS/SAFE."), asks for the evidence phrase verbatim and caps the answer at one advice sentence
-of 8-30 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
+not instructions. The prompt neutralises live URLs and forces a verdict-first sentence ("This message is
+DANGEROUS", "No risk found for this message", or "This message needs a check") with the evidence,
+then asks for one advice sentence of 6-12 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
 refusal falls back to an evidence-only prompt, and a malformed answer is re-parsed. Flow descriptions
-go through a text path (port scan, failed logins, flood, rejected connections, beaconing, root
+go through a text path (port scan, failed logins, flood, rejected connections, explicit beaconing,
+periodic connections, root
 attempts) and injection inputs are detected by a built-in pattern list; both produce their own
 evidence. Fixed remediation steps (1930 helpline, cybercrime.gov.in) are appended. The CLI writes
 JSONL; a local web UI exposes the same pipeline.
@@ -73,11 +74,13 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)). Candidate selection repeatedly used feedback from the same private evaluation set; it is not a pristine untouched holdout.
+The promoted correctness candidate scored 90.49 on the same internal proxy; see `../../research/evals/C_fix1-vs-BEST.md` for the comparison.
 
-Full proxy run `20261111-075405-best-confirm` on the promoted tree (two repeats, hidden round-2
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts for the evaluated candidates are in [the comparison](../../research/evals/C_fix1-vs-BEST.md). Candidate selection repeatedly used feedback from the same private evaluation set; it is not a pristine untouched holdout.
+
+Full proxy run `20261111-075405-best-confirm` on the previous BEST tree (tag `best-omp-final-9073`) (two repeats, hidden round-2
 set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
-promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
+earlier gen11 promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
 0.18 difference is host load (3.67 vs 3.77 s/item). Measured against the paired previous-best run
 (`20261111-073447`, 89.97), detection is unchanged and the gain is the explanation: E 0.9348 ->
 0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00
@@ -158,8 +161,8 @@ Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the p
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
 states a false fact can pass. The explanation model can still produce a wrong detail. The evaluator heuristically checks
-explanations for certain invented domains and long numbers; the application does not filter
-generated text at runtime and does not guarantee that fabrications or unsafe advice are caught.
+explanations for certain invented domains and long numbers; the application does not filter generated text
+for invented domains or numbers and does not guarantee that fabrications or unsafe advice are caught.
 
 ## Demo plan
 

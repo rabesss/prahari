@@ -27,7 +27,7 @@ RETRY_SYSTEM = (
 REFUSAL = re.compile(r"\b(i cannot|i can't|i am unable|i'm unable|i won't|i will not|as an ai|"
                      r"i'm sorry|i am sorry|cannot provide|can't provide)\b", re.I)
 
-VERDICT_WORD = {1: "DANGEROUS", 0: "SAFE", "uncertain": "SUSPICIOUS"}
+VERDICT_WORD = {1: "DANGEROUS", 0: "NO RISK FOUND", "uncertain": "SUSPICIOUS"}
 KIND_WORD = {"sms": "Text message", "injection": "Text message", "url": "Web link", "flow": "Network event"}
 
 SHORT = {
@@ -87,7 +87,8 @@ MECH_TYPE = {
 }
 FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed logins, like password guessing",
               "flood": "a flood of connections", "rejected": "connections were rejected",
-              "beaconing": "connections that repeat at a fixed interval, like beaconing",
+              "beacon_explicit": "explicit beacon or command-and-control activity",
+              "periodic": "connections repeat at a fixed interval",
               "root": "a root-access attempt"}
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
               "at_sign", "no_https", "official_domain"}
@@ -190,7 +191,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             for s in ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
                       "notice", "official_channel", "protective", "promo", "personal"):
                 if s in a["safe"]:
-                    out.append(mech.SAFE_DESC[s])
+                    out.append(mech.safe_description(s, inp))
     else:
         ev = indicrules.indicators(inp)[0]
         risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
@@ -225,7 +226,7 @@ def scam_type(kind, inp, verdict):
         names = [n for n, _ in rules.flow_text_indicators(inp)]
         for name, label in (("port_scan", "a port scan"), ("brute_force", "a brute-force login"),
                             ("flood", "a flood or denial-of-service attempt"),
-                            ("beaconing", "command-and-control beaconing"),
+                            ("beacon_explicit", "command-and-control beaconing"),
                             ("root", "a privilege-escalation attempt")):
             if name in names:
                 return label
@@ -277,19 +278,19 @@ class Explainer:
         # request it must decline. The real host still appears in the evidence for the reader.
         snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: m.group(0).replace(".", "[.]"), snippet)
         ev = compact_evidence(kind, inp, evidence, verdict)
-        reason = ev[0] if ev else "no specific indicators"
         what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event"}.get(kind, "item")
-        # Lower-case "safe" here (the Verdict line above keeps SAFE): the 1B model deterministically
-        # refuses a sentence of the form "This link is SAFE: official domain <bank>" even in a
-        # defensive frame; the lower-case finding does not trigger it and reads the same to a user.
-        first = {1: f"This {what} is DANGEROUS", 0: f"This {what} is safe"}.get(
+        first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")
         # The strongest evidence phrase is written into the required opening, so the model copies it
         # (one concept-bearing phrase the scorer's mention check can see) and does not spend tokens
         # restating it. The detector's other evidence lines stay in evidence_used for the reader.
+        opening = (f"{first}: {ev[0]}" if ev else
+                   f"This {what} was flagged as risky; check it carefully before acting" if verdict == 1 else
+                   f"This {what} needs a check; review it carefully before acting" if verdict == 'uncertain' else
+                   f"This {what} was checked; review it carefully before acting")
         user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
-                f"Start your answer with exactly: \"{first}: {reason}.\" "
+                f"Start your answer with exactly: \"{opening}.\" "
                 "Then write one more sentence of advice, 6-12 words.")
         return ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +
@@ -344,7 +345,8 @@ class Explainer:
         return text, stats
 
 
-_BENIGN_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
+_BENIGN_CLAIM = re.compile(r"\b(?:no risk found|nothing suspicious)\b|"
+                           r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                            r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real)\b", re.I)
 _MAL_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                         r"\b(?:scam|fraud|fraudulent|phishing|suspicious|malicious|fake|dangerous|unsafe)\b", re.I)
@@ -354,13 +356,14 @@ _NEGATED = re.compile(r"\b(?:not|never|no|n't|without)\b", re.I)
 
 def _forced_sentence(prompt):
     """The required opening sentence, e.g. 'This link is DANGEROUS: URL shortener bit.ly'."""
-    m = re.search(r'Start your answer with exactly: "(This [^"]*?)\."', prompt)
+    tail = prompt.rsplit('Start your answer with exactly: "', 1)
+    m = re.match(r'([^"]*?)\."', tail[-1]) if len(tail) == 2 else None
     return m.group(1) if m else "This item was checked"
 
 
 def _prompt_verdict(prompt):
-    tail = prompt.rsplit("Verdict: ", 1)[-1][:12]
-    return 1 if tail.startswith("DANGEROUS") else 0 if tail.startswith("SAFE") else "uncertain"
+    tail = prompt.rsplit("Verdict: ", 1)[-1][:20]
+    return 1 if tail.startswith("DANGEROUS") else 0 if tail.startswith("NO RISK FOUND") else "uncertain"
 
 
 def _consistent(text, verdict):
@@ -378,14 +381,17 @@ def _consistent(text, verdict):
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)
         probe = re.sub(r"\b(do|does|did|don|doesn|didn)'t\b", r"do not", probe, flags=re.I)
-        if verdict == 1 and _BENIGN_CLAIM.search(probe) and not _CONTRAST.search(probe) \
-                and not _NEGATED.search(probe) and not _MAL_CLAIM.search(probe):
+        if verdict == 1 and re.search(r"\b(?:no risk found|nothing suspicious)\b", probe, re.I):
             continue
-        if verdict == 0 and _MAL_CLAIM.search(probe) and not _CONTRAST.search(probe) \
-                and not _NEGATED.search(probe):
+        clauses = _CONTRAST.split(probe)
+        opposite = _BENIGN_CLAIM if verdict == 1 else _MAL_CLAIM
+        if any(not _NEGATED.search(claim.group())
+               for clause in clauses for claim in opposite.finditer(clause)):
             continue
         keep.append(sent)
-    return " ".join(keep).strip() or text
+    if not keep:
+        raise ValueError("explanation contained no consistent sentence")
+    return " ".join(keep).strip()
 
 
 def tidy(text):
@@ -413,8 +419,8 @@ FLOW_ACTIONS = {
     1: ["Block the source address at the firewall or router.",
         "Check the target machine's logs and change any exposed passwords.",
         "Keep the device and router firmware updated."],
-    "uncertain": ["Keep monitoring this source and review the logs."],
-    0: ["No action needed; this looks like normal traffic."],
+    "uncertain": ["Confirm the activity with your IT team and review the logs."],
+    0: ["Confirm the activity with your IT team if unexpected."],
 }
 
 

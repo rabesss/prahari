@@ -21,13 +21,13 @@ ROOTS = r'(?:candidates|research|bench|docs|eval|bin|models)/'
 CODE = re.compile(r'(?:' + ROOTS + r'(?:[^/]+/)*)?[^/]+\.(?:py|sh|md|toml|cfg|html|css|js)'
                   r'|(?:' + ROOTS + r'(?:[^/]+/)*)?requirements[^/]*\.txt'
                   r'|(?:' + ROOTS + r'(?:[^/]+/)*)?\.gitignore'
-                  r'|bin/[^/]+|candidates/[^/]+/bin/[^/]+|\.github/workflows/[^/]+\.yml')
+                  r'|bench/challenge/llama_sample\.txt|bin/[^/]+|candidates/[^/]+/bin/[^/]+|\.github/workflows/[^/]+\.yml')
 CONFIG = re.compile(r'candidates/[^/]+/config\.json|models/registry\.json|eval/weights\.json|bench/[^/]+\.json')
 ARTIFACT = re.compile(r'candidates/[^/]+/artifacts/[^/]+\.joblib')
 RECORD = re.compile(r'research/evals/[^/]+/(?:summary|details)\.json')
 LOG = re.compile(r'research/evals/[^/]+/(?:run|app|tests|guard)\.log')
 RESULT = re.compile(r'bench/results/[^/]+\.json')
-SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl')
+SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl')
 # (allowed keys, required keys) per synthetic directory.
 SYNTH_KEYS = {'research/stress': ({'id', 'label', 'text'}, {'label', 'text'}),
               'bench/fixtures': ({'id', 'input', 'expect', 'rationale'}, {'id', 'input', 'expect', 'rationale'})}
@@ -160,12 +160,23 @@ def config_ok(data):
 
 
 def synth_ok(path, data):
-    allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
+    if path == 'bench/challenge/india_challenge_v1.jsonl':
+        allowed = required = {'id', 'text', 'lang', 'label', 'category', 'pair_id', 'route'}
+    else:
+        allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
     try:
         rows = [loads(x) for x in data.decode('utf-8').splitlines() if x.strip()]
     except (ValueError, UnicodeError, RecursionError):
         return False
-    return 0 < len(rows) <= 500 and all(isinstance(r, dict) and required <= set(r) <= allowed and not ITEM_ID.search(str(r.get('id', ''))) for r in rows)
+    if not (0 < len(rows) <= 500 and all(isinstance(r, dict) and required <= set(r) <= allowed and not ITEM_ID.search(str(r.get('id', ''))) for r in rows)):
+        return False
+    if path == 'bench/challenge/india_challenge_v1.jsonl':
+        return all(isinstance(r['id'], str) and bool(r['id']) and isinstance(r['text'], str)
+                   and isinstance(r['category'], str) and bool(r['category'])
+                   and r['label'] in ('malicious', 'benign') and r['route'] in ('sms', 'injection')
+                   and r['lang'] in ('en', 'hi', 'hinglish')
+                   and (r['pair_id'] is None or isinstance(r['pair_id'], str)) for r in rows)
+    return True
 
 
 def json_strings(data):
@@ -359,6 +370,7 @@ def main():
                     if hit: hidden_hits.add(path); fail(hit)
                     continue
                 if secret_hit(data): fail('secret pattern')
+                if rule == 'synthetic' and secret_hit(json_strings(data).encode('utf-8')): fail('secret pattern')
                 if rule in ('eval JSON', 'ledger') and not valid_json(data, rule == 'ledger'): fail('eval JSON leaf/array/id policy')
                 if rule == 'config' and not config_ok(data): fail('config JSON policy')
                 if rule == 'synthetic' and not synth_ok(path, data): fail('synthetic schema policy')

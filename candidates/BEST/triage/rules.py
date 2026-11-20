@@ -123,14 +123,15 @@ def injection_indicators(text):
 FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
-    ("brute_force", r"\b(\d+\s+(failed\s+)?(login|password)\s+(attempts?|failures?)|failed\s+(logins?|passwords?)|"
-                    r"brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
+    ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
+                    r"(?:(?:(?<![\d,])(?:\d{1,3}(?:,\d{3})*|\d+)|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)[ \t]+){1,3}"
+                    r"(?:(?:ssh|rdp|ftp)[ \t]+)?(?:logins?|login[ \t]+attempts?|passwords?(?:[ \t]+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
-    ("beaconing", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?|"
-                  r"beacon\w*|command\s+and\s+control|\bc2\b)", "connections repeat at a fixed interval, like beaconing"),
+    ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
+    ("periodic", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?)\b", "connections repeat at a fixed interval"),
     ("rejected", r"\b(rejected|reset|rst|refused|s0)\b", "most connections were rejected or reset"),
-    ("root", r"\b(root shell|su attempt|privilege)\b", "the session tried to gain root privileges"),
+    ("root", r"\b(root shell|su attempt|gained root|privilege escalation|(?:escalated|elevated) privileges)\b", "the session tried to gain root privileges"),
 ]
 
 
@@ -140,4 +141,48 @@ BENIGN_FLOW = re.compile(r"\b(software update|update check|routine|normal|expect
 
 def flow_text_indicators(text):
     t = text.lower()
-    return [(n, d) for n, p, d in FLOW_RULES if re.search(p, t)]
+    found = []
+    for name, pattern, description in FLOW_RULES:
+        for match in re.finditer(pattern, t):
+            # Only nearby, direct negation suppresses a signal. A modifier such as
+            # "normal" between negation and indicator remains ambiguous.
+            before = re.split(r"[.;!?\n]", t[max(0, match.start() - 100):match.start()])[-1]
+            # Negated floods, like other negated indicators, do not count as an attack.
+            if re.search(r"\b(?:no|zero|not|without|never|isn't|wasn't|aren't|weren't|"
+                         r"didn't\s+find|did\s+not\s+find)\s+"
+                         r"(?:(?:any\s+)?(?:signs?|evidence|indications?|traces?)\s+of\s+)?"
+                         r"(?:(?:a|an|the|any)\s+)?$", before):
+                continue
+            # A short coordinated list shares the initial negation.
+            if re.search(r"\b(?:no|without)\s+(?:[\w-]+\s+){0,3}"
+                         r"(?:or|nor)\s+(?:(?:a|an|any)\s+)?$", before):
+                continue
+            if name == "brute_force":
+                right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
+                # Bare "passwords" needs a failure word or an attack verb right after it
+                # ("300 passwords guessed", "100 passwords were tried"); "10 passwords were rotated" is not an attack.
+                if (re.search(r"\bpasswords?$", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()) and
+                        not re.match(r"\s+(?:(?:were|was|being|got)\s+)?(?:guessed|tried|attempted|sprayed|tested|brute[- ]?forced)\b", right)):
+                    continue
+                count = re.search(r"\b(?:\d{1,3}(?:,\d{3})*|\d+)\b", match.group())
+                digits = count.group().replace(',', '').lstrip('0') if count else None
+                if count and not digits:
+                    continue
+                signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
+                if (re.search(r"\b(?:successful|authenticated)\b", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied|brute[- ]?force|guessing)\b", match.group())):
+                    continue
+                if not signals and (not count or len(digits) < 2):
+                    continue
+                success = re.search(r"\b(?:successful\s+login|login\s+(?:was\s+)?successful|"
+                                    r"login\s+succeeded|authenticated)\b", right)
+                positive = success and not re.search(r"\b(?:no|not|never|isn't|wasn't)\s+$", right[:success.start()])
+                excluded = success and (re.search(r"\bexclud(?:e|ed|ing)\s+$", right[:success.start()]) or
+                                        re.match(r"\s+(?:users|sessions)\s+excluded\b", right[success.end():]))
+                if positive and not excluded and re.search(
+                        r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()):
+                    description = "failed logins followed by a successful login (possible compromise)"
+            found.append((name, description))
+            break
+    return found

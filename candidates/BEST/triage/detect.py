@@ -161,12 +161,18 @@ def predict_flow(feature_rows):
 
 def predict_flow_text(text):
     ev = rules.flow_text_indicators(text)
-    if rules.BENIGN_FLOW.search(text) and not any(n in ("root", "flood") for n, _ in ev):
-        return 0, 0.35, [d for _, d in ev[:1]]
-    # A lone beaconing description is command-and-control behaviour, not a harmless periodic job:
-    # a scheduled backup or update is already cleared by BENIGN_FLOW above.
-    lab = 1 if any(n != "rejected" for n, _ in ev) else ("uncertain" if ev else 0)
-    return lab, (0.9 if lab == 1 else 0.5 if ev else 0.1), [d for _, d in ev]
+    names = {n for n, _ in ev}
+    benign_cue = bool(rules.BENIGN_FLOW.search(text))
+    if names & {"root", "flood"}:
+        lab = 1
+    elif names & {"port_scan", "brute_force", "beacon_explicit"}:
+        lab = "uncertain" if benign_cue else 1
+    elif benign_cue:
+        lab = 0
+    else:
+        lab = 1 if "periodic" in names else ("uncertain" if "rejected" in names else 0)
+    return lab, (0.9 if lab == 1 else 0.5 if lab == "uncertain" else 0.1), [d for _, d in ev]
+
 
 
 def classify_any(kind, inp):

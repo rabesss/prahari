@@ -30,13 +30,13 @@ REQUEST = (r"(share|send|reply|tell|give|enter|type|provide|submit|forward|confi
 PAY = (r"\b(pay|paid|send|transfer|deposit|remit|fund)\b|(bhejein|bhejo)|"
        r"भुगतान|भेजें|स्वीकार|भरें")
 AMOUNT = r"(rs\.?|inr|₹|rupees|रुपये|राशि|amount|money|balance|bill|dues|शुल्क|फीस)"
-DEST_OFFICIAL = (r"(in|via|through|using|on|at)\s+(the\s+)?(official\s+)?(bank\s+|payment\s+|provider\s+|"
-                 r"insurer\s+|company\s+|merchant\s+)?(app|application|portal|website|site|account settings|ATM)|"
-                 r"official (app|portal|website|site)|आधिकारिक (ऐप|पोर्टल|वेबसाइट)|"
+DEST_OFFICIAL = (r"\b(in|via|through|using|on|at)\s+(the\s+)?(official\s+)?(bank\s+|payment\s+|provider\s+|"
+                 r"insurer\s+|company\s+|merchant\s+)?(app|application|portal|website|site|account settings|ATM)\b|"
+                 r"\bofficial (app|portal|website|site)\b|आधिकारिक (ऐप|पोर्टल|वेबसाइट)|"
                  r"(ऐप|पोर्टल|वेबसाइट)\s*(में|पर|से|द्वारा)\s*(भुगतान|देखें|करें|करें।)|"
-                 r"at the (ATM|branch)|back of your card|signed[- ]in|"
-                 r"official (helpline|number)|number on (the )?(back of )?your card|"
-                 r"(in|via) your (banking |payment )?app")
+                 r"\bat the (ATM|branch)\b|\bback of your card\b|\bsigned[- ]in\b|"
+                 r"\bofficial (helpline|number)\b|\bnumber on (the )?(back of )?your card\b|"
+                 r"\b(in|via) your (banking |payment )?app\b")
 DEST_PERSONAL = (
     r"(to|into|at|on)\s+(this|the|following|my|a)\s+(account|number|wallet|upi|vpa)|"
     r"(is|iss|is) (account|number) (me|mein|par)|"
@@ -410,16 +410,26 @@ def indic_context(text):
 
 
 SAFE_DESC = {
-    "official_channel": "the payment or check happens inside the organisation's official app or portal",
+    "official_channel": "mentions a service channel",
     "transaction_receipt": "reads like a normal payment receipt or delivery record",
     "otp_notification": "reads like a normal OTP notification",
-    "protective": "explicitly says that no payment, code or reply is needed",
+    "protective": "includes a protective or opt-out statement",
     "notice": "reads like a routine notice or appointment",
     "bill_notice": "reads like a routine bill reminder with a payment due",
     "appointment_notice": "reads like a routine appointment or schedule change",
     "promo": "reads like a promotional offer with a discount or cashback",
     "personal": "reads like a personal conversation",
 }
+
+
+def safe_description(name, text):
+    if name == 'official_channel' and re.search(r'\bat the branch\b', text, re.I):
+        other = [m.group() for m in re.finditer(DEST_OFFICIAL, text, re.I)
+                 if not re.fullmatch(r'at the branch', m.group(), re.I)]
+        if other:
+            return 'mentions ' + ', '.join(other) + ' and the branch'
+        return 'mentions the branch'
+    return SAFE_DESC[name]
 
 
 def evidence(a):
@@ -431,5 +441,5 @@ def evidence(a):
     if not a["harm"]:
         for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "notice", "promo"):
             if s in a["safe"]:
-                out.append(SAFE_DESC[s])
+                out.append(safe_description(s, a['text']))
     return out[:5]
