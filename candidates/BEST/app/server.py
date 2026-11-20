@@ -49,7 +49,11 @@ def triage(kind, inp, explain):
                 if _ex is None:
                     _ex = Explainer()
                 res["explanation"], res["llm"] = _ex.generate(_ex.prompt(kind, inp, lab, ev))
+                if not isinstance(res['explanation'], str) or not res['explanation'].strip():
+                    raise ValueError('empty explanation')
         except Exception:
+            res.pop('explanation', None)
+            res.pop('llm', None)
             res["explanation_error"] = "Explanation unavailable. The detector result is still shown."
     return res
 

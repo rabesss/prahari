@@ -50,6 +50,16 @@ def test_generate_failure(monkeypatch):
     assert result['explanation_error'] and result['actions']
 
 
+def test_empty_explanation_is_failure(monkeypatch):
+    monkeypatch.setattr(server.detect, 'classify_any', lambda *_: (1, 0.9, ['signal']))
+    class Fake:
+        def prompt(self, *args): return 'prompt'
+        def generate(self, prompt): return ' ', {'prefill_tps': 0, 'decode_tps': 0}
+    monkeypatch.setattr(server, '_ex', Fake())
+    result = server.triage('flow', 'port scan', True)
+    assert 'explanation_error' in result and 'llm' not in result
+
+
 def test_init_serialized(monkeypatch):
     monkeypatch.setattr(server.detect, 'classify_any', lambda *_: (1, 0.9, ['signal']))
     monkeypatch.setattr(server, '_ex', None)

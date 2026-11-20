@@ -21,6 +21,8 @@ from triage.detect import predict_flow_text
     ('database login attempt succeeded', 0),
     ('failed SSH logins from one IP', 1),
     ('repeated failed SSH logins', 1),
+    ('no failed SSH logins', 0),
+    ('without repeated failed login attempts', 0),
     ('normal traffic, no port scan', 0),
     ('this is not a port scan', 0),
     # Negation of "normal" leaves the scan itself ambiguous.
