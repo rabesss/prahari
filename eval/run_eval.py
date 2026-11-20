@@ -275,7 +275,6 @@ def census_enforced(isolated, changed_or_unavailable, attributed):
 def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
     """Run a stage in a scope or session, measure it, then kill and census it."""
     method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
-    t0 = time.monotonic()
     start = log.stat().st_size if log.exists() else 0
     unit = 'prahari-eval-' + uuid.uuid4().hex + '.scope'
     nonce = uuid.uuid4().hex
@@ -340,6 +339,8 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--dev', '/dev', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
                           '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
                           '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--', *cmd]
+        # Time the stage itself; the pre-launch census is not candidate latency.
+        t0 = time.monotonic()
         p = subprocess.Popen(launch, env=child_env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
         cleanup_done = False
         try:
@@ -878,7 +879,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start, coold
         for name in ('sms_test', 'url_test', 'indic_test', 'flow_test', 'explain_set'):
             data = (HIDDEN / (name + '.jsonl')).read_bytes()
             hidden_hashes[name] = hashlib.sha256(data).hexdigest()
-            hidden_rows[name] = [json.loads(line) for line in data.decode('utf-8').splitlines() if line.strip()]
+            hidden_rows[name] = [json.loads(line) for line in data.decode('utf-8').split('\n') if line.strip()]
             if not hidden_rows[name]:
                 raise ValueError(name + ' is empty')
         hidden_hashes['india_hidden_v2'] = INDIA_V2_SHA256

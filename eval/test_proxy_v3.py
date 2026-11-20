@@ -329,7 +329,7 @@ def test_link_and_payment_grounding_boundaries():
     assert not grounding('node.js', 'The message contains a link.')
     assert not grounding('email user@example.com', 'The message contains a link.')
     assert grounding('Pay the fee at example.com', 'The message asks for payment at example.com.')
-    assert grounding('Pay the fee', 'The message asks for payment at https://example.com.')
+    assert not grounding('Pay the fee', 'The message asks for payment at https://example.com.')
     assert not grounding('Receipt of your payment', 'Deposit the receipt amount right now.')
     assert not grounding('Hello', 'Never share an OTP. The sender demands payment now.')
 
@@ -446,3 +446,9 @@ def test_run_proc_census_enforcement(monkeypatch, tmp_path, isolated, attributed
 def test_grounding_claim_before_advice_and_input_domains(input_text, explanation, expected):
     from proxy_v3 import grounding
     assert grounding(input_text, explanation) is expected
+
+
+def test_reported_please_and_terminal_period():
+    assert not grounding('Your parcel has shipped.', 'The message says please click the link immediately.')
+    assert grounding('Track your parcel at example.com.', 'The message contains a link to track the parcel.')
+    assert grounding('Hello friend', 'You should please verify with the bank directly first.')

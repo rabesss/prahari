@@ -35,14 +35,14 @@ CUES = {
     'call': re.compile(r'\b(?:call|phone|dial|telephone|helpline)\b', re.I),
 }
 # Restrict bare domains to known TLDs and exclude email addresses and file names.
-URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?:co\.in|gov\.in|com|in|org|net|io|xyz|top|example|test)(?![\w.-]))', re.I)
+URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?:co\.in|gov\.in|com|in|org|net|io|xyz|top|example|test)(?![\w-]|\.[\w-]))', re.I)
 PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|processed|successful)\b|\b(?:received|credited|paid)\b.{0,45}\b(?:payment|money|funds|amount|refund)\b|\breceipt\b', re.I)
 PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
 REQUEST_CLAIM = re.compile(r'\b(?:ask(?:s|ed|ing)?|request(?:s|ed|ing)?|want(?:s|ed)?|demand(?:s|ed|ing)?|require(?:s|d)?|transfer|pay|deposit|payment link|told to)\b|मांग|चाहत', re.I)
 ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|when|unless|you should|you may want to|please|it is safer to|i would say)\b|^\s*(?:यदि|अगर|जब)", re.I)
 ADVICE_MODAL = re.compile(r'\b(?:you should|you may want to|please|it is safer to|i would say)\b', re.I)
 # Inputs may carry any real domain; only explanation-side wording is restricted.
-INPUT_URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?!(?:pdf|js|py|txt|exe|jpg|jpeg|png|gif|doc|docx|xls|xlsx|zip|apk|csv|json|html?)(?![\w.-]))[a-z]{2,}(?![\w.-]))', re.I)
+INPUT_URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?!(?:pdf|js|py|txt|exe|jpg|jpeg|png|gif|doc|docx|xls|xlsx|zip|apk|csv|json|html?)(?![\w-]|\.[\w-]))[a-z]{2,}(?![\w-]|\.[\w-]))', re.I)
 NOTE_PREFIX = re.compile(r'^\s*(?:please\s+)?(?:note|be aware|remember)\s+(?:that\s+)?', re.I)
 ADVICE_SPLIT = re.compile(r"\band\s+(?=(?:you should|you may want to|please|it is safer to|never|don't|do not|report|call|block|delete|verify|check|contact|ignore)\b)", re.I)
 NEGATION = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b|नहीं", re.I)
@@ -72,9 +72,15 @@ def grounding(input_text, explanation):
         if ADVICE.search(clause):
             continue
         modal = ADVICE_MODAL.search(clause)
-        if modal:
+        reported = modal and re.search(r'\b(?:says?|said|asks?|asked|tells?|told|instructs?|urges?|wants?)\b', clause[:modal.start()], re.I)
+        if modal and not reported:
             # Only the advice tail is exempt; a claim before it is still checked.
             clause = clause[:modal.start()]
+        # A URL stated as part of a claim must appear in the input.
+        for url in URL.finditer(clause):
+            host = re.sub(r'^[a-z][a-z0-9+.-]*://', '', url.group(), flags=re.I).split('/')[0].lower().rstrip('.')
+            if host not in input_text.lower():
+                return False
         for name, cue in CUES.items():
             matches = list(cue.finditer(clause))
             if not matches or all(negated_cue(clause, m) for m in matches):
