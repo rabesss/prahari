@@ -168,6 +168,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
         else:
             child_env, launch = env, cmd
         p = subprocess.Popen(launch, env=child_env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
+        cleanup_done = False
         try:
             while True:
                 if method == 'systemd_scope' and scope is None:
@@ -234,8 +235,9 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 rc = p.returncode
                 peak_kb = max(peak_kb or 0, legacy_hwm_kb, resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) or None
                 stray = bool(session_pids(p.pid))
+            cleanup_done = True
         finally:
-            if p.poll() is None:
+            if not cleanup_done:
                 if method == 'systemd_scope':
                     subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -243,9 +245,10 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                     for pid in session_pids(p.pid):
                         try: os.kill(pid, signal.SIGKILL)
                         except ProcessLookupError: pass
-                try: os.killpg(p.pid, signal.SIGKILL)
-                except ProcessLookupError: pass
-                p.wait()
+                if p.poll() is None:
+                    try: os.killpg(p.pid, signal.SIGKILL)
+                    except ProcessLookupError: pass
+                    p.wait()
             status_path.unlink(missing_ok=True)
     res = {'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
            'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,

@@ -43,6 +43,7 @@ def test_weighted_total_and_mean_of_totals():
     ('Ordinary text here', "The message asks for payment, so don't pay.", False),
     ('Ordinary text here', 'The message asks for payment if you agree.', False),
     ('Receipt for your payment', 'The sender requested a payment.', False),
+    ('Receipt for the fee paid', 'The sender requested a payment.', False),
 ])
 def test_grounding(src, expl, expected):
     assert grounding(src, expl) is expected

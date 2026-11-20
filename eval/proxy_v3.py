@@ -37,7 +37,7 @@ CUES = {
 }
 URL = re.compile(r'\b[a-z][a-z0-9+.-]*://\S+|(?<![\w.])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?![\w.])', re.I)
 PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|processed|successful)\b|\b(?:received|credited|paid)\b.{0,45}\b(?:payment|money|funds|amount|refund)\b|\breceipt\b', re.I)
-PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|deposit|recharge|fee|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
+PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
 REQUEST_CLAIM = re.compile(r'\b(?:ask|asks|asked|asking|request|requests|requested|requesting|want|wants|demand|demands|demanded|demanding|requires?)\b|मांग(?:ता|ती|ा)?|चाहता', re.I)
 CONDITIONAL = re.compile(r"^\s*(?:if|unless)\b", re.I)
 NEGATED = re.compile(r"\b(?:not|never|doesn't|don't|didn't|does not|do not|did not)\s*$", re.I)
