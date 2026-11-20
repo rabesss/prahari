@@ -66,6 +66,8 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)).
+
 Full proxy run `20261110-081343-gen2-full-r2b` (two repeats, hidden round-2 set): **87.66**, D 0.9024,
 E 0.8875, P 0.6701, C 1.0; promotable, no failures or infra errors. The run before the explanation
 prompt/latency trim scored 86.97 (same D, E 0.8929, P 0.6289), so detection is unchanged and the
@@ -100,9 +102,7 @@ Hindi spellings still land on the same features: hidden indic F1 is 0.9665 with 
 accuracy 0.875 on B.
 
 - **Leave-one-category-out** on the visible Indian set (train on 15 categories plus the SMS corpus,
-  test the held-out category, benign and malicious): **macro F1 1.0**; every malicious category
-  10/10, every benign category 0 false positives. This removes the "memorised set A wording"
-  explanation.
+  test the held-out category, benign and malicious): pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate. The recorded per-category counts were 10/10 malicious and 0 benign false positives.
 - **Three blind paraphrase suites** authored after the rules were frozen: 40 protective-clause
   cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct, with zero
   `uncertain` answers (the runner counts `uncertain` as wrong for either label, stricter than

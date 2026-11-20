@@ -7,12 +7,11 @@ credentials and money. Genuine bank, delivery and utility alerts look similar, a
 can arrive in English, Hinglish or Devanagari. A useful assistant must separate scams from these
 hard negatives without sending private content to a cloud. The Bharat AI-SoC PS3 brief asks for an
 on-device cybersecurity assistant that runs on Arm hardware, explains its decision, and stays useful
-offline. Prahari answers that: local detectors plus a small Llama explanation model, with no
-network at inference time.
+offline. Prahari uses local detectors and a small Llama explanation model. Inputs reach the local app over loopback; model download requires a network. The app does not block outbound traffic, and offline claims cover only what was tested.
 
 ## Architecture
 
-Two stages run entirely on the device. This is the mentor's reference pipeline - feature
+Two stages ran locally on the measured Arm Linux VM. This is the mentor's reference pipeline - feature
 extraction, then rule/ML detectors, then risk fusion, then Llama via ExecuTorch explaining -
 implemented on the CPU; the Performance section lists where each stage runs and what it costs.
 
@@ -74,6 +73,8 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)). Candidate selection repeatedly used feedback from the same private evaluation set; it is not a pristine untouched holdout.
+
 Full proxy run `20261111-075405-best-confirm` on the promoted tree (two repeats, hidden round-2
 set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
 promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
@@ -112,7 +113,7 @@ Hindi spellings still land on the same features: hidden indic F1 is 0.9665 with 
 accuracy 0.875 on B.
 
 - **Leave-one-category-out** on the visible Indian set (32 categories; train on all but one, test the
-  held-out category, benign and malicious): **reported F1 1.0** (32 categories). The script computes pooled binary F1 despite its "macro F1" label; it does not establish real-world generalisation.
+  held-out category, benign and malicious): pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate.
 - **Three blind paraphrase suites** authored after the rules were frozen: 40 protective-clause
   cases, 21 Hindi/Hinglish rows, 30 mixed English/Hindi rows. Final tree: all correct, with zero
   `uncertain` answers (the runner counts `uncertain` as wrong for either label, stricter than
@@ -179,7 +180,7 @@ Three-minute video script:
    `demo_output.json`. Show the guard blocking a connect first.
 3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
    a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
-4. State that everything runs on the local CPU through ExecuTorch, with no network after import, and
+4. State that inference runs on the local CPU through ExecuTorch, that normal app startup does not block outbound traffic, and
    read the measured 3.67 s/item, 2.26 GB peak RSS and 20.8 decode tokens/s.
 
 ## Responsible AI, privacy and safety

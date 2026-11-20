@@ -2,21 +2,23 @@
 
 1. **What is Prahari?** An advisory prototype for pasted messages and URLs, plus two separate network-input experiments; it is not an automatic security service.
 2. **Does it satisfy the Llama requirement?** Its explanation uses Llama 3.2 1B through ExecuTorch on an Arm Linux VM. Acceptance of this VM as the required edge demonstration is unconfirmed.
-3. **Is an Android app ready?** An APK build is in progress; no completed APK or physical-phone run is established in this evidence. Phone performance is pending.
-4. **Is it offline?** Inference is local. The controller tested with an import-time network guard, but normal app startup does not enforce that guard. A separately blocked-egress demo is still needed.
+3. **Is an Android app ready?** A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified.
+4. **Is it offline?** Inference runs locally and inputs reach the local app over loopback. Downloading the model requires network access; the app itself does not block outbound traffic. The controller tested with an import-time network guard. Offline claims cover only what was tested; a separately blocked-egress demo is still needed.
 5. **Does it monitor live traffic?** No. There is no live capture or flow-feature extraction.
 6. **What does the flow model do?** It scores supplied NSL-KDD feature records as dataset replay, using a trained model and signatures.
 7. **Does Llama explain that model's flow verdict?** No. The explanation interface reclassifies a text description with rules. Its result can disagree with the feature model; present the two separately.
 8. **What is the flow false-alarm rate?** 0.0303 in the 22,544-record aggregate evaluation, not a false-alarm rate per hour on a real network (stamp `20261111-075405`, `research/evals/20261111-075405-best-confirm/details.json`).
 9. **How well do SMS and URLs work?** In that aggregate evaluation SMS F1 is 0.9015 and FPR 0.0078 (n=1,162); URL F1 is 0.9948 and FPR 0.0 (n=7,997). Dataset and sampling limits apply; a zero observed FPR is not a guarantee.
-10. **Does LOCO prove generalisation?** No. It uses the visible synthetic Indian set and fixed rules. The record says 1.0 over 32 categories, but the script calculates pooled binary F1 rather than a category macro-average.
+10. **Does LOCO prove generalisation?** No. pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate.
 11. **How broad is language support?** The evaluated synthetic set includes English, Hinglish, mixed and Hindi. Hindi had 0.875 accuracy on 32 items; coverage of other Indic languages is not established.
 12. **Are explanations always correct?** No. In the 28-item checks one verdict and one action failed; evidence mention was 0.714. These checks do not establish user comprehension.
 13. **Can input override the assistant?** There are prompt and pattern-based mitigations and a contradiction filter. They can fail; treating text as data is not a security guarantee.
 14. **Can a safe verdict be trusted?** No verdict guarantees safety. Verify independently using a known official app or number; never share secrets on request.
-15. **Are the results real-world clinical or field validation?** No. They are dataset and synthetic tests, including a tuned development set and a limited separate evaluation. No field trial is claimed.
+15. **Are the results real-world clinical or field validation?** No. They are dataset and synthetic tests, including a tuned development set and a limited separate evaluation. Candidate selection repeatedly used feedback from the same private evaluation set, so it is not a pristine untouched holdout. No field trial is claimed.
 16. **What does KleidiAI contribute?** The installed backend is reported to contain `kai_` symbols, but dispatch on this CPU and any speedup are unverified. The controller recorded the symbol inspection and counts in the evidence ledger.
 17. **How fast is it on a phone?** Unknown. The 3.67 s/item and 2.256 GB peak RSS are from a shared two-vCPU Neoverse-N1 cloud VM; phone timing, memory and power are TODO.
 18. **What is next?** A real Android phone app, live capture and feature extraction, broader Indic coverage, representative licensed data, and independently evaluated usability and safety are planned.
+
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)).
 
 Source paths, timestamps and measurement details: [report](report.md) and [ledger](EVIDENCE.md).
