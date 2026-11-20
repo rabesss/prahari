@@ -434,3 +434,15 @@ def test_run_proc_census_enforcement(monkeypatch, tmp_path, isolated, attributed
     assert result['unit_census']['new_other_scopes'] == 1
     assert result['stray_unit'] == expected
     assert result['stray_cgroup'] == (isolated and attributed)
+
+
+@pytest.mark.parametrize('input_text,explanation,expected', [
+    ('Hello friend', 'The sender requests an OTP and you should report this message.', False),
+    ('Hello friend', 'Please note that the sender requests an OTP from you.', False),
+    ('Verify at bank.co.uk now', 'The message contains a link to verify your account.', True),
+    ('see report.pdf today', 'The message contains a link to a report.', False),
+    ('Your OTP is 1234 do not share', 'The sender shares an OTP code, so never share it.', True),
+])
+def test_grounding_claim_before_advice_and_input_domains(input_text, explanation, expected):
+    from proxy_v3 import grounding
+    assert grounding(input_text, explanation) is expected

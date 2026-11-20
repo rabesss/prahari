@@ -1,6 +1,6 @@
 import copy
 import pytest
-from compare_v3 import compare
+from compare_v3 import compare, EXPECTED_HIDDEN
 
 
 def run(score):
@@ -10,7 +10,8 @@ def run(score):
             'india': {'injection_recall': .8, 'benign_ai_mention_fpr': .02},
             'latency_s_per_item': 2, 'peak_process_tree_rss_gb': 2,
             'host_during': {'cpu_steal_percent_max': 0}, 'contended': False, 'host_start': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0},
-            'host_end': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0}}
+            'host_end': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0},
+            'hidden_sha256': dict(EXPECTED_HIDDEN)}
 
 
 @pytest.fixture(autouse=True)
@@ -142,8 +143,32 @@ def test_promotion_updates_pin_and_rejects_best_drift(monkeypatch, tmp_path):
     pin.write_text(candidate_hash(best) + '\n')
     digest = candidate_hash(cand)
     monkeypatch.setattr(promote_v3, 'compare', lambda *_: {'pass': True})
-    promote_v3.promote(cand, best, [], [{'candidate_hash': digest}], .5, pin)
+    three = [{}, {}, {}]
+    with pytest.raises(ValueError, match='exactly three runs'):
+        promote_v3.promote(cand, best, [{}, {}], [{'candidate_hash': digest}] * 2, .5, pin)
+    promote_v3.promote(cand, best, three, [{'candidate_hash': digest}] * 3, .5, pin)
     assert pin.read_text().strip() == candidate_hash(best) == digest
     (best / 'program').write_text('drift')
     with pytest.raises(ValueError, match='current BEST differs'):
-        promote_v3.promote(cand, best, [], [{'candidate_hash': digest}], .5, pin)
+        promote_v3.promote(cand, best, three, [{'candidate_hash': digest}] * 3, .5, pin)
+
+
+@pytest.mark.parametrize('mutate', ['missing', 'differs', 'one_run'])
+def test_hidden_hashes_must_match_controller_pin(mutate):
+    b, c = run(70), run(71)
+    if mutate == 'missing':
+        del c['hidden_sha256']
+    elif mutate == 'differs':
+        c['hidden_sha256']['sms_test'] = 'f' * 64
+    if mutate == 'one_run':
+        bs, cs = [copy.deepcopy(b), copy.deepcopy(b)], [copy.deepcopy(c), copy.deepcopy(c)]
+        cs[1]['hidden_sha256'] = dict(EXPECTED_HIDDEN, flow_test='e' * 64)
+        for i, r in enumerate(bs):
+            r.update(stamp=f'20261121-10000{i*2}-000000', candidate='BEST')
+        for i, r in enumerate(cs):
+            r.update(stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND')
+        with pytest.raises(ValueError, match='hidden data hashes'):
+            compare(bs, cs, .5)
+        return
+    with pytest.raises(ValueError, match='hidden data hashes'):
+        compare_pair(b, c)

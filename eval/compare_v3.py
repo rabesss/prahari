@@ -11,6 +11,16 @@ BEST_PIN = Path(__file__).resolve().parents[1] / 'research/evals/BEST.sha256'
 
 TASKS = ('sms', 'url', 'indic', 'flow')
 
+# Controller-owned digests of the hidden gold every comparable run must have scored against.
+EXPECTED_HIDDEN = {
+    'sms_test': '0a1a0060e86eccb79a05c43072d8c7fec3d491c509ec39998bf3b6d7f55c1fa4',
+    'url_test': '6b7bd10ed277f7e150fe790b771410b5b3756d79926a92649bd17faa44730798',
+    'indic_test': 'bd8fe7d31bec627923dbe998730574bd1e77e76f2527c8b0b2f2990f7738f524',
+    'flow_test': '277f7a8388cc72bd7df39794101f6d7dffdfad7634bb2d0effab5b7d617b5b43',
+    'explain_set': '8603235cc842b076b4437d0a1f2e936c01cefe232693af5f4d04f754083dd888',
+    'india_hidden_v2': '532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0',
+}
+
 
 def value(run, *path):
     try:
@@ -52,6 +62,8 @@ def compare(best, candidate, threshold):
             raise ValueError('BEST pin missing')
         if not re.fullmatch(r'[0-9a-f]{64}', pinned) or best[0]['candidate_hash'] != pinned:
             raise ValueError('BEST content hash does not match pin')
+        if not all(r.get('hidden_sha256') == EXPECTED_HIDDEN for r in best + candidate):
+            raise ValueError('hidden data hashes missing or differ from the controller pin')
         if best[0]['candidate'] == candidate[0]['candidate']:
             raise ValueError('BEST and candidate paths must differ')
     except (KeyError, TypeError):

@@ -41,6 +41,10 @@ PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect reque
 REQUEST_CLAIM = re.compile(r'\b(?:ask(?:s|ed|ing)?|request(?:s|ed|ing)?|want(?:s|ed)?|demand(?:s|ed|ing)?|require(?:s|d)?|transfer|pay|deposit|payment link|told to)\b|मांग|चाहत', re.I)
 ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|when|unless|you should|you may want to|please|it is safer to|i would say)\b|^\s*(?:यदि|अगर|जब)", re.I)
 ADVICE_MODAL = re.compile(r'\b(?:you should|you may want to|please|it is safer to|i would say)\b', re.I)
+# Inputs may carry any real domain; only explanation-side wording is restricted.
+INPUT_URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?!(?:pdf|js|py|txt|exe|jpg|jpeg|png|gif|doc|docx|xls|xlsx|zip|apk|csv|json|html?)(?![\w.-]))[a-z]{2,}(?![\w.-]))', re.I)
+NOTE_PREFIX = re.compile(r'^\s*(?:please\s+)?(?:note|be aware|remember)\s+(?:that\s+)?', re.I)
+ADVICE_SPLIT = re.compile(r"\band\s+(?=(?:you should|you may want to|please|it is safer to|never|don't|do not|report|call|block|delete|verify|check|contact|ignore)\b)", re.I)
 NEGATION = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b|नहीं", re.I)
 
 
@@ -59,15 +63,24 @@ def grounding(input_text, explanation):
     clauses = []
     for sentence in re.split(r'(?<=[.!?।])\s+', explanation):
         clauses.extend(re.split(r'[,;।!?]|\b(?:and then|so|but)\b|(?:इसलिए|लेकिन|फिर)', sentence, flags=re.I))
+    split = []
     for clause in clauses:
-        if ADVICE.search(clause) or ADVICE_MODAL.search(clause):
+        split.extend(ADVICE_SPLIT.split(clause))
+    for clause in split:
+        # "Please note that the sender requests an OTP" is a claim, not advice.
+        clause = NOTE_PREFIX.sub('', clause)
+        if ADVICE.search(clause):
             continue
+        modal = ADVICE_MODAL.search(clause)
+        if modal:
+            # Only the advice tail is exempt; a claim before it is still checked.
+            clause = clause[:modal.start()]
         for name, cue in CUES.items():
             matches = list(cue.finditer(clause))
             if not matches or all(negated_cue(clause, m) for m in matches):
                 continue
             if name == 'link':
-                if not URL.search(input_text):
+                if not INPUT_URL.search(input_text):
                     return False
             elif not cue.search(input_text):
                 return False

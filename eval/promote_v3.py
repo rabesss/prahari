@@ -12,6 +12,9 @@ from run_eval import candidate_hash
 
 
 def promote(candidate, best_dir, best_runs, candidate_runs, threshold, pin=BEST_PIN):
+    # Promotion needs the three-run confirmation; compare() alone also accepts two-run screens.
+    if len(best_runs) != 3 or len(candidate_runs) != 3:
+        raise ValueError('promotion requires exactly three runs per side')
     result = compare(best_runs, candidate_runs, threshold)
     if not result['pass']:
         raise ValueError('comparison failed: ' + '; '.join(result['failures']))
