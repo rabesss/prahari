@@ -207,6 +207,31 @@ def sweep_external(roots, prefix):
                 path.unlink(missing_ok=True)
 
 
+STAGE_ENV_KEYS = frozenset(('PATH', 'LANG', 'LC_ALL', 'TZ', 'HOME', 'XDG_CACHE_HOME',
+    'XDG_DATA_HOME', 'TMPDIR', 'PYTHONPATH', 'PYTHONDONTWRITEBYTECODE', 'HC_GUARD_LOG',
+    'HC_GUARD_DENY_PATHS', 'HC_MODEL_REGISTRY', 'HC_PY', 'http_proxy', 'https_proxy',
+    'HTTP_PROXY', 'HTTPS_PROXY', 'no_proxy', 'HF_HUB_OFFLINE', 'TRANSFORMERS_OFFLINE',
+    'OMP_NUM_THREADS', 'PRAHARI_EXTERNAL_PREFIX'))
+
+
+def stage_environment(env):
+    result = {k: v for k, v in env.items() if k in STAGE_ENV_KEYS}
+    result['PATH'] = '/usr/local/bin:/usr/bin:/bin'
+    return result
+
+
+def cgroup_census():
+    root = Path('/sys/fs/cgroup/user.slice') / f'user-{os.getuid()}.slice' / f'user@{os.getuid()}.service'
+    if not root.is_dir():
+        raise OSError('user cgroup unavailable')
+    groups = {}
+    for directory, _, files in os.walk(root, onerror=lambda e: (_ for _ in ()).throw(e)):
+        path = Path(directory)
+        if 'cgroup.procs' in files:
+            groups[str(path)] = frozenset((path / 'cgroup.procs').read_text().split())
+    return groups
+
+
 def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
     """Run a stage in a scope or session, measure it, then kill and census it."""
     method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
@@ -217,10 +242,12 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
     roots = ['/dev/shm', '/var/tmp'] + ([env['XDG_RUNTIME_DIR']] if env.get('XDG_RUNTIME_DIR') else [])
     prefix = env.get('PRAHARI_EXTERNAL_PREFIX', 'prahari-eval-' + uuid.uuid4().hex + '-')
     external_before = None
+    cgroups_before = None
     if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
         try:
             sweep_external(roots, prefix)
             external_before = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
+            cgroups_before = cgroup_census()
         except OSError:
             pass
     scope = None
@@ -229,7 +256,8 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
     with open(log, 'ab') as lf:
         if method == 'systemd_scope':
             # systemd-run waits for the actual stage; its exit status is authoritative.
-            stage = ['/usr/bin/env', '-u', 'DBUS_SESSION_BUS_ADDRESS', '-u', 'XDG_RUNTIME_DIR']
+            stage_env = stage_environment(env)
+            stage = ['/usr/bin/env', '-i', *[f'{k}={v}' for k, v in stage_env.items()]]
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
                 stage += ['bwrap', '--die-with-parent', '--ro-bind', '/', '/',
                           '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
@@ -242,7 +270,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                       '-p', 'MemoryAccounting=yes', '--', '/bin/sh', '-c', wrapper, 'stage', *stage, *cmd]
             child_env = env
         else:
-            child_env = {k: v for k, v in env.items() if k not in ('DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR')}
+            child_env = stage_environment(env)
             launch = cmd
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
                 launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
@@ -344,14 +372,20 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
     units_after = user_units(env)
     stray_unit = units_before is None or units_after is None or bool(units_after - units_before - {unit})
     persistent = False
+    stray_cgroup = False
     if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
         try:
             external_after = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
             persistent = external_before is None or any(external_before.get(k) != v for k, v in external_after.items())
+            cgroups_after = cgroup_census()
+            stray_cgroup = cgroups_before is None or any(
+                unit not in path and (path not in cgroups_before or bool(pids - cgroups_before[path]))
+                for path, pids in cgroups_after.items())
             sweep_external(roots, prefix)
         except OSError:
             persistent = True
-    res = {'persistent_state': persistent, 'stray_unit': stray_unit, 'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
+            stray_cgroup = True
+    res = {'stray_cgroup': stray_cgroup, 'persistent_state': persistent, 'stray_unit': stray_unit, 'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
            'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,
            'timed_out': timed_out, 'stray_process': stray, 'rss_method': method}
     if vis_log is not None:
@@ -772,7 +806,9 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     summary['rss_method'] = method
     # A failed bwrap probe fails closed: never claim isolation we cannot create.
     try:
-        probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm', '--', '/bin/true'],
+        probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm', '--',
+                                '/usr/bin/python3', '-c',
+                                'import os; assert os.statvfs("/sys/fs/cgroup").f_flag & os.ST_RDONLY'],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
         isolated = probe.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
@@ -947,6 +983,8 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     if file_viol:
         failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
     process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
+    if any(r.get('stray_cgroup') for r in process_runs):
+        failures.append('stray cgroup or process outside evaluator scope')
     if any(r.get('persistent_state') for r in process_runs):
         failures.append('persistent state outside scratch')
     if any(r.get('stray_unit') for r in process_runs):

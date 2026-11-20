@@ -86,7 +86,7 @@ measurements and timeouts fail. In the same interleaved comparison, every candid
 run must have latency at most 110% and RSS at most 105% of the corresponding BEST
 mean. Re-run comparisons with start 1-minute load above 1.5, missing host data, or
 sampled CPU steal above 20%. Mid-run load is informational. Only systemd scope RSS
-and bwrap isolation can promote; proc fallback is for local development and its
+and bwrap isolation with read-only cgroups can promote; proc fallback is for local development and its
 cumulative child RSS is not a promotion gate. The controller pins the BEST content
 hash and updates it with each promotion.
 The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS

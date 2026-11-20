@@ -279,8 +279,9 @@ def test_fake_completion_cannot_override_process_exit(tmp_path):
     env = os.environ.copy()
     if not run_eval.scope_available(env):
         pytest.skip('user scopes unavailable')
-    env['PRAHARI_STAGE_STATUS'] = str(tmp_path / 'fake.status')
-    code = "import os,pathlib; pathlib.Path(os.environ['PRAHARI_STAGE_STATUS']).write_text('0'); raise SystemExit(7)"
+    fake = tmp_path / 'fake.status'
+    env['PRAHARI_STAGE_STATUS'] = str(fake)
+    code = f"import pathlib; pathlib.Path({str(fake)!r}).write_text('0'); raise SystemExit(7)"
     result = run_eval.run_proc([sys.executable, '-c', code], env, 5, tmp_path, tmp_path / 'proc.log', rss_method='systemd_scope')
     assert result['rc'] == 7
 
@@ -298,3 +299,41 @@ def test_candidate_hash_is_independent_of_checkout_umask(tmp_path):
     assert candidate_hash(a) == candidate_hash(b)
     (b / 'run').chmod(0o664)
     assert candidate_hash(a) != candidate_hash(b)
+
+
+@pytest.mark.parametrize('expl', [
+    'The message has a payment link and an OTP.',
+    'A payment link was included by the sender.',
+    'Payment is contained in this message.',
+    'The text mentioned an OTP code.',
+    'You are told to transfer money now.',
+    'यह संदेश में भुगतान चाहती है।',
+])
+def test_verb_independent_ungrounded_claims(expl):
+    assert not grounding('Hello', expl)
+
+
+@pytest.mark.parametrize('expl', [
+    'You may want to call 1930 to report fraud.',
+    'Report it at https://sancharsaathi.gov.in.',
+    'The message does not contain a link or ask for a payment.',
+])
+def test_advice_and_negated_claims(expl):
+    assert grounding('Hello', expl)
+
+
+def test_link_and_payment_grounding_boundaries():
+    assert not grounding('see report.pdf', 'The message contains a link.')
+    assert not grounding('node.js', 'The message contains a link.')
+    assert not grounding('email user@example.com', 'The message contains a link.')
+    assert grounding('Pay the fee at example.com', 'The message asks for payment at example.com.')
+    assert not grounding('Receipt of your payment', 'Deposit the receipt amount immediately please.')
+    assert not grounding('Hello', 'Never share an OTP. The sender demands payment now.')
+
+
+def test_stage_environment_is_an_allowlist():
+    from run_eval import stage_environment
+    result = stage_environment({'PATH': '/bad', 'HOME': '/scratch', 'HF_HOME': '/shared',
+                                'XDG_CONFIG_HOME': '/shared', 'XDG_RUNTIME_DIR': '/run/user/1',
+                                'DBUS_SESSION_BUS_ADDRESS': 'address', 'HC_PY': '/python'})
+    assert result == {'PATH': '/usr/local/bin:/usr/bin:/bin', 'HOME': '/scratch', 'HC_PY': '/python'}

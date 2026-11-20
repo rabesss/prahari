@@ -25,36 +25,45 @@ def mean(values):
     return sum(values) / len(values) if values else 0.0
 
 
-# Heuristics only: protective recommendations and conditionals are not input claims.
-CLAIM = re.compile(r"\b(?:ask|asks|asked|asking|request|requests|requested|requesting|want|wants|demand|demands|demanded|demanding|contain|contains|mention|mentions|say|says|said|include|includes|requires?|tells?)\b|मांग(?:ता|ती|ा)?|चाहता", re.I)
+# Lexical heuristics: advice and conditional clauses are not input claims.
 CUES = {
-    'payment': re.compile(r'\b(?:pay(?:ment|ing)?|transfer|send (?:money|funds)|fee|deposit|recharge|collect request)\b|भुगतान', re.I),
-    'otp': re.compile(r'\b(?:otp|one[- ]time (?:password|code)|pin|verification code)\b', re.I),
-    'link': re.compile(r'\b(?:link|url|website|web site)\b|https?://|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b', re.I),
+    'payment': re.compile(r'\b(?:pay(?:ment|ing)?|transfer|money|funds|fee|deposit|recharge|collect request)\b|भुगतान', re.I),
+    'otp': re.compile(r'\b(?:otp|pin|code|one[- ]time password)\b', re.I),
+    'link': re.compile(r'\b(?:link|url|website|web site)\b', re.I),
     'app': re.compile(r'\b(?:app(?:lication)?|apk|download|install)\b', re.I),
     'kyc': re.compile(r'\b(?:kyc|know your customer)\b', re.I),
     'call': re.compile(r'\b(?:call|phone|dial|telephone|helpline)\b', re.I),
 }
-URL = re.compile(r'\b[a-z][a-z0-9+.-]*://\S+|(?<![\w.])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?![\w.])', re.I)
+# Restrict bare domains to known TLDs and exclude email addresses and file names.
+URL = re.compile(r'(?<![\w@.])(?:[a-z][a-z0-9+.-]*://[^\s]+|(?:[a-z0-9-]+\.)+(?:co\.in|gov\.in|com|in|org|net|io|xyz|top|example|test)(?![\w.-]))', re.I)
 PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|processed|successful)\b|\b(?:received|credited|paid)\b.{0,45}\b(?:payment|money|funds|amount|refund)\b|\breceipt\b', re.I)
 PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
-REQUEST_CLAIM = re.compile(r'\b(?:ask|asks|asked|asking|request|requests|requested|requesting|want|wants|demand|demands|demanded|demanding|requires?)\b|मांग(?:ता|ती|ा)?|चाहता', re.I)
-CONDITIONAL = re.compile(r"^\s*(?:if|when|unless|यदि|अगर|जब)\b", re.I)
-NEGATED = re.compile(r"\b(?:not|never|doesn't|don't|didn't|does not|do not|did not)\s*$|नहीं\s*$", re.I)
+REQUEST_CLAIM = re.compile(r'\b(?:ask(?:s|ed|ing)?|request(?:s|ed|ing)?|want(?:s|ed)?|demand(?:s|ed|ing)?|require(?:s|d)?|transfer|pay|deposit|payment link|told to)\b|मांग|चाहत', re.I)
+ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|when|unless|you should|you may want to|please|it is safer to|i would say)\b|^\s*(?:यदि|अगर|जब)", re.I)
+NEGATION = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b|नहीं", re.I)
+
+
+def negated_cue(clause, match):
+    before, after = clause[:match.start()], clause[match.end():]
+    # Negation applies through an 'or' chain; an affirmative 'and' starts a new claim.
+    before = re.split(r'\band\b', before, flags=re.I)[-1]
+    if NEGATION.search(before):
+        return True
+    return bool(re.match(r"\s*(?:is|was|were|are|को|की|का)?\s*(?:\b(?:not|never)\b|नहीं)", after, re.I))
 
 
 def grounding(input_text, explanation):
-    if not isinstance(explanation, str) or len(explanation.strip().split()) < 5:
+    if not isinstance(explanation, str) or len(re.findall(r'[^\W_]+', explanation, flags=re.UNICODE)) < 5:
         return False
-    # A condition only exempts its own clause, not the following assertion.
-    for clause in re.split(r'[,;।!?]|(?<!\w)\.(?!\w)|\b(?:and then|so|but)\b|(?:इसलिए|लेकिन|फिर)', explanation, flags=re.I):
-        if CONDITIONAL.search(clause):
-            continue
-        claims = [m for m in CLAIM.finditer(clause) if not NEGATED.search(clause[:m.start()])]
-        if not claims:
+    clauses = []
+    for sentence in re.split(r'(?<=[.!?।])\s+', explanation):
+        clauses.extend(re.split(r'[,;।!?]|\b(?:and then|so|but)\b|(?:इसलिए|लेकिन|फिर)', sentence, flags=re.I))
+    for clause in clauses:
+        if ADVICE.search(clause):
             continue
         for name, cue in CUES.items():
-            if not cue.search(clause):
+            matches = list(cue.finditer(clause))
+            if not matches or all(negated_cue(clause, m) for m in matches):
                 continue
             if name == 'link':
                 if not URL.search(input_text):
