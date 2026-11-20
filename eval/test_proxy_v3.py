@@ -163,7 +163,7 @@ def test_run_scratch_is_fresh_and_removed(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'eval')
     monkeypatch.setattr(run_eval, 'LOCK', tmp_path / 'eval/lock')
     seen = []
-    def fake(a, index, original, scratch, digest, queued):
+    def fake(a, index, original, scratch, digest, queued, full_start):
         assert original == candidate
         assert (scratch / 'candidate/source').read_text() == 'unchanged'
         assert digest == run_eval.candidate_hash(candidate)
@@ -244,3 +244,17 @@ def test_user_scope_measures_and_reaps_descendants(tmp_path):
                                tmp_path / 'proc.log', rss_method='systemd_scope')
     assert result['rss_method'] == 'systemd_scope'
     assert result['rc'] == 0 and result['peak_rss_mb'] > 0 and not result['stray_process']
+
+
+def test_frozen_explanation_score_does_not_depend_on_consistency_v2(monkeypatch):
+    import run_eval
+    item = {'input': 'some input', 'label': 1}
+    output = {'explanation': 'These are five ordinary words here.'}
+    checks = {'consistency': 1.0}
+    monkeypatch.setattr(run_eval, 'explain_checks', lambda *_: (.83, checks, True))
+    monkeypatch.setattr(run_eval, 'grounding', lambda *_: True)
+    monkeypatch.setattr(run_eval, 'consistent_v2', lambda *_: False)
+    score, reported_checks, valid, grounded, diagnostic = run_eval.explanation_components(item, output)
+    assert score == .83 and reported_checks['consistency'] == 1.0 and valid
+    assert grounded == 1 and diagnostic == 0
+    assert .85 * score + .15 * grounded == pytest.approx(.8555)

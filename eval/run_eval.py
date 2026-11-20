@@ -508,6 +508,14 @@ def main():
     return 0 if not result['failures'] and not result['infra_errors'] else 1
 
 
+def explanation_components(item, output):
+    """Keep the frozen E checks independent from the diagnostic gold check."""
+    score, checks, valid = explain_checks(item, output)
+    grounded = float(grounding(item['input'], output['explanation'])) if valid else 0.0
+    diagnostic = float(consistent_v2(item['label'], output['explanation'])) if valid else 0.0
+    return score, checks, valid, grounded, diagnostic
+
+
 def candidate_hash(root):
     """Hash relative names, types, modes, symlink targets and bytes in sorted order."""
     h = hashlib.sha256()
@@ -546,6 +554,7 @@ def run_once(a, run_index):
     with open(LOCK, 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         queued = time.monotonic() - queued
+        full_start = time.monotonic()
         original = Path(a.candidate).resolve()
         with tempfile.TemporaryDirectory(prefix='prahari-run-', dir=EVROOT) as scratch_name:
             scratch = Path(scratch_name)
@@ -556,11 +565,10 @@ def run_once(a, run_index):
                 # The normal evaluator records a failed run for missing candidates.
                 digest = None
                 (scratch / 'candidate').mkdir(exist_ok=True)
-            return _run_once(a, run_index, original, scratch, digest, queued)
+            return _run_once(a, run_index, original, scratch, digest, queued, full_start)
 
 
-def _run_once(a, run_index, original, scratch, digest, queued):
-    full_start = time.monotonic()
+def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     host_start = host_snapshot()
     cand = scratch / "candidate"
     label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or original.name)
@@ -742,11 +750,10 @@ def _run_once(a, run_index, original, scratch, digest, queued):
     e_sum, legacy_e_sum, grounding_sum, consistency_v2_sum, valid, plausible = 0.0, 0.0, 0.0, 0.0, 0, 0
     for it in items:
         o = outs.get(it["id"])
-        tot, r, ok = explain_checks(it, o)
+        tot, r, ok, grounded, diagnostic = explanation_components(it, o)
         legacy_e_sum += tot
-        if ok:
-            consistency_v2_sum += float(consistent_v2(it['label'], o['explanation']))
-            grounding_sum += float(grounding(it['input'], o['explanation']))
+        consistency_v2_sum += diagnostic
+        grounding_sum += grounded
         e_sum += tot
         valid += ok
         plausible += bool(ok and llm_plausible(o))
