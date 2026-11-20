@@ -176,6 +176,31 @@ def test_receive_headers_stops_on_peer_close():
     assert sock.recv.call_count == 2
 
 
+def test_body_timeout_closes_connection(monkeypatch):
+    import socket
+    original_setup = server.H.setup
+    def setup_with_short_timeout(handler):
+        original_setup(handler)
+        handler.connection.settimeout(0.1)
+    monkeypatch.setattr(server.H, 'setup', setup_with_short_timeout)
+    monkeypatch.setattr(server.H, 'protocol_version', 'HTTP/1.1')
+    httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(('127.0.0.1', httpd.server_port), timeout=5) as sock:
+            sock.sendall(b'POST /api/triage HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\n\r\n{')
+            response = _receive_headers(sock)
+            assert b' 400 ' in response.split(b'\r\n', 1)[0]
+            assert b'connection: close' in response.lower()
+            while sock.recv(1024):
+                pass
+    finally:
+        httpd.shutdown()
+        thread.join()
+        httpd.server_close()
+
+
 def test_bad_framing_closes_connection():
     import socket
     httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)

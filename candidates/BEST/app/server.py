@@ -89,6 +89,10 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(raw)
             if not isinstance(body, dict) or not isinstance(body.get('kind', 'sms'), str) or not isinstance(body.get('input', ''), str):
                 raise ValueError
+        except TimeoutError:
+            self.close_connection = True
+            self._send(400, b'{"error":"Invalid request body"}', "application/json")
+            return
         except Exception:
             self._send(400, b'{"error":"Invalid request body"}', "application/json")
             return

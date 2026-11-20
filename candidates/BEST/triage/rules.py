@@ -159,6 +159,9 @@ def flow_text_indicators(text):
                 continue
             if name == "brute_force":
                 right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
+                if (re.search(r"\bpasswords?$", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group())):
+                    continue
                 count = re.search(r"\b(?:\d{1,3}(?:,\d{3})*|\d+)\b", match.group())
                 digits = count.group().replace(',', '').lstrip('0') if count else None
                 if count and not digits:
