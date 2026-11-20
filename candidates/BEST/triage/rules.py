@@ -150,7 +150,9 @@ def flow_text_indicators(text):
             if re.search(r"\b(?:no|zero|not|without|never)\s+(?:(?:a|an|the)\s+)?$", before):
                 continue
             if name == "brute_force":
-                clause = re.split(r"[.;!?]", t[max(0, match.start() - 40):match.end() + 40])[0]
+                left = re.split(r"[.;!?]", t[max(0, match.start() - 40):match.start()])[-1]
+                right = re.split(r"[.;!?]", t[match.end():match.end() + 40])[0]
+                clause = left + match.group() + right
                 if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause):
                     continue
             found.append((name, description))
