@@ -311,3 +311,31 @@ def test_india_v2_dev_path_is_narrow_and_schema_checked():
     assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], label='unknown')]))
     assert synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='injection', pair_id=None)]))
     assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='sms', pair_id=None)]))
+
+
+def test_india_status_line_generated_by_runner(tmp_path):
+    import os
+    import sys
+    from eval.run_eval import run_proc
+    from bench.audit_push import STATUS
+    log = tmp_path / 'private.log'
+    visible = tmp_path / 'run.log'
+    result = run_proc([sys.executable, str(tmp_path / 'india_v2_runner.py'), str(tmp_path / 'candidate')],
+                      os.environ.copy(), 5, tmp_path, log, vis_log=visible, rss_method='proc_fallback')
+    line = visible.read_text().splitlines()[0]
+    assert result['rss_method'] == 'proc_fallback'
+    assert any(rx.fullmatch(line) for rx in STATUS)
+    assert not any(rx.fullmatch(line + ' extra text') for rx in STATUS)
+
+
+def test_hidden_check_requires_india_v2(monkeypatch, tmp_path):
+    from bench import audit_push
+    hidden = tmp_path / 'hidden'
+    hidden.mkdir()
+    for name in audit_push.HIDDEN_FILES:
+        if name != 'india_hidden_v2.jsonl':
+            (hidden / name).write_text('{}\n')
+    monkeypatch.setattr(audit_push, 'HIDDEN', hidden)
+    import pytest
+    with pytest.raises(ValueError, match='hidden check input unavailable'):
+        audit_push.corpus_matchers(tmp_path)

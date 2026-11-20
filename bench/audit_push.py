@@ -5,6 +5,7 @@ The allowlist is the gate. --hidden-check is a controller-only supplementary sca
 visible third-party dataset texts; it is not a disclosure proof.
 """
 import argparse
+import hashlib
 from collections import deque
 import json
 import math
@@ -44,6 +45,7 @@ SECRET = re.compile(rb'(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9_]{20,}
 NUM = r'\d+(?:\.\d+)?'
 PYTEST_COUNTS = r'\d+ (?:passed|failed|skipped|errors?|warnings?|deselected|xfailed|xpassed)'
 STATUS = [re.compile(p) for p in (
+    r'== python(?:3(?:\.\d+)?)?  rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=' + NUM + r'\s*',
     r'== (?:predict --task (?:sms|url|flow)|explain --in) rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=' + NUM + r'\s*',
     r'=+ ' + PYTEST_COUNTS + r'(?:, ' + PYTEST_COUNTS + r')* in ' + NUM + r's(?: \(\d+:\d\d:\d\d\))? =+\s*',
     r'[.sxEF]+\s+\[\s*\d+%\]\s*',
@@ -257,7 +259,7 @@ class Matcher:
 
 
 HIDDEN = Path('/var/tmp/arm-bharat-ai-soc-data/hidden')
-HIDDEN_FILES = ('sms_test.jsonl', 'url_test.jsonl', 'indic_test.jsonl', 'flow_test.jsonl', 'explain_set.jsonl')
+HIDDEN_FILES = ('india_hidden_v2.jsonl', 'sms_test.jsonl', 'url_test.jsonl', 'indic_test.jsonl', 'flow_test.jsonl', 'explain_set.jsonl')
 # dev/explain_examples.jsonl is written by eval/prep_data.py itself (project text), so it is not a third-party corpus.
 VISIBLE_FILES = ('train/sms.jsonl', 'train/url.jsonl', 'train/indic.jsonl', 'train/indic_seed.jsonl',
                  'dev/sms.jsonl', 'dev/url.jsonl', 'dev/indic.jsonl')
@@ -382,6 +384,8 @@ def main():
                 if rule in ('eval JSON', 'ledger') and not valid_json(data, rule == 'ledger'): fail('eval JSON leaf/array/id policy')
                 if rule == 'config' and not config_ok(data): fail('config JSON policy')
                 if rule == 'synthetic' and not synth_ok(path, data): fail('synthetic schema policy')
+                if path == 'bench/dev/india_dev_v2.jsonl' and hashlib.sha256(data).hexdigest() != 'ea6b41a985e34c8ea7ba85af79887423114753579ddc1110eaf093868af0c48f':
+                    fail('India dev v2 sha256 mismatch')
                 if rule == 'code/docs':
                     try: text = data.decode('utf-8')
                     except UnicodeError: fail('undecodable code/docs'); continue

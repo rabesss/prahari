@@ -3,6 +3,7 @@ import argparse
 import datetime as dt
 import json
 import math
+import re
 from statistics import mean
 from pathlib import Path
 
@@ -34,6 +35,16 @@ def compare(best, candidate, threshold):
         for runs in (best, candidate):
             if not all(isinstance(r.get('candidate'), str) and r['candidate'] == runs[0]['candidate'] for r in runs):
                 raise ValueError('candidate path changed within a group')
+        for runs in (best, candidate):
+            if not all(isinstance(r.get('candidate_hash'), str) and re.fullmatch(r'[0-9a-f]{64}', r['candidate_hash'])
+                       and r['candidate_hash'] == runs[0]['candidate_hash'] for r in runs):
+                raise ValueError('candidate content hash missing or changed within group')
+        if not all(isinstance(r.get('session_id'), str) and r['session_id'].strip()
+                   and r['session_id'] == best[0]['session_id'] for r in best + candidate):
+            raise ValueError('comparison session id missing or changed')
+        if not all(r.get('rss_method') in ('systemd_scope', 'proc_fallback')
+                   and r['rss_method'] == best[0]['rss_method'] for r in best + candidate):
+            raise ValueError('RSS method missing or changed')
         if best[0]['candidate'] == candidate[0]['candidate']:
             raise ValueError('BEST and candidate paths must differ')
     except (KeyError, TypeError):
@@ -75,8 +86,8 @@ def compare(best, candidate, threshold):
     if avg(candidate, 'india', 'benign_ai_mention_fpr') > avg(best, 'india', 'benign_ai_mention_fpr'):
         reasons.append('benign AI mention FPR rose')
     for metric, factor in (('latency_s_per_item', 1.10), ('peak_process_tree_rss_gb', 1.05)):
-        b, c = avg(best, metric), avg(candidate, metric)
-        if b <= 0 or c <= 0 or c > b * factor:
+        b = avg(best, metric)
+        if b <= 0 or any(value(r, metric) <= 0 or value(r, metric) > b * factor for r in candidate):
             reasons.append(metric + ' failed')
     return {'pass': not reasons, 'failures': reasons, 'delta': delta, 'threshold': threshold}
 

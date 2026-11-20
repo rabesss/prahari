@@ -28,7 +28,17 @@ def test_weighted_total_and_mean_of_totals():
     ('Download the app', 'It tells you to install an app.', True),
     ('Go to https://example.org', 'The message contains a link.', True),
     ('Hello', 'The sender demands that you transfer money.', False),
-    ('Hello', '', True),
+    ('Hello', '', False),
+    ('Hello', 'Too short to pass', False),
+    ('No payment mentioned', 'Payment is what the message asks for.', True),
+    ('Hello there', 'Payment is what the message asks for.', False),
+    ('Hello there', 'The sender requested a payment.', False),
+    ('Hello there', 'The message wants a payment.', False),
+    ('सिर्फ एक साधारण संदेश', 'संदेश भुगतान मांगता है।', False),
+    ('Meet at 5 p.m. today', 'The message contains a link.', False),
+    ('Meet at 5 i.e. later', 'The message contains a link.', False),
+    ('Ordinary text here', "If it asks for your OTP, don't share it.", True),
+    ('Receipt for your payment', 'The sender requested a payment.', False),
 ])
 def test_grounding(src, expl, expected):
     assert grounding(src, expl) is expected
@@ -138,3 +148,38 @@ def test_corrupt_india_is_infra_failure(monkeypatch, tmp_path):
     result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
     assert not result['promotable']
     assert any('SHA-256 mismatch' in e for e in result['infra_errors'])
+
+
+def test_run_scratch_is_fresh_and_removed(monkeypatch, tmp_path):
+    import argparse
+    import run_eval
+    candidate = tmp_path / 'original'
+    candidate.mkdir()
+    (candidate / 'source').write_text('unchanged')
+    monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'eval')
+    monkeypatch.setattr(run_eval, 'LOCK', tmp_path / 'eval/lock')
+    seen = []
+    def fake(a, index, original, scratch, digest, queued):
+        assert original == candidate
+        assert (scratch / 'candidate/source').read_text() == 'unchanged'
+        assert digest == run_eval.candidate_hash(candidate)
+        (scratch / 'candidate/source').write_text('local cache')
+        seen.append(scratch)
+        return {}
+    monkeypatch.setattr(run_eval, '_run_once', fake)
+    args = argparse.Namespace(candidate=str(candidate))
+    run_eval.run_once(args, 0)
+    run_eval.run_once(args, 1)
+    assert seen[0] != seen[1] and all(not p.exists() for p in seen)
+    assert (candidate / 'source').read_text() == 'unchanged'
+
+
+def test_fallback_kills_background_session(tmp_path):
+    import os
+    import sys
+    from run_eval import run_proc
+    command = 'import subprocess,sys; subprocess.Popen([sys.executable,"-c","import time; time.sleep(30)"]); print("done")'
+    result = run_proc([sys.executable, '-c', command], os.environ.copy(), 5, tmp_path,
+                      tmp_path / 'proc.log', rss_method='proc_fallback')
+    assert result['rc'] == 0 and not result['stray_process']
+    assert result['rss_method'] == 'proc_fallback' and result['peak_rss_mb'] > 0

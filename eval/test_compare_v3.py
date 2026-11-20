@@ -4,7 +4,7 @@ from compare_v3 import compare
 
 
 def run(score):
-    return {'score': score, 'quick': False, 'failures': [], 'infra_errors': [], 'promotable': True,
+    return {'candidate_hash': 'a' * 64, 'session_id': 'test-session', 'rss_method': 'proc_fallback', 'score': score, 'quick': False, 'failures': [], 'infra_errors': [], 'promotable': True,
             'scores': {'D': .8, 'I': .8, 'E': .8},
             'detection': {t: {'conservative': {'f1': .8, 'fpr': .02}} for t in ('sms','url','indic','flow')},
             'india': {'injection_recall': .8, 'benign_ai_mention_fpr': .02},
@@ -83,3 +83,23 @@ def test_contended_or_unmeasured_comparison_fails(change):
     if change == 'missing_host': del c['host_end']
     if change == 'missing_steal': del c['host_start']['cpu_steal_percent']
     assert not compare_pair(b, c)['pass']
+
+
+def test_each_candidate_run_meets_relative_caps():
+    for metric, bad in [('latency_s_per_item', 2.21), ('peak_process_tree_rss_gb', 2.11)]:
+        b, c = run(70), run(71)
+        bs = [dict(b, stamp=f'20261121-10000{i*2}-000000', candidate='BEST') for i in range(2)]
+        cs = [dict(c, stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND') for i in range(2)]
+        cs[0][metric] = bad
+        cs[1][metric] = 1.0  # mean passes but one run does not
+        assert not compare(bs, cs, .5)['pass']
+
+
+@pytest.mark.parametrize('field,bad', [('candidate_hash', 'b' * 64), ('session_id', 'other'), ('rss_method', 'systemd_scope')])
+def test_binding_rejects_changed_run(field, bad):
+    b, c = run(70), run(71)
+    bs = [dict(b, stamp=f'20261121-10000{i*2}-000000', candidate='BEST') for i in range(2)]
+    cs = [dict(c, stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND') for i in range(2)]
+    cs[1][field] = bad
+    with pytest.raises(ValueError):
+        compare(bs, cs, .5)

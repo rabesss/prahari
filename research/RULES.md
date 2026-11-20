@@ -124,3 +124,5 @@ PS3 is fixed (see §1). To maximise the chance of winning within PS3:
   better-quality 4-bit recipes. Llama 3.2 1B KV cache is about 32 KiB/token in FP16, so set a short context window. Reference speeds:
   Pi 5 llama.cpp Q4_K_M at 10.8 tok/s decode; OnePlus 12 SpinQuant at 50 tok/s. No N1 numbers are public; we measured about 17-21 tok/s
   decode on Oracle. [S/I]
+
+Evaluation inputs must never be memoized or cached across runs.

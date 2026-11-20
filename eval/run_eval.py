@@ -12,6 +12,10 @@ import json
 import math
 import os
 import re
+import resource
+import tempfile
+import threading
+import uuid
 import shutil
 import signal
 import subprocess
@@ -111,60 +115,140 @@ def tree_pids(root, proc=Path('/proc')):
     return pids
 
 
-def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
-    """Run cmd, sampling peak RSS (VmHWM) of its process tree and whether watch_pte is mapped/open.
-    With vis_log, the full output (which can echo hidden inputs) stays in the private `log`; vis_log gets a status
-    line plus, on failure, only traceback/error lines."""
-    t0 = time.time()
+def session_pids(sid):
+    result = set()
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / 'stat').read_text().rsplit(')', 1)[1].split()
+            if int(stat[3]) == sid and stat[0] != 'Z':
+                result.add(int(entry.name))
+        except (OSError, ValueError, IndexError):
+            pass
+    return result
+
+
+def scope_available(env):
+    try:
+        return subprocess.run(['systemd-run', '--user', '--scope', '--collect',
+                               '-p', 'MemoryAccounting=yes', 'true'], env=env,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def scope_members(cgroup):
+    members = set()
+    if cgroup is not None and cgroup.exists():
+        for path in [cgroup / 'cgroup.procs', *cgroup.glob('**/cgroup.procs')]:
+            try:
+                members.update(int(x) for x in path.read_text().split())
+            except (OSError, ValueError):
+                pass
+    return members
+
+
+def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
+    """Run a stage in a scope or session, measure it, then kill and census it."""
+    method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
+    t0 = time.monotonic()
     start = log.stat().st_size if log.exists() else 0
-    with open(log, "ab") as lf:
-        p = subprocess.Popen(cmd, env=env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
-        peak_kb, legacy_hwm_kb, pte_seen, timed_out = None, 0, False, False
-        while p.poll() is None:
-            if time.time() - t0 > timeout:
-                timed_out = True
+    unit = 'prahari-eval-' + uuid.uuid4().hex + '.scope'
+    status_path = Path(cwd).parent / (unit + '.status')
+    scope = None
+    peak_kb, legacy_hwm_kb, pte_seen, timed_out, stray = None, 0, False, False, False
+    with open(log, 'ab') as lf:
+        if method == 'systemd_scope':
+            # Keep the scope alive after the command exits so memory.peak can be read.
+            wrapper = '"$@"; rc=$?; printf "%s\\n" "$rc" > "$PRAHARI_STAGE_STATUS"; while :; do sleep 1; done'
+            child_env = dict(env, PRAHARI_STAGE_STATUS=str(status_path))
+            launch = ['systemd-run', '--user', '--scope', '--collect', '--unit', unit,
+                      '-p', 'MemoryAccounting=yes', '--', '/bin/sh', '-c', wrapper, 'stage', *cmd]
+        else:
+            child_env, launch = env, cmd
+        p = subprocess.Popen(launch, env=child_env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            while True:
+                if method == 'systemd_scope' and scope is None:
+                    q = subprocess.run(['systemctl', '--user', 'show', unit, '--property=ControlGroup', '--value'],
+                                       env=env, capture_output=True, text=True)
+                    cg = q.stdout.strip()
+                    if q.returncode == 0 and cg.startswith('/'):
+                        scope = Path('/sys/fs/cgroup') / cg.lstrip('/')
+                pids = scope_members(scope) if method == 'systemd_scope' else session_pids(p.pid) | tree_pids(p.pid)
+                rss = tree_rss_kb(pids)
+                if rss is not None:
+                    peak_kb = max(peak_kb or 0, rss)
+                for pid in pids:
+                    try:
+                        status = Path(f'/proc/{pid}/status').read_text()
+                        hwm = re.search(r'^VmHWM:\s+(\d+)\s+kB', status, re.M)
+                        if hwm:
+                            legacy_hwm_kb = max(legacy_hwm_kb, int(hwm.group(1)))
+                        if watch_pte and not pte_seen:
+                            if watch_pte in Path(f'/proc/{pid}/maps').read_text():
+                                pte_seen = True
+                            else:
+                                for fd in Path(f'/proc/{pid}/fd').iterdir():
+                                    try:
+                                        if os.readlink(fd) == watch_pte:
+                                            pte_seen = True
+                                            break
+                                    except OSError:
+                                        pass
+                    except OSError:
+                        pass
+                if method == 'systemd_scope' and status_path.exists():
+                    break
+                if p.poll() is not None:
+                    break
+                if time.monotonic() - t0 > timeout:
+                    timed_out = True
+                    break
+                time.sleep(.1)
+            wall_s = time.monotonic() - t0
+            if method == 'systemd_scope':
                 try:
-                    os.killpg(p.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                break
-            pids = tree_pids(p.pid)
-            rss = tree_rss_kb(pids)
-            if rss is not None:
-                peak_kb = max(peak_kb or 0, rss)
-            for pid in pids:
+                    rc = int(status_path.read_text().strip()) if status_path.exists() else 1
+                    peak_kb = int((scope / 'memory.peak').read_text().strip()) / 1024 if scope else None
+                except (OSError, ValueError):
+                    rc, peak_kb = 1, None
+                subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
+                               env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 try:
-                    status = Path(f'/proc/{pid}/status').read_text()
-                    hwm = re.search(r'^VmHWM:\s+(\d+)\s+kB', status, re.M)
-                    if hwm:
-                        legacy_hwm_kb = max(legacy_hwm_kb, int(hwm.group(1)))
-                    if watch_pte and not pte_seen:
-                        if watch_pte in Path(f"/proc/{pid}/maps").read_text():
-                            pte_seen = True
-                        else:
-                            for fd in Path(f"/proc/{pid}/fd").iterdir():
-                                try:
-                                    if os.readlink(fd) == watch_pte:
-                                        pte_seen = True
-                                        break
-                                except OSError:
-                                    pass
-                except OSError:
-                    pass
-            time.sleep(0.1)
-        p.wait()
-    res = {"rc": p.returncode, "wall_s": time.time() - t0, "peak_rss_mb": peak_kb / 1024 if peak_kb is not None else None,
-           "legacy_peak_rss_mb": round(legacy_hwm_kb / 1024, 1), "pte_seen": pte_seen, "timed_out": timed_out}
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill(); p.wait()
+                # A lingering member is a failure even if stopping the unit later would remove it.
+                stray = bool(scope_members(scope))
+                subprocess.run(['systemctl', '--user', 'stop', unit], env=env,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                for pid in session_pids(p.pid):
+                    try: os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError: pass
+                try: os.killpg(p.pid, signal.SIGKILL)
+                except ProcessLookupError: pass
+                p.wait()
+                rc = p.returncode
+                peak_kb = max(peak_kb or 0, legacy_hwm_kb, resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) or None
+                stray = bool(session_pids(p.pid))
+        finally:
+            status_path.unlink(missing_ok=True)
+    res = {'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
+           'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,
+           'timed_out': timed_out, 'stray_process': stray, 'rss_method': method}
     if vis_log is not None:
-        with open(vis_log, "a") as vf:
+        with open(vis_log, 'a') as vf:
             vf.write(f"== {Path(cmd[0]).name} {' '.join(c for c in cmd[1:3] if c.startswith('--') or len(c) < 8)} "
                      f"rc={res['rc']} timeout={timed_out} wall_s={res['wall_s']} peak_rss_mb={res['peak_rss_mb']}\n")
-            if res["rc"] != 0 or timed_out:
-                with open(log, "rb") as lf:
+            if res['rc'] != 0 or timed_out:
+                with open(log, 'rb') as lf:
                     lf.seek(start)
-                    lines = lf.read().decode("utf-8", "replace").splitlines()
-                keep = [l for l in lines if re.match(r"(Traceback|  File |\w*(Error|Exception)\b)", l)]
-                vf.write("\n".join(l[:160] for l in keep[-25:]) + "\n")
+                    lines = lf.read().decode('utf-8', 'replace').splitlines()
+                keep = [l for l in lines if re.match(r'(Traceback|  File |\w*(Error|Exception)\b)', l)]
+                vf.write('\n'.join(l[:160] for l in keep[-25:]) + '\n')
     return res
 
 
@@ -413,11 +497,54 @@ def main():
     return 0 if not result['failures'] and not result['infra_errors'] else 1
 
 
+def candidate_hash(root):
+    """Hash relative names, types, modes, symlink targets and bytes in sorted order."""
+    h = hashlib.sha256()
+    def add(value):
+        h.update(len(value).to_bytes(8, 'big')); h.update(value)
+    def visit(path, rel):
+        st = path.lstat()
+        add(os.fsencode(rel)); add(str(st.st_mode).encode())
+        if path.is_symlink():
+            add(os.fsencode(os.readlink(path)))
+        elif path.is_dir():
+            for child in sorted(path.iterdir(), key=lambda x: os.fsencode(x.name)):
+                visit(child, str(Path(rel) / child.name))
+        elif path.is_file():
+            with path.open('rb') as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                    h.update(chunk)
+        else:
+            raise ValueError('candidate contains unsupported file type')
+    visit(root, '.')
+    return h.hexdigest()
+
+
 def run_once(a, run_index):
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    EVROOT.mkdir(parents=True, exist_ok=True)
+    queued = time.monotonic()
+    with open(LOCK, 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        queued = time.monotonic() - queued
+        original = Path(a.candidate).resolve()
+        with tempfile.TemporaryDirectory(prefix='prahari-run-', dir=EVROOT) as scratch_name:
+            scratch = Path(scratch_name)
+            try:
+                digest = candidate_hash(original)
+                shutil.copytree(original, scratch / 'candidate', symlinks=True)
+            except (OSError, ValueError) as exc:
+                # The normal evaluator records a failed run for missing candidates.
+                digest = None
+                (scratch / 'candidate').mkdir(exist_ok=True)
+            return _run_once(a, run_index, original, scratch, digest, queued)
+
+
+def _run_once(a, run_index, original, scratch, digest, queued):
     full_start = time.monotonic()
     host_start = host_snapshot()
-    cand = Path(a.candidate).resolve()
-    label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or cand.name)
+    cand = scratch / "candidate"
+    label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or original.name)
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     art = PROJ / "research" / "evals" / f"{stamp}-{label}"
     priv = EVROOT / "private" / f"{stamp}-{label}"
@@ -425,17 +552,44 @@ def run_once(a, run_index):
     for d in (art, priv, work):
         d.mkdir(parents=True, exist_ok=True)
     failures, infra = [], []
-    summary = {"label": label, "candidate": str(cand), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
+    samples = [host_start] if host_start else []
+    stop_sampling = threading.Event()
+    def sample_host():
+        while not stop_sampling.wait(5):
+            sample = host_snapshot()
+            if sample:
+                samples.append(sample)
+    sampler = threading.Thread(target=sample_host, daemon=True)
+    sampler.start()
+    summary = {"label": label, "candidate": str(original), "candidate_hash": digest, "session_id": os.environ.get("PRAHARI_EVAL_SESSION"), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
                "quick": a.quick, "host_start": host_start,
-               "contended": host_start['load_average'][0] > 1.5 if host_start else None}
+               "contended": host_start['load_average'][0] > 1.5 if host_start else None, "queued_s": round(queued, 1)}
 
     def finish(score, scores, extra=None):
+        stop_sampling.set()
+        sampler.join()
         summary['host_end'] = host_snapshot()
+        if summary['host_end']:
+            samples.append(summary['host_end'])
+        if samples:
+            summary['host_during'] = {
+                'samples': len(samples),
+                'load_1m_max': max(x['load_average'][0] for x in samples),
+                'load_1m_mean': mean([x['load_average'][0] for x in samples]),
+                'cpu_steal_percent_max': max(x['cpu_steal_percent'] for x in samples),
+                'cpu_steal_percent_mean': mean([x['cpu_steal_percent'] for x in samples]),
+            }
         if host_start is None or summary['host_end'] is None:
             infra.append('host load or CPU steal measurement unavailable')
         summary.update({"score": score, "scores": scores, "failures": failures, "infra_errors": infra,
                         "full_wall_s": time.monotonic() - full_start})
-        summary["promotable"] = (not a.quick) and not failures and not infra
+        try:
+            if candidate_hash(original) != digest:
+                failures.append('candidate modified during eval')
+        except (OSError, ValueError):
+            if digest is not None:
+                failures.append('candidate modified during eval')
+        summary["promotable"] = (not a.quick) and not failures and not infra and summary['contended'] is False
         if extra:
             summary.update(extra)
         (art / "summary.json").write_text(json.dumps(summary, indent=1))
@@ -462,19 +616,15 @@ def run_once(a, run_index):
         infra.append(f'adaptive India v2 data missing or invalid: {exc}')
         return finish(0.0, {})
 
-    # queue: one eval at a time (2 vCPU box; keeps latency numbers honest)
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
-    lf = open(LOCK, "w")
-    tq = time.time()
-    fcntl.flock(lf, fcntl.LOCK_EX)
-    summary["queued_s"] = round(time.time() - tq, 1)
-    # A run may have waited behind another evaluator; measure the actual start.
-    host_start = host_snapshot()
-    summary['host_start'] = host_start
-    summary['contended'] = host_start['load_average'][0] > 1.5 if host_start else None
-
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BOXD", "SAIL", "OPENAI", "ANTHROPIC", "GH_", "GITHUB"))}
+    method = 'systemd_scope' if scope_available(env) else 'proc_fallback'
+    summary['rss_method'] = method
+    for key in ('home', 'cache', 'data', 'tmp'):
+        (scratch / key).mkdir()
     env.update({
+        'HOME': str(scratch / 'home'), 'XDG_CACHE_HOME': str(scratch / 'cache'),
+        'XDG_DATA_HOME': str(scratch / 'data'), 'TMPDIR': str(scratch / 'tmp'),
+        'PRAHARI_RSS_METHOD': method,
         "PYTHONPATH": str(PROJ / "eval" / "guard"),
         "HC_GUARD_LOG": str(art / "guard.log"),
         "HC_GUARD_DENY_PATHS": f"{HIDDEN}:{DATA / 'indic'}:{EVROOT / 'private'}",
@@ -570,14 +720,13 @@ def run_once(a, run_index):
             failures.append(f"explain run {k} rc={res['rc']} timeout={res['timed_out']}")
     outs = runs[0]["outputs"] if runs else {}
     per_item, by_kind, check_tot = [], {}, {k: 0.0 for k in W["E"]}
-    e_sum, legacy_e_sum, grounding_sum, valid, plausible = 0.0, 0.0, 0.0, 0, 0
+    e_sum, legacy_e_sum, grounding_sum, consistency_v2_sum, valid, plausible = 0.0, 0.0, 0.0, 0.0, 0, 0
     for it in items:
         o = outs.get(it["id"])
         tot, r, ok = explain_checks(it, o)
         legacy_e_sum += tot
         if ok:
-            r['consistency'] = min(r['consistency'], float(consistent_v2(it['label'], o['explanation'])))
-            tot = sum(W['E'][key] * r[key] for key in W['E'])
+            consistency_v2_sum += float(consistent_v2(it['label'], o['explanation']))
             grounding_sum += float(grounding(it['input'], o['explanation']))
         e_sum += tot
         valid += ok
@@ -590,7 +739,7 @@ def run_once(a, run_index):
     n = max(1, len(items))
     scores["E"] = .85 * e_sum / n + .15 * grounding_sum / n
     details["explanation"] = {"n": len(items), "valid": valid, "llm_plausible": plausible,
-                              "grounding_pass_rate": grounding_sum / n,
+                              "grounding_pass_rate": grounding_sum / n, "consistency_v2": consistency_v2_sum / n,
                               "check_rates": {k: round(v / n, 3) for k, v in check_tot.items()},
                               "by_kind": {k: round(sum(v) / len(v), 3) for k, v in by_kind.items()}}
     write_jsonl(priv / "explain_items.jsonl", per_item)
@@ -638,6 +787,8 @@ def run_once(a, run_index):
     if file_viol:
         failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
     process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
+    if any(r.get('stray_process') for r in process_runs):
+        failures.append('stray process')
     peaks = [r.get('peak_rss_mb') for r in process_runs]
     if any(p is None for p in peaks):
         rss_gb = None
