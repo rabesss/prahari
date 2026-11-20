@@ -136,8 +136,8 @@ def test_process_timeout_and_measurement(tmp_path):
                       os.environ.copy(), .15, tmp_path, tmp_path / 'proc.log')
     assert result['timed_out']
     assert result['rc'] != 0
-    assert result['peak_rss_mb'] is not None
-    assert not measurements_ok(1, 1, result['timed_out'])
+    # A timeout may precede scope creation, leaving no RSS measurement.
+    assert not measurements_ok(1, result['peak_rss_mb'], result['timed_out'])
 
 
 def test_corrupt_india_is_infra_failure(monkeypatch, tmp_path):
