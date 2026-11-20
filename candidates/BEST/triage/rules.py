@@ -124,7 +124,7 @@ FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
-                    r"(?:(?:\d[\d,]*|failed|invalid|unsuccessful|denied|repeated|multiple|many)\s+){1,3}"
+                    r"(?:(?:\d[\d,]*|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)\s+){1,3}"
                     r"(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?|passwords?(?:\s+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
