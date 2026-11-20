@@ -2,6 +2,8 @@
 
 project-authored blind set, run once, no tuning; illustrative, not population accuracy
 
+The v1 set was subsequently exposed and is now exploratory. Generic grounding bugs found through it were fixed after this run; these frozen results were not rerun.
+
 Run on Oracle Arm against promoted BEST tree `beaa3131e6393ce15dd10a7203544739b08ac182`. After PR #20 merged, documentation was reconciled; the final BEST tree is `e586b661852ce450ea153faa3823b821698fba6b`, with detector and explanation code unchanged. The frozen JSONL SHA-256 is `135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67`. It has 72 SMS messages in 36 matched scam/benign pairs, plus 8 malicious injection items. Validation checked exact keys, unique IDs, routes, labels, language counts, pair counts and matched pair language/category. One benign `upi_collect` item is a raffle notice rather than a close look-alike, weakening that pair.
 
 `random.Random(20261120).sample(sorted(ids), 20)` selected the explanations over all 80 IDs before the run; the ordered IDs are in `bench/challenge/llama_sample.txt`. SMS uses `predict_text`, the `bin/predict --task sms` path; injection uses `classify_any("injection", text)`. Explanations use the already computed verdict and evidence, with the promoted Llama prompt and generation. No detector or rule was tuned after the results.
