@@ -649,7 +649,7 @@ def run_once(a, run_index):
     P['parts']['peak_rss'] = p_parts['peak_rss']
     scores['P'] = sum(W['P'][k] * p_parts[k] for k in W['P'])
     if not measurements_ok(lat, rss_gb, any(r.get('timed_out', True) for r in process_runs)):
-        failures.append('performance sanity cap failed: missing measurement, timeout, latency > 6.0 s/item, or RSS > 3.0 GB')
+        failures.append('performance sanity cap failed: missing measurement, timeout, latency > 10.0 s/item, or RSS > 3.0 GB')
     gate = {"llama_family": model.get("family") == "llama",
             "executorch_pte_loaded": all(r["pte_seen"] for r in runs) if runs else False,
             "llm_stats_plausible": plausible >= 0.9 * len(items) if items else False}

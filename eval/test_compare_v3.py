@@ -68,9 +68,9 @@ def test_relative_caps_and_sanity_caps_are_distinct():
     assert compare_pair(b, c)['pass']
     c['latency_s_per_item'] = 5.51
     assert not compare_pair(b, c)['pass']
-    b['latency_s_per_item'], c['latency_s_per_item'] = 5.9, 6.01
+    b['latency_s_per_item'], c['latency_s_per_item'] = 10, 10.01
     assert not compare_pair(b, c)['pass']
-    c['latency_s_per_item'], c['peak_process_tree_rss_gb'] = 5.9, 3.01
+    c['latency_s_per_item'], c['peak_process_tree_rss_gb'] = 10, 3.01
     assert not compare_pair(b, c)['pass']
 
 

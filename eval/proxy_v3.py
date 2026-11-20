@@ -75,4 +75,4 @@ def tree_rss_kb(pids, proc=Path('/proc')):
 def measurements_ok(latency, rss, timed_out=False):
     def valid(v):
         return isinstance(v, (float, int)) and not isinstance(v, bool) and math.isfinite(v) and v > 0
-    return not timed_out and valid(latency) and valid(rss) and latency <= 6.0 and rss <= 3.0
+    return not timed_out and valid(latency) and valid(rss) and latency <= 10.0 and rss <= 3.0

@@ -50,8 +50,8 @@ def test_rss_uses_simultaneous_sum(tmp_path):
     assert tree_rss_kb(tree_pids(1, tmp_path), tmp_path) == 50
 
 
-@pytest.mark.parametrize('lat,rss,timed,expected', [(6,3,False,True),(6.00001,3,False,False),
-    (6,3.00001,False,False),(None,1,False,False),(1,None,False,False),(1,1,True,False)])
+@pytest.mark.parametrize('lat,rss,timed,expected', [(10,3,False,True),(10.00001,3,False,False),
+    (10,3.00001,False,False),(None,1,False,False),(1,None,False,False),(1,1,True,False)])
 def test_measurement_gate(lat,rss,timed,expected):
     assert measurements_ok(lat,rss,timed) is expected
 

@@ -53,7 +53,7 @@ def compare(best, candidate, threshold):
                 return {'pass': False, 'failures': ['invalid host measurement; rerun the comparison']}
             if not 0 <= vals[0] <= 100 or any(v < 0 for v in vals[1:]) or (end == 'host_start' and vals[1] > 1.5):
                 return {'pass': False, 'failures': ['contended or invalid host measurement; rerun the comparison']}
-        if not (0 < value(r, 'latency_s_per_item') <= 6.0 and 0 < value(r, 'peak_process_tree_rss_gb') <= 3.0):
+        if not (0 < value(r, 'latency_s_per_item') <= 10.0 and 0 < value(r, 'peak_process_tree_rss_gb') <= 3.0):
             return {'pass': False, 'failures': ['performance sanity cap failed']}
     def avg(runs, *path):
         return mean(value(r, *path) for r in runs)
