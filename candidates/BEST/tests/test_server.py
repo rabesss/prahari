@@ -84,3 +84,35 @@ def test_malicious_verdict_filters_no_risk_claim():
     import pytest
     with pytest.raises(ValueError, match='no consistent sentence'):
         llm._consistent('No risk found.', 1)
+
+
+def test_demo_reports_explanation_failure(monkeypatch, tmp_path, capsys):
+    import json
+    import sys
+    monkeypatch.setattr(sys, 'argv', ['app', '--demo', '--out', str(tmp_path / 'demo.json')])
+    monkeypatch.setattr(server, 'triage', lambda *args: {'verdict': 'malicious', 'score': 0.9,
+                        'evidence': [], 'explanation_error': 'Explanation unavailable.'})
+    assert server.main() == 1
+    assert all(r['explanation_status'] == 'failed' for r in json.loads((tmp_path / 'demo.json').read_text()))
+    output = capsys.readouterr().out
+    assert 'explanation status: failed' in output and 'prefill=' not in output
+
+
+def test_http_rejects_oversized_and_malformed_bodies():
+    import http.client
+    httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        for body, status, message in [(b'x' * (64 * 1024 + 1), 413, b'Request body too large'),
+                                      (b'{broken', 400, b'Invalid request body'),
+                                      (b'[]', 400, b'Invalid request body')]:
+            conn = http.client.HTTPConnection('127.0.0.1', httpd.server_port, timeout=5)
+            conn.request('POST', '/api/triage', body)
+            response = conn.getresponse()
+            assert response.status == status and message in response.read()
+            conn.close()
+    finally:
+        httpd.shutdown()
+        thread.join()
+        httpd.server_close()

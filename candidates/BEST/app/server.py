@@ -59,7 +59,27 @@ class H(BaseHTTPRequestHandler):
         self._send(200, PAGE.encode(), "text/html; charset=utf-8")
 
     def do_POST(self):
-        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or self.headers.get("Transfer-Encoding"):
+                raise ValueError
+        except ValueError:
+            self._send(400, b'{"error":"Invalid request body"}', "application/json")
+            return
+        if length > 64 * 1024:
+            self.close_connection = True
+            self._send(413, b'{"error":"Request body too large"}', "application/json")
+            return
+        try:
+            raw = self.rfile.read(length)
+            if len(raw) != length:
+                raise ValueError
+            body = json.loads(raw)
+            if not isinstance(body, dict) or not isinstance(body.get('kind', 'sms'), str) or not isinstance(body.get('input', ''), str):
+                raise ValueError
+        except (ValueError, UnicodeDecodeError):
+            self._send(400, b'{"error":"Invalid request body"}', "application/json")
+            return
         res = triage(body.get("kind", "sms"), body.get("input", ""), bool(body.get("explain")))
         self._send(200, json.dumps(res).encode(), "application/json")
 
@@ -90,18 +110,22 @@ def main():
         for k, i in preset:
             t0 = time.perf_counter()
             r = triage(k, i, True)
+            r["explanation_status"] = "failed" if "explanation_error" in r else "success"
             r["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
             r["rss_mb"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
             res.append(r)
             print(f"[{k}] {r['verdict']} score={r['score']} latency={r['latency_ms']} ms "
                   f"rss={r['rss_mb']} MB evidence={r['evidence']}")
             print(f"  explanation: {r.get('explanation', r.get('explanation_error'))}")
-            print(f"  llm: prefill={r.get('llm', {}).get('prefill_tps', 0):.1f} tps "
-                  f"decode={r.get('llm', {}).get('decode_tps', 0):.1f} tps")
+            if r['explanation_status'] == 'failed':
+                print('  explanation status: failed')
+            else:
+                print(f"  llm: prefill={r['llm']['prefill_tps']:.1f} tps "
+                      f"decode={r['llm']['decode_tps']:.1f} tps")
         with open(a.out, "w", encoding="utf-8") as f:
             json.dump(res, f, ensure_ascii=False, indent=1)
         print(f"demo written to {a.out} (start RSS {round(rss0 / 1024, 1)} MB)")
-        return 0
+        return 1 if any(r['explanation_status'] == 'failed' for r in res) else 0
     if a.selftest:
         r1 = triage("sms", "Dear customer your SBI KYC expired, update now at sbi-kyc.in-verify.top or account will be blocked", False)
         r2 = triage("url", "https://www.irctc.co.in/nget/train-search", False)
