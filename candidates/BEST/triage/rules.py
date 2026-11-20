@@ -160,10 +160,11 @@ def flow_text_indicators(text):
                 right = re.split(r"[.;!?]", t[match.end():match.end() + 40])[0]
                 clause = left + match.group() + right
                 count = re.search(r"\b\d[\d,]*\b", match.group())
-                if count and int(count.group().replace(',', '')) == 0:
+                digits = count.group().replace(',', '').lstrip('0') if count else None
+                if count and not digits:
                     continue
                 signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
-                if not signals and (not count or int(count.group().replace(',', '')) < 10):
+                if not signals and (not count or len(digits) < 2):
                     continue
                 if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause) and re.search(
                         r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()):

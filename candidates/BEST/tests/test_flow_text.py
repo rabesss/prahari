@@ -54,3 +54,7 @@ def test_flow_policy(text, expected):
 def test_failure_then_success_evidence():
     _, _, evidence = predict_flow_text('300 failed SSH logins followed by a successful login')
     assert any('possible compromise' in item for item in evidence)
+
+
+def test_large_login_count_does_not_raise():
+    assert predict_flow_text('9' * 5000 + ' login attempts')[0] == 1
