@@ -342,7 +342,8 @@ class Explainer:
         return text, stats
 
 
-_BENIGN_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
+_BENIGN_CLAIM = re.compile(r"\b(?:no risk found|nothing suspicious)\b|"
+                           r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                            r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real)\b", re.I)
 _MAL_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                         r"\b(?:scam|fraud|fraudulent|phishing|suspicious|malicious|fake|dangerous|unsafe)\b", re.I)
@@ -352,7 +353,8 @@ _NEGATED = re.compile(r"\b(?:not|never|no|n't|without)\b", re.I)
 
 def _forced_sentence(prompt):
     """The required opening sentence, e.g. 'This link is DANGEROUS: URL shortener bit.ly'."""
-    m = re.search(r'Start your answer with exactly: "([^"]*?)\."', prompt)
+    tail = prompt.rsplit('Start your answer with exactly: "', 1)
+    m = re.match(r'([^"]*?)\."', tail[-1]) if len(tail) == 2 else None
     return m.group(1) if m else "This item was checked"
 
 
@@ -376,14 +378,20 @@ def _consistent(text, verdict):
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)
         probe = re.sub(r"\b(do|does|did|don|doesn|didn)'t\b", r"do not", probe, flags=re.I)
-        if verdict == 1 and _BENIGN_CLAIM.search(probe) and not _CONTRAST.search(probe) \
-                and not _NEGATED.search(probe) and not _MAL_CLAIM.search(probe):
+        if verdict == 1 and re.search(r"\b(?:no risk found|nothing suspicious)\b", probe, re.I):
+            continue
+        benign_claim = _BENIGN_CLAIM.search(probe)
+        if verdict == 1 and benign_claim and not _CONTRAST.search(probe) \
+                and (benign_claim.group().lower() in ('no risk found', 'nothing suspicious')
+                     or not _NEGATED.search(probe)) and not _MAL_CLAIM.search(probe):
             continue
         if verdict == 0 and _MAL_CLAIM.search(probe) and not _CONTRAST.search(probe) \
                 and not _NEGATED.search(probe):
             continue
         keep.append(sent)
-    return " ".join(keep).strip() or text
+    if not keep:
+        raise ValueError("explanation contained no consistent sentence")
+    return " ".join(keep).strip()
 
 
 def tidy(text):

@@ -99,3 +99,5 @@ Against gold labels: frozen checker 19/20; consistency_v2 17/20. Manual assessme
 | ic-011 | malicious / malicious | pass / pass | This message is DANGEROUS: asks for an OTP, PIN or card detail. Do not respond or share sensitive information. | **correct** — Identifies the PIN request and advises against sharing. |
 | ic-076 | malicious / malicious | pass / pass | This message is DANGEROUS: asks for an OTP, PIN or card detail. Do not respond or share sensitive information. | **weak** — Identifies the OTP request but does not mention the instruction override. |
 | ic-064 | benign / benign | pass / pass | No risk found for this message: reads like a routine notice or appointment. Be cautious of phishing scams that may be disguised as official communications. | **correct** — Treats the loan application status and OTP warning as benign; caution is generic. |
+
+Explanations above were generated before PR #21 review fixes (forced-sentence anchoring, benign-claim filter).

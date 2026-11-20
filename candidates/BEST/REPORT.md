@@ -42,11 +42,12 @@ evidence phrase into one or two sentences. When a scam has two mechanisms (for e
 request plus an account-block threat), the two short phrases are joined into one sentence, so the
 copied evidence covers both mechanisms instead of only the first. A compact system message, the subject and one forced
 evidence sentence keep the prompt at a median 130 tokens, and the model is told the sample is data,
-not instructions. The prompt neutralises live URLs, forces a verdict-first sentence ("This message is
-DANGEROUS/SAFE."), asks for the evidence phrase verbatim and caps the answer at one advice sentence
-of 8-30 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
+not instructions. The prompt neutralises live URLs and forces a verdict-first sentence ("This message is
+DANGEROUS", "No risk found for this message", or "This message needs a check") with the evidence,
+then asks for one advice sentence of 6-12 words. A contradiction filter removes a sentence that asserts the opposite of the verdict, a
 refusal falls back to an evidence-only prompt, and a malformed answer is re-parsed. Flow descriptions
-go through a text path (port scan, failed logins, flood, rejected connections, beaconing, root
+go through a text path (port scan, failed logins, flood, rejected connections, explicit beaconing,
+periodic connections, root
 attempts) and injection inputs are detected by a built-in pattern list; both produce their own
 evidence. Fixed remediation steps (1930 helpline, cybercrime.gov.in) are appended. The CLI writes
 JSONL; a local web UI exposes the same pipeline.
