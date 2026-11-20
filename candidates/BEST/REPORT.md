@@ -157,8 +157,9 @@ because it uses the same protective phrases as genuine Indian notices, so hidden
 Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
-states a false fact can pass. The explanation model can still produce a wrong detail; deterministic
-guards catch fabricated domains and long numbers, not wrong advice.
+states a false fact can pass. The explanation model can still produce a wrong detail. The evaluator heuristically checks
+explanations for certain invented domains and long numbers; the application does not filter
+generated text at runtime and does not guarantee that fabrications or unsafe advice are caught.
 
 ## Demo plan
 
@@ -166,8 +167,8 @@ The demo device is **oracle-a1**, an Arm-based Linux VM (aarch64, 2x Neoverse-N1
 the same core class the rules list for Arm-based Linux devices; the owner is confirming with the
 organisers that a cloud VM counts. Networking cannot be switched off wholesale because the owner
 reaches the box through an SSH tunnel, and `unshare -rn` is not permitted on this host
-(`/proc/self/uid_map`: Operation not permitted). The offline proof is therefore the controller's
-import-time guard, which is what `bin/eval` injects: it blocks non-loopback connects/DNS and logs the
+(`/proc/self/uid_map`: Operation not permitted). The evaluation was therefore tested under the controller's import-time guard (an
+independently blocked-egress demonstration remains pending), which is what `bin/eval` injects: it blocks non-loopback connects/DNS and logs the
 attempt. `tests/test_offline.py` shows that a socket connect fails under the guard while
 `bin/predict` still classifies the lookalike URL correctly.
 

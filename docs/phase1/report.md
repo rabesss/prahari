@@ -81,7 +81,7 @@ A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build 
 
 ## Evaluation and data
 
-Prahari evaluates detection independently from generated explanations. Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](EVIDENCE.md)). Each `n` includes both classes. A zero observed FPR describes this sample; it is not a guarantee. The proxy is an internal engineering measure rather than an official judging score [S3].
+Prahari evaluates detection independently from generated explanations. Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/eval/run_eval.py#L143-L163), [419–426](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/docs/phase1/EVIDENCE.md)). Each `n` includes both classes. A zero observed FPR describes this sample; it is not a guarantee. The proxy is an internal engineering measure rather than an official judging score [S3].
 
 | Task | n | F1 | Precision | Recall | FPR |
 |:--|--:|--:|--:|--:|--:|
@@ -94,19 +94,19 @@ Prahari evaluates detection independently from generated explanations. Historica
 
 **Data and splits.** SMS sources are UCI SMS Spam and Mendeley SMS Phishing, and the URL source is PhiUSIIL; their stated licences are CC BY 4.0. Flow records come from NSL-KDD, described as UNB research use. Indian seed datasets are credited to karanverma19 (Apache-2.0) and bolewara (CC BY 4.0); the categorised Indian-context evaluation uses project-generated synthetic messages [S6]. The model weights and datasets are separately acquired. Source terms should be checked before redistribution.
 
-Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 136 seed rows; development used 607 SMS, 4,000 URL, 12,700 flow and 64 Indian rows [S2]. SMS splits group normalised text, URLs are split by domain, KDDTrain+ records supply train/dev, and the visible Indian set is split by category and label. The separate flow evaluation uses KDDTest+; the separate Indian evaluation uses a second synthetic generator run [S4]. Indian development data was used for tuning.
+Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 136 seed rows; development used 607 SMS, 4,000 URL, 12,700 flow and 64 Indian rows [S2]. SMS splits group normalised text, URLs are split by domain, KDDTrain+ records supply train/dev, and the visible Indian set is split within each category. The separate flow evaluation uses KDDTest+; the separate Indian evaluation uses a second synthetic generator run [S4]. Indian development data was used for tuning.
 
 ## How we tested
 
-| Dataset and source | Licence as recorded in [DATA.md](../../candidates/BEST/DATA.md) | Split and n |
+| Dataset and source | Licence as recorded in [DATA.md](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/candidates/BEST/DATA.md) | Split and n |
 |:--|:--|:--|
 | [UCI SMS Spam](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) and [Mendeley SMS Phishing](https://data.mendeley.com/datasets/f45bkkt8pr) | CC BY 4.0 each | Combined SMS: train 4,127; dev 607; evaluation 1,162. Split by normalized text; per-source counts are not reported. |
 | [PhiUSIIL URLs](https://archive.ics.uci.edu/dataset/967) | CC BY 4.0 | Train 40,000; dev 4,000; evaluation 7,997. Split by domain; evaluation sample is capped and approximately balanced. |
 | [NSL-KDD](https://www.unb.ca/cic/datasets/nsl.html) | UNB research use; not redistributed | KDDTrain+ train 113,273 and dev 12,700; KDDTest+ evaluation 22,544 feature records. |
 | [karanverma19 Indian seed](https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset) and [bolewara Hinglish seed](https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset) | Apache-2.0 and CC BY 4.0, respectively | 136 combined seed rows in training; per-source counts are not reported. |
-| Project-generated Indian-context messages | Original project work | Visible category/label split: train 256, dev 64; separate generator run for evaluation 320. |
+| Project-generated Indian-context messages | Original project work | Visible messages split within each category: train 256, dev 64; separate generator run for evaluation 320. |
 
-Candidate selection repeatedly used feedback from the same private evaluation set, so it is not a pristine untouched holdout. The detection and language results use the half-credit rule above. The separate LOCO stress test is described below. Explanation checks used 28 items and heuristic checks for validity, verdict, consistency, evidence mention, forbidden content, fabrication patterns, action and length; they are not a factuality or safety audit. The recorded work did not test a real phone, live traffic or real user messages.
+Candidate selection repeatedly used feedback from the same private evaluation set, so it is not a pristine untouched holdout. The detection and language results use the half-credit rule above. The separate LOCO stress test is described below. Explanation checks used 28 items and heuristic checks for validity, verdict, consistency, evidence mention, forbidden content, fabrication patterns, action and length; they are not a factuality or safety audit. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial.
 
 **Category holdout.** Leaving each of 32 visible categories out of text-model training yielded pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate [S4]. The script prints a misleading macro label.
 
@@ -169,4 +169,4 @@ These are planned activities rather than completed validation [S7].
 
 [S7] `docs/BRAINSTORM.md` and `candidates/BEST/REPORT.md`, baseline `2fdc142`; Android build status supplied by the controller, 17 November 2026.
 
-The [evidence ledger](EVIDENCE.md) records commands, measurements and their limits. The rendered PDF is built locally from this source and attached at submission.
+The [evidence ledger](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/docs/phase1/EVIDENCE.md) records commands, measurements and their limits. The rendered PDF is built locally from this source and attached at submission.

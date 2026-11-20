@@ -7,5 +7,5 @@ The owner submits the entry and decides repository visibility. Confirm the final
 - [ ] Build the report PDF from the repository root with `pandoc docs/phase1/report.md -o docs/phase1/report.pdf --pdf-engine=xelatex`, as documented in the root README. Review the rendered PDF; it is ignored by Git and must not be committed.
 - [ ] Decide repository visibility and ensure judges can access the chosen source and application. Judges must obtain model access through Hugging Face and follow the Llama 3.2 licence and access terms; weights are not included in the repository.
 - [ ] Verify Llama 3.2 Community License notices, including **Built with Llama**, and applicable acceptable-use and model-access terms. Verify each dataset attribution and licence in [DATA.md](../../candidates/BEST/DATA.md), including NSL-KDD's stated research-use status. Verify ExecuTorch and Chaquopy licence notices for the Android draft before distributing it.
-- [ ] Record final commit SHA: **TODO**.
-- [ ] Record SHA-256 hashes of submitted application, report, video and any separately supplied artifacts: **TODO**.
+- [ ] Freeze the source commit, build the report PDF from it, and record the commit SHA and SHA-256 hashes of the report, application, model files and video in a submission manifest kept outside that commit (so the recorded SHA stays valid). Paste the manifest into the submission form notes.
+- [ ] Report links point to `main` on GitHub; judges need repository access (see visibility above) for them to open.
