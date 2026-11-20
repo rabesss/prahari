@@ -84,3 +84,15 @@ def test_missing_india_is_infra_failure(monkeypatch, tmp_path):
     result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
     assert not result['promotable']
     assert any('adaptive India v2 data missing or invalid' in e for e in result['infra_errors'])
+
+
+def test_process_timeout_and_measurement(tmp_path):
+    import os
+    import sys
+    from run_eval import run_proc
+    result = run_proc([sys.executable, '-c', 'import time; time.sleep(2)'],
+                      os.environ.copy(), .15, tmp_path, tmp_path / 'proc.log')
+    assert result['timed_out']
+    assert result['rc'] != 0
+    assert result['peak_rss_mb'] is not None
+    assert not measurements_ok(1, 1, result['timed_out'])
