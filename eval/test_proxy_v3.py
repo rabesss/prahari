@@ -6,6 +6,7 @@ def test_conservative_penalty_and_undefined():
     r = conservative({'a': 1, 'b': 0, 'c': 0}, {'a': 1, 'b': 1, 'c': 0}, .03)
     assert r['score'] == pytest.approx((2/3)*(1-.5))
     assert conservative({}, {}, .03)['score'] == 0
+    assert conservative({}, {}, .03)['conservative']['fpr'] == 0
     assert conservative({'a': 0}, {'a': 'uncertain'}, .03)['conservative']['fpr'] == 1
 
 
@@ -24,6 +25,7 @@ def test_weighted_total_and_mean_of_totals():
     ('A notice', 'The notice does not ask for payment.', True),
     ('A notice', 'No risk found. Verify independently.', True),
     ('Download the app', 'It tells you to install an app.', True),
+    ('Go to https://example.org', 'The message contains a link.', True),
     ('Hello', 'The sender demands that you transfer money.', False),
     ('Hello', '', True),
 ])

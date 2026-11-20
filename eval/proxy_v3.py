@@ -9,8 +9,10 @@ from conventional import metrics
 def conservative(gold, predictions, knee):
     result = metrics(gold, predictions)
     rates = result['conservative']
-    f1 = rates['f1'] if rates['f1'] is not None else 0.0
-    fpr = rates['fpr'] if rates['fpr'] is not None else 0.0
+    for key, value in rates.items():
+        if value is None:
+            rates[key] = 0.0
+    f1, fpr = rates['f1'], rates['fpr']
     result['score'] = f1 * (1 - min(0.5, max(0.0, fpr - knee) * 5))
     return result
 
@@ -28,7 +30,7 @@ CLAIM = re.compile(r"\b(?:asks?|asking|requests?|requesting|contains?|wants? you
 CUES = {
     'payment': re.compile(r'\b(?:pay(?:ment|ing)?|transfer|send (?:money|funds)|fee|deposit|recharge|collect request)\b', re.I),
     'otp': re.compile(r'\b(?:otp|one[- ]time (?:password|code)|pin|verification code)\b', re.I),
-    'link': re.compile(r'\b(?:link|url|website|web site|https?://|www\.)\b', re.I),
+    'link': re.compile(r'\b(?:link|url|website|web site)\b|https?://|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)+\b', re.I),
     'app': re.compile(r'\b(?:app(?:lication)?|apk|download|install)\b', re.I),
     'kyc': re.compile(r'\b(?:kyc|know your customer)\b', re.I),
     'call': re.compile(r'\b(?:call|phone|dial|telephone|helpline)\b', re.I),

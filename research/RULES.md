@@ -83,7 +83,7 @@ Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
 fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
 The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS
 user and an author with the visible v2-dev set. It is not independent evidence.
-Hidden v2 SHA-256: pending installation and verification by the controller.
+Hidden v2 SHA-256: `532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0`.
 The guard and model checks are proxies, not proof against an adversarial candidate.
 
 ## 8. Track and approach choice

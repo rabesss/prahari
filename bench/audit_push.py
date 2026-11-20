@@ -177,8 +177,10 @@ def synth_ok(path, data):
                    and r['lang'] in ('en', 'hi', 'hinglish')
                    and (r['pair_id'] is None or isinstance(r['pair_id'], str)) for r in rows)
     if path == 'bench/dev/india_dev_v2.jsonl':
-        return (len(rows) == 120 and len({r['id'] for r in rows if isinstance(r['id'], str')}) == len(rows)
-                and all(all(isinstance(r[k], str) and r[k].strip() for k in required)
+        return (len(rows) == 120 and len({r['id'] for r in rows if isinstance(r['id'], str)}) == len(rows)
+                and all(all(isinstance(r[k], str) and r[k].strip() for k in required - {'pair_id'})
+                        and ((r['route'] == 'sms' and isinstance(r['pair_id'], str) and bool(r['pair_id'].strip()))
+                             or (r['route'] == 'injection' and r['pair_id'] is None))
                         and r['route'] in ('sms', 'injection') and r['label'] in ('benign', 'malicious')
                         and r['lang'] in ('en', 'hi', 'hinglish') for r in rows))
     return True

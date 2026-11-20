@@ -309,3 +309,5 @@ def test_india_v2_dev_path_is_narrow_and_schema_checked():
     assert not synth_ok(path, blob([*rows[:-1], rows[0]]))
     assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], extra='bad')]))
     assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], label='unknown')]))
+    assert synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='injection', pair_id=None)]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='sms', pair_id=None)]))
