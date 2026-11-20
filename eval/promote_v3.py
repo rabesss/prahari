@@ -30,7 +30,8 @@ def promote(candidate, best_dir, best_runs, candidate_runs, threshold, pin=BEST_
     with tempfile.TemporaryDirectory(prefix='.prahari-promotion-', dir=best_dir.parent) as temp:
         temp = Path(temp)
         replacement, previous = temp / 'replacement', temp / 'previous'
-        shutil.copytree(candidate, replacement, symlinks=True)
+        shutil.copytree(candidate, replacement, symlinks=True,
+                        ignore=shutil.ignore_patterns('__pycache__', '.pytest_cache', '*.pyc'))
         if candidate_hash(replacement) != digest:
             raise ValueError('promotion copy differs from evaluated content')
         os.replace(best_dir, previous)

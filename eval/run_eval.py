@@ -734,6 +734,14 @@ def explanation_components(item, output):
     return score, checks, valid, grounded, diagnostic
 
 
+# Interpreter and test-runner caches are regenerated locally and are not candidate content.
+CACHE_NAMES = ('__pycache__', '.pytest_cache')
+
+
+def is_cache(name):
+    return name in CACHE_NAMES or name.endswith('.pyc')
+
+
 def candidate_hash(root):
     """Hash names, types, executable bits and bytes, independent of checkout umask."""
     h = hashlib.sha256()
@@ -748,7 +756,8 @@ def candidate_hash(root):
             raise ValueError('candidate symlinks are unsupported')
         elif path.is_dir():
             for child in sorted(path.iterdir(), key=lambda x: os.fsencode(x.name)):
-                visit(child, str(Path(rel) / child.name))
+                if not is_cache(child.name):
+                    visit(child, str(Path(rel) / child.name))
         elif path.is_file():
             add(str(st.st_size).encode())
             with path.open('rb') as f:
@@ -781,7 +790,8 @@ def run_once(a, run_index):
             scratch = Path(scratch_name)
             try:
                 digest = candidate_hash(original)
-                shutil.copytree(original, scratch / 'candidate', symlinks=True)
+                shutil.copytree(original, scratch / 'candidate', symlinks=True,
+                                ignore=shutil.ignore_patterns(*CACHE_NAMES, '*.pyc'))
                 if candidate_hash(scratch / 'candidate') != digest:
                     raise ValueError('scratch copy hash mismatch')
             except (OSError, ValueError) as exc:
