@@ -292,3 +292,20 @@ def test_challenge_schema_not_allowed_in_fixture_directory(tmp_path):
            'category': 'sample', 'pair_id': 'pair-1', 'route': 'sms'}
     add(tmp_path, 'bench/fixtures/india_challenge_v1.jsonl', json.dumps(row).encode() + b'\n')
     assert 'synthetic schema policy' in audit(tmp_path, base).stdout
+
+
+def test_india_v2_dev_path_is_narrow_and_schema_checked():
+    from bench.audit_push import SYNTH, synth_ok
+    import json
+    path = 'bench/dev/india_dev_v2.jsonl'
+    row = {'id': 'dev-1', 'text': 'example', 'lang': 'en', 'label': 'benign',
+           'category': 'notice', 'pair_id': 'pair-1', 'route': 'sms'}
+    def blob(rows):
+        return b''.join(json.dumps(r).encode() + b'\n' for r in rows)
+    rows = [dict(row, id=f'dev-{i}') for i in range(120)]
+    assert SYNTH.fullmatch(path) and synth_ok(path, blob(rows))
+    assert not SYNTH.fullmatch('bench/dev/other.jsonl')
+    assert not synth_ok(path, blob(rows[:-1]))
+    assert not synth_ok(path, blob([*rows[:-1], rows[0]]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], extra='bad')]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], label='unknown')]))

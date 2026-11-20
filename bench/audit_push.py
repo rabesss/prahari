@@ -27,7 +27,7 @@ ARTIFACT = re.compile(r'candidates/[^/]+/artifacts/[^/]+\.joblib')
 RECORD = re.compile(r'research/evals/[^/]+/(?:summary|details)\.json')
 LOG = re.compile(r'research/evals/[^/]+/(?:run|app|tests|guard)\.log')
 RESULT = re.compile(r'bench/results/[^/]+\.json')
-SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl')
+SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl|bench/dev/india_dev_v2\.jsonl')
 # (allowed keys, required keys) per synthetic directory.
 SYNTH_KEYS = {'research/stress': ({'id', 'label', 'text'}, {'label', 'text'}),
               'bench/fixtures': ({'id', 'input', 'expect', 'rationale'}, {'id', 'input', 'expect', 'rationale'})}
@@ -160,7 +160,7 @@ def config_ok(data):
 
 
 def synth_ok(path, data):
-    if path == 'bench/challenge/india_challenge_v1.jsonl':
+    if path in ('bench/challenge/india_challenge_v1.jsonl', 'bench/dev/india_dev_v2.jsonl'):
         allowed = required = {'id', 'text', 'lang', 'label', 'category', 'pair_id', 'route'}
     else:
         allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
@@ -176,7 +176,13 @@ def synth_ok(path, data):
                    and r['label'] in ('malicious', 'benign') and r['route'] in ('sms', 'injection')
                    and r['lang'] in ('en', 'hi', 'hinglish')
                    and (r['pair_id'] is None or isinstance(r['pair_id'], str)) for r in rows)
+    if path == 'bench/dev/india_dev_v2.jsonl':
+        return (len(rows) == 120 and len({r['id'] for r in rows if isinstance(r['id'], str')}) == len(rows)
+                and all(all(isinstance(r[k], str) and r[k].strip() for k in required)
+                        and r['route'] in ('sms', 'injection') and r['label'] in ('benign', 'malicious')
+                        and r['lang'] in ('en', 'hi', 'hinglish') for r in rows))
     return True
+
 
 
 def json_strings(data):

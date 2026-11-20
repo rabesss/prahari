@@ -77,24 +77,14 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 - Proxy weights from research B [I]: completeness 15, detection quality 20, Arm integration/compliance 15, performance 15, offline/privacy 10,
   explanation grounding/remediation 10, novelty 8, docs/reproducibility 6, demo/Q&A 6.
 
-## 7. How `bin/eval` maps to this [I]
-`score = 100 x (0.30 D + 0.25 E + 0.20 P + 0.25 C)`. The weights are in `eval/weights.json`. It covers the machine-checkable 86% of the
-proxy above; novelty and the demo (14%) are human-judged and not scored.
-- **D (detection quality, validation):** hidden test sets for SMS (UCI + Mendeley), URLs (PhiUSIIL), an **Indian-context hard set** (the
-  largest weight) and NSL-KDD flows (official KDDTest+). Per task, F1 is multiplied by a false-positive penalty, because false alerts cost
-  non-expert users.
-- **E (plain-language explanation and remediation):** deterministic checks on a hidden explain set covering verdict correctness, agreement between the text and the truth,
-  required concepts (with close synonyms), forbidden or hallucinated content (US-centric terms, injected tokens), no invented URLs or phone numbers, safe actions, and length.
-- **P (performance and optimisation on Arm):** measured on Oracle's Neoverse-N1, the same Cortex-A76 class as the Pi 5: explain latency, peak
-  RSS, detector throughput and footprint.
-- **C (compliance, offline, completeness, docs):** a hard gate that a Llama-family `.pte` is actually loaded by ExecuTorch (checked in
-  /proc), otherwise the score is capped at 20; plus the offline guard, tests, an app self-test, and README/REPORT/DATA completeness.
-- **Known gaps:** no human judging of novelty, clarity or demo quality; the PhiUSIIL URL test is easy (legitimate rows are mostly bare
-  homepages); the Indian set is synthetic and templated (320-message sets from one generator: set A, now visible for training, and set B, the hidden test since round 2;
-  their `.invalid` link hosts are rewritten to realistic TLDs, but link presence still predicts the label; a third set C from a
-  different spec, with balanced links and lengths, is kept by the controller as the final overfitting check); the explain set is small (28 items), so an E change under about 0.04 is noise; Oracle is not a Pi 5 (similar
-  cores, different memory system, and other jobs share the machine); the offline guard is an in-process proxy, and the real proof is airplane
-  mode on the device.
+## 7. Round-3 proxy and limitations [I]
+
+Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
+fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
+The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS
+user and an author with the visible v2-dev set. It is not independent evidence.
+Hidden v2 SHA-256: pending installation and verification by the controller.
+The guard and model checks are proxies, not proof against an adversarial candidate.
 
 ## 8. Track and approach choice
 PS3 is fixed (see §1). To maximise the chance of winning within PS3:

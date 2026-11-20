@@ -16,7 +16,15 @@ import signal
 import subprocess
 import sys
 import time
+import statistics
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from conventional import metrics as conventional_metrics
+from consistency_v2 import consistent as consistent_v2
+from india_challenge import load as load_india
+from proxy_v3 import conservative, grounding, measurements_ok, mean, total as v3_total, tree_rss_kb
 
 PROJ = Path(__file__).resolve().parents[1]
 DATA = Path("/var/tmp/arm-bharat-ai-soc-data")
@@ -67,11 +75,16 @@ def tree_pids(root):
     while frontier:
         p = frontier.pop()
         try:
-            for c in Path(f"/proc/{p}/task/{p}/children").read_text().split():
-                c = int(c)
-                if c not in pids:
-                    pids.add(c)
-                    frontier.append(c)
+            for thread in Path(f"/proc/{p}/task").iterdir():
+                try:
+                    children = (thread / "children").read_text().split()
+                except OSError:
+                    continue
+                for c in children:
+                    c = int(c)
+                    if c not in pids:
+                        pids.add(c)
+                        frontier.append(c)
         except OSError:
             pass
     return pids
@@ -85,17 +98,18 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
     start = log.stat().st_size if log.exists() else 0
     with open(log, "ab") as lf:
         p = subprocess.Popen(cmd, env=env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
-        peak_kb, pte_seen, timed_out = 0, False, False
+        peak_kb, pte_seen, timed_out = None, False, False
         while p.poll() is None:
             if time.time() - t0 > timeout:
                 timed_out = True
                 os.killpg(p.pid, signal.SIGKILL)
                 break
-            for pid in tree_pids(p.pid):
+            pids = tree_pids(p.pid)
+            rss = tree_rss_kb(pids)
+            if rss is not None:
+                peak_kb = max(peak_kb or 0, rss)
+            for pid in pids:
                 try:
-                    for line in Path(f"/proc/{pid}/status").read_text().splitlines():
-                        if line.startswith("VmHWM:"):
-                            peak_kb = max(peak_kb, int(line.split()[1]))
                     if watch_pte and not pte_seen:
                         if watch_pte in Path(f"/proc/{pid}/maps").read_text():
                             pte_seen = True
@@ -109,9 +123,9 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
                                     pass
                 except OSError:
                     pass
-            time.sleep(0.25)
+            time.sleep(0.1)
         p.wait()
-    res = {"rc": p.returncode, "wall_s": round(time.time() - t0, 3), "peak_rss_mb": round(peak_kb / 1024, 1),
+    res = {"rc": p.returncode, "wall_s": time.time() - t0, "peak_rss_mb": peak_kb / 1024 if peak_kb is not None else None,
            "pte_seen": pte_seen, "timed_out": timed_out}
     if vis_log is not None:
         with open(vis_log, "a") as vf:
@@ -336,14 +350,44 @@ def dir_size_gb(p):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("candidate")
-    ap.add_argument("--repeats", type=int, default=1, help="repeat the explain stage N times (latency noise)")
+    ap.add_argument("--repeats", type=int, default=1, help="run the full evaluator N times")
     ap.add_argument("--label", default=None)
     ap.add_argument("--quick", action="store_true", help="8 explain items, 1 repeat, not promotable")
     a = ap.parse_args()
 
+    if a.repeats < 1:
+        ap.error('--repeats must be positive')
+    results = [run_once(a, k) for k in range(1 if a.quick else a.repeats)]
+    if len(results) == 1:
+        result = results[0]
+    else:
+        result = dict(results[-1])
+        result['runs'] = results
+        def average_tree(nodes):
+            if all(isinstance(x, dict) for x in nodes):
+                common = set.intersection(*(set(x) for x in nodes))
+                return {k: average_tree([x[k] for x in nodes]) for k in common}
+            if all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in nodes):
+                return mean(nodes)
+            return nodes[-1]
+        for key in ('detection', 'india', 'grounding_pass_rate', 'latency_s_per_item', 'peak_process_tree_rss_gb'):
+            if all(key in r for r in results):
+                result[key] = average_tree([r[key] for r in results])
+        result['score'] = mean([r['score'] for r in results])
+        result['proxy_v2_legacy'] = mean([r.get('proxy_v2_legacy', 0) for r in results])
+        result['scores'] = {k: mean([r.get('scores', {}).get(k, 0) for r in results])
+                            for k in ('D', 'I', 'E', 'P', 'C')}
+        result['failures'] = [f'run {k+1}: {x}' for k, r in enumerate(results) for x in r['failures']]
+        result['infra_errors'] = [f'run {k+1}: {x}' for k, r in enumerate(results) for x in r['infra_errors']]
+        result['promotable'] = all(r['promotable'] for r in results)
+    print(json.dumps(result))
+    return 0 if result['promotable'] else 1
+
+
+def run_once(a, run_index):
     cand = Path(a.candidate).resolve()
     label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or cand.name)
-    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     art = PROJ / "research" / "evals" / f"{stamp}-{label}"
     priv = EVROOT / "private" / f"{stamp}-{label}"
     work = EVROOT / "work" / f"{stamp}-{label}"
@@ -354,7 +398,7 @@ def main():
                "quick": a.quick}
 
     def finish(score, scores, extra=None):
-        summary.update({"score": round(score, 2), "scores": scores, "failures": failures, "infra_errors": infra})
+        summary.update({"score": score, "scores": scores, "failures": failures, "infra_errors": infra})
         summary["promotable"] = (not a.quick) and not failures and not infra
         if extra:
             summary.update(extra)
@@ -365,11 +409,17 @@ def main():
             f.write(f"- {stamp} `{label}` score={summary['score']} D={scores.get('D')} E={scores.get('E')} "
                     f"P={scores.get('P')} C={scores.get('C')} fail={len(failures)} quick={a.quick}\n")
         shutil.rmtree(work, ignore_errors=True)
-        print(json.dumps(summary))
-        return 0
+        return summary
 
     if not (cand / "bin" / "predict").exists() or not (cand / "bin" / "explain").exists():
         failures.append("missing bin/predict or bin/explain")
+        return finish(0.0, {})
+
+    india_path = HIDDEN / 'india_hidden_v2.jsonl'
+    try:
+        india_rows = load_india(india_path)
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        infra.append(f'adaptive India v2 data missing or invalid: {exc}')
         return finish(0.0, {})
 
     # queue: one eval at a time (2 vCPU box; keeps latency numbers honest)
@@ -412,7 +462,9 @@ def main():
         if res["rc"] != 0 or res["timed_out"]:
             failures.append(f"predict {task} rc={res['rc']} timeout={res['timed_out']}")
         gold = {r["id"]: r["label"] for r in gold_rows}
-        D[task] = det_metrics(gold, preds)
+        legacy = det_metrics(gold, preds)
+        D[task] = conservative(gold, preds, .01)
+        D[task]["legacy"] = legacy
         D[task]["items_per_s"] = round(len(gold) / max(res["wall_s"], 1e-3), 1)
         if D[task]["invalid"] > 0:
             failures.append(f"predict {task}: {D[task]['invalid']} missing/invalid labels")
@@ -424,9 +476,28 @@ def main():
             D["indic_breakdown"] = {k: {"n": len(g), "acc": round(sum(
                 1.0 if norm_label(preds.get(i)) == y else 0.5 if norm_label(preds.get(i)) == "uncertain" else 0.0
                 for i, y in g.items()) / len(g), 3)} for k, g in sorted(groups.items())}
-    d_score = sum(W["D"][t] * D[t]["score"] for t in W["D"] if t in D)
-    scores["D"] = round(d_score, 4)
+    legacy_d = sum(W['D'][t] * D[t]['legacy']['score'] for t in W['D'] if t in D)
+    scores['D'] = mean([D[t]['score'] if t in D else 0 for t in W['D']])
     details["detection"] = D
+
+    # ---------------- I: adaptive India validation ----------------
+    india_in, india_out = work / 'india.in.jsonl', work / 'india.out.jsonl'
+    write_jsonl(india_in, [{'id': r['id'], 'text': r['text'], 'route': r['route']} for r in india_rows])
+    res = run_proc([str(PY), str(PROJ / 'eval' / 'india_v2_runner.py'), str(cand), str(india_in), str(india_out)],
+                   env, 900, cand, priv / 'proc.log', vis_log=log)
+    india_res = res
+    if res['rc'] != 0 or res['timed_out']:
+        failures.append(f"India prediction rc={res['rc']} timeout={res['timed_out']}")
+    india_preds = {r.get('id'): r.get('label') for r in (read_jsonl(india_out) or []) if isinstance(r, dict)}
+    gold_i = {r['id']: int(r['label'] == 'malicious') for r in india_rows}
+    india_metrics = conservative(gold_i, india_preds, .03)
+    if india_metrics['invalid']:
+        failures.append(f"India prediction: {india_metrics['invalid']} missing/invalid labels")
+    inj_gold = {r['id']: gold_i[r['id']] for r in india_rows if r['route'] == 'injection'}
+    inj = conservative(inj_gold, india_preds, .03)['conservative']
+    scores['I'] = india_metrics['score']
+    details['india'] = {'metrics': india_metrics, 'injection_recall': inj['recall'] or 0.0,
+                        'benign_ai_mention_fpr': inj['fpr'] or 0.0}
 
     # ---------------- E: explanation ----------------
     items = read_jsonl(HIDDEN / "explain_set.jsonl") or []
@@ -444,7 +515,7 @@ def main():
     inp = work / "explain.in.jsonl"
     write_jsonl(inp, [{"id": r["id"], "kind": r["kind"], "input": r["input"]} for r in items])
     runs = []
-    reps = 1 if a.quick else max(1, a.repeats)
+    reps = 1
     for k in range(reps):
         outp = work / f"explain.out.{k}.jsonl"
         res = run_proc([str(cand / "bin" / "explain"), "--in", str(inp), "--out", str(outp)],
@@ -455,10 +526,15 @@ def main():
             failures.append(f"explain run {k} rc={res['rc']} timeout={res['timed_out']}")
     outs = runs[0]["outputs"] if runs else {}
     per_item, by_kind, check_tot = [], {}, {k: 0.0 for k in W["E"]}
-    e_sum, valid, plausible = 0.0, 0, 0
+    e_sum, legacy_e_sum, grounding_sum, valid, plausible = 0.0, 0.0, 0.0, 0, 0
     for it in items:
         o = outs.get(it["id"])
         tot, r, ok = explain_checks(it, o)
+        legacy_e_sum += tot
+        if ok:
+            r['consistency'] = float(consistent_v2(it['label'], o['explanation']))
+            tot = sum(W['E'][key] * r[key] for key in W['E'])
+            grounding_sum += float(grounding(it['input'], o['explanation']))
         e_sum += tot
         valid += ok
         plausible += bool(ok and llm_plausible(o))
@@ -468,8 +544,9 @@ def main():
         per_item.append({"id": it["id"], "kind": it["kind"], "score": round(tot, 3), "checks": r,
                          "output": o})
     n = max(1, len(items))
-    scores["E"] = round(e_sum / n, 4)
+    scores["E"] = .85 * e_sum / n + .15 * grounding_sum / n
     details["explanation"] = {"n": len(items), "valid": valid, "llm_plausible": plausible,
+                              "grounding_pass_rate": grounding_sum / n,
                               "check_rates": {k: round(v / n, 3) for k, v in check_tot.items()},
                               "by_kind": {k: round(sum(v) / len(v), 3) for k, v in by_kind.items()}}
     write_jsonl(priv / "explain_items.jsonl", per_item)
@@ -480,7 +557,7 @@ def main():
     walls = sorted(r["wall_s"] for r in runs) or [None]
     med_wall = walls[len(walls) // 2]
     lat = med_wall / n if med_wall else None
-    rss_gb = max((r["peak_rss_mb"] for r in runs), default=0) / 1024
+    rss_gb = max((r["peak_rss_mb"] for r in runs if r["peak_rss_mb"] is not None), default=0) / 1024
     det_ms = 1000 * timings["url"]["wall_s"] / max(1, D.get("url", {}).get("n", 1)) if "url" in timings else None
     pte_gb = os.path.getsize(model["pte"]) / 1e9 if model.get("pte") and os.path.exists(model["pte"]) else 0
     size_gb = pte_gb + dir_size_gb(cand)
@@ -492,7 +569,7 @@ def main():
                "detector_latency": logscale(det_ms, 1.0, 20.0),
                "size": clip((2.0 - size_gb) / 1.2)}
     P["parts"] = {k: round(v, 3) for k, v in p_parts.items()}
-    scores["P"] = round(sum(W["P"][k] * p_parts[k] for k in W["P"]), 4)
+    scores["P"] = sum(W["P"][k] * p_parts[k] for k in W["P"])
     details["performance"] = P
     llm_stats = [o.get("llm", {}) for o in outs.values() if isinstance(o, dict)]
     if llm_stats:
@@ -502,15 +579,27 @@ def main():
         P["llm_median"] = {k: med(k) for k in ("prompt_tokens", "generated_tokens", "prefill_tps", "decode_tps")}
 
     # ---------------- C: compliance ----------------
-    guard_lines = (art / "guard.log").read_text().splitlines()
-    net_viol = [l for l in guard_lines if "NET blocked" in l]
-    file_viol = [l for l in guard_lines if "FILE blocked" in l]
-    if file_viol:
-        failures.append(f"candidate tried to read hidden eval data ({len(file_viol)} attempts)")
     tests = run_proc([str(PY), "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests"], env, 600, cand, art / "tests.log") \
         if (cand / "tests").is_dir() else {"rc": 1}
     app = run_proc([str(cand / "bin" / "app"), "--selftest"], env, 300, cand, art / "app.log") \
         if (cand / "bin" / "app").exists() else {"rc": 1}
+    guard_lines = (art / 'guard.log').read_text().splitlines()
+    net_viol = [l for l in guard_lines if 'NET blocked' in l]
+    file_viol = [l for l in guard_lines if 'FILE blocked' in l]
+    if file_viol:
+        failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
+    process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
+    peaks = [r.get('peak_rss_mb') for r in process_runs]
+    if any(p is None for p in peaks):
+        rss_gb = None
+    else:
+        rss_gb = max(peaks) * (1024 ** 2) / 1e9
+    P['peak_rss_gb'] = rss_gb
+    p_parts['peak_rss'] = clip((3.0 - rss_gb) / 2.0) if rss_gb else 0.0
+    P['parts']['peak_rss'] = p_parts['peak_rss']
+    scores['P'] = sum(W['P'][k] * p_parts[k] for k in W['P'])
+    if not measurements_ok(lat, rss_gb, any(r.get('timed_out', True) for r in process_runs)):
+        failures.append('hard performance gate failed: missing measurement, timeout, latency > 4.5 s/item, or RSS > 2.6 GB')
     gate = {"llama_family": model.get("family") == "llama",
             "executorch_pte_loaded": all(r["pte_seen"] for r in runs) if runs else False,
             "llm_stats_plausible": plausible >= 0.9 * len(items) if items else False}
@@ -529,14 +618,19 @@ def main():
     if app["rc"] != 0:
         failures.append("bin/app --selftest failed (see app.log)")
 
-    total = 100 * sum(W["top"][k] * scores[k] for k in W["top"])
-    if not gate["pass"]:
-        total = min(total, W["gate_cap"])
+    legacy_total = 100 * (W['top']['D']*legacy_d + W['top']['E']*legacy_e_sum/n +
+                          W['top']['P']*scores['P'] + W['top']['C']*scores['C'])
+    if not gate['pass']:
+        legacy_total = min(legacy_total, W['gate_cap'])
+    total = v3_total(scores['D'], scores['I'], scores['E'], scores['P'])
+    if not gate['pass'] or net_viol or file_viol:
+        total = 0.0
     (art / "details.json").write_text(json.dumps(details, indent=1))
-    return finish(total, scores, {"headline": {
-        "sms_f1": D.get("sms", {}).get("f1"), "url_f1": D.get("url", {}).get("f1"),
-        "indic_f1": D.get("indic", {}).get("f1"), "indic_fpr": D.get("indic", {}).get("fpr"),
-        "flow_f1": D.get("flow", {}).get("f1"), "explain_s_per_item": P["explain_s_per_item"],
+    return finish(total, scores, {"proxy_v2_legacy": legacy_total, "detection": D, "india": details["india"],
+        "grounding_pass_rate": grounding_sum / n, "latency_s_per_item": lat, "peak_process_tree_rss_gb": rss_gb, "headline": {
+        "sms_f1": D.get("sms", {}).get("conservative", {}).get("f1"), "url_f1": D.get("url", {}).get("conservative", {}).get("f1"),
+        "indic_f1": D.get("indic", {}).get("conservative", {}).get("f1"), "indic_fpr": D.get("indic", {}).get("conservative", {}).get("fpr"),
+        "flow_f1": D.get("flow", {}).get("conservative", {}).get("f1"), "explain_s_per_item": P["explain_s_per_item"],
         "peak_rss_gb": P["peak_rss_gb"], "decode_tps": (P.get("llm_median") or {}).get("decode_tps"),
         "model": cfg.get("model")}})
 
