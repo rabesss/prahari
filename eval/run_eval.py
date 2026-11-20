@@ -278,7 +278,8 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
     start = log.stat().st_size if log.exists() else 0
     unit = 'prahari-eval-' + uuid.uuid4().hex + '.scope'
     nonce = uuid.uuid4().hex
-    env = dict(env, PRAHARI_STAGE_NONCE=nonce)
+    # The nonce lives only in the stage's own environment; evaluator-side helpers and the
+    # systemd-run launcher run outside the scope and must not carry it.
     isolated = env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap'
     units_before = user_units(env)
     roots = ['/dev/shm', '/var/tmp'] + ([env['XDG_RUNTIME_DIR']] if env.get('XDG_RUNTIME_DIR') else [])
@@ -319,7 +320,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
     with open(log, 'ab') as lf:
         if method == 'systemd_scope':
             # systemd-run waits for the actual stage; its exit status is authoritative.
-            stage_env = stage_environment(env)
+            stage_env = dict(stage_environment(env), PRAHARI_STAGE_NONCE=nonce)
             stage = ['/usr/bin/env', '-i', *[f'{k}={v}' for k, v in stage_env.items()]]
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
                 stage += ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--dev', '/dev',
@@ -333,7 +334,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                       '-p', 'MemoryAccounting=yes', '--', '/bin/sh', '-c', wrapper, 'stage', *stage, *cmd]
             child_env = env
         else:
-            child_env = stage_environment(env)
+            child_env = dict(stage_environment(env), PRAHARI_STAGE_NONCE=nonce)
             launch = cmd
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
                 launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--dev', '/dev', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
