@@ -259,7 +259,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
             stage_env = stage_environment(env)
             stage = ['/usr/bin/env', '-i', *[f'{k}={v}' for k, v in stage_env.items()]]
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
-                stage += ['bwrap', '--die-with-parent', '--ro-bind', '/', '/',
+                stage += ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--dev', '/dev',
                           '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
                           '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
                           '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--']
@@ -273,7 +273,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
             child_env = stage_environment(env)
             launch = cmd
             if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
-                launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
+                launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--dev', '/dev', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
                           '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
                           '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--', *cmd]
         p = subprocess.Popen(launch, env=child_env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
@@ -806,7 +806,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     summary['rss_method'] = method
     # A failed bwrap probe fails closed: never claim isolation we cannot create.
     try:
-        probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm', '--',
+        probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--dev', '/dev', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm', '--',
                                 '/usr/bin/python3', '-c',
                                 'import os; assert os.statvfs("/sys/fs/cgroup").f_flag & os.ST_RDONLY'],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)

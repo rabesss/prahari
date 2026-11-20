@@ -315,6 +315,7 @@ def test_verb_independent_ungrounded_claims(expl):
 
 @pytest.mark.parametrize('expl', [
     'You may want to call 1930 to report fraud.',
+    'In this situation you should call the police.',
     'Report it at https://sancharsaathi.gov.in.',
     'The message does not contain a link or ask for a payment.',
 ])
@@ -327,7 +328,8 @@ def test_link_and_payment_grounding_boundaries():
     assert not grounding('node.js', 'The message contains a link.')
     assert not grounding('email user@example.com', 'The message contains a link.')
     assert grounding('Pay the fee at example.com', 'The message asks for payment at example.com.')
-    assert not grounding('Receipt of your payment', 'Deposit the receipt amount immediately please.')
+    assert grounding('Pay the fee', 'The message asks for payment at https://example.com.')
+    assert not grounding('Receipt of your payment', 'Deposit the receipt amount right now.')
     assert not grounding('Hello', 'Never share an OTP. The sender demands payment now.')
 
 
@@ -337,3 +339,19 @@ def test_stage_environment_is_an_allowlist():
                                 'XDG_CONFIG_HOME': '/shared', 'XDG_RUNTIME_DIR': '/run/user/1',
                                 'DBUS_SESSION_BUS_ADDRESS': 'address', 'HC_PY': '/python'})
     assert result == {'PATH': '/usr/local/bin:/usr/bin:/bin', 'HOME': '/scratch', 'HC_PY': '/python'}
+
+
+def test_bwrap_keeps_cgroups_read_only():
+    import shutil
+    import subprocess
+    if not shutil.which('bwrap'):
+        pytest.skip('bwrap unavailable')
+    basic = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--', '/bin/true'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if basic.returncode != 0:
+        pytest.skip('bwrap cannot run')
+    probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--dev', '/dev', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
+                            '--', '/usr/bin/python3', '-c',
+                            'import os; assert os.statvfs("/sys/fs/cgroup").f_flag & os.ST_RDONLY; assert os.urandom(1); open("/dev/null", "w").write("x")'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    assert probe.returncode == 0

@@ -40,6 +40,7 @@ PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b
 PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
 REQUEST_CLAIM = re.compile(r'\b(?:ask(?:s|ed|ing)?|request(?:s|ed|ing)?|want(?:s|ed)?|demand(?:s|ed|ing)?|require(?:s|d)?|transfer|pay|deposit|payment link|told to)\b|मांग|चाहत', re.I)
 ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|when|unless|you should|you may want to|please|it is safer to|i would say)\b|^\s*(?:यदि|अगर|जब)", re.I)
+ADVICE_MODAL = re.compile(r'\b(?:you should|you may want to|please|it is safer to|i would say)\b', re.I)
 NEGATION = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b|नहीं", re.I)
 
 
@@ -59,7 +60,7 @@ def grounding(input_text, explanation):
     for sentence in re.split(r'(?<=[.!?।])\s+', explanation):
         clauses.extend(re.split(r'[,;।!?]|\b(?:and then|so|but)\b|(?:इसलिए|लेकिन|फिर)', sentence, flags=re.I))
     for clause in clauses:
-        if ADVICE.search(clause):
+        if ADVICE.search(clause) or ADVICE_MODAL.search(clause):
             continue
         for name, cue in CUES.items():
             matches = list(cue.finditer(clause))
