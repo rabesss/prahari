@@ -339,3 +339,12 @@ def test_hidden_check_requires_india_v2(monkeypatch, tmp_path):
     import pytest
     with pytest.raises(ValueError, match='hidden check input unavailable'):
         audit_push.corpus_matchers(tmp_path)
+
+
+def test_audit_pins_dev_v2_bytes(tmp_path):
+    base = setup_repo(tmp_path)
+    source = AUDIT.parent / 'dev/india_dev_v2.jsonl'
+    add(tmp_path, 'bench/dev/india_dev_v2.jsonl', source.read_bytes() + b'\n')
+    result = audit(tmp_path, base)
+    assert result.returncode == 1
+    assert 'India dev v2 sha256 mismatch' in result.stdout

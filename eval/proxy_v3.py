@@ -39,14 +39,16 @@ URL = re.compile(r'\b[a-z][a-z0-9+.-]*://\S+|(?<![\w.])[a-z0-9-]+(?:\.[a-z0-9-]+
 PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|processed|successful)\b|\b(?:received|credited|paid)\b.{0,45}\b(?:payment|money|funds|amount|refund)\b|\breceipt\b', re.I)
 PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|deposit|recharge|fee|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
 REQUEST_CLAIM = re.compile(r'\b(?:ask|asks|asked|asking|request|requests|requested|requesting|want|wants|demand|demands|demanded|demanding|requires?)\b|मांग(?:ता|ती|ा)?|चाहता', re.I)
-ADVICE = re.compile(r"\b(?:if|unless|never|not|do not|don't|dont|avoid|should not|shouldn't)\b", re.I)
+CONDITIONAL = re.compile(r"^\s*(?:if|unless)\b", re.I)
+NEGATED = re.compile(r"\b(?:not|never|doesn't|don't|didn't|does not|do not|did not)\s*$", re.I)
 
 
 def grounding(input_text, explanation):
     if not isinstance(explanation, str) or len(explanation.strip().split()) < 5:
         return False
-    for sentence in re.split(r'(?<=[!?;।])\s+|(?<!\w)\.(?!\w)\s+', explanation):
-        if not CLAIM.search(sentence) or ADVICE.search(sentence):
+    for sentence in re.split(r'(?<=[.!?;।])\s+', explanation):
+        claims = [m for m in CLAIM.finditer(sentence) if not NEGATED.search(sentence[:m.start()])]
+        if not claims or CONDITIONAL.search(sentence):
             continue
         for name, cue in CUES.items():
             if not cue.search(sentence):

@@ -35,9 +35,13 @@ def test_weighted_total_and_mean_of_totals():
     ('Hello there', 'The sender requested a payment.', False),
     ('Hello there', 'The message wants a payment.', False),
     ('सिर्फ एक साधारण संदेश', 'संदेश भुगतान मांगता है।', False),
+    ('भुगतान मांगता है', 'यह संदेश अभी भुगतान मांगता है।', True),
+    ('एक साधारण संदेश', 'यह संदेश अभी भुगतान मांगता है।', False),
     ('Meet at 5 p.m. today', 'The message contains a link.', False),
     ('Meet at 5 i.e. later', 'The message contains a link.', False),
     ('Ordinary text here', "If it asks for your OTP, don't share it.", True),
+    ('Ordinary text here', "The message asks for payment, so don't pay.", False),
+    ('Ordinary text here', 'The message asks for payment if you agree.', False),
     ('Receipt for your payment', 'The sender requested a payment.', False),
 ])
 def test_grounding(src, expl, expected):
@@ -183,3 +187,60 @@ def test_fallback_kills_background_session(tmp_path):
                       tmp_path / 'proc.log', rss_method='proc_fallback')
     assert result['rc'] == 0 and not result['stray_process']
     assert result['rss_method'] == 'proc_fallback' and result['peak_rss_mb'] > 0
+
+
+def test_isolation_environment(tmp_path):
+    from run_eval import isolation_env
+    env = isolation_env(tmp_path)
+    assert set(env) == {'HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME', 'TMPDIR'}
+    assert len(set(env.values())) == 4
+    assert all(__import__('pathlib').Path(p).is_dir() and __import__('pathlib').Path(p).parent == tmp_path for p in env.values())
+
+
+def test_original_change_and_contention_prevent_promotion(monkeypatch, tmp_path):
+    import argparse
+    import run_eval
+    candidate = tmp_path / 'candidate'
+    (candidate / 'bin').mkdir(parents=True)
+    (candidate / 'bin/predict').touch()
+    (candidate / 'bin/explain').touch()
+    (tmp_path / 'research/evals').mkdir(parents=True)
+    monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
+    monkeypatch.setattr(run_eval, 'HIDDEN', tmp_path / 'absent')
+    monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'eval')
+    monkeypatch.setattr(run_eval, 'LOCK', tmp_path / 'eval/lock')
+    def sample():
+        (candidate / 'changed').write_text('changed')
+        return {'load_average': [2, 1, 1], 'cpu_steal_percent': 0}
+    monkeypatch.setattr(run_eval, 'host_snapshot', sample)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(candidate), label=None, quick=False), 0)
+    assert 'candidate modified during eval' in result['failures']
+    assert result['contended'] and not result['promotable']
+    assert result['host_during']['load_1m_max'] == 2
+
+
+def test_fallback_accounts_for_child_high_water(monkeypatch, tmp_path):
+    import os
+    import sys
+    import run_eval
+    class Usage:
+        ru_maxrss = 100000
+    monkeypatch.setattr(run_eval.resource, 'getrusage', lambda _: Usage())
+    result = run_eval.run_proc([sys.executable, '-c', 'import time; time.sleep(.2)'],
+                               os.environ.copy(), 5, tmp_path, tmp_path / 'proc.log', rss_method='proc_fallback')
+    assert result['peak_rss_mb'] >= 100000 / 1024
+
+
+def test_user_scope_measures_and_reaps_descendants(tmp_path):
+    import os
+    import sys
+    import run_eval
+    env = os.environ.copy()
+    if not run_eval.scope_available(env):
+        pytest.skip('user scopes unavailable')
+    code = ('import os,time; p=os.fork(); '
+            'os._exit(0) if p else (os.setsid(), time.sleep(30))')
+    result = run_eval.run_proc([sys.executable, '-c', code], env, 5, tmp_path,
+                               tmp_path / 'proc.log', rss_method='systemd_scope')
+    assert result['rss_method'] == 'systemd_scope'
+    assert result['rc'] == 0 and result['peak_rss_mb'] > 0 and not result['stray_process']

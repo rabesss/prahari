@@ -235,6 +235,17 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 peak_kb = max(peak_kb or 0, legacy_hwm_kb, resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) or None
                 stray = bool(session_pids(p.pid))
         finally:
+            if p.poll() is None:
+                if method == 'systemd_scope':
+                    subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
+                                   env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    for pid in session_pids(p.pid):
+                        try: os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError: pass
+                try: os.killpg(p.pid, signal.SIGKILL)
+                except ProcessLookupError: pass
+                p.wait()
             status_path.unlink(missing_ok=True)
     res = {'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
            'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,
@@ -506,11 +517,12 @@ def candidate_hash(root):
         st = path.lstat()
         add(os.fsencode(rel)); add(str(st.st_mode).encode())
         if path.is_symlink():
-            add(os.fsencode(os.readlink(path)))
+            raise ValueError('candidate symlinks are unsupported')
         elif path.is_dir():
             for child in sorted(path.iterdir(), key=lambda x: os.fsencode(x.name)):
                 visit(child, str(Path(rel) / child.name))
         elif path.is_file():
+            add(str(st.st_size).encode())
             with path.open('rb') as f:
                 for chunk in iter(lambda: f.read(1024 * 1024), b''):
                     h.update(chunk)
@@ -518,6 +530,13 @@ def candidate_hash(root):
             raise ValueError('candidate contains unsupported file type')
     visit(root, '.')
     return h.hexdigest()
+
+
+def isolation_env(scratch):
+    paths = {'HOME': 'home', 'XDG_CACHE_HOME': 'cache', 'XDG_DATA_HOME': 'data', 'TMPDIR': 'tmp'}
+    for name in paths.values():
+        (scratch / name).mkdir()
+    return {key: str(scratch / name) for key, name in paths.items()}
 
 
 def run_once(a, run_index):
@@ -601,6 +620,9 @@ def _run_once(a, run_index, original, scratch, digest, queued):
         shutil.rmtree(work, ignore_errors=True)
         return summary
 
+    if digest is None:
+        failures.append('candidate could not be copied or hashed')
+        return finish(0.0, {})
     if not (cand / "bin" / "predict").exists() or not (cand / "bin" / "explain").exists():
         failures.append("missing bin/predict or bin/explain")
         return finish(0.0, {})
@@ -619,11 +641,8 @@ def _run_once(a, run_index, original, scratch, digest, queued):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BOXD", "SAIL", "OPENAI", "ANTHROPIC", "GH_", "GITHUB"))}
     method = 'systemd_scope' if scope_available(env) else 'proc_fallback'
     summary['rss_method'] = method
-    for key in ('home', 'cache', 'data', 'tmp'):
-        (scratch / key).mkdir()
+    env.update(isolation_env(scratch))
     env.update({
-        'HOME': str(scratch / 'home'), 'XDG_CACHE_HOME': str(scratch / 'cache'),
-        'XDG_DATA_HOME': str(scratch / 'data'), 'TMPDIR': str(scratch / 'tmp'),
         'PRAHARI_RSS_METHOD': method,
         "PYTHONPATH": str(PROJ / "eval" / "guard"),
         "HC_GUARD_LOG": str(art / "guard.log"),
