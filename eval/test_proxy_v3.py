@@ -259,3 +259,10 @@ def test_frozen_explanation_score_does_not_depend_on_consistency_v2(monkeypatch)
     assert score == .83 and reported_checks['consistency'] == 1.0 and valid
     assert grounded == 1 and diagnostic == 0
     assert .85 * score + .15 * grounded == pytest.approx(.8555)
+
+
+def test_cleanup_census_waits_for_exiting_members():
+    from run_eval import survivors_after_kill
+    states = iter([{123}, set()])
+    assert not survivors_after_kill(lambda: next(states), timeout=1)
+    assert survivors_after_kill(lambda: {123}, timeout=0) == {123}

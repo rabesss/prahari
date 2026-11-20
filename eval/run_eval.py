@@ -149,6 +149,16 @@ def scope_members(cgroup):
     return members
 
 
+def survivors_after_kill(members, timeout=2.0):
+    """Allow killed processes to exit, then fail if any members remain."""
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = members()
+        if not remaining or time.monotonic() >= deadline:
+            return remaining
+        time.sleep(.05)
+
+
 def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
     """Run a stage in a scope or session, measure it, then kill and census it."""
     method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
@@ -222,7 +232,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 except subprocess.TimeoutExpired:
                     p.kill(); p.wait()
                 # A lingering member is a failure even if stopping the unit later would remove it.
-                stray = bool(scope_members(scope))
+                stray = bool(survivors_after_kill(lambda: scope_members(scope)))
                 subprocess.run(['systemctl', '--user', 'stop', unit], env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
@@ -234,7 +244,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 p.wait()
                 rc = p.returncode
                 peak_kb = max(peak_kb or 0, legacy_hwm_kb, resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) or None
-                stray = bool(session_pids(p.pid))
+                stray = bool(survivors_after_kill(lambda: session_pids(p.pid)))
             cleanup_done = True
         finally:
             if not cleanup_done:
