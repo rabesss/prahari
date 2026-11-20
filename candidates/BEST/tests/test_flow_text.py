@@ -32,6 +32,7 @@ from triage.detect import predict_flow_text
     ('2 login attempts', 0),
     ('5 logins from office IP', 0),
     ('300 successful logins from the office', 0),
+    ('many successful logins from the office', 0),
     ('Accepted sessions: 0\n300 failed SSH logins', 1),
     ('1,234 failed logins', 1),
     ('1 successful login', 0),

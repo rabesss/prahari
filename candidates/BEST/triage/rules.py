@@ -164,7 +164,8 @@ def flow_text_indicators(text):
                 if count and not digits:
                     continue
                 signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
-                if re.search(r"\b(?:successful|authenticated)\b", match.group()) and not signals:
+                if (re.search(r"\b(?:successful|authenticated)\b", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied|brute[- ]?force|guessing)\b", match.group())):
                     continue
                 if not signals and (not count or len(digits) < 2):
                     continue

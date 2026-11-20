@@ -100,6 +100,7 @@ def test_contradictory_claims_in_one_sentence_are_filtered():
     sentence = 'This message is dangerous, but it is safe to reply.'
     for verdict in (0, 1):
         assert llm._consistent('Review the message. ' + sentence, verdict) == 'Review the message.'
+    assert llm._consistent('Review it. Do not reply; it is safe.', 1) == 'Review it. Do not reply;'
 
 
 def test_demo_reports_explanation_failure(monkeypatch, tmp_path, capsys):

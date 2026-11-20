@@ -385,7 +385,8 @@ def _consistent(text, verdict):
             continue
         clauses = _CONTRAST.split(probe)
         opposite = _BENIGN_CLAIM if verdict == 1 else _MAL_CLAIM
-        if any(opposite.search(clause) and not _NEGATED.search(clause) for clause in clauses):
+        if any(not _NEGATED.search(claim.group())
+               for clause in clauses for claim in opposite.finditer(clause)):
             continue
         keep.append(sent)
     if not keep:
