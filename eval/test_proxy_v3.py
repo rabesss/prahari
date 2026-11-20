@@ -41,6 +41,13 @@ def test_rss_uses_simultaneous_sum(tmp_path):
         (p / 'status').write_text(f'VmRSS:\t{rss} kB\nVmHWM:\t999 kB\n')
     assert tree_rss_kb([1, 2], tmp_path) == 50
     assert tree_rss_kb([3], tmp_path) is None
+    from run_eval import tree_pids
+    for pid, children in ((1, '2'), (2, '')):
+        task = tmp_path / str(pid) / 'task' / str(pid)
+        task.mkdir(parents=True)
+        (task / 'children').write_text(children)
+    assert tree_pids(1, tmp_path) == {1, 2}
+    assert tree_rss_kb(tree_pids(1, tmp_path), tmp_path) == 50
 
 
 @pytest.mark.parametrize('lat,rss,timed,expected', [(4.5,2.6,False,True),(4.50001,2.6,False,False),

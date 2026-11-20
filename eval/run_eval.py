@@ -70,12 +70,12 @@ def write_jsonl(p, rows):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def tree_pids(root):
+def tree_pids(root, proc=Path('/proc')):
     pids, frontier = {root}, [root]
     while frontier:
         p = frontier.pop()
         try:
-            for thread in Path(f"/proc/{p}/task").iterdir():
+            for thread in (proc / str(p) / "task").iterdir():
                 try:
                     children = (thread / "children").read_text().split()
                 except OSError:
