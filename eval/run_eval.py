@@ -235,8 +235,11 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                           '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
                           '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
                           '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--']
+            # A scope-owned keeper preserves memory.peak until the evaluator reads it.
+            # The shell execs the stage, so systemd-run's waited status is the stage status.
+            wrapper = 'sleep 3600 </dev/null >/dev/null 2>&1 & sleep .2; exec "$@"'
             launch = ['systemd-run', '--user', '--quiet', '--scope', '--collect', '--unit', unit,
-                      '-p', 'MemoryAccounting=yes', '--', *stage, *cmd]
+                      '-p', 'MemoryAccounting=yes', '--', '/bin/sh', '-c', wrapper, 'stage', *stage, *cmd]
             child_env = env
         else:
             child_env = {k: v for k, v in env.items() if k not in ('DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR')}
