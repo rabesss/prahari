@@ -47,6 +47,8 @@ def test_proxy_unchanged_for_identical_predictions():
     (1, 'This is safe.', False),
     (1, 'This is not safe.', True),
     (0, 'This is not safe.', False),
+    (1, 'Not safe.', True),
+    (0, 'Not safe.', False),
     (1, 'No risk found, but be careful.', False),
     (0, 'No risk found, but be careful.', True),
     (1, 'Do not click, it is safe.', False),
