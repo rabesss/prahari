@@ -124,7 +124,7 @@ FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
-                    r"(?:(?:\d{1,3}(?:,\d{3})*|\d+|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)[ \t]+){1,3}"
+                    r"(?:(?:(?<![\d,])(?:\d{1,3}(?:,\d{3})*|\d+)|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)[ \t]+){1,3}"
                     r"(?:(?:ssh|rdp|ftp)[ \t]+)?(?:logins?|login[ \t]+attempts?|passwords?(?:[ \t]+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
@@ -159,8 +159,11 @@ def flow_text_indicators(text):
                 continue
             if name == "brute_force":
                 right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
+                # Bare "passwords" needs a failure word or an attack verb right after it
+                # ("300 passwords guessed", "100 passwords were tried"); "10 passwords were rotated" is not an attack.
                 if (re.search(r"\bpasswords?$", match.group()) and
-                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group())):
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()) and
+                        not re.match(r"\s+(?:(?:were|was|being|got)\s+)?(?:guessed|tried|attempted|sprayed|tested|brute[- ]?forced)\b", right)):
                     continue
                 count = re.search(r"\b(?:\d{1,3}(?:,\d{3})*|\d+)\b", match.group())
                 digits = count.group().replace(',', '').lstrip('0') if count else None

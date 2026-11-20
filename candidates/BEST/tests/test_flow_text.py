@@ -69,6 +69,10 @@ from triage.detect import predict_flow_text
     ('gained root', 1),
     ('callback to unknown host', 1),
     ('connections at regular intervals', 1),
+    ('300 passwords guessed by attacker', 1),
+    ('100 passwords were tried against SSH', 1),
+    ('10 passwords were rotated', 0),
+    ('many passwords stored in the vault', 0),
 ])
 def test_flow_policy(text, expected):
     assert predict_flow_text(text)[0] == expected
@@ -103,7 +107,7 @@ def test_no_compromise_evidence_for_negated_or_excluded_success(text):
     assert label == 1 and all('possible compromise' not in item for item in evidence)
 
 
-@pytest.mark.parametrize('text', ['9,' * 32500, '1,' * 16000 + 'x'])
+@pytest.mark.parametrize('text', ['9,' * 32500, '1,' * 16000 + 'x', '1' + ',234' * 16000 + 'x'])
 def test_malformed_numeric_tokens_are_fast(text):
     import time
     start = time.monotonic()
