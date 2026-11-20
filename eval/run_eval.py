@@ -16,7 +16,6 @@ import signal
 import subprocess
 import sys
 import time
-import statistics
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -482,7 +481,7 @@ def run_once(a, run_index):
             D["indic_breakdown"] = {k: {"n": len(g), "acc": round(sum(
                 1.0 if norm_label(preds.get(i)) == y else 0.5 if norm_label(preds.get(i)) == "uncertain" else 0.0
                 for i, y in g.items()) / len(g), 3)} for k, g in sorted(groups.items())}
-    legacy_d = sum(W['D'][t] * D[t]['legacy']['score'] for t in W['D'] if t in D)
+    legacy_d = round(sum(W['D'][t] * D[t]['legacy']['score'] for t in W['D'] if t in D), 4)
     scores['D'] = mean([D[t]['score'] if t in D else 0 for t in W['D']])
     details["detection"] = D
 
@@ -606,7 +605,8 @@ def run_once(a, run_index):
     else:
         rss_gb = max(peaks) * (1024 ** 2) / 1e9
     P['peak_rss_gb'] = rss_gb
-    p_parts['peak_rss'] = clip((3.0 - rss_gb) / 2.0) if rss_gb else 0.0
+    rss_gib = max(peaks) / 1024 if rss_gb else None
+    p_parts['peak_rss'] = clip((3.0 - rss_gib) / 2.0) if rss_gib else 0.0
     P['parts']['peak_rss'] = p_parts['peak_rss']
     scores['P'] = sum(W['P'][k] * p_parts[k] for k in W['P'])
     if not measurements_ok(lat, rss_gb, any(r.get('timed_out', True) for r in process_runs)):
