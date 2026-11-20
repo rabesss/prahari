@@ -455,7 +455,7 @@ def run_once(a, run_index):
     try:
         if hashlib.sha256(india_path.read_bytes()).hexdigest() != INDIA_V2_SHA256:
             raise ValueError('SHA-256 mismatch')
-        india_rows = load_india(india_path)
+        india_rows = load_india(india_path, expected_sha256=INDIA_V2_SHA256)
         if len(india_rows) != 400:
             raise ValueError('expected 400 India v2 rows')
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
