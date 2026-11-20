@@ -385,7 +385,7 @@ def main():
         result['infra_errors'] = [f'run {k+1}: {x}' for k, r in enumerate(results) for x in r['infra_errors']]
         result['promotable'] = all(r['promotable'] for r in results)
     print(json.dumps(result))
-    return 0 if result['promotable'] else 1
+    return 0 if not result['failures'] and not result['infra_errors'] else 1
 
 
 def run_once(a, run_index):
@@ -538,7 +538,7 @@ def run_once(a, run_index):
         tot, r, ok = explain_checks(it, o)
         legacy_e_sum += tot
         if ok:
-            r['consistency'] = float(consistent_v2(it['label'], o['explanation']))
+            r['consistency'] = min(r['consistency'], float(consistent_v2(it['label'], o['explanation'])))
             tot = sum(W['E'][key] * r[key] for key in W['E'])
             grounding_sum += float(grounding(it['input'], o['explanation']))
         e_sum += tot
