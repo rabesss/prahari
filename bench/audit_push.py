@@ -168,7 +168,15 @@ def synth_ok(path, data):
         rows = [loads(x) for x in data.decode('utf-8').splitlines() if x.strip()]
     except (ValueError, UnicodeError, RecursionError):
         return False
-    return 0 < len(rows) <= 500 and all(isinstance(r, dict) and required <= set(r) <= allowed and not ITEM_ID.search(str(r.get('id', ''))) for r in rows)
+    if not (0 < len(rows) <= 500 and all(isinstance(r, dict) and required <= set(r) <= allowed and not ITEM_ID.search(str(r.get('id', ''))) for r in rows)):
+        return False
+    if path == 'bench/challenge/india_challenge_v1.jsonl':
+        return all(isinstance(r['id'], str) and bool(r['id']) and isinstance(r['text'], str)
+                   and isinstance(r['category'], str) and bool(r['category'])
+                   and r['label'] in ('malicious', 'benign') and r['route'] in ('sms', 'injection')
+                   and r['lang'] in ('en', 'hi', 'hinglish')
+                   and (r['pair_id'] is None or isinstance(r['pair_id'], str)) for r in rows)
+    return True
 
 
 def json_strings(data):
@@ -362,6 +370,7 @@ def main():
                     if hit: hidden_hits.add(path); fail(hit)
                     continue
                 if secret_hit(data): fail('secret pattern')
+                if rule == 'synthetic' and secret_hit(json_strings(data).encode('utf-8')): fail('secret pattern')
                 if rule in ('eval JSON', 'ledger') and not valid_json(data, rule == 'ledger'): fail('eval JSON leaf/array/id policy')
                 if rule == 'config' and not config_ok(data): fail('config JSON policy')
                 if rule == 'synthetic' and not synth_ok(path, data): fail('synthetic schema policy')

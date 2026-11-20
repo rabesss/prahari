@@ -255,13 +255,35 @@ def test_one_line_dump_threshold_matches_rows(tmp_path):
 
 def test_india_challenge_exact_schema(tmp_path):
     base = setup_repo(tmp_path)
-    row = {'id': 'case-1', 'text': 'sample', 'lang': 'en', 'label': 0,
+    row = {'id': 'case-1', 'text': 'sample', 'lang': 'en', 'label': 'benign',
            'category': 'sample', 'pair_id': 'pair-1', 'route': 'sms'}
     add(tmp_path, 'bench/challenge/india_challenge_v1.jsonl', json.dumps(row).encode() + b'\n')
     assert audit(tmp_path, base).returncode == 0
     row['extra'] = 'unexpected'
     add(tmp_path, 'bench/challenge/india_challenge_v1.jsonl', json.dumps(row).encode() + b'\n')
     assert 'synthetic schema policy' in audit(tmp_path, base).stdout
+
+
+@pytest.mark.parametrize('key,value', [('label', 0), ('route', 'url'), ('lang', 'fr'),
+                                       ('text', 3), ('pair_id', 1)])
+def test_challenge_bad_values(tmp_path, key, value):
+    base = setup_repo(tmp_path)
+    row = {'id': 'case-1', 'text': 'sample', 'lang': 'en', 'label': 'benign',
+           'category': 'sample', 'pair_id': None, 'route': 'sms'}
+    row[key] = value
+    add(tmp_path, 'bench/challenge/india_challenge_v1.jsonl', json.dumps(row).encode() + b'\n')
+    assert 'synthetic schema policy' in audit(tmp_path, base).stdout
+
+
+@pytest.mark.parametrize('data,reason', [
+    (b'{"id":"a","id":"b"}\n', 'synthetic schema policy'),
+    ((json.dumps({'id':'x','text':'t','lang':'en','label':'benign','category':'c','pair_id':None,'route':'sms'}) + '\n').encode() * 501, 'synthetic schema policy'),
+    (json.dumps({'id':'x','text':'api_key="' + 'a' * 24 + '"','lang':'en','label':'benign','category':'c','pair_id':None,'route':'sms'}).encode() + b'\n', 'secret pattern'),
+])
+def test_challenge_rejects_unsafe_contents(tmp_path, data, reason):
+    base = setup_repo(tmp_path)
+    add(tmp_path, 'bench/challenge/india_challenge_v1.jsonl', data)
+    assert reason in audit(tmp_path, base).stdout
 
 
 def test_challenge_schema_not_allowed_in_fixture_directory(tmp_path):

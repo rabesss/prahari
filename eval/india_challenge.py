@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the project-authored challenge, keeping SMS and injection results separate."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -9,16 +10,27 @@ from conventional import metrics
 
 KEYS = {'id', 'text', 'lang', 'label', 'category', 'pair_id', 'route'}
 LABELS = {'benign': 0, 'malicious': 1}
+CHALLENGE_SHA256 = '135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67'
 
 
 def load(path):
-    rows = [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != CHALLENGE_SHA256:
+        raise ValueError('frozen challenge sha256 mismatch')
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result: raise ValueError('duplicate key')
+            result[key] = value
+        return result
+    rows = [json.loads(line, object_pairs_hook=pairs) for line in data.decode('utf-8').splitlines() if line.strip()]
     if not rows or any(not isinstance(r, dict) or set(r) != KEYS for r in rows):
         raise ValueError('invalid challenge schema')
     ids = [r['id'] for r in rows]
     if any(not isinstance(x, str) or not x for x in ids) or len(ids) != len(set(ids)):
         raise ValueError('invalid or duplicate challenge IDs')
-    if any(r['route'] not in ('sms', 'injection') or r['label'] not in LABELS or
+    if len(rows) > 500 or any(r['route'] not in ('sms', 'injection') or r['label'] not in ('benign', 'malicious') or
+           r['lang'] not in ('en', 'hi', 'hinglish') or not (r['pair_id'] is None or isinstance(r['pair_id'], str)) or
            any(not isinstance(r[k], str) or not r[k] for k in ('text', 'lang', 'category')) for r in rows):
         raise ValueError('invalid challenge values')
     return rows

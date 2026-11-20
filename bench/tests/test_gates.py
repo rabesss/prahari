@@ -9,6 +9,15 @@ import stress
 from common import digest
 
 
+def test_frozen_challenge_mismatch_fails_gate(tmp_path, monkeypatch, capsys):
+    path = tmp_path / 'challenge.jsonl'
+    path.write_text('modified\n')
+    monkeypatch.setattr(gate, 'CHALLENGE', path)
+    monkeypatch.setattr(sys, 'argv', ['gate.py'])
+    assert gate.main() == 1
+    assert 'challenge sha256 mismatch' in capsys.readouterr().out
+
+
 def test_uncertain_benign_is_not_correct():
     r=stress.evaluate([{'id':'x','label':0}], {'x':'uncertain'})
     assert not r['x']['correct']

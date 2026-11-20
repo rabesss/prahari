@@ -6,9 +6,13 @@ import sys
 from common import ROOT, digest, fixture_inputs, predict, rows
 
 FIXTURES=sorted((ROOT/'bench/fixtures').glob('*.jsonl'))
+CHALLENGE = ROOT / 'bench/challenge/india_challenge_v1.jsonl'
+CHALLENGE_SHA256 = '135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67'
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument('candidate', nargs='?', default='candidates/BEST'); p.add_argument('--reference', default=str(ROOT/'bench/reference.json')); p.add_argument('--record',action='store_true'); a=p.parse_args()
+    if not CHALLENGE.is_file() or digest(CHALLENGE) != CHALLENGE_SHA256:
+        print('FAIL frozen challenge sha256 mismatch or missing'); return 1
     for artifact in sorted((Path(a.candidate)/'artifacts').glob('*.joblib')): print(f'ARTIFACT {artifact.name}: bytes={artifact.stat().st_size}')
     reference={} if a.record else json.loads(Path(a.reference).read_text())['fixtures']; result={}; failures=[]
     for path in FIXTURES:
