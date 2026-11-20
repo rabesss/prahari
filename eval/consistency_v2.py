@@ -2,7 +2,7 @@
 import re
 
 CLAIM = re.compile(r'\b(no risk found|nothing suspicious|safe|unsafe|dangerous|malicious|phishing|fraud(?:ulent)?|scam|suspicious)\b', re.I)
-NEGATION = re.compile(r"\b(?:not|never|isn't|isnt|aren't|arent|without)\b", re.I)
+NEGATION = re.compile(r"\b(?:not|never|isn't|isnt|aren't|arent|without)\s+(?:(?:a|an|the)\s+)?$", re.I)
 SPLIT = re.compile(r'[.;!?]|\b(?:but|however|although|though|yet|except|while)\b', re.I)
 
 
@@ -20,6 +20,6 @@ def consistent(verdict, text):
                 continue
             benign = term in ('no risk found', 'nothing suspicious', 'safe')
             # Negation applies only to words preceding this claim within this clause.
-            if NEGATION.search(clause[:match.start()]): benign = not benign
+            if NEGATION.search(prefix): benign = not benign
             if (verdict == 1 and benign) or (verdict == 0 and not benign): return False
     return True
