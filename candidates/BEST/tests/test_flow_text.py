@@ -31,7 +31,9 @@ from triage.detect import predict_flow_text
     ('1 login attempt', 0),
     ('2 login attempts', 0),
     ('5 logins from office IP', 0),
-    ('300 successful logins', 1),
+    ('300 successful logins from the office', 0),
+    ('Accepted sessions: 0\n300 failed SSH logins', 1),
+    ('1,234 failed logins', 1),
     ('1 successful login', 0),
     ('0 successful logins', 0),
     ('failed passwords', 1),
@@ -90,7 +92,16 @@ def test_negation_does_not_cross_newline():
     '300 failed SSH logins followed by a login that was not successful',
     '300 failed SSH logins, authenticated users excluded',
     '300 failed SSH logins excluding authenticated sessions',
+    '300 failed SSH logins followed by no successful login',
 ])
 def test_no_compromise_evidence_for_negated_or_excluded_success(text):
     label, _, evidence = predict_flow_text(text)
     assert label == 1 and all('possible compromise' not in item for item in evidence)
+
+
+@pytest.mark.parametrize('text', ['9,' * 32500, '1,' * 16000 + 'x'])
+def test_malformed_numeric_tokens_are_fast(text):
+    import time
+    start = time.monotonic()
+    predict_flow_text(text)
+    assert time.monotonic() - start < 0.5

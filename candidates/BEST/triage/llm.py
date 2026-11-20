@@ -383,12 +383,9 @@ def _consistent(text, verdict):
         probe = re.sub(r"\b(do|does|did|don|doesn|didn)'t\b", r"do not", probe, flags=re.I)
         if verdict == 1 and re.search(r"\b(?:no risk found|nothing suspicious)\b", probe, re.I):
             continue
-        benign_claim = _BENIGN_CLAIM.search(probe)
-        if verdict == 1 and benign_claim and not _CONTRAST.search(probe) \
-                and not _NEGATED.search(probe) and not _MAL_CLAIM.search(probe):
-            continue
-        if verdict == 0 and _MAL_CLAIM.search(probe) and not _CONTRAST.search(probe) \
-                and not _NEGATED.search(probe):
+        clauses = _CONTRAST.split(probe)
+        opposite = _BENIGN_CLAIM if verdict == 1 else _MAL_CLAIM
+        if any(opposite.search(clause) and not _NEGATED.search(clause) for clause in clauses):
             continue
         keep.append(sent)
     if not keep:

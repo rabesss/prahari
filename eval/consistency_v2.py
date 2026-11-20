@@ -15,6 +15,8 @@ def consistent(verdict, text):
             term = match.group()
             # Generic warnings about future scams are advice, not claims about the item.
             prefix = clause[:match.start()]
+            if re.search(r"\bnot\s+necessarily\s+$", prefix):
+                continue
             negated = bool(NEGATION.search(prefix))
             if term not in ('no risk found', 'nothing suspicious') and not negated and not re.search(
                     r"\b(?:is|are|looks|seems|appears|was|were|isn't|aren't)\b", prefix):

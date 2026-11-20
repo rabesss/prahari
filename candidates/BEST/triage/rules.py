@@ -124,8 +124,8 @@ FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
-                    r"(?:(?:\d[\d,]*|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)\s+){1,3}"
-                    r"(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?|passwords?(?:\s+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
+                    r"(?:(?:\d{1,3}(?:,\d{3})*|\d+|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)[ \t]+){1,3}"
+                    r"(?:(?:ssh|rdp|ftp)[ \t]+)?(?:logins?|login[ \t]+attempts?|passwords?(?:[ \t]+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
     ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
@@ -159,16 +159,18 @@ def flow_text_indicators(text):
                 continue
             if name == "brute_force":
                 right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
-                count = re.search(r"\b\d[\d,]*\b", match.group())
+                count = re.search(r"\b(?:\d{1,3}(?:,\d{3})*|\d+)\b", match.group())
                 digits = count.group().replace(',', '').lstrip('0') if count else None
                 if count and not digits:
                     continue
                 signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
+                if re.search(r"\b(?:successful|authenticated)\b", match.group()) and not signals:
+                    continue
                 if not signals and (not count or len(digits) < 2):
                     continue
                 success = re.search(r"\b(?:successful\s+login|login\s+(?:was\s+)?successful|"
                                     r"login\s+succeeded|authenticated)\b", right)
-                positive = success and not re.search(r"\b(?:not|never|isn't|wasn't)\s+$", right[:success.start()])
+                positive = success and not re.search(r"\b(?:no|not|never|isn't|wasn't)\s+$", right[:success.start()])
                 excluded = success and (re.search(r"\bexclud(?:e|ed|ing)\s+$", right[:success.start()]) or
                                         re.match(r"\s+(?:users|sessions)\s+excluded\b", right[success.end():]))
                 if positive and not excluded and re.search(

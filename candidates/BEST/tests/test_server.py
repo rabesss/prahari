@@ -96,6 +96,12 @@ def test_malicious_verdict_filters_no_risk_claim():
         llm._consistent('No risk found.', 1)
 
 
+def test_contradictory_claims_in_one_sentence_are_filtered():
+    sentence = 'This message is dangerous, but it is safe to reply.'
+    for verdict in (0, 1):
+        assert llm._consistent('Review the message. ' + sentence, verdict) == 'Review the message.'
+
+
 def test_demo_reports_explanation_failure(monkeypatch, tmp_path, capsys):
     import json
     import sys
@@ -151,6 +157,24 @@ def test_http_rejects_deep_json_and_duplicate_lengths():
         httpd.server_close()
 
 
+def _receive_headers(sock):
+    response = b''
+    while b'\r\n\r\n' not in response:
+        chunk = sock.recv(1024)
+        if not chunk:
+            break
+        response += chunk
+    return response
+
+
+def test_receive_headers_stops_on_peer_close():
+    from unittest.mock import Mock
+    sock = Mock()
+    sock.recv.side_effect = [b'partial', b'']
+    assert _receive_headers(sock) == b'partial'
+    assert sock.recv.call_count == 2
+
+
 def test_bad_framing_closes_connection():
     import socket
     httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)
@@ -161,9 +185,7 @@ def test_bad_framing_closes_connection():
                         b'Content-Length: 2\r\nContent-Length: 2\r\n'):
             with socket.create_connection(('127.0.0.1', httpd.server_port), timeout=5) as sock:
                 sock.sendall(b'POST /api/triage HTTP/1.1\r\nHost: localhost\r\n' + headers + b'\r\n')
-                response = b''
-                while b'\r\n\r\n' not in response:
-                    response += sock.recv(1024)
+                response = _receive_headers(sock)
                 assert b' 400 ' in response.split(b'\r\n', 1)[0]
                 assert b'connection: close' in response.lower()
     finally:
