@@ -18,6 +18,7 @@ def test_weighted_total_and_mean_of_totals():
 @pytest.mark.parametrize('src,expl,expected', [
     ('Pay the fee now', 'The message asks for a payment.', True),
     ('Your payment was received', 'The message asks for a payment.', False),
+    ('Your payment was received', 'The message says the payment was received.', True),
     ('Please visit the branch tomorrow', 'It requests a payment.', False),
     ('Please call the branch', 'The notice contains a phone call request.', True),
     ('Your balance is available', 'The message requests an OTP.', False),

@@ -51,7 +51,10 @@ def grounding(input_text, explanation):
                     continue
                 if not cue.search(input_text):
                     return False
-                if name == 'payment' and PAYMENT_RECEIPT.search(input_text) and not PAYMENT_REQUEST.search(input_text):
+                if (name == 'payment' and PAYMENT_RECEIPT.search(input_text)
+                        and not PAYMENT_REQUEST.search(input_text)
+                        and (re.search(r'\b(?:asks?|asking|requests?|requesting|demands?|demanding|requires?|wants? you to|tells? you to)\b', claim.group(), re.I)
+                             or PAYMENT_REQUEST.search(tail))):
                     return False
     return True
 

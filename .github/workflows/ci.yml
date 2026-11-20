@@ -76,7 +76,7 @@ jobs:
         if: always()
         run: |
           python eval/test_scorer.py
-          python -m pytest -q eval/test_conventional.py eval/test_india_challenge.py eval/test_proxy_v3.py
+          python -m pytest -q eval/test_conventional.py eval/test_india_challenge.py eval/test_proxy_v3.py eval/test_compare_v3.py
       - name: Benchmark tests
         id: tests
         if: always()

@@ -1,0 +1,59 @@
+import copy
+import pytest
+from compare_v3 import compare
+
+
+def run(score):
+    return {'score': score, 'quick': False, 'failures': [], 'infra_errors': [], 'promotable': True,
+            'scores': {'D': .8, 'I': .8, 'E': .8},
+            'detection': {t: {'conservative': {'f1': .8, 'fpr': .02}} for t in ('sms','url','indic','flow')},
+            'india': {'injection_recall': .8, 'benign_ai_mention_fpr': .02},
+            'latency_s_per_item': 2, 'peak_process_tree_rss_gb': 2}
+
+
+def compare_pair(b, c):
+    bs, cs = [copy.deepcopy(b), copy.deepcopy(b)], [copy.deepcopy(c), copy.deepcopy(c)]
+    for i, r in enumerate(bs):
+        r.update(stamp=f'20261121-10000{i*2}-000000', candidate='BEST')
+    for i, r in enumerate(cs):
+        r.update(stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND')
+    return compare(bs, cs, .5)
+
+
+def test_promotion_and_score_threshold():
+    b, c = run(70), run(71)
+    assert compare_pair(b, c)['pass']
+    c['score'] = 70.49
+    assert not compare_pair(b, c)['pass']
+
+
+@pytest.mark.parametrize('path,value', [
+    (('scores','E'),.78), (('detection','sms','conservative','f1'),.78),
+    (('detection','url','conservative','fpr'),.026),
+    (('india','injection_recall'),.79), (('india','benign_ai_mention_fpr'),.03),
+    (('latency_s_per_item',),2.21), (('peak_process_tree_rss_gb',),2.11),
+])
+def test_each_regression_gate(path, value):
+    b, c = run(70), run(71)
+    target = c
+    for key in path[:-1]: target = target[key]
+    target[path[-1]] = value
+    assert not compare_pair(b, c)['pass']
+
+
+def test_rejects_noninterleaved_runs():
+    b, c = run(70), run(71)
+    bs = [dict(b, stamp=f'20261121-10000{i}-000000', candidate='BEST') for i in (0, 1)]
+    cs = [dict(c, stamp=f'20261121-10000{i}-000000', candidate='CAND') for i in (2, 3)]
+    with pytest.raises(ValueError, match='interleaved'):
+        compare(bs, cs, .5)
+
+
+def test_missing_and_failures_fail_closed():
+    b, c = run(70), run(71)
+    c['failures'] = ['timeout']
+    assert not compare_pair(b,c)['pass']
+    c['failures'] = []
+    del c['latency_s_per_item']
+    with pytest.raises(ValueError): compare_pair(b,c)
+    with pytest.raises(ValueError): compare([b],[c],.5)

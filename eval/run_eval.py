@@ -98,7 +98,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
     start = log.stat().st_size if log.exists() else 0
     with open(log, "ab") as lf:
         p = subprocess.Popen(cmd, env=env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
-        peak_kb, pte_seen, timed_out = None, False, False
+        peak_kb, legacy_hwm_kb, pte_seen, timed_out = None, 0, False, False
         while p.poll() is None:
             if time.time() - t0 > timeout:
                 timed_out = True
@@ -110,6 +110,10 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
                 peak_kb = max(peak_kb or 0, rss)
             for pid in pids:
                 try:
+                    status = Path(f'/proc/{pid}/status').read_text()
+                    hwm = re.search(r'^VmHWM:\s+(\d+)\s+kB', status, re.M)
+                    if hwm:
+                        legacy_hwm_kb = max(legacy_hwm_kb, int(hwm.group(1)))
                     if watch_pte and not pte_seen:
                         if watch_pte in Path(f"/proc/{pid}/maps").read_text():
                             pte_seen = True
@@ -126,7 +130,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None):
             time.sleep(0.1)
         p.wait()
     res = {"rc": p.returncode, "wall_s": time.time() - t0, "peak_rss_mb": peak_kb / 1024 if peak_kb is not None else None,
-           "pte_seen": pte_seen, "timed_out": timed_out}
+           "legacy_peak_rss_mb": round(legacy_hwm_kb / 1024, 1), "pte_seen": pte_seen, "timed_out": timed_out}
     if vis_log is not None:
         with open(vis_log, "a") as vf:
             vf.write(f"== {Path(cmd[0]).name} {' '.join(c for c in cmd[1:3] if c.startswith('--') or len(c) < 8)} "
@@ -385,6 +389,7 @@ def main():
 
 
 def run_once(a, run_index):
+    full_start = time.monotonic()
     cand = Path(a.candidate).resolve()
     label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or cand.name)
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
@@ -398,7 +403,8 @@ def run_once(a, run_index):
                "quick": a.quick}
 
     def finish(score, scores, extra=None):
-        summary.update({"score": score, "scores": scores, "failures": failures, "infra_errors": infra})
+        summary.update({"score": score, "scores": scores, "failures": failures, "infra_errors": infra,
+                        "full_wall_s": time.monotonic() - full_start})
         summary["promotable"] = (not a.quick) and not failures and not infra
         if extra:
             summary.update(extra)
@@ -568,6 +574,11 @@ def run_once(a, run_index):
                "peak_rss": clip((3.0 - rss_gb) / 2.0) if rss_gb > 0 else 0.0,
                "detector_latency": logscale(det_ms, 1.0, 20.0),
                "size": clip((2.0 - size_gb) / 1.2)}
+    legacy_rss = runs[0]['legacy_peak_rss_mb'] / 1024 if runs else 0
+    legacy_lat = round(runs[0]['wall_s'], 3) / n if runs else None
+    legacy_parts = dict(p_parts, explain_latency=logscale(legacy_lat, 3.0, 15.0),
+                        peak_rss=clip((3.0 - legacy_rss) / 2.0) if legacy_rss > 0 else 0.0)
+    legacy_p = round(sum(W['P'][k] * legacy_parts[k] for k in W['P']), 4)
     P["parts"] = {k: round(v, 3) for k, v in p_parts.items()}
     scores["P"] = sum(W["P"][k] * p_parts[k] for k in W["P"])
     details["performance"] = P
@@ -618,8 +629,8 @@ def run_once(a, run_index):
     if app["rc"] != 0:
         failures.append("bin/app --selftest failed (see app.log)")
 
-    legacy_total = 100 * (W['top']['D']*legacy_d + W['top']['E']*legacy_e_sum/n +
-                          W['top']['P']*scores['P'] + W['top']['C']*scores['C'])
+    legacy_total = 100 * (W['top']['D']*legacy_d + W['top']['E']*round(legacy_e_sum/n, 4) +
+                          W['top']['P']*legacy_p + W['top']['C']*scores['C'])
     if not gate['pass']:
         legacy_total = min(legacy_total, W['gate_cap'])
     total = v3_total(scores['D'], scores['I'], scores['E'], scores['P'])

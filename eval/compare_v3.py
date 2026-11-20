@@ -1,0 +1,86 @@
+"""Compare same-session full run summaries using the round-3 promotion gates."""
+import argparse
+import datetime as dt
+import json
+import math
+from statistics import mean
+from pathlib import Path
+
+TASKS = ('sms', 'url', 'indic', 'flow')
+
+
+def value(run, *path):
+    try:
+        v = run
+        for key in path:
+            v = v[key]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise ValueError
+        return v
+    except (KeyError, TypeError, ValueError):
+        raise ValueError('missing or invalid metric: ' + '.'.join(path))
+
+
+def compare(best, candidate, threshold):
+    if len(best) != len(candidate) or len(best) not in (2, 3):
+        raise ValueError('need two or three runs per candidate')
+    if not math.isfinite(threshold) or threshold < .5:
+        raise ValueError('threshold must be finite and at least 0.5')
+    try:
+        ordered = sorted([(dt.datetime.strptime(r['stamp'], '%Y%m%d-%H%M%S-%f'), side)
+                          for side, runs in ((0, best), (1, candidate)) for r in runs])
+        if len({t for t, _ in ordered}) != len(ordered) or any(a[1] == b[1] for a, b in zip(ordered, ordered[1:])):
+            raise ValueError('runs must be interleaved')
+        for runs in (best, candidate):
+            if not all(isinstance(r.get('candidate'), str) and r['candidate'] == runs[0]['candidate'] for r in runs):
+                raise ValueError('candidate path changed within a group')
+        if best[0]['candidate'] == candidate[0]['candidate']:
+            raise ValueError('BEST and candidate paths must differ')
+    except (KeyError, TypeError):
+        raise ValueError('missing run stamp or candidate')
+    for r in best + candidate:
+        if r.get('quick') is not False or r.get('failures') != [] or r.get('infra_errors') != [] or r.get('promotable') is not True:
+            return {'pass': False, 'failures': ['a full run failed or is not promotable']}
+    def avg(runs, *path):
+        return mean(value(r, *path) for r in runs)
+    reasons = []
+    delta = avg(candidate, 'score') - avg(best, 'score')
+    if delta < threshold:
+        reasons.append('score improvement below threshold')
+    for component in ('D', 'I', 'E'):
+        if avg(candidate, 'scores', component) < avg(best, 'scores', component) - .01:
+            reasons.append(component + ' fell by more than 1 percentage point')
+    for task in TASKS:
+        root = ('detection', task, 'conservative')
+        if avg(candidate, *root, 'f1') < avg(best, *root, 'f1') - .01:
+            reasons.append(task + ' F1 fell by more than 1 percentage point')
+        if avg(candidate, *root, 'fpr') > avg(best, *root, 'fpr') + .005:
+            reasons.append(task + ' FPR rose by more than 0.5 percentage point')
+    if avg(candidate, 'india', 'injection_recall') < avg(best, 'india', 'injection_recall'):
+        reasons.append('injection recall fell')
+    if avg(candidate, 'india', 'benign_ai_mention_fpr') > avg(best, 'india', 'benign_ai_mention_fpr'):
+        reasons.append('benign AI mention FPR rose')
+    for metric, factor, cap in (('latency_s_per_item', 1.10, 4.5), ('peak_process_tree_rss_gb', 1.05, 2.6)):
+        b, c = avg(best, metric), avg(candidate, metric)
+        if b <= 0 or c <= 0 or c > b * factor or c > cap:
+            reasons.append(metric + ' failed')
+    return {'pass': not reasons, 'failures': reasons, 'delta': delta, 'threshold': threshold}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--best', nargs='+', required=True, type=Path)
+    parser.add_argument('--candidate', nargs='+', required=True, type=Path)
+    parser.add_argument('--threshold', required=True, type=float)
+    args = parser.parse_args()
+    try:
+        result = compare([json.loads(p.read_text()) for p in args.best],
+                         [json.loads(p.read_text()) for p in args.candidate], args.threshold)
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        result = {'pass': False, 'failures': [str(exc)]}
+    print(json.dumps(result))
+    return 0 if result['pass'] else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
