@@ -77,24 +77,27 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 - Proxy weights from research B [I]: completeness 15, detection quality 20, Arm integration/compliance 15, performance 15, offline/privacy 10,
   explanation grounding/remediation 10, novelty 8, docs/reproducibility 6, demo/Q&A 6.
 
-## 7. How `bin/eval` maps to this [I]
-`score = 100 x (0.30 D + 0.25 E + 0.20 P + 0.25 C)`. The weights are in `eval/weights.json`. It covers the machine-checkable 86% of the
-proxy above; novelty and the demo (14%) are human-judged and not scored.
-- **D (detection quality, validation):** hidden test sets for SMS (UCI + Mendeley), URLs (PhiUSIIL), an **Indian-context hard set** (the
-  largest weight) and NSL-KDD flows (official KDDTest+). Per task, F1 is multiplied by a false-positive penalty, because false alerts cost
-  non-expert users.
-- **E (plain-language explanation and remediation):** deterministic checks on a hidden explain set covering verdict correctness, agreement between the text and the truth,
-  required concepts (with close synonyms), forbidden or hallucinated content (US-centric terms, injected tokens), no invented URLs or phone numbers, safe actions, and length.
-- **P (performance and optimisation on Arm):** measured on Oracle's Neoverse-N1, the same Cortex-A76 class as the Pi 5: explain latency, peak
-  RSS, detector throughput and footprint.
-- **C (compliance, offline, completeness, docs):** a hard gate that a Llama-family `.pte` is actually loaded by ExecuTorch (checked in
-  /proc), otherwise the score is capped at 20; plus the offline guard, tests, an app self-test, and README/REPORT/DATA completeness.
-- **Known gaps:** no human judging of novelty, clarity or demo quality; the PhiUSIIL URL test is easy (legitimate rows are mostly bare
-  homepages); the Indian set is synthetic and templated (320-message sets from one generator: set A, now visible for training, and set B, the hidden test since round 2;
-  their `.invalid` link hosts are rewritten to realistic TLDs, but link presence still predicts the label; a third set C from a
-  different spec, with balanced links and lengths, is kept by the controller as the final overfitting check); the explain set is small (28 items), so an E change under about 0.04 is noise; Oracle is not a Pi 5 (similar
-  cores, different memory system, and other jobs share the machine); the offline guard is an in-process proxy, and the real proof is airplane
-  mode on the device.
+## 7. Round-3 proxy and limitations [I]
+
+Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
+fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
+Every run has sanity caps of 10.0 s/item and 3.0 GB process-tree peak RSS; missing
+measurements and timeouts fail. In the same interleaved comparison, every candidate
+run must have latency at most 110% and RSS at most 105% of the corresponding BEST
+mean. Re-run comparisons with start 1-minute load above 1.5, missing host data, or
+sampled CPU steal above 20%. Mid-run load is informational. Only systemd scope RSS
+and bwrap isolation with read-only cgroups can promote; proc fallback is for local development and its
+cumulative child RSS is not a promotion gate. The controller pins the BEST content
+hash and updates it with each promotion.
+The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS
+user and an author with the visible v2-dev set. It is not independent evidence.
+Hidden v2 SHA-256: `532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0`.
+OMP is non-malicious but Goodhart-prone; mechanical checks cover plausible cache,
+shared temporary state, fake completion, ungrounded wording and BEST drift. Deliberate
+adversarial behaviour is forbidden, including daemons, writes outside scratch,
+modifications to BEST, research/evals or eval data, and reading hidden data. The
+controller reviews every promoted candidate's diff for such code and reruns final
+confirmation itself. Same-user OS isolation is a limitation, not a guarantee.
 
 ## 8. Track and approach choice
 PS3 is fixed (see §1). To maximise the chance of winning within PS3:
@@ -130,3 +133,5 @@ PS3 is fixed (see §1). To maximise the chance of winning within PS3:
   better-quality 4-bit recipes. Llama 3.2 1B KV cache is about 32 KiB/token in FP16, so set a short context window. Reference speeds:
   Pi 5 llama.cpp Q4_K_M at 10.8 tok/s decode; OnePlus 12 SpinQuant at 50 tok/s. No N1 numbers are public; we measured about 17-21 tok/s
   decode on Oracle. [S/I]
+
+Evaluation inputs must never be memoized or cached across runs.

@@ -5,6 +5,7 @@ The allowlist is the gate. --hidden-check is a controller-only supplementary sca
 visible third-party dataset texts; it is not a disclosure proof.
 """
 import argparse
+import hashlib
 from collections import deque
 import json
 import math
@@ -27,7 +28,7 @@ ARTIFACT = re.compile(r'candidates/[^/]+/artifacts/[^/]+\.joblib')
 RECORD = re.compile(r'research/evals/[^/]+/(?:summary|details)\.json')
 LOG = re.compile(r'research/evals/[^/]+/(?:run|app|tests|guard)\.log')
 RESULT = re.compile(r'bench/results/[^/]+\.json')
-SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl')
+SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl|bench/dev/india_dev_v2\.jsonl')
 # (allowed keys, required keys) per synthetic directory.
 SYNTH_KEYS = {'research/stress': ({'id', 'label', 'text'}, {'label', 'text'}),
               'bench/fixtures': ({'id', 'input', 'expect', 'rationale'}, {'id', 'input', 'expect', 'rationale'})}
@@ -44,7 +45,8 @@ SECRET = re.compile(rb'(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9_]{20,}
 NUM = r'\d+(?:\.\d+)?'
 PYTEST_COUNTS = r'\d+ (?:passed|failed|skipped|errors?|warnings?|deselected|xfailed|xpassed)'
 STATUS = [re.compile(p) for p in (
-    r'== (?:predict --task (?:sms|url|flow)|explain --in) rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=' + NUM + r'\s*',
+    r'== python(?:3(?:\.\d+)?)?  rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=(?:' + NUM + r'|None)\s*',
+    r'== (?:predict --task (?:sms|url|flow)|explain --in) rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=(?:' + NUM + r'|None)\s*',
     r'=+ ' + PYTEST_COUNTS + r'(?:, ' + PYTEST_COUNTS + r')* in ' + NUM + r's(?: \(\d+:\d\d:\d\d\))? =+\s*',
     r'[.sxEF]+\s+\[\s*\d+%\]\s*',
     PYTEST_COUNTS + r'(?:, ' + PYTEST_COUNTS + r')* in ' + NUM + r's\s*',
@@ -160,7 +162,7 @@ def config_ok(data):
 
 
 def synth_ok(path, data):
-    if path == 'bench/challenge/india_challenge_v1.jsonl':
+    if path in ('bench/challenge/india_challenge_v1.jsonl', 'bench/dev/india_dev_v2.jsonl'):
         allowed = required = {'id', 'text', 'lang', 'label', 'category', 'pair_id', 'route'}
     else:
         allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
@@ -176,7 +178,15 @@ def synth_ok(path, data):
                    and r['label'] in ('malicious', 'benign') and r['route'] in ('sms', 'injection')
                    and r['lang'] in ('en', 'hi', 'hinglish')
                    and (r['pair_id'] is None or isinstance(r['pair_id'], str)) for r in rows)
+    if path == 'bench/dev/india_dev_v2.jsonl':
+        return (len(rows) == 120 and len({r['id'] for r in rows if isinstance(r['id'], str)}) == len(rows)
+                and all(all(isinstance(r[k], str) and r[k].strip() for k in required - {'pair_id'})
+                        and ((r['route'] == 'sms' and isinstance(r['pair_id'], str) and bool(r['pair_id'].strip()))
+                             or (r['route'] == 'injection' and r['pair_id'] is None))
+                        and r['route'] in ('sms', 'injection') and r['label'] in ('benign', 'malicious')
+                        and r['lang'] in ('en', 'hi', 'hinglish') for r in rows))
     return True
+
 
 
 def json_strings(data):
@@ -249,7 +259,7 @@ class Matcher:
 
 
 HIDDEN = Path('/var/tmp/arm-bharat-ai-soc-data/hidden')
-HIDDEN_FILES = ('sms_test.jsonl', 'url_test.jsonl', 'indic_test.jsonl', 'flow_test.jsonl', 'explain_set.jsonl')
+HIDDEN_FILES = ('india_hidden_v2.jsonl', 'sms_test.jsonl', 'url_test.jsonl', 'indic_test.jsonl', 'flow_test.jsonl', 'explain_set.jsonl')
 # dev/explain_examples.jsonl is written by eval/prep_data.py itself (project text), so it is not a third-party corpus.
 VISIBLE_FILES = ('train/sms.jsonl', 'train/url.jsonl', 'train/indic.jsonl', 'train/indic_seed.jsonl',
                  'dev/sms.jsonl', 'dev/url.jsonl', 'dev/indic.jsonl')
@@ -350,16 +360,17 @@ def main():
                 if CONTROLLER.fullmatch(path): controller.add(path)
                 rules = [('code/docs', CODE.fullmatch(path)), ('config', CONFIG.fullmatch(path)), ('artifact', ARTIFACT.fullmatch(path)),
                          ('eval JSON', RECORD.fullmatch(path) or RESULT.fullmatch(path)), ('eval log', LOG.fullmatch(path)),
-                         ('ledger', path == 'research/evals/ledger.jsonl'), ('synthetic', SYNTH.fullmatch(path))]
+                         ('ledger', path == 'research/evals/ledger.jsonl'), ('best pin', path == 'research/evals/BEST.sha256'), ('synthetic', SYNTH.fullmatch(path))]
                 matched = [name for name, match in rules if match]
                 if len(matched) != 1:
                     fail('path not uniquely allowlisted'); continue
                 rule = matched[0]
                 size = int(git('cat-file', '-s', oid))
-                limit = {'code/docs': 1_000_000, 'config': 256_000, 'artifact': 5_000_000, 'eval log': 4_000, 'eval JSON': 1_000_000, 'ledger': 1_000_000, 'synthetic': 1_000_000}[rule]
+                limit = {'code/docs': 1_000_000, 'config': 256_000, 'artifact': 5_000_000, 'eval log': 4_000, 'eval JSON': 1_000_000, 'ledger': 1_000_000, 'best pin': 65, 'synthetic': 1_000_000}[rule]
                 if size > limit: fail(f'{rule} size limit'); continue
                 if oid not in blob_cache: blob_cache[oid] = git('cat-file', 'blob', oid, binary=True)
                 data = blob_cache[oid]
+                if rule == 'best pin' and not re.fullmatch(rb'[0-9a-f]{64}\n', data): fail('invalid BEST pin')
                 if rule == 'artifact':
                     artifacts.add((path, oid, size))
                     try: data = inflate(data)
@@ -374,6 +385,8 @@ def main():
                 if rule in ('eval JSON', 'ledger') and not valid_json(data, rule == 'ledger'): fail('eval JSON leaf/array/id policy')
                 if rule == 'config' and not config_ok(data): fail('config JSON policy')
                 if rule == 'synthetic' and not synth_ok(path, data): fail('synthetic schema policy')
+                if path == 'bench/dev/india_dev_v2.jsonl' and hashlib.sha256(data).hexdigest() != 'ea6b41a985e34c8ea7ba85af79887423114753579ddc1110eaf093868af0c48f':
+                    fail('India dev v2 sha256 mismatch')
                 if rule == 'code/docs':
                     try: text = data.decode('utf-8')
                     except UnicodeError: fail('undecodable code/docs'); continue

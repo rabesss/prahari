@@ -292,3 +292,66 @@ def test_challenge_schema_not_allowed_in_fixture_directory(tmp_path):
            'category': 'sample', 'pair_id': 'pair-1', 'route': 'sms'}
     add(tmp_path, 'bench/fixtures/india_challenge_v1.jsonl', json.dumps(row).encode() + b'\n')
     assert 'synthetic schema policy' in audit(tmp_path, base).stdout
+
+
+def test_india_v2_dev_path_is_narrow_and_schema_checked():
+    from bench.audit_push import SYNTH, synth_ok
+    import json
+    path = 'bench/dev/india_dev_v2.jsonl'
+    row = {'id': 'dev-1', 'text': 'example', 'lang': 'en', 'label': 'benign',
+           'category': 'notice', 'pair_id': 'pair-1', 'route': 'sms'}
+    def blob(rows):
+        return b''.join(json.dumps(r).encode() + b'\n' for r in rows)
+    rows = [dict(row, id=f'dev-{i}') for i in range(120)]
+    assert SYNTH.fullmatch(path) and synth_ok(path, blob(rows))
+    assert not SYNTH.fullmatch('bench/dev/other.jsonl')
+    assert not synth_ok(path, blob(rows[:-1]))
+    assert not synth_ok(path, blob([*rows[:-1], rows[0]]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], extra='bad')]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], label='unknown')]))
+    assert synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='injection', pair_id=None)]))
+    assert not synth_ok(path, blob([*rows[:-1], dict(rows[-1], route='sms', pair_id=None)]))
+
+
+def test_india_status_line_generated_by_runner(tmp_path):
+    import os
+    import sys
+    from eval.run_eval import run_proc
+    from bench.audit_push import STATUS
+    log = tmp_path / 'private.log'
+    visible = tmp_path / 'run.log'
+    result = run_proc([sys.executable, str(tmp_path / 'india_v2_runner.py'), str(tmp_path / 'candidate')],
+                      os.environ.copy(), 5, tmp_path, log, vis_log=visible, rss_method='proc_fallback')
+    line = visible.read_text().splitlines()[0]
+    assert result['rss_method'] == 'proc_fallback'
+    assert any(rx.fullmatch(line) for rx in STATUS)
+    assert not any(rx.fullmatch(line + ' extra text') for rx in STATUS)
+
+
+def test_hidden_check_requires_india_v2(monkeypatch, tmp_path):
+    from bench import audit_push
+    hidden = tmp_path / 'hidden'
+    hidden.mkdir()
+    for name in audit_push.HIDDEN_FILES:
+        if name != 'india_hidden_v2.jsonl':
+            (hidden / name).write_text('{}\n')
+    monkeypatch.setattr(audit_push, 'HIDDEN', hidden)
+    import pytest
+    with pytest.raises(ValueError, match='hidden check input unavailable'):
+        audit_push.corpus_matchers(tmp_path)
+
+
+def test_audit_pins_dev_v2_bytes(tmp_path):
+    base = setup_repo(tmp_path)
+    source = AUDIT.parent / 'dev/india_dev_v2.jsonl'
+    add(tmp_path, 'bench/dev/india_dev_v2.jsonl', source.read_bytes() + b'\n')
+    result = audit(tmp_path, base)
+    assert result.returncode == 1
+    assert 'India dev v2 sha256 mismatch' in result.stdout
+
+
+def test_runner_status_accepts_unavailable_peak_without_extra_content():
+    from bench.audit_push import STATUS
+    line = '== predict --task sms rc=-9 timeout=True wall_s=0.15 peak_rss_mb=None'
+    assert any(rx.fullmatch(line) for rx in STATUS)
+    assert not any(rx.fullmatch(line + ' diagnostic') for rx in STATUS)

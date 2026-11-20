@@ -60,3 +60,14 @@ def test_explanations_continue_after_consistency_failure(tmp_path, monkeypatch):
     assert explanations['a']['explanation_status'] == 'failed' and explanations['a']['explanation_error']
     assert 'text' not in explanations['a'] and 'stats' not in explanations['a']
     assert explanations['b']['explanation_status'] == 'success' and explanations['b']['text'] == 'Model explanation.'
+def test_explicit_adaptive_dataset_hash_is_verified(tmp_path):
+    row = {'id': 'a', 'text': 'sample', 'lang': 'en', 'label': 'benign',
+           'category': 'upi', 'pair_id': 'p', 'route': 'sms'}
+    path = tmp_path / 'adaptive.jsonl'
+    path.write_text(json.dumps(row) + '\n')
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert load(path, expected_sha256=digest) == [row]
+    with pytest.raises(ValueError, match='sha256 mismatch'):
+        load(path, expected_sha256='0' * 64)
+    with pytest.raises(ValueError, match='sha256 mismatch'):
+        load(path)

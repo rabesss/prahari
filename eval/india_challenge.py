@@ -13,10 +13,14 @@ LABELS = {'benign': 0, 'malicious': 1}
 CHALLENGE_SHA256 = '135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67'
 
 
-def load(path):
-    data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != CHALLENGE_SHA256:
-        raise ValueError('frozen challenge sha256 mismatch')
+def load(path, *, expected_sha256=None):
+    return load_bytes(path.read_bytes(), expected_sha256=expected_sha256)
+
+
+def load_bytes(data, *, expected_sha256=None):
+    expected = CHALLENGE_SHA256 if expected_sha256 is None else expected_sha256
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise ValueError('dataset sha256 mismatch')
     def pairs(items):
         result = {}
         for key, value in items:
