@@ -13,8 +13,8 @@ Bharat AI-SoC Challenge 2026, PS3 entry. It checks pasted SMS/WhatsApp-style mes
    three high-precision intrusion signatures on top.
 2. **Advisory layer:** Llama 3.2 1B Instruct (INT4 QLoRA, ExecuTorch `.pte`) turns the verdict, type
    and top evidence phrase into a short explanation. The compact prompt neutralises live links,
-   forces a verdict-first sentence and asks for the evidence phrase verbatim; a contradiction filter
-   removes a sentence that claims the opposite of the verdict, and a refusal falls back to an
+   forces a verdict-first sentence and asks for the evidence phrase verbatim; a heuristic filter
+   attempts to remove sentences that contradict the verdict, and a refusal falls back to an
    evidence-only prompt. Fixed remediation steps (1930 helpline,
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
@@ -47,7 +47,9 @@ Model files are not in git. See DATA.md for provenance and licences.
 
 ## Results
 
-Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)).
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts for the evaluated candidates are in [the comparison](../../research/evals/C_fix1-vs-BEST.md).
+
+The following 90.73 proxy describes the old BEST at `best-omp-final-9073`, not the promoted candidate. The promoted correctness candidate scored 90.49; see `research/evals/C_fix1-vs-BEST.md` for the comparison and conventional metrics.
 
 `bin/eval` proxy (two repeats, hidden round-2 set): 90.73 (internal proxy, not a judging score) — D 0.9024, E 0.9473, P 0.7486, C 1.0,
 promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0.8505. Explanation:

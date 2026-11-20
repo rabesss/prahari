@@ -28,3 +28,5 @@ Baseline reviewed: `2fdc142e645a7e435fd49af29ac29559be2a2bfc` (2026-11-17, main 
 ## Worked demo record (report "Worked example")
 
 Measured 2026-11-17 on the Oracle A1 Neoverse-N1 VM: `candidates/BEST/bin/app --demo --out <dir>/demo-output.json` (visible presets in `candidates/BEST/app/server.py`). Electricity-scam preset: verdict malicious, score 1.0, category "a payment fraud", 3 evidence items, backend `executorch`, model `llama32-1b-qlora`, 133 prompt tokens, 31 generated, prefill 75.0 tok/s, decode 21.5 tok/s, generation 5,643 ms, end-to-end 13,169 ms including the one-time model load, RSS 2,303.9 MB. The other five presets took 2,909–6,858 ms each. Status: measured (single run; the JSON is not committed). Rerun the command to reproduce; timings vary with host load. Note: the `llm.first_token_ms` field in this build is an absolute timestamp, not a duration, so TTFT is not reported from it.
+
+- Frozen project-authored India challenge v1 SHA-256: `135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67` (`bench/challenge/india_challenge_v1.jsonl`).

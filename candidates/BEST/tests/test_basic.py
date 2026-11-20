@@ -95,6 +95,8 @@ def test_otp_share_request_flagged():
 def test_explain_cases_file_is_complete():
     import json
     path = Path(__file__).parent / "explain_cases.jsonl"
+    if not path.exists():
+        path = Path(__file__).resolve().parents[2] / "BEST" / "tests" / "explain_cases.jsonl"
     rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert len(rows) >= 20
     assert {r["kind"] for r in rows} == {"sms", "url", "flow", "injection"}

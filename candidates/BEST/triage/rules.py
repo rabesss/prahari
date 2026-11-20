@@ -124,11 +124,11 @@ FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(\d+\s+(failed\s+)?(login|password)\s+(attempts?|failures?)|failed\s+(logins?|passwords?)|"
-                    r"brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
+                    r"\d+\s+failed\s+(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?)|login\s+attempts?|brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
-    ("beaconing", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?|"
-                  r"beacon\w*|command\s+and\s+control|\bc2\b)", "connections repeat at a fixed interval, like beaconing"),
+    ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
+    ("periodic", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?)\b", "connections repeat at a fixed interval"),
     ("rejected", r"\b(rejected|reset|rst|refused|s0)\b", "most connections were rejected or reset"),
     ("root", r"\b(root shell|su attempt|privilege)\b", "the session tried to gain root privileges"),
 ]

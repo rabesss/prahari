@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Reproduce the visible checks. HC_PY selects the prepared Python environment.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CAND="$ROOT/candidates/BEST"
+CHALLENGE=""
+while (($#)); do
+  case "$1" in
+    --challenge) CHALLENGE="${2:?missing challenge path}"; shift 2 ;;
+    --candidate) CAND="$(realpath "${2:?missing candidate path}")"; shift 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+PY="${HC_PY:-$ROOT/.venv/bin/python}"
+export HC_PY="$PY"
+cd "$ROOT"
+"$PY" - "$CAND" <<'PY'
+import hashlib, importlib.metadata, json, pathlib, subprocess, sys
+from packaging.specifiers import SpecifierSet
+cand = pathlib.Path(sys.argv[1])
+print('Python', sys.version.split()[0])
+if sys.version_info[:2] != (3, 12): raise SystemExit('Python 3.12 required')
+config = json.loads((cand / 'config.json').read_text())
+registry = pathlib.Path(__import__('os').environ.get('HC_MODEL_REGISTRY', 'models/registry.json'))
+model = json.loads(registry.read_text())[config['model']]
+model_present = all(pathlib.Path(model[k]).is_file() for k in ('pte', 'tokenizer'))
+for line in (cand / 'requirements.txt').read_text().splitlines():
+    if '==' not in line: continue
+    name, expected = line.strip().split('==', 1)
+    try: actual = importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError: actual = 'missing'
+    print(f'{name}: {actual} (expected {expected})')
+    if (actual == 'missing' or not SpecifierSet('==' + expected).contains(actual)) and not (actual == 'missing' and not model_present and name in ('torch', 'executorch')):
+        raise SystemExit(f'version mismatch: {name}')
+artifacts = sorted((cand / 'artifacts').glob('*.joblib'))
+if {f.name for f in artifacts} != {'sms.joblib', 'url.joblib', 'indic.joblib', 'flow.joblib'}:
+    raise SystemExit('detector artifacts missing or unexpected')
+for f in artifacts:
+    print('sha256', hashlib.sha256(f.read_bytes()).hexdigest(), f)
+    rel = f.relative_to(pathlib.Path.cwd())
+    expected = subprocess.check_output(['git', 'rev-parse', f'HEAD:{rel}'], text=True).strip()
+    actual = subprocess.check_output(['git', 'hash-object', str(f)], text=True).strip()
+    if expected != actual: raise SystemExit(f'artifact differs from HEAD: {rel}')
+for key in ('pte', 'tokenizer'):
+    path = pathlib.Path(model[key])
+    if path.is_file():
+        h = hashlib.sha256()
+        with path.open('rb') as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b''): h.update(chunk)
+        print('sha256', h.hexdigest(), path)
+    else: print('missing model asset:', path)
+PY
+"$CAND/bin/app" --selftest
+"$PY" bench/gate.py "$CAND"
+"$PY" eval/conventional.py "$CAND" --visible-only
+if [[ -n "$CHALLENGE" ]]; then
+  "$PY" eval/india_challenge.py "$CAND" "$CHALLENGE"
+else
+  echo 'Challenge: skipped (no --challenge provided)'
+fi
+"$PY" - "$CAND" <<'PY'
+import json, os, pathlib, subprocess, sys, tempfile
+cand = pathlib.Path(sys.argv[1])
+config = json.loads((cand / 'config.json').read_text())
+registry = pathlib.Path(os.environ.get('HC_MODEL_REGISTRY', 'models/registry.json'))
+model = json.loads(registry.read_text())[config['model']]
+if not all(pathlib.Path(model[k]).is_file() for k in ('pte', 'tokenizer')):
+    print('Llama example: skipped (model assets absent)')
+else:
+    with tempfile.TemporaryDirectory(prefix='prahari-repro-') as td:
+        inp, out = pathlib.Path(td) / 'in.jsonl', pathlib.Path(td) / 'out.jsonl'
+        inp.write_text(json.dumps({'id': 'example', 'kind': 'flow', 'input': 'port scan from an unknown host'}) + '\n')
+        subprocess.run([str(cand / 'bin/explain'), '--in', str(inp), '--out', str(out)], check=True)
+        r = json.loads(out.read_text())
+        print('Llama example:', r['verdict'], r['explanation'])
+PY

@@ -21,13 +21,13 @@ ROOTS = r'(?:candidates|research|bench|docs|eval|bin|models)/'
 CODE = re.compile(r'(?:' + ROOTS + r'(?:[^/]+/)*)?[^/]+\.(?:py|sh|md|toml|cfg|html|css|js)'
                   r'|(?:' + ROOTS + r'(?:[^/]+/)*)?requirements[^/]*\.txt'
                   r'|(?:' + ROOTS + r'(?:[^/]+/)*)?\.gitignore'
-                  r'|bin/[^/]+|candidates/[^/]+/bin/[^/]+|\.github/workflows/[^/]+\.yml')
+                  r'|bench/challenge/llama_sample\.txt|bin/[^/]+|candidates/[^/]+/bin/[^/]+|\.github/workflows/[^/]+\.yml')
 CONFIG = re.compile(r'candidates/[^/]+/config\.json|models/registry\.json|eval/weights\.json|bench/[^/]+\.json')
 ARTIFACT = re.compile(r'candidates/[^/]+/artifacts/[^/]+\.joblib')
 RECORD = re.compile(r'research/evals/[^/]+/(?:summary|details)\.json')
 LOG = re.compile(r'research/evals/[^/]+/(?:run|app|tests|guard)\.log')
 RESULT = re.compile(r'bench/results/[^/]+\.json')
-SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl')
+SYNTH = re.compile(r'(?:research/stress|bench/fixtures)/[^/]+\.jsonl|bench/challenge/india_challenge_v1\.jsonl')
 # (allowed keys, required keys) per synthetic directory.
 SYNTH_KEYS = {'research/stress': ({'id', 'label', 'text'}, {'label', 'text'}),
               'bench/fixtures': ({'id', 'input', 'expect', 'rationale'}, {'id', 'input', 'expect', 'rationale'})}
@@ -160,7 +160,10 @@ def config_ok(data):
 
 
 def synth_ok(path, data):
-    allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
+    if path == 'bench/challenge/india_challenge_v1.jsonl':
+        allowed = required = {'id', 'text', 'lang', 'label', 'category', 'pair_id', 'route'}
+    else:
+        allowed, required = SYNTH_KEYS[path.rsplit('/', 1)[0]]
     try:
         rows = [loads(x) for x in data.decode('utf-8').splitlines() if x.strip()]
     except (ValueError, UnicodeError, RecursionError):

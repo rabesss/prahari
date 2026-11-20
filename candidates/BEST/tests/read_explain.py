@@ -30,7 +30,7 @@ _spec.loader.exec_module(_scorer)
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cases", default=str(CAND / "tests" / "explain_cases.jsonl"))
+    ap.add_argument("--cases", default=str(CAND.parents[0] / "BEST" / "tests" / "explain_cases.jsonl"))
     ap.add_argument("--only", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--out", default="/var/tmp/kavach-explain-read.jsonl")
