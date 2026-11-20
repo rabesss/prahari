@@ -283,3 +283,18 @@ def test_fake_completion_cannot_override_process_exit(tmp_path):
     code = "import os,pathlib; pathlib.Path(os.environ['PRAHARI_STAGE_STATUS']).write_text('0'); raise SystemExit(7)"
     result = run_eval.run_proc([sys.executable, '-c', code], env, 5, tmp_path, tmp_path / 'proc.log', rss_method='systemd_scope')
     assert result['rc'] == 7
+
+
+def test_candidate_hash_is_independent_of_checkout_umask(tmp_path):
+    import shutil
+    from run_eval import candidate_hash
+    a, b = tmp_path / 'a', tmp_path / 'b'
+    a.mkdir(mode=0o755)
+    (a / 'run').write_text('same')
+    (a / 'run').chmod(0o755)
+    shutil.copytree(a, b)
+    b.chmod(0o775)
+    (b / 'run').chmod(0o775)
+    assert candidate_hash(a) == candidate_hash(b)
+    (b / 'run').chmod(0o664)
+    assert candidate_hash(a) != candidate_hash(b)

@@ -615,13 +615,15 @@ def explanation_components(item, output):
 
 
 def candidate_hash(root):
-    """Hash relative names, types, modes, symlink targets and bytes in sorted order."""
+    """Hash names, types, executable bits and bytes, independent of checkout umask."""
     h = hashlib.sha256()
     def add(value):
         h.update(len(value).to_bytes(8, 'big')); h.update(value)
     def visit(path, rel):
         st = path.lstat()
-        add(os.fsencode(rel)); add(str(st.st_mode).encode())
+        add(os.fsencode(rel))
+        add(b'dir' if path.is_dir() and not path.is_symlink() else
+            b'file-exec' if st.st_mode & 0o111 else b'file')
         if path.is_symlink():
             raise ValueError('candidate symlinks are unsupported')
         elif path.is_dir():
