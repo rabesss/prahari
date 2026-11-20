@@ -2,7 +2,7 @@
 import re
 
 CLAIM = re.compile(r'\b(no risk found|nothing suspicious|safe|unsafe|dangerous|malicious|phishing|fraud(?:ulent)?|scam|suspicious)\b', re.I)
-NEGATION = re.compile(r"\b(?:not|never|isn't|isnt|aren't|arent|without)\s+(?:(?:a|an|the)\s+)?$", re.I)
+NEGATION = re.compile(r"\b(?:not|never|isn't|isnt|aren't|arent|without)\s+(?:(?:very|really|entirely|completely|totally|necessarily)\s+){0,2}(?:(?:a|an|the)\s+)?$", re.I)
 SPLIT = re.compile(r'[.;!?]|\b(?:but|however|although|though|yet|except|while)\b', re.I)
 
 

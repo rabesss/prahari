@@ -82,8 +82,13 @@ def main():
         by_id = {r['id']: r for r in rows}
         for ident in sample:
             r, pred = by_id[ident], predictions[ident]
-            explanation, stats = ex.generate(ex.prompt(r['route'], r['text'], pred['label'], pred['evidence']))
-            result['explanations'][ident] = {'text': explanation, 'stats': stats}
+            try:
+                explanation, stats = ex.generate(ex.prompt(r['route'], r['text'], pred['label'], pred['evidence']))
+                if not isinstance(explanation, str) or not explanation.strip():
+                    raise ValueError('empty explanation')
+                result['explanations'][ident] = {'text': explanation, 'stats': stats, 'explanation_status': 'success'}
+            except ValueError:
+                result['explanations'][ident] = {'explanation_status': 'failed', 'explanation_error': 'Explanation unavailable.'}
             save()
     print(json.dumps(result['summary'], ensure_ascii=False, indent=2))
 

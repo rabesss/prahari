@@ -59,12 +59,19 @@ def triage(kind, inp, explain):
 
 
 class H(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(10)
+
     def do_GET(self):
         self._send(200, PAGE.encode(), "text/html; charset=utf-8")
 
     def do_POST(self):
         try:
-            length = int(self.headers.get("Content-Length", "0"))
+            lengths = self.headers.get_all("Content-Length", [])
+            if len(lengths) > 1:
+                raise ValueError
+            length = int(lengths[0] if lengths else "0")
             if length < 0 or self.headers.get("Transfer-Encoding"):
                 raise ValueError
         except ValueError:
@@ -81,7 +88,7 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(raw)
             if not isinstance(body, dict) or not isinstance(body.get('kind', 'sms'), str) or not isinstance(body.get('input', ''), str):
                 raise ValueError
-        except (ValueError, UnicodeDecodeError):
+        except Exception:
             self._send(400, b'{"error":"Invalid request body"}', "application/json")
             return
         res = triage(body.get("kind", "sms"), body.get("input", ""), bool(body.get("explain")))
@@ -91,6 +98,8 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        if code == 413:
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(data)
 

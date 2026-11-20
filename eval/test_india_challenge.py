@@ -33,3 +33,30 @@ def test_challenge_rejects_wrong_hash(tmp_path):
     path.write_text('{}\n')
     with pytest.raises(ValueError, match='sha256 mismatch'):
         load(path)
+
+
+def test_explanations_continue_after_consistency_failure(tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / 'candidates' / 'BEST'))
+    from triage import detect, llm
+
+    rows = [{'id': ident, 'text': text, 'lang': 'en', 'label': 'malicious',
+             'category': 'test', 'pair_id': None, 'route': 'sms'}
+            for ident, text in [('a', 'bad'), ('b', 'good')]]
+    monkeypatch.setattr(india_challenge, 'load', lambda _: rows)
+    monkeypatch.setattr(detect, 'predict_text', lambda texts: [(1, 0.9, ['signal']) for _ in texts])
+    class Fake:
+        def prompt(self, kind, text, label, evidence): return text
+        def generate(self, prompt):
+            if prompt == 'bad': raise ValueError('private details')
+            return 'Model explanation.', {'generated_tokens': 3}
+    monkeypatch.setattr(llm, 'Explainer', Fake)
+    sample, out = tmp_path / 'sample', tmp_path / 'result.json'
+    sample.write_text('a\nb\n')
+    monkeypatch.setattr(sys, 'argv', ['india_challenge', 'candidates/BEST', 'unused', '--sample', str(sample), '--out', str(out)])
+    india_challenge.main()
+    explanations = json.loads(out.read_text())['explanations']
+    assert explanations['a']['explanation_status'] == 'failed' and explanations['a']['explanation_error']
+    assert 'text' not in explanations['a'] and 'stats' not in explanations['a']
+    assert explanations['b']['explanation_status'] == 'success' and explanations['b']['text'] == 'Model explanation.'

@@ -24,7 +24,18 @@ from triage.detect import predict_flow_text
     ('no failed SSH logins', 0),
     ('without repeated failed login attempts', 0),
     ('successful backup. 300 failed SSH logins', 1),
-    ('backup completed. 300 failed SSH logins were authenticated', 0),
+    ('backup completed. 300 failed SSH logins were authenticated', 1),
+    ('300 failed SSH logins followed by a successful login', 1),
+    ('300 failed SSH logins then attacker authenticated as admin', 1),
+    ('0 failed SSH logins', 0),
+    ('1 login attempt', 0),
+    ('2 login attempts', 0),
+    ('5 logins from office IP', 0),
+    ('failed passwords', 1),
+    ('no evidence of a port scan', 0),
+    ('no sign of any port scan', 0),
+    ('no reconnaissance or brute force seen', 0),
+    ('not a normal port scan', 'uncertain'),
     ('normal traffic, no port scan', 0),
     ('this is not a port scan', 0),
     # Negation of "normal" leaves the scan itself ambiguous.
@@ -38,3 +49,8 @@ from triage.detect import predict_flow_text
 ])
 def test_flow_policy(text, expected):
     assert predict_flow_text(text)[0] == expected
+
+
+def test_failure_then_success_evidence():
+    _, _, evidence = predict_flow_text('300 failed SSH logins followed by a successful login')
+    assert any('possible compromise' in item for item in evidence)

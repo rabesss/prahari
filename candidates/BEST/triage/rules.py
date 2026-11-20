@@ -124,8 +124,8 @@ FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
     ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
-                    r"(?:(?:\d+|failed|invalid|unsuccessful|denied|repeated|multiple|many)\s+){1,3}"
-                    r"(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?|password\s+(?:attempts?|failures?)))\b", "many failed logins look like password guessing"),
+                    r"(?:(?:\d[\d,]*|failed|invalid|unsuccessful|denied|repeated|multiple|many)\s+){1,3}"
+                    r"(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?|passwords?(?:\s+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
     ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
@@ -146,15 +146,28 @@ def flow_text_indicators(text):
         for match in re.finditer(pattern, t):
             # Only nearby, direct negation suppresses a signal. A modifier such as
             # "normal" between negation and indicator remains ambiguous.
-            before = t[max(0, match.start() - 40):match.start()]
-            if re.search(r"\b(?:no|zero|not|without|never)\s+(?:(?:a|an|the)\s+)?$", before):
+            before = t[max(0, match.start() - 100):match.start()]
+            if re.search(r"\b(?:no|zero|not|without|never)\s+"
+                         r"(?:(?:any\s+)?(?:signs?|evidence|indications?|traces?)\s+of\s+)?"
+                         r"(?:(?:a|an|the|any)\s+)?$", before):
+                continue
+            # A short coordinated list shares the initial negation.
+            if re.search(r"\b(?:no|without)\s+(?:[\w-]+\s+){0,3}"
+                         r"(?:or|nor)\s+(?:(?:a|an|any)\s+)?$", before):
                 continue
             if name == "brute_force":
                 left = re.split(r"[.;!?]", t[max(0, match.start() - 40):match.start()])[-1]
                 right = re.split(r"[.;!?]", t[match.end():match.end() + 40])[0]
                 clause = left + match.group() + right
-                if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause):
+                count = re.search(r"\b\d[\d,]*\b", match.group())
+                if count and int(count.group().replace(',', '')) == 0:
                     continue
+                signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
+                if not signals and (not count or int(count.group().replace(',', '')) < 10):
+                    continue
+                if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause) and re.search(
+                        r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()):
+                    description = "failed logins followed by a successful login (possible compromise)"
             found.append((name, description))
             break
     return found

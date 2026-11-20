@@ -121,7 +121,30 @@ def test_http_rejects_oversized_and_malformed_bodies():
             conn.request('POST', '/api/triage', body)
             response = conn.getresponse()
             assert response.status == status and message in response.read()
+            if status == 413:
+                assert response.getheader('Connection') == 'close'
             conn.close()
+    finally:
+        httpd.shutdown()
+        thread.join()
+        httpd.server_close()
+
+
+def test_http_rejects_deep_json_and_duplicate_lengths():
+    import http.client
+    import socket
+    httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        conn = http.client.HTTPConnection('127.0.0.1', httpd.server_port, timeout=5)
+        conn.request('POST', '/api/triage', b'[' * 2000 + b']' * 2000)
+        response = conn.getresponse()
+        assert response.status == 400 and b'Invalid request body' in response.read()
+        conn.close()
+        with socket.create_connection(('127.0.0.1', httpd.server_port), timeout=5) as sock:
+            sock.sendall(b'POST /api/triage HTTP/1.1\r\nHost: localhost\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{}')
+            assert b' 400 ' in sock.recv(1024).split(b'\r\n', 1)[0]
     finally:
         httpd.shutdown()
         thread.join()

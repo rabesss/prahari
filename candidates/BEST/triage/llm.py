@@ -384,8 +384,7 @@ def _consistent(text, verdict):
             continue
         benign_claim = _BENIGN_CLAIM.search(probe)
         if verdict == 1 and benign_claim and not _CONTRAST.search(probe) \
-                and (benign_claim.group().lower() in ('no risk found', 'nothing suspicious')
-                     or not _NEGATED.search(probe)) and not _MAL_CLAIM.search(probe):
+                and not _NEGATED.search(probe) and not _MAL_CLAIM.search(probe):
             continue
         if verdict == 0 and _MAL_CLAIM.search(probe) and not _CONTRAST.search(probe) \
                 and not _NEGATED.search(probe):
