@@ -711,7 +711,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     art = PROJ / "research" / "evals" / f"{stamp}-{label}"
     priv = EVROOT / "private" / f"{stamp}-{label}"
-    work = EVROOT / "work" / f"{stamp}-{label}"
+    work = scratch / "work"
     for d in (art, priv, work):
         d.mkdir(parents=True, exist_ok=True)
     failures, infra = [], []
