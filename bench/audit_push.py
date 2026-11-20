@@ -45,8 +45,8 @@ SECRET = re.compile(rb'(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9_]{20,}
 NUM = r'\d+(?:\.\d+)?'
 PYTEST_COUNTS = r'\d+ (?:passed|failed|skipped|errors?|warnings?|deselected|xfailed|xpassed)'
 STATUS = [re.compile(p) for p in (
-    r'== python(?:3(?:\.\d+)?)?  rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=' + NUM + r'\s*',
-    r'== (?:predict --task (?:sms|url|flow)|explain --in) rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=' + NUM + r'\s*',
+    r'== python(?:3(?:\.\d+)?)?  rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=(?:' + NUM + r'|None)\s*',
+    r'== (?:predict --task (?:sms|url|flow)|explain --in) rc=-?\d+ timeout=(?:True|False) wall_s=' + NUM + ' peak_rss_mb=(?:' + NUM + r'|None)\s*',
     r'=+ ' + PYTEST_COUNTS + r'(?:, ' + PYTEST_COUNTS + r')* in ' + NUM + r's(?: \(\d+:\d\d:\d\d\))? =+\s*',
     r'[.sxEF]+\s+\[\s*\d+%\]\s*',
     PYTEST_COUNTS + r'(?:, ' + PYTEST_COUNTS + r')* in ' + NUM + r's\s*',

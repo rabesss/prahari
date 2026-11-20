@@ -348,3 +348,10 @@ def test_audit_pins_dev_v2_bytes(tmp_path):
     result = audit(tmp_path, base)
     assert result.returncode == 1
     assert 'India dev v2 sha256 mismatch' in result.stdout
+
+
+def test_runner_status_accepts_unavailable_peak_without_extra_content():
+    from bench.audit_push import STATUS
+    line = '== predict --task sms rc=-9 timeout=True wall_s=0.15 peak_rss_mb=None'
+    assert any(rx.fullmatch(line) for rx in STATUS)
+    assert not any(rx.fullmatch(line + ' diagnostic') for rx in STATUS)
