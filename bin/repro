@@ -6,11 +6,15 @@ CAND="$ROOT/candidates/BEST"
 CHALLENGE=""
 while (($#)); do
   case "$1" in
-    --challenge) CHALLENGE="${2:?missing challenge path}"; shift 2 ;;
+    --challenge) CHALLENGE="$(realpath -e "${2:?missing challenge path}")"; shift 2 ;;
     --candidate) CAND="$(realpath "${2:?missing candidate path}")"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+case "$CAND/" in
+  "$ROOT/"*) ;;
+  *) echo 'candidate must be inside the repository' >&2; exit 2 ;;
+esac
 PY="${HC_PY:-$ROOT/.venv/bin/python}"
 export HC_PY="$PY"
 cd "$ROOT"
