@@ -172,3 +172,18 @@ def test_hidden_hashes_must_match_controller_pin(mutate):
         return
     with pytest.raises(ValueError, match='hidden data hashes'):
         compare_pair(b, c)
+
+
+def test_candidate_hash_ignores_python_caches(tmp_path):
+    from run_eval import candidate_hash
+    (tmp_path / 'pkg').mkdir()
+    (tmp_path / 'pkg' / 'mod.py').write_text('x = 1\n')
+    before = candidate_hash(tmp_path)
+    (tmp_path / 'pkg' / '__pycache__').mkdir()
+    (tmp_path / 'pkg' / '__pycache__' / 'mod.cpython-312.pyc').write_bytes(b'cache')
+    (tmp_path / '.pytest_cache').mkdir()
+    (tmp_path / '.pytest_cache' / 'v').write_text('cache')
+    (tmp_path / 'stray.pyc').write_bytes(b'cache')
+    assert candidate_hash(tmp_path) == before
+    (tmp_path / 'pkg' / 'mod.py').write_text('x = 2\n')
+    assert candidate_hash(tmp_path) != before
