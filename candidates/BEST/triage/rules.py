@@ -123,14 +123,15 @@ def injection_indicators(text):
 FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
-    ("brute_force", r"\b(\d+\s+(failed\s+)?(login|password)\s+(attempts?|failures?)|failed\s+(logins?|passwords?)|"
-                    r"\d+\s+failed\s+(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?)|login\s+attempts?|brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
+    ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
+                    r"(?:(?:\d+|failed|invalid|unsuccessful|denied|repeated|multiple|many)\s+){1,3}"
+                    r"(?:(?:ssh|rdp|ftp)\s+)?(?:logins?|login\s+attempts?|password\s+(?:attempts?|failures?)))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
     ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
     ("periodic", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?)\b", "connections repeat at a fixed interval"),
     ("rejected", r"\b(rejected|reset|rst|refused|s0)\b", "most connections were rejected or reset"),
-    ("root", r"\b(root shell|su attempt|privilege)\b", "the session tried to gain root privileges"),
+    ("root", r"\b(root shell|su attempt|gained root|privilege escalation|(?:escalated|elevated) privileges)\b", "the session tried to gain root privileges"),
 ]
 
 
@@ -140,4 +141,18 @@ BENIGN_FLOW = re.compile(r"\b(software update|update check|routine|normal|expect
 
 def flow_text_indicators(text):
     t = text.lower()
-    return [(n, d) for n, p, d in FLOW_RULES if re.search(p, t)]
+    found = []
+    for name, pattern, description in FLOW_RULES:
+        for match in re.finditer(pattern, t):
+            # Only nearby, direct negation suppresses a signal. A modifier such as
+            # "normal" between negation and indicator remains ambiguous.
+            before = t[max(0, match.start() - 40):match.start()]
+            if re.search(r"\b(?:no|zero|not|without|never)\s+(?:(?:a|an|the)\s+)?$", before):
+                continue
+            if name == "brute_force":
+                clause = re.split(r"[.;!?]", t[max(0, match.start() - 40):match.end() + 40])[0]
+                if re.search(r"\b(?:successful|succeeded|authenticated)\b", clause):
+                    continue
+            found.append((name, description))
+            break
+    return found
