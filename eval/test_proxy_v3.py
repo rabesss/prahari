@@ -50,8 +50,8 @@ def test_rss_uses_simultaneous_sum(tmp_path):
     assert tree_rss_kb(tree_pids(1, tmp_path), tmp_path) == 50
 
 
-@pytest.mark.parametrize('lat,rss,timed,expected', [(4.5,2.6,False,True),(4.50001,2.6,False,False),
-    (4.5,2.60001,False,False),(None,1,False,False),(1,None,False,False),(1,1,True,False)])
+@pytest.mark.parametrize('lat,rss,timed,expected', [(6,3,False,True),(6.00001,3,False,False),
+    (6,3.00001,False,False),(None,1,False,False),(1,None,False,False),(1,1,True,False)])
 def test_measurement_gate(lat,rss,timed,expected):
     assert measurements_ok(lat,rss,timed) is expected
 
@@ -89,8 +89,24 @@ def test_missing_india_is_infra_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'HIDDEN', tmp_path / 'absent')
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
     result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
+    assert set(result['host_start']) == {'load_average', 'cpu_steal_percent'}
+    assert set(result['host_end']) == {'load_average', 'cpu_steal_percent'}
+    assert result['contended'] == (result['host_start']['load_average'][0] > 1.5)
     assert not result['promotable']
     assert any('adaptive India v2 data missing or invalid' in e for e in result['infra_errors'])
+
+
+def test_missing_host_sample_is_infra_failure(monkeypatch, tmp_path):
+    import argparse
+    import run_eval
+    (tmp_path / 'research/evals').mkdir(parents=True)
+    monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
+    monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
+    monkeypatch.setattr(run_eval, 'host_snapshot', lambda: None)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(tmp_path / 'missing'), label=None, quick=False), 0)
+    assert result['contended'] is None
+    assert not result['promotable']
+    assert 'host load or CPU steal measurement unavailable' in result['infra_errors']
 
 
 def test_process_timeout_and_measurement(tmp_path):

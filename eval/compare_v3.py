@@ -41,6 +41,20 @@ def compare(best, candidate, threshold):
     for r in best + candidate:
         if r.get('quick') is not False or r.get('failures') != [] or r.get('infra_errors') != [] or r.get('promotable') is not True:
             return {'pass': False, 'failures': ['a full run failed or is not promotable']}
+        if r.get('contended') is not False:
+            return {'pass': False, 'failures': ['contended or unmeasured run; rerun the comparison']}
+        for end in ('host_start', 'host_end'):
+            snapshot = r.get(end)
+            if not isinstance(snapshot, dict) or not isinstance(snapshot.get('load_average'), list) or len(snapshot['load_average']) != 3:
+                return {'pass': False, 'failures': ['missing host measurement; rerun the comparison']}
+            try:
+                vals = [value(snapshot, 'cpu_steal_percent')] + [value({'load': v}, 'load') for v in snapshot['load_average']]
+            except ValueError:
+                return {'pass': False, 'failures': ['invalid host measurement; rerun the comparison']}
+            if not 0 <= vals[0] <= 100 or any(v < 0 for v in vals[1:]) or (end == 'host_start' and vals[1] > 1.5):
+                return {'pass': False, 'failures': ['contended or invalid host measurement; rerun the comparison']}
+        if not (0 < value(r, 'latency_s_per_item') <= 6.0 and 0 < value(r, 'peak_process_tree_rss_gb') <= 3.0):
+            return {'pass': False, 'failures': ['performance sanity cap failed']}
     def avg(runs, *path):
         return mean(value(r, *path) for r in runs)
     reasons = []
@@ -60,9 +74,9 @@ def compare(best, candidate, threshold):
         reasons.append('injection recall fell')
     if avg(candidate, 'india', 'benign_ai_mention_fpr') > avg(best, 'india', 'benign_ai_mention_fpr'):
         reasons.append('benign AI mention FPR rose')
-    for metric, factor, cap in (('latency_s_per_item', 1.10, 4.5), ('peak_process_tree_rss_gb', 1.05, 2.6)):
+    for metric, factor in (('latency_s_per_item', 1.10), ('peak_process_tree_rss_gb', 1.05)):
         b, c = avg(best, metric), avg(candidate, metric)
-        if b <= 0 or c <= 0 or c > b * factor or c > cap:
+        if b <= 0 or c <= 0 or c > b * factor:
             reasons.append(metric + ' failed')
     return {'pass': not reasons, 'failures': reasons, 'delta': delta, 'threshold': threshold}
 

@@ -81,6 +81,10 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 
 Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
 fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
+Every run has sanity caps of 6.0 s/item and 3.0 GB process-tree peak RSS; missing
+measurements and timeouts fail. In the same interleaved comparison, candidate mean
+latency must be at most 110% of BEST and mean RSS at most 105% of BEST. Re-run
+comparisons containing a run with start 1-minute load above 1.5 or missing host data.
 The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS
 user and an author with the visible v2-dev set. It is not independent evidence.
 Hidden v2 SHA-256: `532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0`.

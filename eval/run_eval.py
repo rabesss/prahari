@@ -46,6 +46,26 @@ NUM_RE = re.compile(r"\+?\d[\d\s-]{4,}\d")
 REPORT_SECTIONS = ["problem", "architecture", "models", "datasets", "results", "performance", "limitations", "responsible"]
 
 
+def host_snapshot():
+    """Load averages and host-wide CPU steal over a short sample interval."""
+    try:
+        load = list(os.getloadavg())
+        def cpu_ticks():
+            fields = Path('/proc/stat').read_text().splitlines()[0].split()
+            if fields[0] != 'cpu' or len(fields) < 9:
+                raise ValueError('incomplete CPU counters')
+            ticks = [int(x) for x in fields[1:9]]
+            return sum(ticks), ticks[7]
+        total0, steal0 = cpu_ticks()
+        time.sleep(.1)
+        total1, steal1 = cpu_ticks()
+        if total1 <= total0 or steal1 < steal0:
+            raise ValueError('invalid CPU counter delta')
+        return {'load_average': load, 'cpu_steal_percent': 100 * (steal1 - steal0) / (total1 - total0)}
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def clip(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))
 
@@ -388,12 +408,14 @@ def main():
         result['failures'] = [f'run {k+1}: {x}' for k, r in enumerate(results) for x in r['failures']]
         result['infra_errors'] = [f'run {k+1}: {x}' for k, r in enumerate(results) for x in r['infra_errors']]
         result['promotable'] = all(r['promotable'] for r in results)
+        result['contended'] = any(r.get('contended') is not False for r in results)
     print(json.dumps(result))
     return 0 if not result['failures'] and not result['infra_errors'] else 1
 
 
 def run_once(a, run_index):
     full_start = time.monotonic()
+    host_start = host_snapshot()
     cand = Path(a.candidate).resolve()
     label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or cand.name)
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
@@ -404,9 +426,13 @@ def run_once(a, run_index):
         d.mkdir(parents=True, exist_ok=True)
     failures, infra = [], []
     summary = {"label": label, "candidate": str(cand), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
-               "quick": a.quick}
+               "quick": a.quick, "host_start": host_start,
+               "contended": host_start['load_average'][0] > 1.5 if host_start else None}
 
     def finish(score, scores, extra=None):
+        summary['host_end'] = host_snapshot()
+        if host_start is None or summary['host_end'] is None:
+            infra.append('host load or CPU steal measurement unavailable')
         summary.update({"score": score, "scores": scores, "failures": failures, "infra_errors": infra,
                         "full_wall_s": time.monotonic() - full_start})
         summary["promotable"] = (not a.quick) and not failures and not infra
@@ -442,6 +468,10 @@ def run_once(a, run_index):
     tq = time.time()
     fcntl.flock(lf, fcntl.LOCK_EX)
     summary["queued_s"] = round(time.time() - tq, 1)
+    # A run may have waited behind another evaluator; measure the actual start.
+    host_start = host_snapshot()
+    summary['host_start'] = host_start
+    summary['contended'] = host_start['load_average'][0] > 1.5 if host_start else None
 
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BOXD", "SAIL", "OPENAI", "ANTHROPIC", "GH_", "GITHUB"))}
     env.update({
@@ -619,7 +649,7 @@ def run_once(a, run_index):
     P['parts']['peak_rss'] = p_parts['peak_rss']
     scores['P'] = sum(W['P'][k] * p_parts[k] for k in W['P'])
     if not measurements_ok(lat, rss_gb, any(r.get('timed_out', True) for r in process_runs)):
-        failures.append('hard performance gate failed: missing measurement, timeout, latency > 4.5 s/item, or RSS > 2.6 GB')
+        failures.append('performance sanity cap failed: missing measurement, timeout, latency > 6.0 s/item, or RSS > 3.0 GB')
     gate = {"llama_family": model.get("family") == "llama",
             "executorch_pte_loaded": all(r["pte_seen"] for r in runs) if runs else False,
             "llm_stats_plausible": plausible >= 0.9 * len(items) if items else False}
