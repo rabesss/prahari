@@ -107,7 +107,7 @@ def test_missing_india_is_infra_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
     monkeypatch.setattr(run_eval, 'HIDDEN', tmp_path / 'absent')
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
-    result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, no_cooldown=True, repeats=1), 0)
     assert set(result['host_start']) == {'load_average', 'cpu_steal_percent'}
     assert set(result['host_end']) == {'load_average', 'cpu_steal_percent'}
     assert result['contended'] == (result['host_start']['load_average'][0] > 1.5)
@@ -122,7 +122,7 @@ def test_missing_host_sample_is_infra_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
     monkeypatch.setattr(run_eval, 'host_snapshot', lambda: None)
-    result = run_eval.run_once(argparse.Namespace(candidate=str(tmp_path / 'missing'), label=None, quick=False), 0)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(tmp_path / 'missing'), label=None, quick=False, no_cooldown=True), 0)
     assert result['contended'] is None
     assert not result['promotable']
     assert 'host load or CPU steal measurement unavailable' in result['infra_errors']
@@ -154,7 +154,7 @@ def test_corrupt_india_is_infra_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
     monkeypatch.setattr(run_eval, 'HIDDEN', hidden)
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'private')
-    result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, repeats=1), 0)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(cand), label=None, quick=False, no_cooldown=True, repeats=1), 0)
     assert not result['promotable']
     assert any('SHA-256 mismatch' in e for e in result['infra_errors'])
 
@@ -168,7 +168,7 @@ def test_run_scratch_is_fresh_and_removed(monkeypatch, tmp_path):
     monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'eval')
     monkeypatch.setattr(run_eval, 'LOCK', tmp_path / 'eval/lock')
     seen = []
-    def fake(a, index, original, scratch, digest, queued, full_start):
+    def fake(a, index, original, scratch, digest, queued, full_start, cooldown_s):
         assert original == candidate
         assert (scratch / 'candidate/source').read_text() == 'unchanged'
         assert digest == run_eval.candidate_hash(candidate)
@@ -176,7 +176,7 @@ def test_run_scratch_is_fresh_and_removed(monkeypatch, tmp_path):
         seen.append(scratch)
         return {}
     monkeypatch.setattr(run_eval, '_run_once', fake)
-    args = argparse.Namespace(candidate=str(candidate))
+    args = argparse.Namespace(candidate=str(candidate), no_cooldown=True)
     run_eval.run_once(args, 0)
     run_eval.run_once(args, 1)
     assert seen[0] != seen[1] and all(not p.exists() for p in seen)
@@ -218,7 +218,7 @@ def test_original_change_and_contention_prevent_promotion(monkeypatch, tmp_path)
         (candidate / 'changed').write_text('changed')
         return {'load_average': [2, 1, 1], 'cpu_steal_percent': 0}
     monkeypatch.setattr(run_eval, 'host_snapshot', sample)
-    result = run_eval.run_once(argparse.Namespace(candidate=str(candidate), label=None, quick=False), 0)
+    result = run_eval.run_once(argparse.Namespace(candidate=str(candidate), label=None, quick=False, no_cooldown=True), 0)
     assert 'candidate modified during eval' in result['failures']
     assert result['contended'] and not result['promotable']
     assert result['host_during']['load_1m_max'] == 2
@@ -356,3 +356,81 @@ def test_bwrap_keeps_cgroups_read_only():
                             'import os; assert os.statvfs("/sys/fs/cgroup").f_flag & os.ST_RDONLY; assert os.urandom(1); open("/dev/null", "w").write("x")'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     assert probe.returncode == 0
+
+
+def test_cooldown_waits_until_load_settles_and_stops_at_timeout():
+    from run_eval import cooldown
+    now = [0.0]
+    sleeps = []
+    def sleep(seconds):
+        sleeps.append(seconds)
+        now[0] += seconds
+    loads = iter([(3, 0, 0), (2, 0, 0), (1.5, 0, 0)])
+    assert cooldown(lambda: next(loads), lambda: now[0], sleep) == 10
+    assert sleeps == [5, 5]
+    now[0] = 0
+    sleeps.clear()
+    assert cooldown(lambda: (3, 0, 0), lambda: now[0], sleep) == 360
+    assert len(sleeps) == 72 and all(s == 5 for s in sleeps)
+
+
+def test_cooldown_excluded_from_full_wall_and_can_be_disabled(monkeypatch, tmp_path):
+    import argparse
+    import run_eval
+    (tmp_path / 'research/evals').mkdir(parents=True)
+    monkeypatch.setattr(run_eval, 'PROJ', tmp_path)
+    monkeypatch.setattr(run_eval, 'EVROOT', tmp_path / 'eval')
+    monkeypatch.setattr(run_eval, 'LOCK', tmp_path / 'eval/lock')
+    monkeypatch.setattr(run_eval, 'host_snapshot', lambda: {'load_average': [2, 1, 1], 'cpu_steal_percent': 0})
+    monkeypatch.setattr(run_eval, 'cooldown', lambda: 360)
+    args = argparse.Namespace(candidate=str(tmp_path / 'missing'), label=None, quick=False)
+    result = run_eval.run_once(args, 0)
+    assert result['cooldown_s'] == 360 and result['full_wall_s'] < 5
+    assert result['contended'] and not result['promotable']
+    args.no_cooldown = True
+    assert run_eval.run_once(args, 0)['cooldown_s'] == 0
+
+
+def test_cgroup_attribution_and_mode_policy(tmp_path):
+    from run_eval import attributed_cgroup_changes, census_enforced
+    before = {'/user/old.scope': frozenset({'10'})}
+    after = {'/user/old.scope': frozenset({'10'}), '/user/other.scope': frozenset({'20'}),
+             '/user/own.scope': frozenset({'21'})}
+    (tmp_path / '20').mkdir()
+    (tmp_path / '20/environ').write_bytes(b'OTHER=x\0')
+    check = lambda pids, nonce: attributed_cgroup_changes(before, after, 'own.scope', pids, nonce, tmp_path)
+    assert not check({21}, 'abc')
+    assert check({20}, 'abc')
+    (tmp_path / '20/environ').write_bytes(b'PRAHARI_STAGE_NONCE=abc\0')
+    assert check(set(), 'abc')
+    assert not check(set(), 'different')
+    assert not census_enforced(True, True, False)
+    assert census_enforced(True, False, True)
+    assert census_enforced(False, True, False)
+    assert not census_enforced(False, False, False)
+
+
+@pytest.mark.parametrize('isolated,attributed,expected', [(True, False, False), (True, True, True), (False, False, True)])
+def test_run_proc_census_enforcement(monkeypatch, tmp_path, isolated, attributed, expected):
+    import os
+    import sys
+    import run_eval
+    units = iter([set(), {'unrelated.scope'}])
+    monkeypatch.setattr(run_eval, 'user_units', lambda env: next(units))
+    monkeypatch.setattr(run_eval, 'cgroup_census', lambda: {})
+    monkeypatch.setattr(run_eval, 'attributed_cgroup_changes', lambda *args: attributed)
+    monkeypatch.setattr(run_eval, 'external_census', lambda *args: {})
+    monkeypatch.setattr(run_eval, 'sweep_external', lambda *args: None)
+    popen = run_eval.subprocess.Popen
+    def launch(cmd, *args, **kwargs):
+        if cmd[0] == 'bwrap':
+            cmd = cmd[cmd.index('--') + 1:]
+        return popen(cmd, *args, **kwargs)
+    monkeypatch.setattr(run_eval.subprocess, 'Popen', launch)
+    env = dict(os.environ, PRAHARI_ISOLATION_METHOD='bwrap' if isolated else 'unavailable',
+               PRAHARI_SCRATCH=str(tmp_path), PRAHARI_WORK=str(tmp_path))
+    result = run_eval.run_proc([sys.executable, '-c', 'pass'], env, 5, tmp_path,
+                               tmp_path / 'run.log', rss_method='proc_fallback')
+    assert result['unit_census']['new_other_scopes'] == 1
+    assert result['stray_unit'] == expected
+    assert result['stray_cgroup'] == (isolated and attributed)

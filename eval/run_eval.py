@@ -70,6 +70,22 @@ def host_snapshot():
         return None
 
 
+def cooldown(load_reader=os.getloadavg, clock=time.monotonic, sleep=time.sleep, timeout=360):
+    """Wait for the lagging one-minute load to settle, bounded by timeout."""
+    start = clock()
+    while True:
+        try:
+            if load_reader()[0] <= 1.5:
+                break
+        except (OSError, ValueError, IndexError):
+            break  # host_snapshot will report an unavailable measurement
+        remaining = timeout - (clock() - start)
+        if remaining <= 0:
+            break
+        sleep(min(5, remaining))
+    return clock() - start
+
+
 def clip(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))
 
@@ -211,7 +227,7 @@ STAGE_ENV_KEYS = frozenset(('PATH', 'LANG', 'LC_ALL', 'TZ', 'HOME', 'XDG_CACHE_H
     'XDG_DATA_HOME', 'TMPDIR', 'PYTHONPATH', 'PYTHONDONTWRITEBYTECODE', 'HC_GUARD_LOG',
     'HC_GUARD_DENY_PATHS', 'HC_MODEL_REGISTRY', 'HC_PY', 'http_proxy', 'https_proxy',
     'HTTP_PROXY', 'HTTPS_PROXY', 'no_proxy', 'HF_HUB_OFFLINE', 'TRANSFORMERS_OFFLINE',
-    'OMP_NUM_THREADS', 'PRAHARI_EXTERNAL_PREFIX'))
+    'OMP_NUM_THREADS', 'PRAHARI_EXTERNAL_PREFIX', 'PRAHARI_STAGE_NONCE'))
 
 
 def stage_environment(env):
@@ -232,22 +248,70 @@ def cgroup_census():
     return groups
 
 
+def attributed_cgroup_changes(before, after, unit, stage_pids, nonce, proc=Path('/proc')):
+    """Find new cgroup members attributable to this stage, not unrelated sessions."""
+    if after is None:
+        return False
+    before = before or {}
+    for path, members in after.items():
+        if unit in Path(path).parts:
+            continue
+        for pid in members - before.get(path, frozenset()):
+            if int(pid) in stage_pids:
+                return True
+            try:
+                entries = (proc / pid / 'environ').read_bytes().split(b'\0')
+                if ('PRAHARI_STAGE_NONCE=' + nonce).encode() in entries:
+                    return True
+            except (OSError, ValueError):
+                pass
+    return False
+
+
+def census_enforced(isolated, changed_or_unavailable, attributed):
+    return attributed if isolated else changed_or_unavailable or attributed
+
+
 def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
     """Run a stage in a scope or session, measure it, then kill and census it."""
     method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
     t0 = time.monotonic()
     start = log.stat().st_size if log.exists() else 0
     unit = 'prahari-eval-' + uuid.uuid4().hex + '.scope'
+    nonce = uuid.uuid4().hex
+    env = dict(env, PRAHARI_STAGE_NONCE=nonce)
+    isolated = env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap'
     units_before = user_units(env)
     roots = ['/dev/shm', '/var/tmp'] + ([env['XDG_RUNTIME_DIR']] if env.get('XDG_RUNTIME_DIR') else [])
     prefix = env.get('PRAHARI_EXTERNAL_PREFIX', 'prahari-eval-' + uuid.uuid4().hex + '-')
     external_before = None
-    cgroups_before = None
+    try:
+        cgroups_before = cgroup_census()
+    except OSError:
+        cgroups_before = None
+    attributed = False
+    cgroup_unavailable = cgroups_before is None
+    new_cgroups = set()
+    new_cgroup_members = set()
+    stage_pids = set()
+    next_census = 0.0
+    def observe_cgroups():
+        nonlocal attributed, cgroup_unavailable
+        try:
+            snapshot = cgroup_census()
+            attributed |= attributed_cgroup_changes(cgroups_before, snapshot, unit, stage_pids, nonce)
+            if cgroups_before is not None:
+                for path, members in snapshot.items():
+                    if unit not in Path(path).parts:
+                        if path not in cgroups_before:
+                            new_cgroups.add(path)
+                        new_cgroup_members.update((path, pid) for pid in members - cgroups_before.get(path, frozenset()))
+        except OSError:
+            cgroup_unavailable = True
     if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
         try:
             sweep_external(roots, prefix)
             external_before = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
-            cgroups_before = cgroup_census()
         except OSError:
             pass
     scope = None
@@ -291,6 +355,12 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                         except OSError:
                             pass
                 pids = scope_members(scope) if method == 'systemd_scope' else session_pids(p.pid) | tree_pids(p.pid)
+                if isolated:
+                    for pid in pids:
+                        stage_pids.update(tree_pids(pid))
+                    if time.monotonic() >= next_census or p.poll() is not None:
+                        observe_cgroups()
+                        next_census = time.monotonic() + 1
                 rss = tree_rss_kb(pids)
                 if rss is not None:
                     peak_kb = max(peak_kb or 0, rss)
@@ -369,19 +439,24 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                     p.wait()
             if peak_file is not None:
                 peak_file.close()
+    observe_cgroups()
     units_after = user_units(env)
     unit_unavailable = units_before is None or units_after is None
     new_units = set() if unit_unavailable else units_after - units_before - {unit}
-    stray_unit = unit_unavailable or bool(new_units)
+    stray_unit = census_enforced(isolated, unit_unavailable or bool(new_units), attributed)
     unit_census = {
         'unavailable': unit_unavailable,
         'new_prahari_scopes': sum(name.startswith('prahari-eval-') and name.endswith('.scope') for name in new_units),
         'new_other_scopes': sum(not name.startswith('prahari-eval-') and name.endswith('.scope') for name in new_units),
         'new_slices': sum(name.endswith('.slice') for name in new_units),
         'new_other': sum(not name.endswith(('.scope', '.slice')) for name in new_units),
+        'cgroup_unavailable': cgroup_unavailable,
+        'new_cgroups': len(new_cgroups),
+        'new_cgroup_members': len(new_cgroup_members),
+        'attributed': attributed,
     }
     persistent = False
-    stray_cgroup = False
+    stray_cgroup = attributed
     if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
         try:
             external_after = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
@@ -617,6 +692,7 @@ def main():
     ap.add_argument("--repeats", type=int, default=1, help="run the full evaluator N times")
     ap.add_argument("--label", default=None)
     ap.add_argument("--quick", action="store_true", help="8 explain items, 1 repeat, not promotable")
+    ap.add_argument('--no-cooldown', action='store_true', help='skip load cooldown (for tests)')
     a = ap.parse_args()
 
     if a.repeats < 1:
@@ -697,6 +773,7 @@ def run_once(a, run_index):
     with open(LOCK, 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         queued = time.monotonic() - queued
+        cooldown_s = 0.0 if getattr(a, 'no_cooldown', False) else cooldown()
         full_start = time.monotonic()
         original = Path(a.candidate).resolve()
         with tempfile.TemporaryDirectory(prefix='prahari-run-', dir=EVROOT) as scratch_name:
@@ -710,10 +787,10 @@ def run_once(a, run_index):
                 # The normal evaluator records a failed run for missing candidates.
                 digest = None
                 (scratch / 'candidate').mkdir(exist_ok=True)
-            return _run_once(a, run_index, original, scratch, digest, queued, full_start)
+            return _run_once(a, run_index, original, scratch, digest, queued, full_start, cooldown_s)
 
 
-def _run_once(a, run_index, original, scratch, digest, queued, full_start):
+def _run_once(a, run_index, original, scratch, digest, queued, full_start, cooldown_s):
     host_start = host_snapshot()
     cand = scratch / "candidate"
     label = re.sub(r"[^A-Za-z0-9_.-]", "_", a.label or original.name)
@@ -735,7 +812,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     sampler.start()
     summary = {"label": label, "candidate": str(original), "candidate_hash": digest, "session_id": os.environ.get("PRAHARI_EVAL_SESSION"), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
                "quick": a.quick, "host_start": host_start,
-               "contended": host_start['load_average'][0] > 1.5 if host_start else None, "queued_s": round(queued, 1)}
+               "contended": host_start['load_average'][0] > 1.5 if host_start else None, "queued_s": round(queued, 1), "cooldown_s": round(cooldown_s, 1)}
 
     def finish(score, scores, extra=None):
         stop_sampling.set()
@@ -993,7 +1070,8 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
         failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
     process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
     summary['unit_census'] = {key: sum(r.get('unit_census', {}).get(key, 0) for r in process_runs)
-                              for key in ('unavailable', 'new_prahari_scopes', 'new_other_scopes', 'new_slices', 'new_other')}
+                              for key in ('unavailable', 'new_prahari_scopes', 'new_other_scopes', 'new_slices', 'new_other',
+                                          'cgroup_unavailable', 'new_cgroups', 'new_cgroup_members', 'attributed')}
     if any(r.get('stray_cgroup') for r in process_runs):
         failures.append('stray cgroup or process outside evaluator scope')
     if any(r.get('persistent_state') for r in process_runs):
