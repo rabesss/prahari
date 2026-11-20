@@ -42,6 +42,10 @@ def test_weighted_total_and_mean_of_totals():
     ('Ordinary text here', "If it asks for your OTP, don't share it.", True),
     ('Ordinary text here', "The message asks for payment, so don't pay.", False),
     ('Ordinary text here', 'The message asks for payment if you agree.', False),
+    ('Hello there', 'If you are worried, the sender asks for payment.', False),
+    ('Hello there', 'The message contains a greeting, so do not share your OTP.', True),
+    ('Hello there', 'When the message asks for your OTP, do not share it.', True),
+    ('साधारण संदेश', 'यह संदेश भुगतान नहीं मांगता है।', True),
     ('Receipt for your payment', 'The sender requested a payment.', False),
     ('Receipt for the fee paid', 'The sender requested a payment.', False),
 ])
@@ -266,3 +270,16 @@ def test_cleanup_census_waits_for_exiting_members():
     states = iter([{123}, set()])
     assert not survivors_after_kill(lambda: next(states), timeout=1)
     assert survivors_after_kill(lambda: {123}, timeout=0) == {123}
+
+
+def test_fake_completion_cannot_override_process_exit(tmp_path):
+    import os
+    import sys
+    import run_eval
+    env = os.environ.copy()
+    if not run_eval.scope_available(env):
+        pytest.skip('user scopes unavailable')
+    env['PRAHARI_STAGE_STATUS'] = str(tmp_path / 'fake.status')
+    code = "import os,pathlib; pathlib.Path(os.environ['PRAHARI_STAGE_STATUS']).write_text('0'); raise SystemExit(7)"
+    result = run_eval.run_proc([sys.executable, '-c', code], env, 5, tmp_path, tmp_path / 'proc.log', rss_method='systemd_scope')
+    assert result['rc'] == 7

@@ -4,13 +4,21 @@ from compare_v3 import compare
 
 
 def run(score):
-    return {'candidate_hash': 'a' * 64, 'session_id': 'test-session', 'rss_method': 'proc_fallback', 'score': score, 'quick': False, 'failures': [], 'infra_errors': [], 'promotable': True,
+    return {'candidate_hash': 'a' * 64, 'session_id': 'test-session', 'rss_method': 'systemd_scope', 'isolation_method': 'bwrap', 'score': score, 'quick': False, 'failures': [], 'infra_errors': [], 'promotable': True,
             'scores': {'D': .8, 'I': .8, 'E': .8},
             'detection': {t: {'conservative': {'f1': .8, 'fpr': .02}} for t in ('sms','url','indic','flow')},
             'india': {'injection_recall': .8, 'benign_ai_mention_fpr': .02},
             'latency_s_per_item': 2, 'peak_process_tree_rss_gb': 2,
-            'contended': False, 'host_start': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0},
+            'host_during': {'cpu_steal_percent_max': 0}, 'contended': False, 'host_start': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0},
             'host_end': {'load_average': [1, 1, 1], 'cpu_steal_percent': 0}}
+
+
+@pytest.fixture(autouse=True)
+def best_pin(monkeypatch, tmp_path):
+    import compare_v3
+    pin = tmp_path / 'BEST.sha256'
+    pin.write_text('a' * 64 + '\n')
+    monkeypatch.setattr(compare_v3, 'BEST_PIN', pin)
 
 
 def compare_pair(b, c):
@@ -95,7 +103,7 @@ def test_each_candidate_run_meets_relative_caps():
         assert not compare(bs, cs, .5)['pass']
 
 
-@pytest.mark.parametrize('field,bad', [('candidate_hash', 'b' * 64), ('session_id', 'other'), ('rss_method', 'systemd_scope')])
+@pytest.mark.parametrize('field,bad', [('candidate_hash', 'b' * 64), ('session_id', 'other'), ('rss_method', 'proc_fallback')])
 def test_binding_rejects_changed_run(field, bad):
     b, c = run(70), run(71)
     bs = [dict(b, stamp=f'20261121-10000{i*2}-000000', candidate='BEST') for i in range(2)]
@@ -103,3 +111,39 @@ def test_binding_rejects_changed_run(field, bad):
     cs[1][field] = bad
     with pytest.raises(ValueError):
         compare(bs, cs, .5)
+
+
+def test_best_pin_and_fallback_fail_closed(best_pin):
+    import compare_v3
+    b, c = run(70), run(71)
+    b['candidate_hash'] = 'b' * 64
+    with pytest.raises(ValueError, match='BEST content hash'):
+        compare_pair(b, c)
+    b = run(70)
+    b['rss_method'] = c['rss_method'] = 'proc_fallback'
+    with pytest.raises(ValueError, match='systemd_scope'):
+        compare_pair(b, c)
+    b = run(70)
+    c = run(71)
+    c['host_during']['cpu_steal_percent_max'] = 21
+    assert not compare_pair(b, c)['pass']
+
+
+def test_promotion_updates_pin_and_rejects_best_drift(monkeypatch, tmp_path):
+    import promote_v3
+    from run_eval import candidate_hash
+    best = tmp_path / 'BEST'
+    cand = tmp_path / 'candidate'
+    best.mkdir()
+    cand.mkdir()
+    (best / 'program').write_text('old')
+    (cand / 'program').write_text('new')
+    pin = tmp_path / 'BEST.sha256'
+    pin.write_text(candidate_hash(best) + '\n')
+    digest = candidate_hash(cand)
+    monkeypatch.setattr(promote_v3, 'compare', lambda *_: {'pass': True})
+    promote_v3.promote(cand, best, [], [{'candidate_hash': digest}], .5, pin)
+    assert pin.read_text().strip() == candidate_hash(best) == digest
+    (best / 'program').write_text('drift')
+    with pytest.raises(ValueError, match='current BEST differs'):
+        promote_v3.promote(cand, best, [], [{'candidate_hash': digest}], .5, pin)

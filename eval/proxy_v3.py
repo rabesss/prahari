@@ -39,26 +39,29 @@ URL = re.compile(r'\b[a-z][a-z0-9+.-]*://\S+|(?<![\w.])[a-z0-9-]+(?:\.[a-z0-9-]+
 PAYMENT_RECEIPT = re.compile(r'\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|processed|successful)\b|\b(?:received|credited|paid)\b.{0,45}\b(?:payment|money|funds|amount|refund)\b|\breceipt\b', re.I)
 PAYMENT_REQUEST = re.compile(r'\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|भुगतान.{0,30}मांग', re.I)
 REQUEST_CLAIM = re.compile(r'\b(?:ask|asks|asked|asking|request|requests|requested|requesting|want|wants|demand|demands|demanded|demanding|requires?)\b|मांग(?:ता|ती|ा)?|चाहता', re.I)
-CONDITIONAL = re.compile(r"^\s*(?:if|unless)\b", re.I)
-NEGATED = re.compile(r"\b(?:not|never|doesn't|don't|didn't|does not|do not|did not)\s*$", re.I)
+CONDITIONAL = re.compile(r"^\s*(?:if|when|unless|यदि|अगर|जब)\b", re.I)
+NEGATED = re.compile(r"\b(?:not|never|doesn't|don't|didn't|does not|do not|did not)\s*$|नहीं\s*$", re.I)
 
 
 def grounding(input_text, explanation):
     if not isinstance(explanation, str) or len(explanation.strip().split()) < 5:
         return False
-    for sentence in re.split(r'(?<=[.!?;।])\s+', explanation):
-        claims = [m for m in CLAIM.finditer(sentence) if not NEGATED.search(sentence[:m.start()])]
-        if not claims or CONDITIONAL.search(sentence):
+    # A condition only exempts its own clause, not the following assertion.
+    for clause in re.split(r'[,;।!?]|(?<!\w)\.(?!\w)|\b(?:and then|so|but)\b|(?:इसलिए|लेकिन|फिर)', explanation, flags=re.I):
+        if CONDITIONAL.search(clause):
+            continue
+        claims = [m for m in CLAIM.finditer(clause) if not NEGATED.search(clause[:m.start()])]
+        if not claims:
             continue
         for name, cue in CUES.items():
-            if not cue.search(sentence):
+            if not cue.search(clause):
                 continue
             if name == 'link':
                 if not URL.search(input_text):
                     return False
             elif not cue.search(input_text):
                 return False
-            elif (name == 'payment' and REQUEST_CLAIM.search(sentence)
+            elif (name == 'payment' and REQUEST_CLAIM.search(clause)
                   and PAYMENT_RECEIPT.search(input_text) and not PAYMENT_REQUEST.search(input_text)):
                 return False
     return True

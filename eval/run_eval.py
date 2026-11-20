@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from conventional import metrics as conventional_metrics
 from consistency_v2 import consistent as consistent_v2
-from india_challenge import load as load_india
+from india_challenge import load_bytes as load_india
 from proxy_v3 import conservative, grounding, measurements_ok, mean, total as v3_total, tree_rss_kb
 
 PROJ = Path(__file__).resolve().parents[1]
@@ -159,24 +159,92 @@ def survivors_after_kill(members, timeout=2.0):
         time.sleep(.05)
 
 
+def user_units(env):
+    try:
+        result = subprocess.run(['systemctl', '--user', 'list-units', '--all', '--plain', '--no-legend', '--no-pager'],
+                                env=env, capture_output=True, text=True, timeout=10, check=True)
+        return {line.split()[0] for line in result.stdout.splitlines() if line.split()}
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def external_census(roots, exclusions):
+    """Snapshot same-user entries; an incomplete census fails closed."""
+    entries = {}
+    excluded = [Path(p).resolve() for p in exclusions]
+    def visit(path):
+        if any(path == x or x in path.parents for x in excluded):
+            return
+        try:
+            st = path.lstat()
+            if st.st_uid == os.getuid():
+                entries[str(path)] = (st.st_ino, st.st_mtime_ns, st.st_size, st.st_mode)
+            if path.is_dir() and not path.is_symlink():
+                for child in path.iterdir():
+                    visit(child)
+        except FileNotFoundError:
+            pass
+    for root in roots:
+        root = Path(root)
+        if root.is_dir():
+            for child in root.iterdir():
+                visit(child)
+    return entries
+
+
+def sweep_external(roots, prefix):
+    # Only this run's unpredictable evaluator-owned prefix is eligible.
+    for root in roots:
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        for path in root.glob(prefix + '*'):
+            if path.lstat().st_uid != os.getuid():
+                continue
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+
+
 def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_method=None):
     """Run a stage in a scope or session, measure it, then kill and census it."""
     method = rss_method or env.get('PRAHARI_RSS_METHOD') or ('systemd_scope' if scope_available(env) else 'proc_fallback')
     t0 = time.monotonic()
     start = log.stat().st_size if log.exists() else 0
     unit = 'prahari-eval-' + uuid.uuid4().hex + '.scope'
-    status_path = Path(cwd).parent / (unit + '.status')
+    units_before = user_units(env)
+    roots = ['/dev/shm', '/var/tmp'] + ([env['XDG_RUNTIME_DIR']] if env.get('XDG_RUNTIME_DIR') else [])
+    prefix = env.get('PRAHARI_EXTERNAL_PREFIX', 'prahari-eval-' + uuid.uuid4().hex + '-')
+    external_before = None
+    if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
+        try:
+            sweep_external(roots, prefix)
+            external_before = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
+        except OSError:
+            pass
     scope = None
     peak_kb, legacy_hwm_kb, pte_seen, timed_out, stray = None, 0, False, False, False
+    peak_file = None
     with open(log, 'ab') as lf:
         if method == 'systemd_scope':
-            # Keep the scope alive after the command exits so memory.peak can be read.
-            wrapper = '"$@"; rc=$?; printf "%s\\n" "$rc" > "$PRAHARI_STAGE_STATUS"; while :; do sleep 1; done'
-            child_env = dict(env, PRAHARI_STAGE_STATUS=str(status_path))
-            launch = ['systemd-run', '--user', '--scope', '--collect', '--unit', unit,
-                      '-p', 'MemoryAccounting=yes', '--', '/bin/sh', '-c', wrapper, 'stage', *cmd]
+            # systemd-run waits for the actual stage; its exit status is authoritative.
+            stage = ['/usr/bin/env', '-u', 'DBUS_SESSION_BUS_ADDRESS', '-u', 'XDG_RUNTIME_DIR']
+            if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
+                stage += ['bwrap', '--die-with-parent', '--ro-bind', '/', '/',
+                          '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
+                          '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
+                          '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--']
+            launch = ['systemd-run', '--user', '--quiet', '--scope', '--collect', '--unit', unit,
+                      '-p', 'MemoryAccounting=yes', '--', *stage, *cmd]
+            child_env = env
         else:
-            child_env, launch = env, cmd
+            child_env = {k: v for k, v in env.items() if k not in ('DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR')}
+            launch = cmd
+            if env.get('PRAHARI_ISOLATION_METHOD') == 'bwrap':
+                launch = ['bwrap', '--die-with-parent', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm',
+                          '--bind', env['PRAHARI_SCRATCH'], env['PRAHARI_SCRATCH'],
+                          '--bind', env['PRAHARI_WORK'], env['PRAHARI_WORK'], '--', *cmd]
         p = subprocess.Popen(launch, env=child_env, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
         cleanup_done = False
         try:
@@ -187,6 +255,10 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                     cg = q.stdout.strip()
                     if q.returncode == 0 and cg.startswith('/'):
                         scope = Path('/sys/fs/cgroup') / cg.lstrip('/')
+                        try:
+                            peak_file = (scope / 'memory.peak').open()
+                        except OSError:
+                            pass
                 pids = scope_members(scope) if method == 'systemd_scope' else session_pids(p.pid) | tree_pids(p.pid)
                 rss = tree_rss_kb(pids)
                 if rss is not None:
@@ -210,8 +282,6 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                                         pass
                     except OSError:
                         pass
-                if method == 'systemd_scope' and status_path.exists():
-                    break
                 if p.poll() is not None:
                     break
                 if time.monotonic() - t0 > timeout:
@@ -220,17 +290,24 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                 time.sleep(.1)
             wall_s = time.monotonic() - t0
             if method == 'systemd_scope':
-                try:
-                    rc = int(status_path.read_text().strip()) if status_path.exists() else 1
-                    peak_kb = int((scope / 'memory.peak').read_text().strip()) / 1024 if scope else None
-                except (OSError, ValueError):
-                    rc, peak_kb = 1, None
-                subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
-                               env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if timed_out:
+                    subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
+                                   env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 try:
                     p.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     p.kill(); p.wait()
+                rc = p.returncode
+                try:
+                    if peak_file is not None:
+                        peak_file.seek(0)
+                        peak_kb = int(peak_file.read().strip()) / 1024
+                    else:
+                        peak_kb = None
+                except (OSError, ValueError):
+                    peak_kb = None
+                subprocess.run(['systemctl', '--user', 'kill', '--kill-whom=all', '--signal=SIGKILL', unit],
+                               env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # A lingering member is a failure even if stopping the unit later would remove it.
                 stray = bool(survivors_after_kill(lambda: scope_members(scope)))
                 subprocess.run(['systemctl', '--user', 'stop', unit], env=env,
@@ -259,20 +336,25 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
                     try: os.killpg(p.pid, signal.SIGKILL)
                     except ProcessLookupError: pass
                     p.wait()
-            status_path.unlink(missing_ok=True)
-    res = {'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
+            if peak_file is not None:
+                peak_file.close()
+    units_after = user_units(env)
+    stray_unit = units_before is None or units_after is None or bool(units_after - units_before - {unit})
+    persistent = False
+    if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
+        try:
+            external_after = external_census(roots, [env['PRAHARI_SCRATCH'], env['PRAHARI_WORK'], log.parent, PROJ / 'research' / 'evals'])
+            persistent = external_before is None or any(external_before.get(k) != v for k, v in external_after.items())
+            sweep_external(roots, prefix)
+        except OSError:
+            persistent = True
+    res = {'persistent_state': persistent, 'stray_unit': stray_unit, 'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
            'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,
            'timed_out': timed_out, 'stray_process': stray, 'rss_method': method}
     if vis_log is not None:
         with open(vis_log, 'a') as vf:
             vf.write(f"== {Path(cmd[0]).name} {' '.join(c for c in cmd[1:3] if c.startswith('--') or len(c) < 8)} "
                      f"rc={res['rc']} timeout={timed_out} wall_s={res['wall_s']} peak_rss_mb={res['peak_rss_mb']}\n")
-            if res['rc'] != 0 or timed_out:
-                with open(log, 'rb') as lf:
-                    lf.seek(start)
-                    lines = lf.read().decode('utf-8', 'replace').splitlines()
-                keep = [l for l in lines if re.match(r'(Traceback|  File |\w*(Error|Exception)\b)', l)]
-                vf.write('\n'.join(l[:160] for l in keep[-25:]) + '\n')
     return res
 
 
@@ -574,6 +656,8 @@ def run_once(a, run_index):
             try:
                 digest = candidate_hash(original)
                 shutil.copytree(original, scratch / 'candidate', symlinks=True)
+                if candidate_hash(scratch / 'candidate') != digest:
+                    raise ValueError('scratch copy hash mismatch')
             except (OSError, ValueError) as exc:
                 # The normal evaluator records a failed run for missing candidates.
                 digest = None
@@ -629,7 +713,11 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
         except (OSError, ValueError):
             if digest is not None:
                 failures.append('candidate modified during eval')
-        summary["promotable"] = (not a.quick) and not failures and not infra and summary['contended'] is False
+        if samples and max(x['cpu_steal_percent'] for x in samples) > 20:
+            infra.append('CPU steal exceeded 20 percent')
+        summary["promotable"] = ((not a.quick) and not failures and not infra and summary['contended'] is False
+                                 and summary.get('rss_method') == 'systemd_scope'
+                                 and summary.get('isolation_method') == 'bwrap')
         if extra:
             summary.update(extra)
         (art / "summary.json").write_text(json.dumps(summary, indent=1))
@@ -650,23 +738,50 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
 
     india_path = HIDDEN / 'india_hidden_v2.jsonl'
     try:
-        if hashlib.sha256(india_path.read_bytes()).hexdigest() != INDIA_V2_SHA256:
+        india_data = india_path.read_bytes()
+        if hashlib.sha256(india_data).hexdigest() != INDIA_V2_SHA256:
             raise ValueError('SHA-256 mismatch')
-        india_rows = load_india(india_path, expected_sha256=INDIA_V2_SHA256)
+        india_rows = load_india(india_data, expected_sha256=INDIA_V2_SHA256)
         if len(india_rows) != 400:
             raise ValueError('expected 400 India v2 rows')
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         infra.append(f'adaptive India v2 data missing or invalid: {exc}')
         return finish(0.0, {})
 
+    try:
+        hidden_rows, hidden_hashes = {}, {}
+        for name in ('sms_test', 'url_test', 'indic_test', 'flow_test', 'explain_set'):
+            data = (HIDDEN / (name + '.jsonl')).read_bytes()
+            hidden_hashes[name] = hashlib.sha256(data).hexdigest()
+            hidden_rows[name] = [json.loads(line) for line in data.decode('utf-8').splitlines() if line.strip()]
+            if not hidden_rows[name]:
+                raise ValueError(name + ' is empty')
+        hidden_hashes['india_hidden_v2'] = INDIA_V2_SHA256
+        summary['hidden_sha256'] = hidden_hashes
+    except (OSError, ValueError, UnicodeError) as exc:
+        infra.append(f'hidden data missing or invalid: {exc}')
+        return finish(0.0, {})
+
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BOXD", "SAIL", "OPENAI", "ANTHROPIC", "GH_", "GITHUB"))}
     method = 'systemd_scope' if scope_available(env) else 'proc_fallback'
     summary['rss_method'] = method
+    # A failed bwrap probe fails closed: never claim isolation we cannot create.
+    try:
+        probe = subprocess.run(['bwrap', '--ro-bind', '/', '/', '--tmpfs', '/tmp', '--tmpfs', '/dev/shm', '--', '/bin/true'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        isolated = probe.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        isolated = False
+    summary['isolation_method'] = 'bwrap' if isolated else 'unavailable'
+
     env.update(isolation_env(scratch))
     env.update({
         'PRAHARI_RSS_METHOD': method,
+        'PRAHARI_ISOLATION_METHOD': summary['isolation_method'],
+        'PRAHARI_SCRATCH': str(scratch), 'PRAHARI_WORK': str(work),
+        'PRAHARI_EXTERNAL_PREFIX': 'prahari-eval-' + uuid.uuid4().hex + '-',
         "PYTHONPATH": str(PROJ / "eval" / "guard"),
-        "HC_GUARD_LOG": str(art / "guard.log"),
+        "HC_GUARD_LOG": str(work / "guard.log"),
         "HC_GUARD_DENY_PATHS": f"{HIDDEN}:{DATA / 'indic'}:{EVROOT / 'private'}",
         "HC_MODEL_REGISTRY": str(REGISTRY),
         "HC_PY": str(PY),
@@ -674,7 +789,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
         "HTTP_PROXY": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9", "no_proxy": "127.0.0.1,localhost",
         "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "OMP_NUM_THREADS": env.get("OMP_NUM_THREADS", "2"),
     })
-    (art / "guard.log").touch()
+    (work / "guard.log").touch()
     log = art / "run.log"
     scores, details = {}, {}
 
@@ -683,7 +798,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     timings = {}
     for task, src, field, ptask in (("sms", "sms_test", "text", "sms"), ("url", "url_test", "url", "url"),
                                      ("indic", "indic_test", "text", "sms"), ("flow", "flow_test", "features", "flow")):
-        gold_rows = read_jsonl(HIDDEN / f"{src}.jsonl")
+        gold_rows = hidden_rows[src]
         if not gold_rows:
             infra.append(f"hidden set {src} missing")
             continue
@@ -734,7 +849,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
                         'benign_ai_mention_fpr': inj['fpr'] or 0.0}
 
     # ---------------- E: explanation ----------------
-    items = read_jsonl(HIDDEN / "explain_set.jsonl") or []
+    items = hidden_rows['explain_set']
     if not items:
         infra.append("hidden explain_set missing")
     if a.quick:
@@ -820,12 +935,17 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
         if (cand / "tests").is_dir() else {"rc": 1}
     app = run_proc([str(cand / "bin" / "app"), "--selftest"], env, 300, cand, art / "app.log") \
         if (cand / "bin" / "app").exists() else {"rc": 1}
-    guard_lines = (art / 'guard.log').read_text().splitlines()
+    guard_lines = (work / 'guard.log').read_text().splitlines()
+    (art / 'guard.log').write_text('\n'.join(guard_lines) + ('\n' if guard_lines else ''))
     net_viol = [l for l in guard_lines if 'NET blocked' in l]
     file_viol = [l for l in guard_lines if 'FILE blocked' in l]
     if file_viol:
         failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
     process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
+    if any(r.get('persistent_state') for r in process_runs):
+        failures.append('persistent state outside scratch')
+    if any(r.get('stray_unit') for r in process_runs):
+        failures.append('stray unit')
     if any(r.get('stray_process') for r in process_runs):
         failures.append('stray process')
     peaks = [r.get('peak_rss_mb') for r in process_runs]

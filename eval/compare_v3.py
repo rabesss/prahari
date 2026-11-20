@@ -7,6 +7,8 @@ import re
 from statistics import mean
 from pathlib import Path
 
+BEST_PIN = Path(__file__).resolve().parents[1] / 'research/evals/BEST.sha256'
+
 TASKS = ('sms', 'url', 'indic', 'flow')
 
 
@@ -42,9 +44,14 @@ def compare(best, candidate, threshold):
         if not all(isinstance(r.get('session_id'), str) and r['session_id'].strip()
                    and r['session_id'] == best[0]['session_id'] for r in best + candidate):
             raise ValueError('comparison session id missing or changed')
-        if not all(r.get('rss_method') in ('systemd_scope', 'proc_fallback')
-                   and r['rss_method'] == best[0]['rss_method'] for r in best + candidate):
-            raise ValueError('RSS method missing or changed')
+        if not all(r.get('rss_method') == 'systemd_scope' and r.get('isolation_method') == 'bwrap' for r in best + candidate):
+            raise ValueError('promotion requires systemd_scope and bwrap')
+        try:
+            pinned = BEST_PIN.read_text().strip()
+        except OSError:
+            raise ValueError('BEST pin missing')
+        if not re.fullmatch(r'[0-9a-f]{64}', pinned) or best[0]['candidate_hash'] != pinned:
+            raise ValueError('BEST content hash does not match pin')
         if best[0]['candidate'] == candidate[0]['candidate']:
             raise ValueError('BEST and candidate paths must differ')
     except (KeyError, TypeError):
@@ -64,6 +71,12 @@ def compare(best, candidate, threshold):
                 return {'pass': False, 'failures': ['invalid host measurement; rerun the comparison']}
             if not 0 <= vals[0] <= 100 or any(v < 0 for v in vals[1:]) or (end == 'host_start' and vals[1] > 1.5):
                 return {'pass': False, 'failures': ['contended or invalid host measurement; rerun the comparison']}
+        try:
+            steal = value(r, 'host_during', 'cpu_steal_percent_max')
+        except ValueError:
+            return {'pass': False, 'failures': ['missing CPU steal measurement']}
+        if not 0 <= steal <= 20:
+            return {'pass': False, 'failures': ['CPU steal exceeded threshold']}
         if not (0 < value(r, 'latency_s_per_item') <= 10.0 and 0 < value(r, 'peak_process_tree_rss_gb') <= 3.0):
             return {'pass': False, 'failures': ['performance sanity cap failed']}
     def avg(runs, *path):

@@ -14,7 +14,10 @@ CHALLENGE_SHA256 = '135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e09
 
 
 def load(path, *, expected_sha256=None):
-    data = path.read_bytes()
+    return load_bytes(path.read_bytes(), expected_sha256=expected_sha256)
+
+
+def load_bytes(data, *, expected_sha256=None):
     expected = CHALLENGE_SHA256 if expected_sha256 is None else expected_sha256
     if hashlib.sha256(data).hexdigest() != expected:
         raise ValueError('dataset sha256 mismatch')

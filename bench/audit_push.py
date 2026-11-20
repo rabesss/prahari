@@ -360,16 +360,17 @@ def main():
                 if CONTROLLER.fullmatch(path): controller.add(path)
                 rules = [('code/docs', CODE.fullmatch(path)), ('config', CONFIG.fullmatch(path)), ('artifact', ARTIFACT.fullmatch(path)),
                          ('eval JSON', RECORD.fullmatch(path) or RESULT.fullmatch(path)), ('eval log', LOG.fullmatch(path)),
-                         ('ledger', path == 'research/evals/ledger.jsonl'), ('synthetic', SYNTH.fullmatch(path))]
+                         ('ledger', path == 'research/evals/ledger.jsonl'), ('best pin', path == 'research/evals/BEST.sha256'), ('synthetic', SYNTH.fullmatch(path))]
                 matched = [name for name, match in rules if match]
                 if len(matched) != 1:
                     fail('path not uniquely allowlisted'); continue
                 rule = matched[0]
                 size = int(git('cat-file', '-s', oid))
-                limit = {'code/docs': 1_000_000, 'config': 256_000, 'artifact': 5_000_000, 'eval log': 4_000, 'eval JSON': 1_000_000, 'ledger': 1_000_000, 'synthetic': 1_000_000}[rule]
+                limit = {'code/docs': 1_000_000, 'config': 256_000, 'artifact': 5_000_000, 'eval log': 4_000, 'eval JSON': 1_000_000, 'ledger': 1_000_000, 'best pin': 65, 'synthetic': 1_000_000}[rule]
                 if size > limit: fail(f'{rule} size limit'); continue
                 if oid not in blob_cache: blob_cache[oid] = git('cat-file', 'blob', oid, binary=True)
                 data = blob_cache[oid]
+                if rule == 'best pin' and not re.fullmatch(rb'[0-9a-f]{64}\n', data): fail('invalid BEST pin')
                 if rule == 'artifact':
                     artifacts.add((path, oid, size))
                     try: data = inflate(data)

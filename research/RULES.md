@@ -82,13 +82,22 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
 fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
 Every run has sanity caps of 10.0 s/item and 3.0 GB process-tree peak RSS; missing
-measurements and timeouts fail. In the same interleaved comparison, candidate mean
-latency must be at most 110% of BEST and mean RSS at most 105% of BEST. Re-run
-comparisons containing a run with start 1-minute load above 1.5 or missing host data.
+measurements and timeouts fail. In the same interleaved comparison, every candidate
+run must have latency at most 110% and RSS at most 105% of the corresponding BEST
+mean. Re-run comparisons with start 1-minute load above 1.5, missing host data, or
+sampled CPU steal above 20%. Mid-run load is informational. Only systemd scope RSS
+and bwrap isolation can promote; proc fallback is for local development and its
+cumulative child RSS is not a promotion gate. The controller pins the BEST content
+hash and updates it with each promotion.
 The India v2 adaptive validation set is aggregate-only, not blind: it shares an OS
 user and an author with the visible v2-dev set. It is not independent evidence.
 Hidden v2 SHA-256: `532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0`.
-The guard and model checks are proxies, not proof against an adversarial candidate.
+OMP is non-malicious but Goodhart-prone; mechanical checks cover plausible cache,
+shared temporary state, fake completion, ungrounded wording and BEST drift. Deliberate
+adversarial behaviour is forbidden, including daemons, writes outside scratch,
+modifications to BEST, research/evals or eval data, and reading hidden data. The
+controller reviews every promoted candidate's diff for such code and reruns final
+confirmation itself. Same-user OS isolation is a limitation, not a guarantee.
 
 ## 8. Track and approach choice
 PS3 is fixed (see §1). To maximise the chance of winning within PS3:
