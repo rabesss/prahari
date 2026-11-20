@@ -370,7 +370,16 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
             if peak_file is not None:
                 peak_file.close()
     units_after = user_units(env)
-    stray_unit = units_before is None or units_after is None or bool(units_after - units_before - {unit})
+    unit_unavailable = units_before is None or units_after is None
+    new_units = set() if unit_unavailable else units_after - units_before - {unit}
+    stray_unit = unit_unavailable or bool(new_units)
+    unit_census = {
+        'unavailable': unit_unavailable,
+        'new_prahari_scopes': sum(name.startswith('prahari-eval-') and name.endswith('.scope') for name in new_units),
+        'new_other_scopes': sum(not name.startswith('prahari-eval-') and name.endswith('.scope') for name in new_units),
+        'new_slices': sum(name.endswith('.slice') for name in new_units),
+        'new_other': sum(not name.endswith(('.scope', '.slice')) for name in new_units),
+    }
     persistent = False
     stray_cgroup = False
     if env.get('PRAHARI_ISOLATION_METHOD') == 'unavailable':
@@ -385,7 +394,7 @@ def run_proc(cmd, env, timeout, cwd, log, watch_pte=None, vis_log=None, rss_meth
         except OSError:
             persistent = True
             stray_cgroup = True
-    res = {'stray_cgroup': stray_cgroup, 'persistent_state': persistent, 'stray_unit': stray_unit, 'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
+    res = {'unit_census': unit_census, 'stray_cgroup': stray_cgroup, 'persistent_state': persistent, 'stray_unit': stray_unit, 'rc': rc, 'wall_s': wall_s, 'peak_rss_mb': peak_kb / 1024 if peak_kb is not None else None,
            'legacy_peak_rss_mb': round(legacy_hwm_kb / 1024, 1), 'pte_seen': pte_seen,
            'timed_out': timed_out, 'stray_process': stray, 'rss_method': method}
     if vis_log is not None:
@@ -983,6 +992,8 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start):
     if file_viol:
         failures.append(f'candidate tried to read hidden eval data ({len(file_viol)} attempts)')
     process_runs = list(timings.values()) + [india_res] + runs + [tests, app]
+    summary['unit_census'] = {key: sum(r.get('unit_census', {}).get(key, 0) for r in process_runs)
+                              for key in ('unavailable', 'new_prahari_scopes', 'new_other_scopes', 'new_slices', 'new_other')}
     if any(r.get('stray_cgroup') for r in process_runs):
         failures.append('stray cgroup or process outside evaluator scope')
     if any(r.get('persistent_state') for r in process_runs):
