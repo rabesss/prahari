@@ -286,6 +286,7 @@ class Explainer:
         # restating it. The detector's other evidence lines stay in evidence_used for the reader.
         opening = (f"{first}: {ev[0]}" if ev else
                    f"This {what} was flagged as risky; check it carefully before acting" if verdict == 1 else
+                   f"This {what} needs a check; review it carefully before acting" if verdict == 'uncertain' else
                    f"This {what} was checked; review it carefully before acting")
         user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"

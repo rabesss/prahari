@@ -32,6 +32,20 @@ from triage.detect import predict_flow_text
     ('2 login attempts', 0),
     ('5 logins from office IP', 0),
     ('failed passwords', 1),
+    ('brute force was not successful', 1),
+    ('successful brute force', 1),
+    ('brute force succeeded', 1),
+    ('password guessing was successful', 1),
+    ('brute force detected, authenticated users excluded', 1),
+    ('brute force detected excluding authenticated sessions', 1),
+    ("this isn't a port scan", 0),
+    ("it isn't a flood", 0),
+    ("this wasn't a port scan", 0),
+    ("these aren't port scans", 0),
+    ("these weren't port scans", 0),
+    ("didn't find failed SSH logins", 0),
+    ('did not find failed SSH logins', 0),
+    ('without any port scan', 0),
     ('no evidence of a port scan', 0),
     ('no sign of any port scan', 0),
     ('no reconnaissance or brute force seen', 0),
@@ -58,3 +72,12 @@ def test_failure_then_success_evidence():
 
 def test_large_login_count_does_not_raise():
     assert predict_flow_text('9' * 5000 + ' login attempts')[0] == 1
+
+
+def test_success_on_next_line_is_not_login_outcome():
+    label, _, evidence = predict_flow_text('300 failed SSH logins\nsuccessful backup')
+    assert label == 1 and all('possible compromise' not in item for item in evidence)
+
+
+def test_negation_does_not_cross_newline():
+    assert predict_flow_text('no evidence of\nport scan')[0] == 1

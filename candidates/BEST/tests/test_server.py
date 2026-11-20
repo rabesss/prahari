@@ -151,6 +151,27 @@ def test_http_rejects_deep_json_and_duplicate_lengths():
         httpd.server_close()
 
 
+def test_bad_framing_closes_connection():
+    import socket
+    httpd = server.ThreadingHTTPServer(('127.0.0.1', 0), server.H)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        for headers in (b'Content-Length: invalid\r\n', b'Transfer-Encoding: chunked\r\n',
+                        b'Content-Length: 2\r\nContent-Length: 2\r\n'):
+            with socket.create_connection(('127.0.0.1', httpd.server_port), timeout=5) as sock:
+                sock.sendall(b'POST /api/triage HTTP/1.1\r\nHost: localhost\r\n' + headers + b'\r\n')
+                response = b''
+                while b'\r\n\r\n' not in response:
+                    response += sock.recv(1024)
+                assert b' 400 ' in response.split(b'\r\n', 1)[0]
+                assert b'connection: close' in response.lower()
+    finally:
+        httpd.shutdown()
+        thread.join()
+        httpd.server_close()
+
+
 def test_appointment_does_not_match_your_app():
     from triage import indicrules
     text = 'Your appointment with the doctor is confirmed.'
@@ -166,6 +187,13 @@ def test_branch_notice_describes_branch():
     assert 'mentions the branch' in llm.compact_evidence('sms', text, [], 0)
 
 
+def test_branch_does_not_erase_other_channel():
+    from triage import mech
+    text = 'Open the official app. Collect cash at the branch.'
+    evidence = mech.evidence(mech.analyze(text))
+    assert any('official app' in item and 'branch' in item for item in evidence)
+
+
 def test_never_ask_does_not_claim_no_payment_or_reply():
     from triage import mech
     text = 'We never ask for your OTP.'
@@ -179,3 +207,9 @@ def test_empty_evidence_uses_neutral_risk_opening(monkeypatch):
     prompt = llm.Explainer.prompt(object(), 'sms', 'some text', 1, [])
     assert llm._forced_sentence(prompt) == 'This message was flagged as risky; check it carefully before acting'
     assert 'no specific indicators' not in prompt
+
+
+def test_empty_evidence_uncertain_opening(monkeypatch):
+    monkeypatch.setattr(llm, 'compact_evidence', lambda *args: [])
+    prompt = llm.Explainer.prompt(object(), 'sms', 'some text', 'uncertain', [])
+    assert llm._forced_sentence(prompt) == 'This message needs a check; review it carefully before acting'

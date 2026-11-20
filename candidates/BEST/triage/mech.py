@@ -30,13 +30,13 @@ REQUEST = (r"(share|send|reply|tell|give|enter|type|provide|submit|forward|confi
 PAY = (r"\b(pay|paid|send|transfer|deposit|remit|fund)\b|(bhejein|bhejo)|"
        r"भुगतान|भेजें|स्वीकार|भरें")
 AMOUNT = r"(rs\.?|inr|₹|rupees|रुपये|राशि|amount|money|balance|bill|dues|शुल्क|फीस)"
-DEST_OFFICIAL = (r"(in|via|through|using|on|at)\s+(the\s+)?(official\s+)?(bank\s+|payment\s+|provider\s+|"
-                 r"insurer\s+|company\s+|merchant\s+)?(app|application|portal|website|site|account settings|ATM)|"
-                 r"official (app|portal|website|site)|आधिकारिक (ऐप|पोर्टल|वेबसाइट)|"
+DEST_OFFICIAL = (r"\b(in|via|through|using|on|at)\s+(the\s+)?(official\s+)?(bank\s+|payment\s+|provider\s+|"
+                 r"insurer\s+|company\s+|merchant\s+)?(app|application|portal|website|site|account settings|ATM)\b|"
+                 r"\bofficial (app|portal|website|site)\b|आधिकारिक (ऐप|पोर्टल|वेबसाइट)|"
                  r"(ऐप|पोर्टल|वेबसाइट)\s*(में|पर|से|द्वारा)\s*(भुगतान|देखें|करें|करें।)|"
-                 r"at the (ATM|branch)|back of your card|signed[- ]in|"
-                 r"official (helpline|number)|number on (the )?(back of )?your card|"
-                 r"(in|via) your (banking |payment )?app")
+                 r"\bat the (ATM|branch)\b|\bback of your card\b|\bsigned[- ]in\b|"
+                 r"\bofficial (helpline|number)\b|\bnumber on (the )?(back of )?your card\b|"
+                 r"\b(in|via) your (banking |payment )?app\b")
 DEST_PERSONAL = (
     r"(to|into|at|on)\s+(this|the|following|my|a)\s+(account|number|wallet|upi|vpa)|"
     r"(is|iss|is) (account|number) (me|mein|par)|"
@@ -424,6 +424,10 @@ SAFE_DESC = {
 
 def safe_description(name, text):
     if name == 'official_channel' and re.search(r'\bat the branch\b', text, re.I):
+        other = [m.group() for m in re.finditer(DEST_OFFICIAL, text, re.I)
+                 if not re.fullmatch(r'at the branch', m.group(), re.I)]
+        if other:
+            return 'mentions ' + ', '.join(other) + ' and the branch'
         return 'mentions the branch'
     return SAFE_DESC[name]
 

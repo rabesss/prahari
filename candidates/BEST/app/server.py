@@ -75,6 +75,7 @@ class H(BaseHTTPRequestHandler):
             if length < 0 or self.headers.get("Transfer-Encoding"):
                 raise ValueError
         except ValueError:
+            self.close_connection = True
             self._send(400, b'{"error":"Invalid request body"}', "application/json")
             return
         if length > 64 * 1024:
@@ -98,7 +99,7 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        if code == 413:
+        if self.close_connection:
             self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(data)

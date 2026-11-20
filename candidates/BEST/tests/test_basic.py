@@ -92,6 +92,15 @@ def test_otp_share_request_flagged():
         assert lab == 1 and ev
 
 
+def test_official_channel_prefixes_do_not_suppress_harm():
+    texts = [
+        'Share your OTP in your application today or the account will be blocked.',
+        'Share your OTP in your approved portal or the account will be blocked.',
+        'Pay Rs 499 in your application or the meter will be cut. Send to 9876543210.',
+    ]
+    assert all(label == 1 for label, _, _ in detect.predict_text(texts))
+
+
 def test_explain_cases_file_is_complete():
     import json
     path = Path(__file__).parent / "explain_cases.jsonl"

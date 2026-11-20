@@ -146,8 +146,10 @@ def flow_text_indicators(text):
         for match in re.finditer(pattern, t):
             # Only nearby, direct negation suppresses a signal. A modifier such as
             # "normal" between negation and indicator remains ambiguous.
-            before = t[max(0, match.start() - 100):match.start()]
-            if re.search(r"\b(?:no|zero|not|without|never)\s+"
+            before = re.split(r"[.;!?\n]", t[max(0, match.start() - 100):match.start()])[-1]
+            # Negated floods, like other negated indicators, do not count as an attack.
+            if re.search(r"\b(?:no|zero|not|without|never|isn't|wasn't|aren't|weren't|"
+                         r"didn't\s+find|did\s+not\s+find)\s+"
                          r"(?:(?:any\s+)?(?:signs?|evidence|indications?|traces?)\s+of\s+)?"
                          r"(?:(?:a|an|the|any)\s+)?$", before):
                 continue
@@ -156,8 +158,8 @@ def flow_text_indicators(text):
                          r"(?:or|nor)\s+(?:(?:a|an|any)\s+)?$", before):
                 continue
             if name == "brute_force":
-                left = re.split(r"[.;!?]", t[max(0, match.start() - 40):match.start()])[-1]
-                right = re.split(r"[.;!?]", t[match.end():match.end() + 40])[0]
+                left = re.split(r"[.;!?\n]", t[max(0, match.start() - 40):match.start()])[-1]
+                right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
                 clause = left + match.group() + right
                 count = re.search(r"\b\d[\d,]*\b", match.group())
                 digits = count.group().replace(',', '').lstrip('0') if count else None

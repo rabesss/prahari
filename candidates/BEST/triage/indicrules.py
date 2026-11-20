@@ -129,8 +129,8 @@ PROTECTIVE = [
      r"|ignore any caller|work(s)? only at the keypad",
      "tells you not to share the code or not to reply"),
     ("official_channel",
-     r"official (app|portal|website|site|account)|signed-in|staff portal|provider app|"
-     r"your (banking |payment )?app\b|in your app\b|आधिकारिक|desk number on your card|back of your card",
+     r"\bofficial (app|portal|website|site|account)\b|\bsigned-in\b|\bstaff portal\b|\bprovider app\b|"
+     r"\byour (banking |payment )?app\b|\bin your app\b|आधिकारिक|\bdesk number on your card\b|\bback of your card\b",
      "points you to the official app, portal or the number on your card"),
     ("never_ask_secret",
      r"(never|will not|won't|does not|doesn't|do not)\s+ask[^.;!?।\n]{0,30}"
