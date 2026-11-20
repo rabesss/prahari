@@ -1,5 +1,7 @@
 # Research report: PS3 Kavach Lite (round 2, 11 Nov 2026)
 
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../eval/run_eval.py#L143-L163), [419–426](../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../docs/phase1/EVIDENCE.md)).
+
 ## Current best
 
 **Candidate:** `candidates/gen11` (the measured snapshot), promoted to **`candidates/BEST`** on 11 Nov;
@@ -147,8 +149,7 @@ on the reader, length fell 1.0 -> 0.857 because four answers dropped under 15 wo
 ## Generalisation evidence (local)
 
 - **Leave-one-category-out on the visible Indian set** (32 categories; train on all but one, test
-  the held-out category): macro F1 1.0, 32/32 categories at "excellent" (`research/evals`-independent
-  script in `research/stress/loco.py`). An earlier 15-category run also gave 1.0; the expanded run
+  the held-out category): pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate (`research/stress/loco.py`). An earlier 15-category run also gave 1.0; the expanded run
   covers every category in `data/train` and `data/dev`.
 - **Blind paraphrase suites** (authored after the rules were frozen, never used for training):
   `protective` 40 cases, Hindi/Hinglish benign/scam 21, mixed English/Hindi 30. All correct on the final

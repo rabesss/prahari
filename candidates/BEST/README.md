@@ -1,8 +1,6 @@
 # Prahari: offline scam and phishing triage on Arm
 
-Bharat AI-SoC Challenge 2026, PS3 entry. It checks SMS/WhatsApp messages, web links and network-event
-descriptions **entirely on the device**. It flags scams, phishing and intrusions, then explains the verdict in plain
-language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. The app uses local inference; use an external egress block for an offline demonstration.
+Bharat AI-SoC Challenge 2026, PS3 entry. It checks pasted SMS/WhatsApp-style messages, web links and network-event descriptions. Local inference was measured on an Arm Linux VM; the Android port is experimental and has not been verified on a phone. The web interface accepts pasted inputs and does not monitor a network. It uses **Llama 3.2 1B through ExecuTorch**. Inputs reach the local app over loopback; downloading the model needs network access. The app itself does not block outbound traffic, and offline claims cover only what was tested.
 
 ## How it works
 1. **Mechanism layer (fast, explainable):** transparent rules decide what a message asks the reader to
@@ -21,14 +19,16 @@ language using **Llama 3.2 1B running through ExecuTorch** on an Arm CPU. The ap
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
 
-## Setup (one command on a fresh aarch64 Linux box)
+## Detector self-test after dependency setup
+
+A full Llama run also requires model access, files and a configured registry.
 ```sh
 # Full judge setup (venv at the repository root, model download, registry): see the top-level README.md.
 # Standalone: create the venv here and point the launcher at it.
 python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 HC_PY="$PWD/.venv/bin/python" bin/app --selftest   # reads ../../models/registry.json, or $HC_MODEL_REGISTRY if set
 ```
-The Python package, entry scripts and joblib detectors in this directory are the **compiled application**
+The Python application, launchers and serialized detectors in this directory are the application
 for Phase 1: `bin/app` is the single documented entry (UI, `--demo`, `--selftest`), and `bin/predict` /
 `bin/explain` are the batch entry points. The Llama `.pte` and tokenizer are read from the model registry
 (`models/registry.json`, `llama32-1b-qlora`); model files are not committed.
@@ -46,6 +46,9 @@ Python 3.12 venv with `executorch==1.6.0`, `torch` (CPU), `scikit-learn`, `panda
 Model files are not in git. See DATA.md for provenance and licences.
 
 ## Results
+
+Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts: pending (see [EVIDENCE.md](../../docs/phase1/EVIDENCE.md)).
+
 `bin/eval` proxy (two repeats, hidden round-2 set): 90.73 (internal proxy, not a judging score) — D 0.9024, E 0.9473, P 0.7486, C 1.0,
 promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0.8505. Explanation:
 3.67 s/item, 2.256 GB peak RSS, 20.8 decode tokens/s on 2x Neoverse-N1. See REPORT.md for the full

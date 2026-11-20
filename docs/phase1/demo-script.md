@@ -1,6 +1,6 @@
 # Prahari demo shot list — target 2:50
 
-This is a production plan, not evidence a recording, Android APK, real phone, or egress block exists. Rehearse and verify actual results before recording. Never show hidden data or per-item hidden predictions. Do not click a suspicious link. Llama results can vary; show the actual verdict and timing, even if wrong.
+This is a production plan, not evidence of a recording, real-phone operation or egress block. A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. Rehearse and verify actual results before recording. Never show hidden data or per-item hidden predictions. Do not click a suspicious link. Llama results can vary; show the actual verdict and timing, even if wrong.
 
 | Time | Shot and narration |
 |:--|:--|
@@ -13,9 +13,11 @@ This is a production plan, not evidence a recording, Android APK, real phone, or
 | 2:05–2:25 | Enter `connections rejected` as a network description: this exercises the rule path's uncertain case. Show the actual result and cautious action. If the actual result differs, disclose it and investigate rather than staging success. |
 | 2:25–2:50 | Summarise: VM benchmark 3.67 s/item, 2.256 GB peak RSS, measured under the cited evaluation; no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
 
+Inference runs locally and inputs reach the local app over loopback. Downloading the model requires network access; the app itself does not block outbound traffic. Offline claims cover only what was tested.
+
 ## Offline proof variants
 
-**A. Remote real Android phone — planned, currently blocked on an APK.** Show the real phone identity and app build. Inspect the installed APK manifest/permissions and show that it declares no `android.permission.INTERNET`; stage model and assets beforehand. Run the same local inference with the remote-control connection retained. No INTERNET permission is evidence about that APK, not proof of every device network condition. Record phone model, OS, ABI, memory, model version and actual timing. Do not present this variant as implemented until it works.
+**A. Remote real Android phone — planned; on-device generation is unverified.** Show the real phone identity and app build. Inspect the installed APK manifest/permissions and show that it declares no `android.permission.INTERNET`; stage model and assets beforehand. Run the same local inference with the remote-control connection retained. No INTERNET permission is evidence about that APK, not proof of every device network condition. Record phone model, OS, ABI, memory, model version and actual timing. Do not present this variant as implemented until it works.
 
 **B. Arm Linux server — conditional on an owner-provided egress block.** Show `uname -m` and `lscpu`; identify the environment as a cloud VM, not a physical edge device. An administrator must arrange a verified external egress block while preserving the SSH/loopback control path; do not disable an existing remote connection. Show a controlled outbound request failing under the same restriction, then run the application and show a result. The evaluator's import guard is a separate test, not proof normal app startup enforces a block. If the block cannot be established and verified, label offline proof pending. Organizer acceptance of a cloud VM is unconfirmed.
 
