@@ -191,7 +191,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             for s in ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
                       "notice", "official_channel", "protective", "promo", "personal"):
                 if s in a["safe"]:
-                    out.append(mech.SAFE_DESC[s])
+                    out.append(mech.safe_description(s, inp))
     else:
         ev = indicrules.indicators(inp)[0]
         risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
@@ -278,16 +278,18 @@ class Explainer:
         # request it must decline. The real host still appears in the evidence for the reader.
         snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: m.group(0).replace(".", "[.]"), snippet)
         ev = compact_evidence(kind, inp, evidence, verdict)
-        reason = ev[0] if ev else "no specific indicators"
         what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event"}.get(kind, "item")
         first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")
         # The strongest evidence phrase is written into the required opening, so the model copies it
         # (one concept-bearing phrase the scorer's mention check can see) and does not spend tokens
         # restating it. The detector's other evidence lines stay in evidence_used for the reader.
+        opening = (f"{first}: {ev[0]}" if ev else
+                   f"This {what} was flagged as risky; check it carefully before acting" if verdict == 1 else
+                   f"This {what} was checked; review it carefully before acting")
         user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
-                f"Start your answer with exactly: \"{first}: {reason}.\" "
+                f"Start your answer with exactly: \"{opening}.\" "
                 "Then write one more sentence of advice, 6-12 words.")
         return ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +

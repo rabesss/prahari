@@ -410,16 +410,22 @@ def indic_context(text):
 
 
 SAFE_DESC = {
-    "official_channel": "the payment or check happens inside the organisation's official app or portal",
+    "official_channel": "mentions a service channel",
     "transaction_receipt": "reads like a normal payment receipt or delivery record",
     "otp_notification": "reads like a normal OTP notification",
-    "protective": "explicitly says that no payment, code or reply is needed",
+    "protective": "includes a protective or opt-out statement",
     "notice": "reads like a routine notice or appointment",
     "bill_notice": "reads like a routine bill reminder with a payment due",
     "appointment_notice": "reads like a routine appointment or schedule change",
     "promo": "reads like a promotional offer with a discount or cashback",
     "personal": "reads like a personal conversation",
 }
+
+
+def safe_description(name, text):
+    if name == 'official_channel' and re.search(r'\bat the branch\b', text, re.I):
+        return 'mentions the branch'
+    return SAFE_DESC[name]
 
 
 def evidence(a):
@@ -431,5 +437,5 @@ def evidence(a):
     if not a["harm"]:
         for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "notice", "promo"):
             if s in a["safe"]:
-                out.append(SAFE_DESC[s])
+                out.append(safe_description(s, a['text']))
     return out[:5]

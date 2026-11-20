@@ -116,3 +116,33 @@ def test_http_rejects_oversized_and_malformed_bodies():
         httpd.shutdown()
         thread.join()
         httpd.server_close()
+
+
+def test_appointment_does_not_match_your_app():
+    from triage import indicrules
+    text = 'Your appointment with the doctor is confirmed.'
+    assert 'official_channel' not in {name for name, _ in indicrules.indicators(text)[0]}
+    assert 'official app' not in str(llm.compact_evidence('sms', text, [], 0))
+
+
+def test_branch_notice_describes_branch():
+    from triage import mech
+    text = 'Your KYC document was received at the branch today.'
+    analysis = mech.analyze(text)
+    assert 'mentions the branch' in mech.evidence(analysis)
+    assert 'mentions the branch' in llm.compact_evidence('sms', text, [], 0)
+
+
+def test_never_ask_does_not_claim_no_payment_or_reply():
+    from triage import mech
+    text = 'We never ask for your OTP.'
+    assert 'protective' in mech.analyze(text)['safe']
+    evidence = llm.compact_evidence('sms', text, [], 0)
+    assert evidence == ['includes a protective or opt-out statement']
+
+
+def test_empty_evidence_uses_neutral_risk_opening(monkeypatch):
+    monkeypatch.setattr(llm, 'compact_evidence', lambda *args: [])
+    prompt = llm.Explainer.prompt(object(), 'sms', 'some text', 1, [])
+    assert llm._forced_sentence(prompt) == 'This message was flagged as risky; check it carefully before acting'
+    assert 'no specific indicators' not in prompt
