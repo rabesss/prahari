@@ -214,6 +214,9 @@ def test_round2_unrelated_official_channel_does_not_clear_payment_or_reader_dema
     text = 'Pay your electricity bill of ₹500 at https://power-update.xyz. View your balance in the official app.'
     assert 'pay_unverified' in dict(mech.analyze(text)['harm'])
     assert verdict(text) == 1
+    text = 'Pay your electricity bill of ₹500 at https://power-update.xyz via the official app.'
+    assert 'pay_unverified' in dict(mech.analyze(text)['harm'])
+    assert verdict(text) == 1
     text = 'Police arrested a gang who asked victims to share OTP, please share your OTP with our agent.'
     a = mech.analyze(text)
     assert a['reader_direct'] and 'secret_request' in dict(a['harm'])

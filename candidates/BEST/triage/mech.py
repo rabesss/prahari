@@ -677,7 +677,7 @@ def analyze(text):
         a["pay_to_receive"] = True
         a["harm"].append(("pay_to_receive", "asks for a payment before a refund, prize or delivery is released"))
     elif pay and (fee or _clause_hit(AMOUNT, t) or agent_pay or (unmoney and payment_dest_strong)) and \
-            (payment_dest_strong or not payment_official) and \
+            (payment_dest_strong or payment_risky or not payment_official) and \
             (payment_personal or payment_risky or dest_staff or agent_pay
              or (fee and payment_links)
              or (payment_links and _clause_hit(UTILITY, t))):
