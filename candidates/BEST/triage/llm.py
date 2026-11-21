@@ -71,7 +71,7 @@ MECH_SHORT = {
     "prize_claim": "promises a prize that needs a fee or details",
     "sextortion": "threatens to publish private material",
     "investment": "promises guaranteed or doubled returns for a deposit",
-    "id_request": "asks you to send Aadhaar or PAN for KYC to a chat or link",
+    "id_request": "asks you to send identity documents to a chat or link",
 }
 MECH_TYPE = {
     "secret_request": "OTP or PIN theft",

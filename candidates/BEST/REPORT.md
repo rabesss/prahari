@@ -74,25 +74,16 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-Round-3 proxy v3 (conservative F1; uncertain and invalid predictions count as errors) on the
-interleaved comparison, session `r3-20261121-cmp-gen35b`: BEST mean **84.75** (runs 84.804/84.702),
-this candidate mean **85.50** (85.507/85.497); delta **+0.75**, threshold 0.5, every promotion gate
-passes, no failures or infrastructure errors, no contended run. D is unchanged; the gain is India
-detection quality (I 0.7484 -> 0.7773: recall 0.710 -> 0.720 at FPR 0.045 -> 0.040) and the
-explanation component is 0.9332 against BEST's 0.9377, inside the 1.0pp gate. The controller's
-confirmation and promotion are separate.
+The shipped candidate is gen51 with controller-accepted Terra review and CodeRabbit correctness
+fixes. The controller's pre-fix gen51 confirmation was a 3+3 interleaved comparison: gen51 mean
+**86.579**, D **0.9084**, I **0.8295**, E **0.9332**, zero failures. India confusion was
+146 TP / 6 FP / 194 TN / 54 FN (recall 0.730, FPR 0.030). These are proxy measurements, not
+competition results. The correctness fixes were accepted even if the proxy score falls slightly.
 
-| Detector | F1 | Precision | Recall | FPR | Score |
-|---|---|---|---|---|---|
-| SMS | 0.9071 | 0.9765 | 0.8469 | 0.0041 | 0.9071 |
-| URL | 0.9940 | 1.000 | 0.9880 | 0.0000 | 0.9940 |
-| Indic | 0.9714 | 0.9871 | 0.9563 | 0.0125 | 0.9593 |
-| Flow | 0.8505 | 0.9706 | 0.7568 | 0.0303 | 0.7643 |
-
-India v2 adaptive validation: conservative F1 0.818 (precision 0.947, recall 0.720, FPR 0.040;
-penalised component 0.7773), against BEST's 0.809 (0.940/0.710/0.045, component 0.7484); injection
-recall 0.70 (equal); benign AI-mention FPR 0.0. The round-3 baseline on the same set was F1 0.686
-(recall 0.585, FPR 0.120) with injection recall 0.625.
+The post-fix detector measured **87.158** over two repeats, with D **0.9084**, I **0.8295**,
+E **0.9332**, no failures or infrastructure errors, mean explanation latency **3.823 s/item**
+and peak process-tree RSS **2.046 GB**. This run preceded a report-only update; the final exact
+candidate is re-evaluated separately and its results are recorded in the project log.
 
 The false-alarm work targets four rule-forced India rows and the benign look-alikes around them:
 an official-app reward notice with no fee, details, link or private channel is not a prize scam; a

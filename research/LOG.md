@@ -567,3 +567,16 @@ before its eval; the 36-token cut still cost P. BEST stays gen51 (pin 46f30b36).
 tags are correct: `best-pre-gen35b` is `3f1d79a` and `best-pre-gen51` is `8d6e1ec`, each the
 immediate pre-promotion commit (an earlier closeout note misnamed `8d6e1ec`/`ed784be`). The BRIEF
 permits no new launch after 21 Nov 14:00 IST; the owner submits the verified gen51 BEST.
+
+**PR #28 review fixes (Terra review and CodeRabbit).** The controller accepted these as product
+correctness changes even if the proxy fell slightly. Before: gen51 confirmation mean 86.579,
+D 0.9084, I 0.8295, E 0.9332. After: report-inclusive BEST hash
+`eddfac67665c15766b39fe8892b26fa1d51899e855ae32bc8ee56c9e7cc62969`, two-repeat mean
+87.2074, D 0.9084, I 0.8295, E 0.9332, 0 failures and 0 infrastructure errors, mean explanation
+latency 3.7824 s/item and peak RSS 2.0458 GB. The earlier detector-identical run before the
+report-only update measured 87.1584. The final run was uncontended with bwrap and systemd scope.
+Candidate and evaluator tests passed 294/294 (146 candidate, 148 evaluator).
+
+The sealed holdout was used a second time, disclosed, with no explanations and no tuning from
+its result. Combined conservative F1 0.8021, recall 0.9167, FPR 0.3100; SMS F1 0.7875,
+recall 0.9265, FPR 0.3333; injection F1 0.8750, recall 0.8750, FPR 0.1538.

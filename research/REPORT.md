@@ -8,11 +8,13 @@ round-2 historical numbers below use half-credit proxy metrics and are kept for 
 
 Starting tree was the round-3 `candidates/BEST` (baseline run `r3-best-a`, proxy 73.07). The first
 promoted candidate was `candidates/gen13b` (gen13 plus the controller's PR #21 flow-text restore), a
-copy of that BEST plus changes 1-6 below. The final round-3 BEST is `candidates/gen51` - the gen35b line plus the prize-risk guard described
+copy of that BEST plus changes 1-6 below. The promoted round-3 baseline was `candidates/gen51` - the gen35b line plus the prize-risk guard described
 later - promoted on 21 Nov (`2890666`, pin `46f30b36…`) with a controller-confirmed 3+3 delta of
 **+1.917**; `gen35b` is tagged `best-pre-gen51` (`8d6e1ec`, the immediate pre-promotion commit).
 The older `best-pre-gen35b` tag is `3f1d79a`, also the immediate pre-promotion commit; both
 rollback tags are correct (an earlier note misnamed `8d6e1ec`/`ed784be`, so no re-point is needed).
+The shipped BEST now includes controller-accepted Terra review and CodeRabbit correctness fixes;
+its current content hash is `eddfac67665c15766b39fe8892b26fa1d51899e855ae32bc8ee56c9e7cc62969`.
 
 1. **No abstention outside flow text.** `mech.decide` and the generic SMS path now answer 1 at the
    posterior midpoint when a mechanism is present and 0 when none is, instead of "uncertain". Under
@@ -182,7 +184,7 @@ failures do not respond to tail wording. Gen55 is kept as the best E evidence; t
 The dev flow set is train-overfit (F1 0.9985 vs hidden 0.8505, FPR 0.0022 vs 0.0303) and its
 threshold sweep is flat, so it cannot tune the hidden threshold. The visible India dev is 120/120
 on BEST; the 54 hidden false negatives have no visible examples, so no visible-driven India fix can
-be validated. The owner's launch remains the verified gen51 BEST at pin 46f30b36.
+be validated. That was the pre-review gen51 baseline at pin 46f30b36; see the review-fix results in the log for the current BEST.
 
 The next candidate, gen53, targets visible generalisation rather than the adaptive set: a
 webinar/workshop notice cue, a task-lure branch requiring personal-chat contact plus an earn cue,
@@ -397,8 +399,8 @@ Round 3 BEST (gen51, 3+3 mean 86.579): D 0.9084 (27.25 of 30), I 0.8295 (24.89 o
 E 0.9332 (23.33 of 25), P 0.7408 (11.11 of 15), C 1.0. D's gap is the flow task (F1 0.8505,
 recall 0.757, FPR 3.03%, penalised 0.7643) on the shifted KDDTest+ distribution; SMS 0.9041,
 URL 0.9956 and Indic 0.9712 are near ceiling. India is 146/6/194/54 (recall 0.730, FPR 0.030);
-the six false alarms sit exactly on the FPR knee, and every rule screen after gen35b left the
-confusion bit-identical, so the remaining misses are semantic. E misses mention items (0.643,
+the six false alarms sit exactly on the FPR knee. Gen51 changed the gen35b confusion from
+144 TP / 8 FP / 56 FN to 146 TP / 6 FP / 54 FN; later screens left it unchanged. E misses mention items (0.643,
 18/28) plus verdict 0.939 and actions 0.964; gen55's 20/28 mention was worth only +0.23 points,
 below the gate. P is noise-limited at 0.68-0.77 on this shared box. That is why the last
 experiments targeted single, measurable effects and were kept only when the full run moved.

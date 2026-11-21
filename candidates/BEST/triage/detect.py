@@ -97,7 +97,7 @@ def predict_text(texts):
                                         or a["appointment"] or a["notice"])
         soft_note = not a["harm"] and (
             a["advice"] or (a["collect_review"] and not a["risky"]) or a["awareness"])
-        if a.get("report") and not a.get("reader_direct"):
+        if a.get("report") and not a.get("reader_direct") and not a["harm"]:
             out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
             continue
         if decisive:
