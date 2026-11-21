@@ -593,3 +593,24 @@ The final report-inclusive BEST after the CI repair has hash
 `57996c7089c8865bb6b55f9d6dcd6490f9639cfc861eeabbc72a14c5c2947e81`. Its two-repeat mean was
 87.2665, D 0.9084, I 0.8295, E 0.9332, with zero failures and infrastructure errors, mean
 explanation latency 3.7347 s/item and peak RSS 2.0458 GB. Neither run was contended.
+
+**PR #28 review round 2 fixes (Terra and CodeRabbit).** Reassurance no longer clears requests
+or a decisive model score; sentence boundaries preserve domains and filenames; request destinations
+are associated with their sentence; and third-party reporting is distinguished from reader demands.
+The BEST pin changed from `57996c7089c8865bb6b55f9d6dcd6490f9639cfc861eeabbc72a14c5c2947e81`
+to `7f36d78c29a9250154bac071769eb61700b30417a318218446191808718f032d`.
+
+On Oracle, `bin/eval candidates/BEST --repeats 2` with session `pr28-review2-final-20261121`
+measured a mean score of **86.4074**, D **0.8674**, I **0.8394**, E **0.9332**, and P **0.7916**.
+Mean explanation latency was **3.6747 s/item** and mean peak RSS **2.0461 GB** (maximum
+2.0463 GB). Both runs had zero failures and infrastructure errors, were uncontended at start,
+and used bwrap and systemd scope; maximum sampled CPU steal was 5.0%. D fell from 0.9084 in
+the prior report-inclusive review-fixed result; the correctness changes were requested despite
+possible proxy-score loss. The final candidate hash differs from the earlier sealed-holdout hash
+`eddfac67665c15766b39fe8892b26fa1d51899e855ae32bc8ee56c9e7cc62969`; the holdout was not rerun.
+
+Oracle regression tests passed **312/312** (164 candidate and 148 evaluator). The fixture gate
+passed. The stress runner reported no pinned-row regression, but the gate remains failing because
+three existing suite references and the suite list require regeneration; that infrastructure
+mismatch predates this round. The r3, r4 injection and r4 SMS suites respectively scored 32/34,
+22/24 and 57/58; the other three suites scored 21/21, 30/30 and 40/40.
