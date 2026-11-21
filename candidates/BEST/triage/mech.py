@@ -673,7 +673,8 @@ def analyze(text):
                if _clause_hit(PAY, clause) or (_clause_hit(DEMAND, clause) and _any(MONEY, clause))]
     cont_idx = [i + 1 for i in pay_idx if i + 1 < len(all_clauses) and i + 1 not in pay_idx and
                 (hosts(all_clauses[i + 1]) or _clause_hit(r"\blink\b", all_clauses[i + 1]) or
-                 _any(phone, all_clauses[i + 1]))]
+                 (_any(phone, all_clauses[i + 1]) and
+                  _clause_hit(r"\b(send|pay|transfer|upi|gpay|phonepe|paytm)\b", all_clauses[i + 1])))]
     payment_clauses = [all_clauses[i] for i in sorted(set(pay_idx) | set(cont_idx))]
     payment_official = bool(payment_clauses) and all(
         _any(DEST_OFFICIAL, clause) or any(is_official(host) for host in hosts(clause))
