@@ -2,6 +2,10 @@
 
 Prahari is a prototype offline scam and phishing triage assistant for Arm Bharat AI-SoC Challenge 2026–27, PS3. Local detectors classify pasted messages and URLs; Llama 3.2 1B generates advice through ExecuTorch. A network text description is scored by rules; a separate trained model scores NSL-KDD feature records as dataset replay. Live traffic capture is not implemented. Results are advisory and can be wrong. The measured deployment is an Arm cloud VM, not a phone or an established edge-device demonstration.
 
+## Round-3 results
+
+On Oracle's two-vCPU Arm Neoverse-N1 VM, gen51 achieved conservative F1 of 0.904 on SMS, 0.994 on URL, 0.971 on Indic and 0.851 on NSL-KDD flow replay. These hidden sets were used repeatedly during development. On the separately sealed final holdout, combined F1 was 0.802 and FPR 0.31; hard benign look-alikes caused many false alarms. End-to-end processing took about 3.8–4.8 s/item and process-tree peak RSS was about 2.05–2.34 GB (systemd scope `memory.peak`, including page cache). See the [report](docs/phase1/report.md) for the baseline, evaluation limits and explanation audit. No real-phone result has been measured.
+
 ## Run on aarch64 Linux
 
 Use Python 3.12 and sufficient storage and RAM. The tested environment is described in [the report](docs/phase1/report.md); exact dependency availability on a fresh machine remains to be verified. Network access is needed for installation and model acquisition, not intended for inference.

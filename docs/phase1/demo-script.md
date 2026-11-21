@@ -9,9 +9,9 @@ This is a production plan, not evidence of a recording, real-phone operation or 
 | 0:45–1:05 | Show the app's lookalike phishing URL preset. Show evidence, explanation and timing without opening it. |
 | 1:05–1:25 | **Dataset replay:** prepare one licensed, visible real NSL-KDD feature record locally in the `bin/predict --task flow` JSONL schema (`id` and 41 named `features`); run `candidates/BEST/bin/predict --task flow --in <visible-record.jsonl> --out <result.jsonl>` with `HC_PY` configured. Show the resulting model verdict and evidence. Do not commit or display private data. This is not live capture. Choose the visible record in rehearsal; licence and permission must allow this use. If `data/dev/flow.jsonl` is provisioned, extract its first record locally with the snippet below; the dataset is not committed. |
 | 1:25–1:45 | **Separate text-rule path:** select Network event in the UI and use the port-scan description preset. Show its rule verdict and Llama explanation with on-screen timing. Explain that it independently reclassifies text and does not explain the replay model's verdict; the two can disagree. |
-| 1:45–2:05 | Show the hard benign bank-debit preset and its evidence and explanation. A benign label is not a safety guarantee. |
+| 1:45–2:05 | Show the hard benign bank-debit preset and its evidence and explanation. The benign label reads “NO RISK FOUND — still verify”; it is not a safety guarantee. |
 | 2:05–2:25 | Enter `connections rejected` as a network description: this exercises the rule path's uncertain case. Show the actual result and cautious action. If the actual result differs, disclose it and investigate rather than staging success. |
-| 2:25–2:50 | Summarise: VM benchmark 3.67 s/item, 2.256 GB peak RSS, measured under the cited evaluation; no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
+| 2:25–2:50 | Summarise: VM benchmark about 3.8–4.8 s/item and 2.05–2.34 GB process-tree peak RSS (systemd scope memory.peak, including page cache); no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
 
 Inference runs locally and inputs reach the local app over loopback. Downloading the model requires network access; the app itself does not block outbound traffic. Offline claims cover only what was tested.
 
