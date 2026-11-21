@@ -269,3 +269,16 @@ def test_round2_report_does_not_exempt_a_later_imperative():
         a = mech.analyze(text)
         assert a['reader_direct'] and 'secret_request' in dict(a['harm'])
         assert verdict(text) == 1
+
+
+@pytest.mark.parametrize('text', [
+    'Your electricity bill is due. Your connection will be disconnected. Call 9876543210.',
+    'Pay your electricity bill of ₹500. Use this link: https://power-update.xyz.',
+    'KYC update: upload your passport. Send it to this WhatsApp chat.',
+])
+def test_final_review_continuation_false_safes(text):
+    assert verdict(text) == 1
+
+
+def test_official_payment_with_help_number_stays_benign():
+    assert verdict('Please pay your electricity bill of ₹500 on https://sbi.co.in. For assistance call 9876543210.') == 0
