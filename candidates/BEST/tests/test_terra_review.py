@@ -143,6 +143,7 @@ def test_official_branch_with_block_threat_does_not_crash():
     'Install this app, We will send you the APK on WhatsApp, We never ask for OTP.',
     'Bank KYC: buy gift vouchers and send the codes to our manager. No fee is required.',
     'Install the attached update.apk.',
+    'Bank requires your password. No fee is required.',
 ])
 def test_round2_protection_does_not_hide_harm(text):
     assert mech.decide(0.1, mech.analyze(text))[0] == 1

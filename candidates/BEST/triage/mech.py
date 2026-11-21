@@ -59,7 +59,7 @@ SHARE = (r"(shar(e|ing)|send(ing)?|reply|telling|tell|giv(e|ing)|forward(ing)?|r
 ENTER = (r"(enter(ing)?|typ(e|ing)|fill(ing)?|provid(e|ing)|submit(ting)?|confirm(ing)?|"
          r"verif(y|ying)|updat(e|ing)|upload(ing)?|डालें|दर्ज|पुष्टि|स्वीकार|भरें|अपडेट|करें)")
 DEMAND = (r"(\b(ask|asks|asked|asking|demand|demands|demanded|demanding|want|wants|wanted|"
-          r"request|requests|requested|requesting)\b|मांग\w*|कहता है|कहती है|कह रह\w*|"
+          r"request|requests|requested|requesting|require|requires|required|requiring)\b|मांग\w*|कहता है|कहती है|कह रह\w*|"
           r"bolta hai|bol rah\w*|keh rah\w*|कहा है|कहते हैं|maang\w*|maang rah\w*)")
 PAY = (r"\b(pay|paid|paying|send|sends|sending|transfer|transfers|deposit|deposits|remit|fund|"
        r"approve|approves|authori[sz]e|scan|buy|purchase|top[- ]?up|recharge|bhar\w*)\b"
