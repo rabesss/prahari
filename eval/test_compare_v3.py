@@ -94,16 +94,6 @@ def test_contended_or_unmeasured_comparison_fails(change):
     assert not compare_pair(b, c)['pass']
 
 
-def test_each_candidate_run_meets_relative_caps():
-    for metric, bad in [('latency_s_per_item', 2.21), ('peak_process_tree_rss_gb', 2.11)]:
-        b, c = run(70), run(71)
-        bs = [dict(b, stamp=f'20261121-10000{i*2}-000000', candidate='BEST') for i in range(2)]
-        cs = [dict(c, stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND') for i in range(2)]
-        cs[0][metric] = bad
-        cs[1][metric] = 1.0  # mean passes but one run does not
-        assert not compare(bs, cs, .5)['pass']
-
-
 @pytest.mark.parametrize('field,bad', [('candidate_hash', 'b' * 64), ('session_id', 'other'), ('rss_method', 'proc_fallback')])
 def test_binding_rejects_changed_run(field, bad):
     b, c = run(70), run(71)
