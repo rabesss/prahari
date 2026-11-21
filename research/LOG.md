@@ -570,13 +570,26 @@ permits no new launch after 21 Nov 14:00 IST; the owner submits the verified gen
 
 **PR #28 review fixes (Terra review and CodeRabbit).** The controller accepted these as product
 correctness changes even if the proxy fell slightly. Before: gen51 confirmation mean 86.579,
-D 0.9084, I 0.8295, E 0.9332. After: report-inclusive BEST hash
+D 0.9084, I 0.8295, E 0.9332. Before the later CI crash repair: report-inclusive BEST hash
 `eddfac67665c15766b39fe8892b26fa1d51899e855ae32bc8ee56c9e7cc62969`, two-repeat mean
 87.2074, D 0.9084, I 0.8295, E 0.9332, 0 failures and 0 infrastructure errors, mean explanation
 latency 3.7824 s/item and peak RSS 2.0458 GB. The earlier detector-identical run before the
-report-only update measured 87.1584. The final run was uncontended with bwrap and systemd scope.
-Candidate and evaluator tests passed 294/294 (146 candidate, 148 evaluator).
+report-only update measured 87.1584. This earlier run was uncontended with bwrap and systemd scope.
+At that point candidate and evaluator tests passed 294/294 (146 candidate, 148 evaluator).
 
-The sealed holdout was used a second time, disclosed, with no explanations and no tuning from
+The sealed holdout was used a second time on that pre-CI-repair hash, disclosed, with no explanations and no tuning from
 its result. Combined conservative F1 0.8021, recall 0.9167, FPR 0.3100; SMS F1 0.7875,
 recall 0.9265, FPR 0.3333; injection F1 0.8750, recall 0.8750, FPR 0.1538.
+
+GitHub CI then exposed a crash in the official-channel block-threat branch; the separate fix and
+regression test were driven by CI, not by the holdout. The two-repeat detector evaluation before the
+report-only update scored 87.1218, D 0.9084, I 0.8295, E 0.9332, with no failures or infrastructure
+errors, mean latency 3.8526 s/item and peak RSS 2.0458 GB. Tests passed 295/295 (147 candidate,
+148 evaluator). The visible stress runner completed without a crash, but the previously failing
+stress-reference gate still requires regeneration by the infrastructure owner. The holdout was not
+run a third time and therefore its figures above apply only to the earlier hash.
+
+The final report-inclusive BEST after the CI repair has hash
+`57996c7089c8865bb6b55f9d6dcd6490f9639cfc861eeabbc72a14c5c2947e81`. Its two-repeat mean was
+87.2665, D 0.9084, I 0.8295, E 0.9332, with zero failures and infrastructure errors, mean
+explanation latency 3.7347 s/item and peak RSS 2.0458 GB. Neither run was contended.

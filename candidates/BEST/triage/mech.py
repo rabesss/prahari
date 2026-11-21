@@ -850,7 +850,7 @@ def decide(p_model, a, gate=0.85):
         return 0, p_model, a
     # A warning carried on the service's own app or portal is a notice, not a demand: only a
     # secret request or a payment to an unverified payee survives the official-channel test.
-    if a["official_channel"] and {n for n, _ in harm} <= {"block_threat", "job_offer"}:
+    if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"}:
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["bill"] or a["notice"] or a["appointment"]) and \
             not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):

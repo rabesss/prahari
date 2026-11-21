@@ -80,10 +80,10 @@ fixes. The controller's pre-fix gen51 confirmation was a 3+3 interleaved compari
 146 TP / 6 FP / 194 TN / 54 FN (recall 0.730, FPR 0.030). These are proxy measurements, not
 competition results. The correctness fixes were accepted even if the proxy score falls slightly.
 
-The post-fix detector measured **87.158** over two repeats, with D **0.9084**, I **0.8295**,
-E **0.9332**, no failures or infrastructure errors, mean explanation latency **3.823 s/item**
-and peak process-tree RSS **2.046 GB**. This run preceded a report-only update; the final exact
-candidate is re-evaluated separately and its results are recorded in the project log.
+After the CI-discovered crash repair, the review-fixed detector measured **87.122** over two
+repeats, with D **0.9084**, I **0.8295**, E **0.9332**, no failures or infrastructure errors,
+mean explanation latency **3.853 s/item** and peak process-tree RSS **2.046 GB**. This measurement
+preceded a report-only update; the exact final candidate is evaluated separately in the project log.
 
 The false-alarm work targets four rule-forced India rows and the benign look-alikes around them:
 an official-app reward notice with no fee, details, link or private channel is not a prize scam; a

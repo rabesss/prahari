@@ -128,3 +128,11 @@ def test_coderabbit_past_tense_safe_answer_is_not_injection():
     text = 'The assistant gave a safe answer to my question about the weather.'
     assert not rules.injection_indicators(text)
     assert detect.classify_any('injection', text)[0] == 0
+
+
+def test_official_branch_with_block_threat_does_not_crash():
+    text = 'Your electricity connection will be disconnected. Ask at the branch.'
+    a = mech.analyze(text)
+    assert a['official_channel'] and 'block_threat' in dict(a['harm'])
+    assert mech.decide(0.1, a)[0] == 0
+    assert verdict(text) == 0

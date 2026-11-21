@@ -14,7 +14,7 @@ later - promoted on 21 Nov (`2890666`, pin `46f30b36…`) with a controller-conf
 The older `best-pre-gen35b` tag is `3f1d79a`, also the immediate pre-promotion commit; both
 rollback tags are correct (an earlier note misnamed `8d6e1ec`/`ed784be`, so no re-point is needed).
 The shipped BEST now includes controller-accepted Terra review and CodeRabbit correctness fixes;
-its current content hash is `eddfac67665c15766b39fe8892b26fa1d51899e855ae32bc8ee56c9e7cc62969`.
+its current content hash is `57996c7089c8865bb6b55f9d6dcd6490f9639cfc861eeabbc72a14c5c2947e81`.
 
 1. **No abstention outside flow text.** `mech.decide` and the generic SMS path now answer 1 at the
    posterior midpoint when a mechanism is present and 0 when none is, instead of "uncertain". Under
