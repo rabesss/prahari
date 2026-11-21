@@ -94,16 +94,6 @@ def test_contended_or_unmeasured_comparison_fails(change):
     assert not compare_pair(b, c)['pass']
 
 
-def test_each_candidate_run_meets_relative_caps():
-    for metric, bad in [('latency_s_per_item', 2.21), ('peak_process_tree_rss_gb', 2.11)]:
-        b, c = run(70), run(71)
-        bs = [dict(b, stamp=f'20261121-10000{i*2}-000000', candidate='BEST') for i in range(2)]
-        cs = [dict(c, stamp=f'20261121-10000{i*2+1}-000000', candidate='CAND') for i in range(2)]
-        cs[0][metric] = bad
-        cs[1][metric] = 1.0  # mean passes but one run does not
-        assert not compare(bs, cs, .5)['pass']
-
-
 @pytest.mark.parametrize('field,bad', [('candidate_hash', 'b' * 64), ('session_id', 'other'), ('rss_method', 'proc_fallback')])
 def test_binding_rejects_changed_run(field, bad):
     b, c = run(70), run(71)
@@ -187,3 +177,19 @@ def test_candidate_hash_ignores_python_caches(tmp_path):
     assert candidate_hash(tmp_path) == before
     (tmp_path / 'pkg' / 'mod.py').write_text('x = 2\n')
     assert candidate_hash(tmp_path) != before
+
+
+def test_relative_perf_gates_use_medians():
+    b, c = run(70), run(71)
+    bs = [copy.deepcopy(b) for _ in range(3)]
+    cs = [copy.deepcopy(c) for _ in range(3)]
+    for i, r in enumerate(bs):
+        r.update(stamp=f'20261121-1000{i*2:02d}-000000', candidate='BEST', peak_process_tree_rss_gb=2.045)
+    for i, r in enumerate(cs):
+        r.update(stamp=f'20261121-1000{i*2+1:02d}-000000', candidate='CAND', peak_process_tree_rss_gb=2.045)
+    cs[0]['peak_process_tree_rss_gb'] = 2.175  # one noisy run (6.4% over) no longer fails
+    assert compare(bs, cs, .5)['pass']
+    for r in cs[:2]:
+        r['peak_process_tree_rss_gb'] = 2.175  # a median regression still fails
+    result = compare(bs, cs, .5)
+    assert not result['pass'] and 'peak_process_tree_rss_gb failed' in result['failures']
