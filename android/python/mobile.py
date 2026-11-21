@@ -7,6 +7,12 @@ import types
 import numpy as np
 import portable
 
+# detect imports joblib at module level, but Android never loads pickles: the
+# detectors below use exported portable parameters. Chaquopy ships no joblib,
+# so register an inert stub that fails loudly if anything tries to unpickle.
+def _no_pickles(*a, **k): raise RuntimeError('joblib.load is not available on Android')
+sys.modules['joblib'] = types.SimpleNamespace(load=_no_pickles)
+
 # detect imports textmodel; Android uses the import-free inference equivalent.
 from triage import mech
 textmodel = types.ModuleType('triage.textmodel')
@@ -47,4 +53,4 @@ def check(kind, text, runner):
     detector_ms = (time.perf_counter()-t0)*1000
     ex = BridgeExplainer(runner)
     explanation, stats = ex.generate(ex.prompt(kind, text, lab, ev))
-    return json.dumps({'verdict': {0:'SAFE',1:'DANGEROUS','uncertain':'SUSPICIOUS'}[lab], 'score':score, 'evidence':ev, 'explanation':explanation, 'actions':llm.actions_for(kind, lab), 'detector_ms':detector_ms, 'llm':stats}, ensure_ascii=False)
+    return json.dumps({'verdict': {0:'NO RISK FOUND — still verify',1:'DANGEROUS','uncertain':'SUSPICIOUS'}[lab], 'score':score, 'evidence':ev, 'explanation':explanation, 'actions':llm.actions_for(kind, lab), 'detector_ms':detector_ms, 'llm':stats}, ensure_ascii=False)
