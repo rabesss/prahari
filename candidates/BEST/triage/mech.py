@@ -608,7 +608,9 @@ def analyze(text):
         r"\b(if|when|a caller|someone|fraudster|scammer)\b[^.;!?।\n]{0,60}"
         r"\b(asks?|demands?|requests?)\b[^.;!?।\n]{0,50}"
         r"(otp|pin|password|code)\b", t, re.I))
-    if (hypothetical and not direct_share and not read_code) or (a["report"] and not a["reader_direct"]):
+    # Report framing never clears a credential demand: scammers wrap requests in news-style text,
+    # so a warning that quotes a demand is flagged rather than risk clearing a real one.
+    if hypothetical and not direct_share and not read_code:
         # A third-party report can contain both a demand and its quoted action.
         share_hit = False
         enter_hit = False
@@ -638,6 +640,14 @@ def analyze(text):
                    any(is_official(host) for host in hosts(clause)))))
         for _, clause in clauses(t)
     )
+    # A private channel elsewhere in the message still receives the document unless the request
+    # itself names an official channel ("upload in the official app").
+    ident_official = any(
+        (_clause_hit(IDENT_ACT + r"[^.;!?।\n]{0,40}" + IDENT, clause) or
+         _clause_hit(IDENT + r"[^.;!?।\n]{0,40}" + IDENT_ACT, clause))
+        and (_any(DEST_OFFICIAL, clause) or any(is_official(host) for host in hosts(clause)))
+        for _, clause in clauses(t))
+    id_channel = id_channel or (_clause_hit(PRIVATE_CHANNEL, t) and not ident_official)
     if ident_ask and _clause_hit(KYC_CONTEXT, t) and id_channel:
         a["harm"].append(("id_request", "asks you to send identity documents to a chat or link"))
 
