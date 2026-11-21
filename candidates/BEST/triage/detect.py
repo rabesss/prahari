@@ -75,7 +75,7 @@ def predict_text(texts):
     for i, t in enumerate(texts):
         a = mech.analyze(t)
         ana[i] = a
-        strong_safe = {"transaction_receipt", "otp_notification", "protective", "official_channel",
+        strong_safe = {"transaction_receipt", "otp_notification", "protective", "opt_out", "official_channel",
                        "bill_notice", "appointment_notice"} & set(a["safe"])
         if mech.indic_context(t) or strong_safe:
             idx.append(i)
@@ -95,16 +95,21 @@ def predict_text(texts):
         decisive = [n for n, _ in a["harm"] if n in mech.DECISIVE]
         benign_note = not a["harm"] and (a["official_channel"] or a["receipt"] or a["bill"]
                                         or a["appointment"] or a["notice"])
+        soft_note = not a["harm"] and (
+            a["advice"] or (a["collect_review"] and not a["risky"]) or a["awareness"])
+        if a.get("report") and not a.get("reader_direct") and not a["harm"]:
+            out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
+            continue
         if decisive:
             out.append((1, max(float(p), 0.85), mech.evidence(a)[:6]))
             continue
-        if benign_note:
+        if benign_note or soft_note:
             out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
             continue
         ind_ev, score, prot, strong = indicrules.indicators(t)
         p = _text_decision(float(p), score, prot, strong)
         ev = list(ind_ev) if ind_ev else rules.text_indicators(t)
-        lab, s = _decide(p, [], lo=0.32, hi=0.60)
+        lab, s = (1, p) if p >= 0.60 else (0, p)
         out.append((lab, s, [d for _, d in ev][:6]))
     return out
 
@@ -163,6 +168,9 @@ def predict_flow_text(text):
     ev = rules.flow_text_indicators(text)
     names = {n for n, _ in ev}
     benign_cue = bool(rules.BENIGN_FLOW.search(text))
+    # Owner-approved PR #21 policy: a benign cue next to a port scan, brute force or C2 beacon
+    # is genuinely ambiguous (a routine IT vulnerability scan must not become an alert), and a
+    # lone rejected connection is ambiguous too. Flow text is outside the D and I metrics.
     if names & {"root", "flood"}:
         lab = 1
     elif names & {"port_scan", "brute_force", "beacon_explicit"}:
@@ -185,4 +193,10 @@ def classify_any(kind, inp):
         inj = rules.injection_indicators(inp)
         if inj:
             return 1, 0.95, [d for _, d in inj]
+        lab, score, ev = predict_text([inp])[0]
+        # Outside the visible rules, only a confident model positive counts: the hidden benign
+        # AI-mention rows all score below 0.85 on the visible set.
+        if lab == 1 and (mech.analyze(inp)["harm"] or float(score) >= 0.85):
+            return lab, score, ev
+        return 0, min(float(score), 0.40), ev
     return predict_text([inp])[0]

@@ -1,0 +1,300 @@
+{
+ "label": "r3-f1-best-a",
+ "candidate": "candidates/BEST",
+ "candidate_hash": "dfcf6365ef86de4edb40a24c9a80f7baad69650bea3eba45f7cc64e2a5a5e6e1",
+ "session_id": "r3-20261121-fix1",
+ "stamp": "20261120-195921-521916",
+ "artifacts": "research/evals/20261120-195921-521916-r3-f1-best-a",
+ "quick": false,
+ "host_start": {
+  "load_average": [
+   1.48779296875,
+   2.47265625,
+   2.486328125
+  ],
+  "cpu_steal_percent": 0.0
+ },
+ "contended": false,
+ "queued_s": 0.0,
+ "cooldown_s": 80.0,
+ "hidden_sha256": {
+  "sms_test": "0a1a0060e86eccb79a05c43072d8c7fec3d491c509ec39998bf3b6d7f55c1fa4",
+  "url_test": "6b7bd10ed277f7e150fe790b771410b5b3756d79926a92649bd17faa44730798",
+  "indic_test": "bd8fe7d31bec627923dbe998730574bd1e77e76f2527c8b0b2f2990f7738f524",
+  "flow_test": "277f7a8388cc72bd7df39794101f6d7dffdfad7634bb2d0effab5b7d617b5b43",
+  "explain_set": "8603235cc842b076b4437d0a1f2e936c01cefe232693af5f4d04f754083dd888",
+  "india_hidden_v2": "532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995fb0"
+ },
+ "rss_method": "systemd_scope",
+ "isolation_method": "bwrap",
+ "unit_census": {
+  "unavailable": 0,
+  "new_prahari_scopes": 0,
+  "new_other_scopes": 1,
+  "new_slices": 0,
+  "new_other": 0,
+  "cgroup_unavailable": 0,
+  "new_cgroups": 2,
+  "new_cgroup_members": 88,
+  "attributed": 0
+ },
+ "host_end": {
+  "load_average": [
+   4.5947265625,
+   3.39111328125,
+   2.81982421875
+  ],
+  "cpu_steal_percent": 0.0
+ },
+ "host_during": {
+  "samples": 29,
+  "load_1m_max": 5.73583984375,
+  "load_1m_mean": 3.5797077047413794,
+  "cpu_steal_percent_max": 0.0,
+  "cpu_steal_percent_mean": 0.0
+ },
+ "score": 73.28174645465315,
+ "scores": {
+  "D": 0.899659838438383,
+  "I": 0.3774193548387097,
+  "E": 0.935401785714286,
+  "P": 0.7722884008988815,
+  "C": 1.0
+ },
+ "failures": [],
+ "infra_errors": [],
+ "full_wall_s": 139.26935888105072,
+ "promotable": true,
+ "proxy_v2_legacy": 90.068,
+ "detection": {
+  "sms": {
+   "n": 1162,
+   "positives": 196,
+   "negatives": 966,
+   "decided": 1153,
+   "uncertain": 9,
+   "invalid": 0,
+   "coverage": 0.9922547332185886,
+   "confusion_decided": {
+    "tp": 166,
+    "fp": 5,
+    "tn": 956,
+    "fn": 26
+   },
+   "conditional": {
+    "precision": 0.9707602339181286,
+    "recall": 0.8645833333333334,
+    "f1": 0.9146005509641874,
+    "fpr": 0.005202913631633715
+   },
+   "conservative": {
+    "precision": 0.9431818181818182,
+    "recall": 0.8469387755102041,
+    "f1": 0.8924731182795699,
+    "fpr": 0.010351966873706004
+   },
+   "undefined_reasons": {},
+   "score": 0.8909025134130324,
+   "legacy": {
+    "f1": 0.9044,
+    "precision": 0.9573,
+    "recall": 0.8571,
+    "fpr": 0.0078,
+    "invalid": 0,
+    "n": 1162,
+    "score": 0.9044
+   },
+   "items_per_s": 285.0
+  },
+  "url": {
+   "n": 7997,
+   "positives": 3997,
+   "negatives": 4000,
+   "decided": 7984,
+   "uncertain": 13,
+   "invalid": 0,
+   "coverage": 0.9983743903963986,
+   "confusion_decided": {
+    "tp": 3949,
+    "fp": 0,
+    "tn": 4000,
+    "fn": 35
+   },
+   "conditional": {
+    "precision": 1.0,
+    "recall": 0.991214859437751,
+    "f1": 0.9955880499180638,
+    "fpr": 0.0
+   },
+   "conservative": {
+    "precision": 1.0,
+    "recall": 0.9879909932449337,
+    "f1": 0.9939592247671785,
+    "fpr": 0.0
+   },
+   "undefined_reasons": {},
+   "score": 0.9939592247671785,
+   "legacy": {
+    "f1": 0.9948,
+    "precision": 1.0,
+    "recall": 0.9896,
+    "fpr": 0.0,
+    "invalid": 0,
+    "n": 7997,
+    "score": 0.9948
+   },
+   "items_per_s": 2375.9
+  },
+  "indic": {
+   "n": 320,
+   "positives": 160,
+   "negatives": 160,
+   "decided": 317,
+   "uncertain": 3,
+   "invalid": 0,
+   "coverage": 0.990625,
+   "confusion_decided": {
+    "tp": 150,
+    "fp": 2,
+    "tn": 158,
+    "fn": 7
+   },
+   "conditional": {
+    "precision": 0.9868421052631579,
+    "recall": 0.9554140127388535,
+    "f1": 0.970873786407767,
+    "fpr": 0.0125
+   },
+   "conservative": {
+    "precision": 0.9868421052631579,
+    "recall": 0.9375,
+    "f1": 0.9615384615384616,
+    "fpr": 0.0125
+   },
+   "undefined_reasons": {},
+   "score": 0.9495192307692308,
+   "legacy": {
+    "f1": 0.9665,
+    "precision": 0.987,
+    "recall": 0.9469,
+    "fpr": 0.0125,
+    "invalid": 0,
+    "n": 320,
+    "score": 0.9544
+   },
+   "items_per_s": 84.8
+  },
+  "indic_breakdown": {
+   "hard:False": {
+    "n": 127,
+    "acc": 0.972
+   },
+   "hard:True": {
+    "n": 193,
+    "acc": 0.964
+   },
+   "lang:en": {
+    "n": 192,
+    "acc": 0.977
+   },
+   "lang:hi": {
+    "n": 32,
+    "acc": 0.875
+   },
+   "lang:hinglish": {
+    "n": 80,
+    "acc": 0.975
+   },
+   "lang:mixed": {
+    "n": 16,
+    "acc": 1.0
+   }
+  },
+  "flow": {
+   "n": 22544,
+   "positives": 12833,
+   "negatives": 9711,
+   "decided": 22544,
+   "uncertain": 0,
+   "invalid": 0,
+   "coverage": 1.0,
+   "confusion_decided": {
+    "tp": 9712,
+    "fp": 294,
+    "tn": 9417,
+    "fn": 3121
+   },
+   "conditional": {
+    "precision": 0.9706176294223466,
+    "recall": 0.7567988778929323,
+    "f1": 0.8504750645825123,
+    "fpr": 0.03027494593759654
+   },
+   "conservative": {
+    "precision": 0.9706176294223466,
+    "recall": 0.7567988778929323,
+    "f1": 0.8504750645825123,
+    "fpr": 0.03027494593759654
+   },
+   "undefined_reasons": {},
+   "score": 0.7642583848040906,
+   "legacy": {
+    "f1": 0.8505,
+    "precision": 0.9706,
+    "recall": 0.7568,
+    "fpr": 0.0303,
+    "invalid": 0,
+    "n": 22544,
+    "score": 0.7643
+   },
+   "items_per_s": 6882.4
+  }
+ },
+ "india": {
+  "metrics": {
+   "n": 400,
+   "positives": 200,
+   "negatives": 200,
+   "decided": 383,
+   "uncertain": 17,
+   "invalid": 0,
+   "coverage": 0.9575,
+   "confusion_decided": {
+    "tp": 117,
+    "fp": 13,
+    "tn": 176,
+    "fn": 77
+   },
+   "conditional": {
+    "precision": 0.9,
+    "recall": 0.6030927835051546,
+    "f1": 0.7222222222222222,
+    "fpr": 0.06878306878306878
+   },
+   "conservative": {
+    "precision": 0.8297872340425532,
+    "recall": 0.585,
+    "f1": 0.6862170087976539,
+    "fpr": 0.12
+   },
+   "undefined_reasons": {},
+   "score": 0.3774193548387097
+  },
+  "injection_recall": 0.625,
+  "benign_ai_mention_fpr": 0.0
+ },
+ "grounding_pass_rate": 0.9285714285714286,
+ "latency_s_per_item": 3.9124373686084124,
+ "peak_process_tree_rss_gb": 2.04470272,
+ "headline": {
+  "sms_f1": 0.8924731182795699,
+  "url_f1": 0.9939592247671785,
+  "indic_f1": 0.9615384615384616,
+  "indic_fpr": 0.0125,
+  "flow_f1": 0.8504750645825123,
+  "explain_s_per_item": 3.91,
+  "peak_rss_gb": 2.04470272,
+  "decode_tps": 16.9372,
+  "model": "llama32-1b-qlora"
+ }
+}
