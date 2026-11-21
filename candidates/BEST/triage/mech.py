@@ -151,7 +151,7 @@ QR = (r"(scan (this|the|our|below) qr|this qr|qr code|scan kar\w*|स्कै�
 REMOTE = (r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen shar\w*|remote[- ]access "
           r"(software|app|tool)|remote app|remote support)\b|"
           r"\b(install|download)\b[^.;!?।\n]{0,30}\b(app|application|apk|software|tool)\b|"
-          r"\.apk\b|grant (contacts|sms|access|permissions)|"
+          r"grant (contacts|sms|access|permissions)|"
           r"ऐप (लगाकर|इंस्टॉल)|ऐप डाउनलोड|रिमोट (ऐप|सॉफ्टवेयर)|स्क्रीन (साझा|शेयर)")
 THREAT = (
     r"\b(block|blocked|suspend|suspended|deactivat\w*|disconnect\w*|cut[- ]?off|freeze|frozen|"
@@ -337,11 +337,12 @@ SAFE = [
      r"na (bhejein|bataen|karein)|न भेजें|न बताएं|मत बताएं|साझा न करें|नहीं मांगा|नहीं मांगेगा|"
      r"(needs|requires) no (code|payment|link|fee|otp|reply|pin)|"
      r"koi (secret )?code kisi ko mat|"
-     r"reply stop|opt out|unsubscribe|works only at the keypad|"
+     r"works only at the keypad|"
      r"(कोई\s+)?(शुल्क|भुगतान|पिन|कोड|राशि|लिंक|फीस)[^।;!?\n]{0,45}"
      r"(नहीं चाहिए|नहीं लगेगा|नहीं लगती|की जरूरत नहीं|नहीं मांगा|नहीं है|नहीं)|"
      r"(fraud|scam|alert)[^.;!?।\n]{0,40}(never|do not|don't)\s+(ask|share|send)|"
      r"(agencies|banks|police|officials?)\s+(do not|don't|never)\s+ask"),
+    ("opt_out", r"reply stop|opt out|unsubscribe"),
     ("notice",
      r"\b(appointment|scheduled|rescheduled|meeting|notice|reminder|admit card|result|interview|"
      r"application|shortlisted|portal|office|campus|school|college|policy|renewal|statement)\b|"
@@ -546,14 +547,20 @@ def analyze(text):
     report_verb = _any(r"\b(is|are|was|were|has|have|had)\s+(calling|asking|telling|sending|cheating|"
                        r"duping|running|operating|targeting|using|demanding|threatening|posing|"
                        r"pretending|impersonating)\b", t) or _any(
-        r"\b(arrested|busted|detained|convicted|booked|filed)\b", t)
-    a["report"] = bool(report_src and third_actor and report_verb)
+        r"\b(arrested|busted|detained|convicted|booked|filed|asked|requested|demanded|told)\b", t)
+    # A bank or police agent asking for a code is not, by itself, a news report.
+    # Require an actual report frame or an explicitly named third-party audience.
+    report_frame = _any(r"\b(warn\w*|beware|advisory|awareness|news|report\w*|"
+                        r"arrest\w*|bust\w*|detain\w*|convict\w*|booked)\b|गिरफ्तार\w*", t)
+    third_audience = _any(r"\b(victims?|customers|citizens|people|public)\b|लोग", t)
+    a["report"] = bool(report_src and third_actor and report_verb and (report_frame or third_audience))
     a["reader_direct"] = bool(
         _any(r"\b(you|your|aap|aapka|आप|आपका)\b[^.;!?।\n]{0,40}"
              r"\b(must|need to|should|pay|send|transfer|share|click|install|download|call|verify|"
              r"update|deposit|invest)\b", t)
-        or _any(r"(^|[.!?।]\s{0,3})(?:(?:kindly|please|pls|request you to|कृपया|ज़रा|जरा)\s+)?(pay|send|transfer|share|click|install|download|verify|update|"
-                r"deposit|invest|call)\b", t)
+        or _clause_hit(r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)\s*,?\s*)*"
+                       r"(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b", t)
+        or _clause_hit(r"\b(?:please|kindly|pls)\s+(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b", t)
         or _clause_hit(DEMAND + r"[^.;!?।\n]{0,40}\b(?:your|aapka|आपका)\b[^.;!?।\n]{0,25}" + CREDS, t)
         or _any(r"(?:कृपया|ज़रा|जरा)\s+[^.;!?।\n]{0,40}(भेजें|भेजो|बताएं|बताओ|साझा|दें|भरें|करें)", t)
         or _any(r"\b(pay|send|transfer|share|deposit|invest)\s+(now|today|immediately|at once|"
@@ -592,7 +599,6 @@ def analyze(text):
     read_code = bool(re.search(
         r"\b(read|speak|repeat|dictate)\b[^.;!?।\n]{0,40}\b(otp|code|pin|6[- ]?digit)\b"
         r"[^.;!?।\n]{0,40}\b(screen|phone|message|sms|app)\b", t, re.I))
-    a["secret_share"] = share_hit
     direct_share = share_hit
     share_hit = share_hit or (_clause_hit(DEMAND + r"[^.;!?।\n]{0,40}" + CREDS, t) or
                               _clause_hit(CREDS + r"[^.;!?।\n]{0,40}" + DEMAND, t))
@@ -607,6 +613,8 @@ def analyze(text):
         share_hit = False
         enter_hit = False
         read_code = False
+        direct_share = False
+    a["secret_share"] = direct_share
     if share_hit or read_code or enter_hit:
         a["secret"] = True
         if a["isolation"] or a["secrecy"] or a["authority"]:
@@ -646,17 +654,33 @@ def analyze(text):
         for _, clause in clauses(t)
     )
     a["dest_strong"] = _any(DEST_STRONG, t) or phone_destination
-    dest_staff = _clause_hit(DEST_STAFF, t)
-    agent_pay = _clause_hit(r"(agent|officer|advisor|representative|staff)[’']?s?\s+"
-                            r"(number|account|upi|vpa)", t)
+    # An unrelated official-channel sentence cannot authorize a payment elsewhere.
+    payment_clauses = [clause for _, clause in clauses(t)
+                       if _clause_hit(PAY, clause) or
+                       (_clause_hit(DEMAND, clause) and _any(MONEY, clause))]
+    payment_official = bool(payment_clauses) and all(
+        _any(DEST_OFFICIAL, clause) or any(is_official(host) for host in hosts(clause))
+        for clause in payment_clauses
+    )
+    payment_dest_strong = any(
+        _any(DEST_STRONG, clause) or _any(phone, clause)
+        for clause in payment_clauses
+    ) or _any(r"\b(?:to|on)\s+" + phone, t)
+    payment_personal = any(_clause_hit(DEST_PERSONAL, clause) for clause in payment_clauses)
+    payment_risky = any(host_risk(host) for clause in payment_clauses for host in hosts(clause))
+    payment_links = any(hosts(clause) or _clause_hit(r"\blink\b", clause)
+                        for clause in payment_clauses)
+    dest_staff = any(_clause_hit(DEST_STAFF, clause) for clause in payment_clauses)
+    agent_pay = any(_clause_hit(r"(agent|officer|advisor|representative|staff)[’']?s?\s+"
+                                r"(number|account|upi|vpa)", clause) for clause in payment_clauses)
     if _clause_hit(PAY_TO_RECEIVE, t):
         a["pay_to_receive"] = True
         a["harm"].append(("pay_to_receive", "asks for a payment before a refund, prize or delivery is released"))
-    elif pay and (fee or _clause_hit(AMOUNT, t) or agent_pay or (unmoney and a["dest_strong"])) and \
-            (a["dest_strong"] or not a["official_channel"]) and \
-            (_clause_hit(DEST_PERSONAL, t) or risky_any or dest_staff or agent_pay
-             or (fee and (a["hosts"] or _clause_hit(r"\blink\b", t)))
-             or (a["hosts"] and _clause_hit(UTILITY, t))):
+    elif pay and (fee or _clause_hit(AMOUNT, t) or agent_pay or (unmoney and payment_dest_strong)) and \
+            (payment_dest_strong or not payment_official) and \
+            (payment_personal or payment_risky or dest_staff or agent_pay
+             or (fee and payment_links)
+             or (payment_links and _clause_hit(UTILITY, t))):
         a["pay_unverified"] = True
         a["harm"].append(("pay_unverified", "asks for a payment to a personal number, account or unverified link"))
     private_negated = _any(
@@ -676,7 +700,7 @@ def analyze(text):
         # "Approve the collect request only after the order arrives" is advice, not a push.
         a["collect"] = True
         a["harm"].append(("collect_request", "pushes you to approve a UPI collect or payment request"))
-    if _clause_hit(QR, t) and unmoney and not a["official_channel"]:
+    if _clause_hit(QR, t) and unmoney and not payment_official:
         a["collect"] = True
         a["harm"].append(("qr_payment", "asks you to scan a QR code and approve a payment"))
     # Commas separate negated and affirmative instructions, while sentence splitting
@@ -693,7 +717,9 @@ def analyze(text):
             r"(never|do not|don't)\s+(install|download|use|do that|allow|share)", remote_clause) or _any(
             r"(never|do not|don't)\s+(install|download|use)\b[^.;!?।\n]{0,40}"
             r"(anydesk|teamviewer|remote[- ]access|screen shar)", remote_clause)
-        if _clause_hit(REMOTE, remote_clause) and not remote_negated:
+        apk_install = (_clause_hit(r"\b(install|download)\b", remote_clause) and
+                       _clause_hit(r"\b(apk|sideload|unknown sources?)\b", remote_clause))
+        if (_clause_hit(REMOTE, remote_clause) or apk_install) and not remote_negated:
             generic_install = _clause_hit(r"\b(install|download)\b", remote_clause) and not _clause_hit(
                 r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen shar\w*|remote[- ]access "
                 r"(software|app|tool)|remote app|remote support)\b", remote_clause)
@@ -807,7 +833,7 @@ def analyze(text):
     # lone amount word counted as a demand pair and forced a private-payee alarm.
     demand_money = _clause_hit(DEMAND + r"[^.;!?।\n]{0,30}(?:" + MONEY + r")", t) or \
         _clause_hit(r"(?:" + MONEY + r")[^.;!?।\n]{0,30}" + DEMAND, t)
-    if a["dest_strong"] and (demand_money or (unmoney and (fee or a["threat"])) or (pay and a["pay_unverified"])):
+    if payment_dest_strong and (demand_money or (unmoney and (fee or a["threat"])) or (pay and a["pay_unverified"])):
         a["pay_unverified"] = True
         if ("payment_request_private", "asks for money to a private account or personal number") not in a["harm"]:
             a["harm"].append(("payment_request_private", "asks for money to a private account or personal number"))
@@ -925,7 +951,8 @@ SAFE_DESC = {
     "official_channel": "points to the official app or channel",
     "transaction_receipt": "reads like a normal payment receipt, order or delivery record",
     "otp_notification": "reads like a normal OTP notification",
-    "protective": "includes a protective or opt-out statement",
+    "protective": "includes a protective statement",
+    "opt_out": "includes an opt-out option",
     "notice": "reads like a routine notice or appointment",
     "bill_notice": "reads like a routine bill reminder with a payment due",
     "appointment_notice": "reads like a routine appointment or schedule change",
@@ -971,7 +998,7 @@ def evidence(a):
         if r not in out:
             out.append(r)
     if not a["harm"]:
-        for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "notice",
+        for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "opt_out", "notice",
                   "promo", "consumer_advice", "collect_review", "awareness"):
             if s in a["safe"]:
                 out.append(safe_description(s, a['text']))

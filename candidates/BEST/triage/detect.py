@@ -75,7 +75,7 @@ def predict_text(texts):
     for i, t in enumerate(texts):
         a = mech.analyze(t)
         ana[i] = a
-        strong_safe = {"transaction_receipt", "otp_notification", "protective", "official_channel",
+        strong_safe = {"transaction_receipt", "otp_notification", "protective", "opt_out", "official_channel",
                        "bill_notice", "appointment_notice"} & set(a["safe"])
         if mech.indic_context(t) or strong_safe:
             idx.append(i)

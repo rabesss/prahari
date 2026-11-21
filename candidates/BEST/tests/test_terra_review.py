@@ -193,6 +193,7 @@ def test_round2_destinations_belong_to_the_request():
 @pytest.mark.parametrize('text', [
     'Police arrested a gang for fraud. They requested customers to send their OTP. Never share your OTP.',
     'Police arrested a gang for fraud after they asked victims to share OTP.',
+    'A news report says scammers requested customers to send their OTP.',
 ])
 def test_round2_third_party_reports_are_not_demands(text):
     a = mech.analyze(text)
@@ -207,3 +208,46 @@ def test_round2_reader_demands_and_otp_notice():
         assert 'secret_request' in dict(mech.analyze(text)['harm'])
         assert verdict(text) == 1
     assert verdict('Your OTP is 4821. Never share it with anyone. -SBI') == 0
+
+
+def test_round2_unrelated_official_channel_does_not_clear_payment_or_reader_demand():
+    text = 'Pay your electricity bill of ₹500 at https://power-update.xyz. View your balance in the official app.'
+    assert 'pay_unverified' in dict(mech.analyze(text)['harm'])
+    assert verdict(text) == 1
+    text = 'Police arrested a gang who asked victims to share OTP, please share your OTP with our agent.'
+    a = mech.analyze(text)
+    assert a['reader_direct'] and 'secret_request' in dict(a['harm'])
+    assert verdict(text) == 1
+
+
+def test_round2_promotion_with_opt_out_keeps_existing_benign_verdict():
+    text = 'Festive sale: 40% off on all footwear at Demo Store until Sunday. Unsubscribe to stop offers.'
+    a = mech.analyze(text)
+    assert a['promo'] and not a['protective']
+    assert verdict(text) == 0
+
+
+def test_round2_report_and_apk_are_not_inferred_from_words_alone():
+    for text in ('Our bank agent is asking for OTP.', 'A police agent is asking for the OTP.'):
+        a = mech.analyze(text)
+        assert not a['report'] and 'secret_request' in dict(a['harm'])
+        assert verdict(text) == 1
+    for text in ('Never install the attached update.apk.',
+                 'Do not install this app. We sent you an APK on WhatsApp.'):
+        assert 'remote_access' not in dict(mech.analyze(text)['harm'])
+    assert verdict('Never install the attached update.apk.') == 0
+
+
+def test_round2_unrelated_private_channel_does_not_taint_official_payment():
+    text = 'Pay your electricity bill of ₹500 in the official app. For help ask at the personal number.'
+    assert 'pay_unverified' not in dict(mech.analyze(text)['harm'])
+    assert verdict(text) == 0
+
+
+def test_round2_report_does_not_exempt_a_later_imperative():
+    for text in ('Police arrested a gang. Now share your OTP with our agent.',
+                 'Police arrested a gang for fraud; please send your OTP to our agent.',
+                 'Police arrested a gang. Now give your OTP to our agent.'):
+        a = mech.analyze(text)
+        assert a['reader_direct'] and 'secret_request' in dict(a['harm'])
+        assert verdict(text) == 1
