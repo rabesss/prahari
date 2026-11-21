@@ -608,7 +608,9 @@ def analyze(text):
         r"\b(if|when|a caller|someone|fraudster|scammer)\b[^.;!?।\n]{0,60}"
         r"\b(asks?|demands?|requests?)\b[^.;!?।\n]{0,50}"
         r"(otp|pin|password|code)\b", t, re.I))
-    if (hypothetical and not direct_share and not read_code) or (a["report"] and not a["reader_direct"]):
+    # Report framing never clears a credential demand: scammers wrap requests in news-style text,
+    # so a warning that quotes a demand is flagged rather than risk clearing a real one.
+    if hypothetical and not direct_share and not read_code:
         # A third-party report can contain both a demand and its quoted action.
         share_hit = False
         enter_hit = False
@@ -638,6 +640,14 @@ def analyze(text):
                    any(is_official(host) for host in hosts(clause)))))
         for _, clause in clauses(t)
     )
+    # A private channel elsewhere in the message still receives the document unless the request
+    # itself names an official channel ("upload in the official app").
+    ident_official = any(
+        (_clause_hit(IDENT_ACT + r"[^.;!?।\n]{0,40}" + IDENT, clause) or
+         _clause_hit(IDENT + r"[^.;!?।\n]{0,40}" + IDENT_ACT, clause))
+        and (_any(DEST_OFFICIAL, clause) or any(is_official(host) for host in hosts(clause)))
+        for _, clause in clauses(t))
+    id_channel = id_channel or (_clause_hit(PRIVATE_CHANNEL, t) and not ident_official)
     if ident_ask and _clause_hit(KYC_CONTEXT, t) and id_channel:
         a["harm"].append(("id_request", "asks you to send identity documents to a chat or link"))
 
@@ -653,11 +663,19 @@ def analyze(text):
         _any(r"\b(?:to|on)\s+" + phone, clause)
         for _, clause in clauses(t)
     )
-    a["dest_strong"] = _any(DEST_STRONG, t) or phone_destination
-    # An unrelated official-channel sentence cannot authorize a payment elsewhere.
-    payment_clauses = [clause for _, clause in clauses(t)
-                       if _clause_hit(PAY, clause) or
-                       (_clause_hit(DEMAND, clause) and _any(MONEY, clause))]
+    # A threat followed by "call <mobile number>" sends the reader to a private number.
+    threat_call = _clause_hit(THREAT, t) and _any(r"\b(?:call|contact|whatsapp|dial)\b[^.;!?।\n]{0,20}" + phone, t)
+    a["dest_strong"] = _any(DEST_STRONG, t) or phone_destination or threat_call
+    # An unrelated official-channel sentence cannot authorize a payment elsewhere, but a link or
+    # number given in the very next sentence ("Use this link: ...") belongs to the payment.
+    all_clauses = [clause for _, clause in clauses(t)]
+    pay_idx = [i for i, clause in enumerate(all_clauses)
+               if _clause_hit(PAY, clause) or (_clause_hit(DEMAND, clause) and _any(MONEY, clause))]
+    cont_idx = [i + 1 for i in pay_idx if i + 1 < len(all_clauses) and i + 1 not in pay_idx and
+                (hosts(all_clauses[i + 1]) or _clause_hit(r"\blink\b", all_clauses[i + 1]) or
+                 (_any(phone, all_clauses[i + 1]) and
+                  _clause_hit(r"\b(send|pay|transfer|upi|gpay|phonepe|paytm)\b", all_clauses[i + 1])))]
+    payment_clauses = [all_clauses[i] for i in sorted(set(pay_idx) | set(cont_idx))]
     payment_official = bool(payment_clauses) and all(
         _any(DEST_OFFICIAL, clause) or any(is_official(host) for host in hosts(clause))
         for clause in payment_clauses

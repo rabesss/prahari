@@ -198,11 +198,23 @@ def test_round2_destinations_belong_to_the_request():
     'Police arrested a gang for fraud after they asked victims to share OTP.',
     'A news report says scammers requested customers to send their OTP.',
 ])
-def test_round2_third_party_reports_are_not_demands(text):
-    a = mech.analyze(text)
-    assert a['report'] and not a['reader_direct']
-    assert 'secret_request' not in dict(a['harm'])
-    assert verdict(text) == 0
+def test_round2_third_party_reports_are_flagged_conservatively(text):
+    # Controller decision after the final review: report framing no longer clears a quoted
+    # credential demand. A warning is flagged (a false alarm) rather than risk clearing a scam.
+    assert verdict(text) == 1
+
+
+@pytest.mark.parametrize('text', [
+    'Bank customers are asked to share OTP with our agent.',
+    'Police arrested a gang. To complete KYC upload your Aadhaar. Our agent will receive it on WhatsApp.',
+])
+def test_final_review_report_framing_false_safes(text):
+    assert verdict(text) == 1
+
+
+def test_document_to_official_app_with_unrelated_chat_stays_benign():
+    a = mech.analyze('For KYC, upload your passport in the official app. Read updates in this WhatsApp chat.')
+    assert 'id_request' not in dict(a['harm'])
 
 
 def test_round2_reader_demands_and_otp_notice():
@@ -257,3 +269,16 @@ def test_round2_report_does_not_exempt_a_later_imperative():
         a = mech.analyze(text)
         assert a['reader_direct'] and 'secret_request' in dict(a['harm'])
         assert verdict(text) == 1
+
+
+@pytest.mark.parametrize('text', [
+    'Your electricity bill is due. Your connection will be disconnected. Call 9876543210.',
+    'Pay your electricity bill of ₹500. Use this link: https://power-update.xyz.',
+    'KYC update: upload your passport. Send it to this WhatsApp chat.',
+])
+def test_final_review_continuation_false_safes(text):
+    assert verdict(text) == 1
+
+
+def test_official_payment_with_help_number_stays_benign():
+    assert verdict('Please pay your electricity bill of ₹500 on https://sbi.co.in. For assistance call 9876543210.') == 0

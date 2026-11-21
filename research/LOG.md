@@ -614,3 +614,5 @@ passed. The stress runner reported no pinned-row regression, but the gate remain
 three existing suite references and the suite list require regeneration; that infrastructure
 mismatch predates this round. The r3, r4 injection and r4 SMS suites respectively scored 32/34,
 22/24 and 57/58; the other three suites scored 21/21, 30/30 and 40/40.
+
+- 2026-11-21 controller: PR #28 hit the 3-round review cap with reviewer-found false-safes in the report and per-clause association paths. Conservative fix (`fix/report-path-conservative`): report framing never clears a credential demand; a private channel anywhere receives a non-official document request; a link or payment-verb number in the sentence after a payment belongs to it; threat + "call <mobile>" is a private destination. Reviewer adversarial suite (20 scams / 10 benign): main 12/20 caught, 2/10 flagged; PR #28 head 15/20, 1/10; this fix 20/20, 2/10 (both flagged items are news-style warnings that quote a demand, accepted). Eval 2 runs: 86.29, D 0.8674, I 0.8394, E 0.9332; stress, fixtures, ratchet (0 downgraded) pass; BEST hash b9e16a6e…. Sealed holdout not rerun (already used twice).
