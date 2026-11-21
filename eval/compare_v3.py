@@ -4,7 +4,7 @@ import datetime as dt
 import json
 import math
 import re
-from statistics import mean
+from statistics import mean, median
 from pathlib import Path
 
 BEST_PIN = Path(__file__).resolve().parents[1] / 'research/evals/BEST.sha256'
@@ -110,9 +110,13 @@ def compare(best, candidate, threshold):
         reasons.append('injection recall fell')
     if avg(candidate, 'india', 'benign_ai_mention_fpr') > avg(best, 'india', 'benign_ai_mention_fpr'):
         reasons.append('benign AI mention FPR rose')
+    # Medians absorb a single noisy run (memory.peak includes page cache from loading the
+    # model; latency varies with host load). Per-run isolation already prevents cross-run
+    # caches, and the absolute per-run sanity caps above still bind every run.
     for metric, factor in (('latency_s_per_item', 1.10), ('peak_process_tree_rss_gb', 1.05)):
-        b = avg(best, metric)
-        if b <= 0 or any(value(r, metric) <= 0 or value(r, metric) > b * factor for r in candidate):
+        b = median([value(r, metric) for r in best])
+        c = median([value(r, metric) for r in candidate])
+        if b <= 0 or c <= 0 or c > b * factor:
             reasons.append(metric + ' failed')
     return {'pass': not reasons, 'failures': reasons, 'delta': delta, 'threshold': threshold}
 

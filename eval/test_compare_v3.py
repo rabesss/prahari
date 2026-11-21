@@ -187,3 +187,19 @@ def test_candidate_hash_ignores_python_caches(tmp_path):
     assert candidate_hash(tmp_path) == before
     (tmp_path / 'pkg' / 'mod.py').write_text('x = 2\n')
     assert candidate_hash(tmp_path) != before
+
+
+def test_relative_perf_gates_use_medians():
+    b, c = run(70), run(71)
+    bs = [copy.deepcopy(b) for _ in range(3)]
+    cs = [copy.deepcopy(c) for _ in range(3)]
+    for i, r in enumerate(bs):
+        r.update(stamp=f'20261121-1000{i*2:02d}-000000', candidate='BEST', peak_process_tree_rss_gb=2.045)
+    for i, r in enumerate(cs):
+        r.update(stamp=f'20261121-1000{i*2+1:02d}-000000', candidate='CAND', peak_process_tree_rss_gb=2.045)
+    cs[0]['peak_process_tree_rss_gb'] = 2.175  # one noisy run (6.4% over) no longer fails
+    assert compare(bs, cs, .5)['pass']
+    for r in cs[:2]:
+        r['peak_process_tree_rss_gb'] = 2.175  # a median regression still fails
+    result = compare(bs, cs, .5)
+    assert not result['pass'] and 'peak_process_tree_rss_gb failed' in result['failures']

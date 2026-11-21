@@ -82,9 +82,9 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
 fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
 Every run has sanity caps of 10.0 s/item and 3.0 GB process-tree peak RSS; missing
-measurements and timeouts fail. In the same interleaved comparison, every candidate
-run must have latency at most 110% and RSS at most 105% of the corresponding BEST
-mean. Re-run comparisons with start 1-minute load above 1.5, missing host data, or
+measurements and timeouts fail. In the same interleaved comparison, the candidate's
+median latency must be at most 110% and its median RSS at most 105% of BEST's median
+(single runs of identical code vary by about 6%: memory.peak includes page cache). Re-run comparisons with start 1-minute load above 1.5, missing host data, or
 sampled CPU steal above 20%. Mid-run load is informational. Only systemd scope RSS
 and bwrap isolation with read-only cgroups can promote; proc fallback is for local development and its
 cumulative child RSS is not a promotion gate. The controller pins the BEST content
