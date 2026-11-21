@@ -33,7 +33,7 @@ def cmd_predict(a):
 
 
 def cmd_explain(a):
-    from .llm import Explainer, actions_for
+    from .llm import Explainer, actions_for, scam_type
     rows = read_jsonl(a.inp)
     ex = Explainer()
     out = []
@@ -41,10 +41,18 @@ def cmd_explain(a):
         t0 = time.time()
         kind, inp = r["kind"], r["input"]
         lab, score, ev = detect.classify_any(kind, inp)
-        text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
-        out.append({"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
-                    "explanation": text, "actions": actions_for(kind, lab), "evidence_used": ev,
-                    "llm": stats, "latency_ms": round((time.time() - t0) * 1000, 1)})
+        row = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
+                    "category": scam_type(kind, inp, lab),
+                    "actions": actions_for(kind, lab), "evidence_used": ev}
+        try:
+            text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError('empty explanation')
+            row.update(explanation=text, llm=stats, explanation_status='success')
+        except ValueError:
+            row.update(explanation_status='failed', explanation_error='Explanation unavailable.')
+        row['latency_ms'] = round((time.time() - t0) * 1000, 1)
+        out.append(row)
         write_jsonl(a.out, out)  # incremental, so a timeout keeps partial results
     write_jsonl(a.out, out)
 

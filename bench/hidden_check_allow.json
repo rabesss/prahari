@@ -29,6 +29,11 @@
    "blob": "b37cef38fceca4c432170ecffa28e14e9ea263b2",
    "path": "research/REPORT.md",
    "reason": "quotes two short demo texts from the train/indic_seed HF seed sets (Apache-2.0 / CC BY 4.0); attribution belongs in candidates/BEST/DATA.md; controller-reviewed 2026-11-10"
+  },
+  {
+   "blob": "96a5046b1fc87ce98f1b9ceedadce4f9499d488c",
+   "path": "candidates/*/tests/test_basic.py",
+   "reason": "adds authored flow/URL/OTP test strings to the previously reviewed blob 35c4e60 (two short HF seed-set quotes, Apache-2.0 / CC BY 4.0, attributed in candidates/BEST/DATA.md); hidden check: no hidden matches; controller-reviewed 2026-11-17"
   }
  ]
 }

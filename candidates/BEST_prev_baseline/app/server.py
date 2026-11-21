@@ -9,7 +9,7 @@ from triage import detect
 from triage.cli import VERDICT
 
 PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>Kavach Lite - offline scam triage</title>
+<title>Prahari - offline scam triage</title>
 <style>body{font:16px system-ui;max-width:720px;margin:2em auto;padding:0 16px}textarea{width:100%;height:8em}
 .v{font-weight:700;font-size:1.2em}.malicious{color:#b00}.benign{color:#070}.uncertain{color:#a60}</style>
 <h1>Offline scam &amp; phishing check</h1><p>Runs fully on this device. Nothing is sent to the internet.</p>

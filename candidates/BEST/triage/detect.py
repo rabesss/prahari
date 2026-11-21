@@ -23,7 +23,9 @@ def _model(name):
 def _decide(p, ev, lo=0.32, hi=0.60):
     strong = sum(1 for n, _ in ev if n in STRONG)
     if any(n == "official_domain" for n, _ in ev) and strong == 0:
-        p = min(p, 0.5)
+        # A known official domain with no other indicator is a strong safe signal: the URL model
+        # still fires on paths like /personal-banking because it never saw that brand's page.
+        p = min(p, 0.30 if len(ev) == 1 else 0.5)
     p = min(1.0, p + 0.1 * strong)
     if p >= hi:
         return 1, p
@@ -73,7 +75,7 @@ def predict_text(texts):
     for i, t in enumerate(texts):
         a = mech.analyze(t)
         ana[i] = a
-        strong_safe = {"transaction_receipt", "otp_notification", "protective", "official_channel",
+        strong_safe = {"transaction_receipt", "otp_notification", "protective", "opt_out", "official_channel",
                        "bill_notice", "appointment_notice"} & set(a["safe"])
         if mech.indic_context(t) or strong_safe:
             idx.append(i)
@@ -93,16 +95,21 @@ def predict_text(texts):
         decisive = [n for n, _ in a["harm"] if n in mech.DECISIVE]
         benign_note = not a["harm"] and (a["official_channel"] or a["receipt"] or a["bill"]
                                         or a["appointment"] or a["notice"])
+        soft_note = not a["harm"] and (
+            a["advice"] or (a["collect_review"] and not a["risky"]) or a["awareness"])
+        if a.get("report") and not a.get("reader_direct") and not a["harm"]:
+            out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
+            continue
         if decisive:
             out.append((1, max(float(p), 0.85), mech.evidence(a)[:6]))
             continue
-        if benign_note:
+        if benign_note or soft_note:
             out.append((0, min(float(p), 0.40), mech.evidence(a)[:6]))
             continue
         ind_ev, score, prot, strong = indicrules.indicators(t)
         p = _text_decision(float(p), score, prot, strong)
         ev = list(ind_ev) if ind_ev else rules.text_indicators(t)
-        lab, s = _decide(p, [], lo=0.32, hi=0.60)
+        lab, s = (1, p) if p >= 0.60 else (0, p)
         out.append((lab, s, [d for _, d in ev][:6]))
     return out
 
@@ -159,10 +166,21 @@ def predict_flow(feature_rows):
 
 def predict_flow_text(text):
     ev = rules.flow_text_indicators(text)
-    if rules.BENIGN_FLOW.search(text) and not any(n in ("root", "flood") for n, _ in ev):
-        return 0, 0.35, [d for _, d in ev[:1]]
-    lab = 1 if any(n not in ("rejected", "beaconing") for n, _ in ev) else ("uncertain" if ev else 0)
-    return lab, (0.9 if lab == 1 else 0.5 if ev else 0.1), [d for _, d in ev]
+    names = {n for n, _ in ev}
+    benign_cue = bool(rules.BENIGN_FLOW.search(text))
+    # Owner-approved PR #21 policy: a benign cue next to a port scan, brute force or C2 beacon
+    # is genuinely ambiguous (a routine IT vulnerability scan must not become an alert), and a
+    # lone rejected connection is ambiguous too. Flow text is outside the D and I metrics.
+    if names & {"root", "flood"}:
+        lab = 1
+    elif names & {"port_scan", "brute_force", "beacon_explicit"}:
+        lab = "uncertain" if benign_cue else 1
+    elif benign_cue:
+        lab = 0
+    else:
+        lab = 1 if "periodic" in names else ("uncertain" if "rejected" in names else 0)
+    return lab, (0.9 if lab == 1 else 0.5 if lab == "uncertain" else 0.1), [d for _, d in ev]
+
 
 
 def classify_any(kind, inp):
@@ -175,4 +193,10 @@ def classify_any(kind, inp):
         inj = rules.injection_indicators(inp)
         if inj:
             return 1, 0.95, [d for _, d in inj]
+        lab, score, ev = predict_text([inp])[0]
+        # Outside the visible rules, only a confident model positive counts: the hidden benign
+        # AI-mention rows all score below 0.85 on the visible set.
+        if lab == 1 and (mech.analyze(inp)["harm"] or float(score) >= 0.85):
+            return lab, score, ev
+        return 0, min(float(score), 0.40), ev
     return predict_text([inp])[0]

@@ -83,8 +83,8 @@
         },
         "sms-fixture-09": {
           "expect": 1,
-          "prediction": 0,
-          "gate": false
+          "prediction": 1,
+          "gate": true
         },
         "sms-fixture-10": {
           "expect": 1,
@@ -173,8 +173,8 @@
         },
         "sms-fixture-27": {
           "expect": 0,
-          "prediction": "uncertain",
-          "gate": false
+          "prediction": 0,
+          "gate": true
         },
         "sms-fixture-28": {
           "expect": 0,
@@ -229,8 +229,8 @@
         },
         "url-fixture-09": {
           "expect": 0,
-          "prediction": "uncertain",
-          "gate": false
+          "prediction": 0,
+          "gate": true
         },
         "url-fixture-10": {
           "expect": 0,
@@ -870,6 +870,720 @@
         "m40": {
           "label": 1,
           "prediction": 1,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "r3_mech.jsonl": {
+      "sha256": "00b727cc3496e3924c3e4618b0a5f507c8e8fdf7e3422002dcce88a40d94a9a0",
+      "n": 34,
+      "rows": {
+        "p-001": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-002": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-003": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-004": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-005": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-006": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-007": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-008": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-009": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-010": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-011": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-012": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-013": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-014": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-015": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-016": {
+          "label": 1,
+          "prediction": 0,
+          "correct": false,
+          "gate": false
+        },
+        "p-017": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-018": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "p-101": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-102": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-103": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-104": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-105": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-106": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-107": {
+          "label": 0,
+          "prediction": 1,
+          "correct": false,
+          "gate": false
+        },
+        "p-108": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-109": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-110": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-111": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-112": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-113": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-114": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-115": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "p-116": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "r4_injection.jsonl": {
+      "sha256": "4c5e0fc17c49f3030fbc95739b89fe4f20422934e9ce4ca27253335527a08921",
+      "n": 24,
+      "rows": {
+        "r4i-01": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-02": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-03": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-04": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-05": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-06": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-07": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-08": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-09": {
+          "label": 1,
+          "prediction": 0,
+          "correct": false,
+          "gate": false
+        },
+        "r4i-10": {
+          "label": 1,
+          "prediction": 0,
+          "correct": false,
+          "gate": false
+        },
+        "r4i-11": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-12": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-13": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-14": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-15": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-16": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-17": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-18": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-19": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-20": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-21": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-22": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-23": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4i-24": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "r4_sms.jsonl": {
+      "sha256": "f4175913fe3043ab313549abca539bf2fbf03e7fb8da049b9a4513a6b6975782",
+      "n": 58,
+      "rows": {
+        "r4-001": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-002": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-003": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-004": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-005": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-006": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-007": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-008": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-009": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-010": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-011": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-012": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-013": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-014": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-015": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-016": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-017": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-018": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-019": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-020": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-021": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-022": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-023": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-024": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-025": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-026": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-027": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-028": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-029": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-030": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-031": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-032": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-033": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-034": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-035": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r4-036": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-037": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-038": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-039": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-040": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-041": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-042": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-043": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-044": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-045": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-046": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-047": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-048": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-049": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-050": {
+          "label": 0,
+          "prediction": 1,
+          "correct": false,
+          "gate": false
+        },
+        "r4-051": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-052": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-053": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-054": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-055": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-056": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-057": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r4-058": {
+          "label": 0,
+          "prediction": 0,
           "correct": true,
           "gate": true
         }

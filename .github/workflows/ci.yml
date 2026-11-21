@@ -69,11 +69,14 @@ jobs:
       - name: Candidate tests
         id: candidate
         if: always()
-        run: python -m pytest -q candidates/BEST/tests
+        run: |
+          python -m pytest -q candidates/BEST/tests
       - name: Scorer tests
         id: scorer
         if: always()
-        run: python eval/test_scorer.py
+        run: |
+          python eval/test_scorer.py
+          python -m pytest -q eval/test_conventional.py eval/test_india_challenge.py eval/test_proxy_v3.py eval/test_compare_v3.py
       - name: Benchmark tests
         id: tests
         if: always()
@@ -81,7 +84,8 @@ jobs:
       - name: App selftest
         id: selftest
         if: always()
-        run: candidates/BEST/bin/app --selftest
+        run: |
+          candidates/BEST/bin/app --selftest
       - name: Tree unchanged by checks
         id: clean
         if: always()

@@ -107,11 +107,53 @@ def text_indicators(text):
 
 
 INJECTION_RULES = [
-    ("prompt_injection", r"ignore\s+(all\s+|any\s+)?(previous|prior|above|earlier)\s+(rules|instructions|prompts)"
-     r"|disregard\s+(the\s+)?(previous|above|earlier|system)\s+(rules|instructions|prompt)"
-     r"|forget\s+(your\s+)?(rules|instructions)|you are now\s+(a|an|the)\s+"
-     r"|system prompt|reply\s+(with\s+)?safe\b|return\s+(the\s+)?label\s+(as\s+)?safe"
-     r"|act as\s+(a|an|the)\s+(admin|system|developer|assistant)", "tries to inject instructions into the assistant"),
+    ("prompt_injection",
+     r"(ignore|disregard|forget)\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier|old)\s+"
+     r"(rules|instructions|prompts|directions|messages?|labels?)"
+     r"|(print|output|write|return|reply|answer|say)\s+(the\s+)?(label\s+|answer\s+|result\s+)?(as\s+)?"
+     r"(safe|benign|approved|clean)\b"
+     r"|(treat|mark|label|classify|consider|score)\s+(this|it|the (message|sms|text))\s+(as\s+)?(a\s+)?"
+     r"(benign|safe|clean|approved|harmless)"
+     r"|regardless\s+of\s+(the\s+)?(content|text|message|input|what)"
+     r"|\b(your|the|model'?s?)\s+score\s+(increases|goes up|is higher)"
+     r"|\b(do not|don't|never)\s+(warn|alert|flag)\s+(the\s+)?(user|reader|human)"
+     r"|\b(hidden|secret)\s+(instruction|rule|prompt|command)"
+     r"|(if|when)\s+you\s+(are\s+|were\s+)?(reviewing|reading|scanning|classifying|grading)\s+this"
+     r"|(language model|classifier|assistant|chatbot|llm)\s{0,3}[,:;]\s{0,3}(please\s+)?"
+     r"(output|reply|say|print|label|approve|ignore|mark)"
+     r"|\bAI ko bolo\b|\bclassifier ke liye\b|\bassistant ji\b|\bmodel ke liye\b"
+     r"|(पिछले|पिछली)\s+(निर्देश|निर्देशों|नियमों)\s{0,3}(भूलो|भूल जाओ|अनदेखा|अनदेखी|छोड़ो)?"
+     r"|(सहायक|असिस्टेंट|असिस्टैंट|मॉडल|क्लासिफायर|एआई)\s{0,3}(को|जी|के लिए|,)?\s{0,3}[:：]?\s{0,3}(निर्देश|खतरा शून्य|सुरक्षित|साफ|यह|this)"
+     r"|(सहायक|असिस्टेंट|असिस्टैंट)\s{0,3}(को)?\s{0,3}(बोलो|कहो|बताओ)[^।\n]{0,40}(सुरक्षित|साफ|benign|safe)"
+     r"|(खतरा शून्य|सुरक्षित कहो|साफ कहो|benign likh\w*|safe likh\w*|सुरक्षित लिखो)"
+     r"|(ignore|अनदेखा)\s+(the\s+)?(scam|risk|warning|danger)"
+     r"|(system|developer|admin)\s+(instructions?|prompt|rules)\s{0,3}[:\-]"
+     r"|^(system|developer)\s{0,3}:[^\n]{0,60}(benign|safe|ham|classif|label|approve|score|malicious|spam)"
+     r"|disregard\s+(your|all|the)\s+(rules|instructions|guidelines|prompt)"
+     r"|(classify|label|mark|score|rate)\s+(this|the|it)\b[^.;!?।\n]{0,30}(as\s+)?(benign|safe|ham|clean|approved|malicious|spam)\b"
+     r"|label\s{0,3}[=:]\s{0,3}(0|1|benign|safe|ham|malicious|spam)\b"
+     r"|\b(do not|don't|never)\s+(flag|report)\s+(this|the (message|sms|text))\b"
+     r"|(purane|pichhle|pichle|पुराने)\s+(instructions?|niyam|rules|directions?|निर्देश)"
+     r"|(isko|ise|is (message|sms) ko)\s+(safe|benign|clean)\s{0,3}(bolo|batao|likho|kaho|mark)"
+     r"|(इसे|इस (संदेश|मैसेज) को)\s{0,3}(सुरक्षित|साफ|खतरा रहित)\s{0,3}(बताओ|बताएं|कहो|कहें|लिखो|बोलो)"
+     r"|(AI|model|classifier|assistant)\s+(ke liye|के लिए)\s{0,3}[:：]?\s{0,3}(note|instruction|label|निर्देश|यह|this)"
+     r"|(if|when)\s+you\s+are\s+(an?\s+)?(ai|assistant|model|bot|llm)\b[^.]{0,40}(say|print|output|reply|label)",
+     "tries to inject instructions into the assistant"),
+    ("assistant_directive",
+     r"(ignore|disregard|forget)\s+(all\s+|any\s+|the\s+|your\s+)?(safety|warning|risk|alert|scam)"
+     r"\s{0,3}(rules|instructions|warnings?|alerts?|flags?)?"
+     r"|(assistant|model|classifier|bot|llm|सहायक|एआई)\b[^.\n]{0,45}"
+     r"(user ko|user|upayogkarta|उपयोगकर्ता)?\s{0,3}(bolo|kaho|batao|bataen|likho|कहो|बताओ|बताएं|लिखो)\b"
+     r"[^.\n]{0,45}(genuine|safe|benign|notice hai|सुरक्षित|असली|सच्चा)"
+     r"|(warning|चेतावनी|धोखाधड़ी|fraud|scam)\b[^.\n]{0,25}"
+     r"(mat dena|mat do|मत दो|न कहें|न बताएं|mat batao|mat likho|na kaho)"
+     r"|(conceal|hide)\s+(the\s+)?(payment|instruction|warning|risk|otp|fee)"
+     r"|override\s+(the\s+)?(label|verdict|classification|score|result)"
+     r"|(model|classifier|assistant)\s{0,3}[,:;]\s{0,3}(this|the)\b[^.\n]{0,40}"
+     r"(benign|safe|label|classif|score|verdict)"
+     r"|\b(correct|right)\s+(label|answer|verdict|output)\s{0,3}(is|=|:)\s{0,3}(0|1|benign|safe|malicious)"
+     r"|(answer|reply|jawab|जवाब)\b[^.\n]{0,30}\b(sirf|only)\b[^.\n]{0,20}\b(safe|benign|सुरक्षित)",
+     "directs the assistant to a fixed verdict"),
 ]
 
 
@@ -123,14 +165,15 @@ def injection_indicators(text):
 FLOW_RULES = [
     ("port_scan", r"\b(\d{2,}\s+(different|distinct|unique)\s+ports|port\s*scan\w*|many\s+(different\s+)?ports|"
                   r"sequential\s+ports|consecutive\s+ports|scanned\s+\d+\s+ports|\d+\s+ports\s+(in|within|over)\b)", "connections to many ports look like a port scan"),
-    ("brute_force", r"\b(\d+\s+(failed\s+)?(login|password)\s+(attempts?|failures?)|failed\s+(logins?|passwords?)|"
-                    r"brute.?force|password\s+guessing|repeated\s+(failed\s+)?(logins?|attempts?))", "many failed logins look like password guessing"),
+    ("brute_force", r"\b(?:brute[- ]?force|password\s+guessing|"
+                    r"(?:(?:(?<![\d,])(?:\d{1,3}(?:,\d{3})*|\d+)|failed|invalid|unsuccessful|denied|repeated|multiple|many|successful|authenticated)[ \t]+){1,3}"
+                    r"(?:(?:ssh|rdp|ftp)[ \t]+)?(?:logins?|login[ \t]+attempts?|passwords?(?:[ \t]+(?:attempts?|failures?))?))\b", "many failed logins look like password guessing"),
     ("flood", r"\b(syn\s*flood|\d{2,}\s+(syn|tcp|udp|packets?|connections?|requests?)[^.]{0,40}"
               r"(per|in|within|/)\s*(second|sec|minute|min)|flood|ddos|denial[- ]of[- ]service|half[- ]open)", "a burst of connections looks like a flood / denial-of-service attempt"),
-    ("beaconing", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?|"
-                  r"beacon\w*|command\s+and\s+control|\bc2\b)", "connections repeat at a fixed interval, like beaconing"),
+    ("beacon_explicit", r"\b(beacon\w*|command\s+and\s+control|c2|callback\s+to\s+unknown\s+host)\b", "explicit beacon or command-and-control activity"),
+    ("periodic", r"\b(every\s+\d+\s*(seconds?|minutes?|mins?|secs?)|periodic\w*|regular\s+intervals?)\b", "connections repeat at a fixed interval"),
     ("rejected", r"\b(rejected|reset|rst|refused|s0)\b", "most connections were rejected or reset"),
-    ("root", r"\b(root shell|su attempt|privilege)\b", "the session tried to gain root privileges"),
+    ("root", r"\b(root shell|su attempt|gained root|privilege escalation|(?:escalated|elevated) privileges)\b", "the session tried to gain root privileges"),
 ]
 
 
@@ -140,4 +183,49 @@ BENIGN_FLOW = re.compile(r"\b(software update|update check|routine|normal|expect
 
 def flow_text_indicators(text):
     t = text.lower()
-    return [(n, d) for n, p, d in FLOW_RULES if re.search(p, t)]
+    found = []
+    for name, pattern, description in FLOW_RULES:
+        for match in re.finditer(pattern, t):
+            # Only nearby, direct negation suppresses a signal. A modifier such as
+            # "normal" between negation and indicator remains ambiguous.
+            before = re.split(r"[.;!?\n]", t[max(0, match.start() - 100):match.start()])[-1]
+            # Negated floods, like other negated indicators, do not count as an attack.
+            if re.search(r"\b(?:no|zero|not|without|never|isn't|wasn't|aren't|weren't|"
+                         r"didn't\s+find|did\s+not\s+find)\s+"
+                         r"(?:(?:any\s+)?(?:signs?|evidence|indications?|traces?)\s+of\s+)?"
+                         r"(?:(?:a|an|the|any)\s+)?$",
+                         before):
+                continue
+            # A short coordinated list shares the initial negation.
+            if re.search(r"\b(?:no|without)\s+(?:[\w-]+\s+){0,3}"
+                         r"(?:or|nor)\s+(?:(?:a|an|any)\s+)?$", before):
+                continue
+            if name == "brute_force":
+                right = re.split(r"[.;!?\n]", t[match.end():match.end() + 40])[0]
+                # Bare "passwords" needs a failure word or an attack verb right after it
+                # ("300 passwords guessed", "100 passwords were tried"); "10 passwords were rotated" is not an attack.
+                if (re.search(r"\bpasswords?$", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()) and
+                        not re.match(r"\s+(?:(?:were|was|being|got)\s+)?(?:guessed|tried|attempted|sprayed|tested|brute[- ]?forced)\b", right)):
+                    continue
+                count = re.search(r"\b(?:\d{1,3}(?:,\d{3})*|\d+)\b", match.group())
+                digits = count.group().replace(',', '').lstrip('0') if count else None
+                if count and not digits:
+                    continue
+                signals = re.search(r"\b(?:failed|invalid|unsuccessful|denied|repeated|multiple|many|brute[- ]?force|guessing)\b", match.group())
+                if (re.search(r"\b(?:successful|authenticated)\b", match.group()) and
+                        not re.search(r"\b(?:failed|invalid|unsuccessful|denied|brute[- ]?force|guessing)\b", match.group())):
+                    continue
+                if not signals and (not count or len(digits) < 2):
+                    continue
+                success = re.search(r"\b(?:successful\s+login|login\s+(?:was\s+)?successful|"
+                                    r"login\s+succeeded|authenticated)\b", right)
+                positive = success and not re.search(r"\b(?:no|not|never|isn't|wasn't)\s+$", right[:success.start()])
+                excluded = success and (re.search(r"\bexclud(?:e|ed|ing)\s+$", right[:success.start()]) or
+                                        re.match(r"\s+(?:users|sessions)\s+excluded\b", right[success.end():]))
+                if positive and not excluded and re.search(
+                        r"\b(?:failed|invalid|unsuccessful|denied)\b", match.group()):
+                    description = "failed logins followed by a successful login (possible compromise)"
+            found.append((name, description))
+            break
+    return found

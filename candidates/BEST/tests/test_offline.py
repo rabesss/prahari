@@ -38,3 +38,10 @@ def test_predict_runs_offline(tmp_path):
     assert p.returncode == 0, p.stderr[-800:]
     rows = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
     assert rows and rows[0]["label"] == 1
+
+
+@pytest.mark.skipif(not GUARD.is_dir(), reason="controller offline guard not present")
+def test_app_selftest_runs_offline(tmp_path):
+    p = subprocess.run([str(CAND / "bin" / "app"), "--selftest"], env=_env(tmp_path),
+                       capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr[-800:]
