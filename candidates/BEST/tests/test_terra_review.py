@@ -155,6 +155,8 @@ def test_round2_protection_obeys_gate_and_request_cues():
         assert mech.decide(0.84, a)[0] == 0
         assert mech.decide(0.85, a)[0] == 1
     for text in ('Install the app. We never ask for OTP.',
+                 'Pay now. We never ask for OTP.',
+                 'We require a voucher code. No fee is required.',
                  'Please pay the bill. No fee is required.',
                  'Enter your OTP in the official app. We never ask for OTP.',
                  'Buy a voucher and send the code. No fee is required.'):

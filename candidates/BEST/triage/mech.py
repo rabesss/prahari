@@ -840,11 +840,14 @@ def analyze(text):
 
     a["request_cues"] = bool(
         _clause_hit(r"\b(install|download|sideload)\b", t) or
-        (_clause_hit(r"\b(buy|purchase|send|share|forward|provide)\b", t) and
+        ((_clause_hit(r"\b(buy|purchase|send|share|forward|provide)\b", t) or
+          _clause_hit(DEMAND + r"|\b(?:require|requires|need|needs)\b", t)) and
          _any(r"\b(gift cards?|vouchers?|codes?)\b", t)) or
+        _clause_hit(r"\b(pay|transfer|deposit|remit|recharge)\b|भुगतान|जमा|ट्रांसफर", t) or
         (pay and (_any(MONEY, t) or _any(AMOUNT, t))) or
         a["secret"] or share_hit or enter_hit or
-        _clause_hit(ENTER + sep + CREDS, t) or _clause_hit(CREDS + sep + ENTER, t)
+        _clause_hit(ENTER + sep + CRED, t) or _clause_hit(CRED + sep + ENTER, t) or
+        _clause_hit(DEMAND + sep + CRED, t)
     )
     # Evidence texts are deduplicated in order.
     return a
