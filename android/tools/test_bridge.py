@@ -34,7 +34,9 @@ print('Android bridge TTFT field is the callback duration')
 # End to end through the shipped detector, with only NumPy available.
 class Echo:
     def generate(self, prompt):
-        return json.dumps({'text': 'This message is DANGEROUS. It asks you to update KYC at a fake link.', 'stats': {}})
+        word = prompt.rsplit('Verdict: ', 1)[-1].split('\n')[0]
+        reply = {'DANGEROUS': 'This item is DANGEROUS. It points to an unofficial site.', 'NO RISK FOUND': 'No risk found for this item.'}
+        return json.dumps({'text': reply.get(word, 'This item is SUSPICIOUS.'), 'stats': {}})
 for kind, text in [('sms', 'Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked'),
                    ('url', 'http://sbi-kyc.in-verify.top/login'),
                    ('flow', 'many connections to different ports from one host in a few seconds')]:

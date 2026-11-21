@@ -40,10 +40,12 @@ for name, samples, expected in [('sms',sms,ref_sms),('url',urls,ref_url)]:
 class Fake:
     def generate(self, prompt):
         self.prompt = prompt
-        return json.dumps({'text':'This network event is DANGEROUS.','stats':{}})
+        reply = {'DANGEROUS': 'This network event is DANGEROUS.', 'NO RISK FOUND': 'No risk found for this network event.'}
+        word = prompt.rsplit('Verdict: ', 1)[-1].split('\n')[0]
+        return json.dumps({'text': reply.get(word, 'This network event is SUSPICIOUS.'), 'stats': {}})
 for f, expected in zip(flows, ref_flow):
     fake=Fake(); got=json.loads(mobile.check('flow',json.dumps(f),fake))
-    assert got['verdict'] == {0:'SAFE',1:'DANGEROUS','uncertain':'SUSPICIOUS'}[expected[0]]
+    assert got['verdict'] == {0:'NO RISK FOUND — still verify',1:'DANGEROUS','uncertain':'SUSPICIOUS'}[expected[0]]
     assert abs(got['score']-expected[1]) <= 1e-6
-    assert ('Verdict: ' + got['verdict']) in fake.prompt
+    assert ('Verdict: ' + mobile.llm.VERDICT_WORD[expected[0]]) in fake.prompt
 print('all fixture verdicts and scores match')
