@@ -14,9 +14,10 @@ Prahari is an Arm CPU prototype that helps people assess suspicious messages, li
 
 Round-3 measurements are from Oracle, an Arm Neoverse-N1 VM with two vCPUs [S8].
 
-- Shipped `candidates/BEST` is gen51 (content hash `46f30b36…`), promoted after a controller 3+3 interleaved confirmation.
-- Conservative F1: SMS **0.904**, URL **0.994**, Indic **0.971**, NSL-KDD flow replay **0.851**. These evaluation sets were used repeatedly during development.
-- On the sealed final holdout, combined F1 improved from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. False alarms remain high.
+- Shipped `candidates/BEST` is gen51 plus post-review conservative rule fixes (PR #30, content hash `b9e16a6e…`). gen51 (`46f30b36…`) was promoted after a controller 3+3 interleaved confirmation; the PR #30 fixes were checked with the same evaluator, without a new 3+3 confirmation.
+- Conservative F1 of the shipped rules: SMS **0.922**, URL **0.994**, Indic **0.950**, NSL-KDD flow replay **0.850**. These evaluation sets were used repeatedly during development.
+- On the sealed final holdout, gen51 improved combined F1 from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. The PR #30 fixes came after the holdout runs and were not scored on it. False alarms remain high.
+- In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules caught 20 scams (PR #21 baseline 13) and flagged 5 harmless messages (baseline 3). Messages that mix an official channel with an unofficial WhatsApp, mobile number or link can still be marked safe.
 - End-to-end time was about **3.8–4.8 s/item**; process-tree peak RSS was about **2.05–2.34 GB**, measured by systemd scope `memory.peak`, which includes page cache.
 - A blind manual audit of 20 holdout explanations found 5 correct, 8 weak and 7 wrong; 4 made false claims about the input and 16 gave generic or misdirected advice.
 
@@ -83,20 +84,20 @@ Prahari evaluates detection independently from generated explanations. The follo
 
 | Set | n | Coverage | Precision | Recall | F1 | FPR |
 |:--|--:|--:|--:|--:|--:|--:|
-| SMS | 1,162 | 1.0 | 0.976 | 0.842 | 0.904 | 0.41% |
+| SMS | 1,162 | 1.0 | 0.977 | 0.872 | 0.922 | 0.41% |
 | URL | 7,997 | 0.998 | 1.000 | 0.988 | 0.994 | 0 |
-| Indic | 320 | 1.0 | 0.994 | 0.950 | 0.971 | 0.63% |
-| NSL-KDD flow replay | 22,544 | 1.0 | 0.971 | 0.757 | 0.851 | 3.03% |
+| Indic | 320 | 1.0 | 0.956 | 0.944 | 0.950 | 4.38% |
+| NSL-KDD flow replay | 22,544 | 1.0 | 0.971 | 0.757 | 0.850 | 3.03% |
 
 Historical `eval/run_eval.py` detection metrics gave half credit to uncertain verdicts, and historical language accuracy gave half credit for abstentions. Those earlier aggregates do not include abstention counts and are not directly comparable to the conservative figures above [S3].
 
-**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a controller 3+3 interleaved confirmation. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). The rounded means and reported improvements are recorded separately [S8].
+**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a controller 3+3 interleaved confirmation. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). After review, PR #30 added conservative rule fixes for messages wrongly marked safe; on the same evaluator it scored 86.3, without a new 3+3 confirmation. It raised SMS F1 and lowered Indic F1, with Indic FPR rising from 0.63% to 4.38%. The table above is for the shipped rules. The rounded means and reported improvements are recorded separately [S8].
 
-**India v2 adaptive validation.** A different agent authored 400 items blind. Aggregate-only feedback was used for tuning, making this a validation set, not a test. Penalized score I rose from 0.377 at baseline to 0.830 for gen51; injection recall was 0.70 and benign-AI-mention FPR was 0 [S8]. The earlier v1 challenge set was previously exposed and is exploratory only.
+**India v2 adaptive validation.** A different agent authored 400 items blind. Aggregate-only feedback was used for tuning, making this a validation set, not a test. Penalized score I rose from 0.377 at baseline to 0.830 for gen51 and 0.839 for the shipped rules; injection recall was 0.70 (gen51) and 0.725 (shipped), and benign-AI-mention FPR was 0 [S8]. The earlier v1 challenge set was previously exposed and is exploratory only.
 
 ### Sealed holdout
 
-The final holdout contained 184 items after independent label review: 84 malicious and 100 benign, with 155 SMS-route and 29 injection-route items. A different model family (Gemini) authored it blind in a different style. It was never seen during development, stayed off the dev box until freeze, and was scored once [S8].
+The final holdout contained 184 items after independent label review: 84 malicious and 100 benign, with 155 SMS-route and 29 injection-route items. A different model family (Gemini) authored it blind in a different style. It was never seen during development and stayed off the dev box until freeze. The baseline and gen51 were each scored once; a review-fix revision of gen51 was scored once more and gave the same results. The later PR #30 fixes were not scored on the holdout, so the table describes gen51, not the exact shipped rules [S8].
 
 | Metric | PR #21 baseline | gen51 |
 |:--|--:|--:|
@@ -115,6 +116,8 @@ The final holdout contained 184 items after independent label review: 84 malicio
 
 The pre-registered ship rule required F1 no more than 2 percentage points below baseline and FPR no more than 2 points above; gen51 passed at FPR +2.0 points. False alarms were high for both systems on hard benign look-alikes. About 12 of gen51's 31 false positives contain placeholder `.example` links; the rest are genuine benign notices, especially safety advisories mentioning scam tactics [S8].
 
+**Known rule limits.** In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules caught 20 scams (PR #21 baseline 13) and flagged 5 harmless messages (baseline 3). The 4 missed scams mix an official channel with an unofficial one: an official app and then a WhatsApp number, a disconnection threat with a mobile number next to the official app, or a KYC reminder with an unofficial link. They are documented, not patched, because each new rule raised false alarms and the holdout could not be reused to check a fix. A benign verdict reads “NO RISK FOUND — still verify”, never “safe” [S8].
+
 **Data and splits.** SMS sources are UCI SMS Spam and Mendeley SMS Phishing, and the URL source is PhiUSIIL; their stated licences are CC BY 4.0. Flow records come from NSL-KDD, described as UNB research use. Indian seed datasets are credited to karanverma19 (Apache-2.0) and bolewara (CC BY 4.0); the categorised Indian-context evaluation uses project-generated synthetic messages [S6]. The model weights and datasets are separately acquired. Source terms should be checked before redistribution.
 
 Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 136 seed rows; development used 607 SMS, 4,000 URL, 12,700 flow and 64 Indian rows [S2]. SMS splits group normalised text, URLs are split by domain, KDDTrain+ records supply train/dev, and the visible Indian set is split within each category. The separate flow evaluation uses KDDTest+; the separate Indian evaluation uses a second synthetic generator run [S4]. Indian development data was used for tuning.
@@ -129,7 +132,7 @@ Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 13
 | [karanverma19 Indian seed](https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset) and [bolewara Hinglish seed](https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset) | Apache-2.0 and CC BY 4.0, respectively | 136 combined seed rows in training; per-source counts are not reported. |
 | Project-generated Indian-context messages | Original project work | Visible messages split within each category: train 256, dev 64; separate generator run for evaluation 320. |
 
-Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored once after freeze. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths no longer output `uncertain`, because the conservative metric counts abstention as an error. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
+Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored after freeze on the baseline, gen51 and one gen51 review-fix revision, not on the final PR #30 rules. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths no longer output `uncertain`, because the conservative metric counts abstention as an error. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
 
 **Category holdout.** Leaving each of 32 visible categories out of text-model training yielded pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate [S4]. The script prints a misleading macro label.
 
@@ -151,7 +154,7 @@ Inference runs locally; inputs reach the local app over loopback. Downloading th
 
 ## Limitations and Phase 2
 
-Prahari is a triage prototype. It misses some attacks and raises false alarms; on the sealed holdout both systems raised many false alarms, including on safety advisories [S8]. An unfamiliar scam can bypass the rules, the legacy NSL-KDD distribution differs from modern traffic, and a benign verdict cannot prove safety. The flow model has no live packet-to-feature pipeline, and generated explanations need stronger validation. The cloud VM does not establish phone performance, physical edge deployment or organizer acceptance [S2, S4].
+Prahari is a triage prototype. It misses some attacks and raises false alarms; on the sealed holdout both systems raised many false alarms, including on safety advisories [S8]. An unfamiliar scam can bypass the rules, including messages that mix official and unofficial channels, the legacy NSL-KDD distribution differs from modern traffic, and a benign verdict cannot prove safety. The flow model has no live packet-to-feature pipeline, and generated explanations need stronger validation. The cloud VM does not establish phone performance, physical edge deployment or organizer acceptance [S2, S4].
 
 Phase 2 will turn the prototype into a more representative edge system:
 
