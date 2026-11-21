@@ -1,0 +1,6 @@
+== predict --task sms rc=0 timeout=False wall_s=4.9149227200541645 peak_rss_mb=177.78515625
+== predict --task url rc=0 timeout=False wall_s=3.584813257912174 peak_rss_mb=170.5
+== predict --task sms rc=0 timeout=False wall_s=4.2857001919765025 peak_rss_mb=176.28515625
+== predict --task flow rc=0 timeout=False wall_s=3.5794301769929007 peak_rss_mb=238.484375
+== python  rc=0 timeout=False wall_s=3.771327883936465 peak_rss_mb=176.2265625
+== explain --in rc=0 timeout=False wall_s=104.6113626731094 peak_rss_mb=1950.75390625

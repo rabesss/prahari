@@ -74,37 +74,51 @@ and the Llama 3.2 licence and tokenizer. Evaluation used the controller's `bin/e
 
 ## Results
 
-The promoted correctness candidate scored 90.49 on the same internal proxy; see `../../research/evals/C_fix1-vs-BEST.md` for the comparison.
-
-Historical detection F1, precision, recall, FPR and language accuracy from `eval/run_eval.py` are half-credit proxy metrics: an uncertain verdict contributes ½ to each side of the confusion counts, or ½ credit to language accuracy ([lines 143–163](../../eval/run_eval.py#L143-L163), [419–426](../../eval/run_eval.py#L419-L426)). Published aggregates do not include abstention counts. Conventional metrics with abstention counts for the evaluated candidates are in [the comparison](../../research/evals/C_fix1-vs-BEST.md). Candidate selection repeatedly used feedback from the same private evaluation set; it is not a pristine untouched holdout.
-
-Full proxy run `20261111-075405-best-confirm` on the previous BEST tree (tag `best-omp-final-9073`) (two repeats, hidden round-2
-set): **90.73**, D 0.9024, E 0.9473, P 0.7486, C 1.0; promotable, no failures or infra errors. The
-earlier gen11 promotion run `20261111-074120-gen11-full` scored 90.55 with identical detection and checks; the
-0.18 difference is host load (3.67 vs 3.77 s/item). Measured against the paired previous-best run
-(`20261111-073447`, 89.97), detection is unchanged and the gain is the explanation: E 0.9348 ->
-0.9473 on the same 28 items, with the prompt shortened again (130 vs 137 tokens, 3.67 vs 4.00
-s/item). Against the labelled 89.87 stamp, the same D/E comparison holds and P adds the rest. The explanation lineage is the grounded first sentence (E 0.8875 -> 0.9348, stamp
-`20261111-064233`), then a shorter system line, flow/receipt concept phrases and the joined
-two-mechanism evidence (mention 0.643 -> 0.714, length 0.982 -> 1.0, sms by-kind 0.938 -> 0.95).
-Each step was kept only if the full run moved; the intermediate gen9/gen10 trees scored 89.44/90.30
-against a paired 89.97 and stayed below the promotion gate until gen11.
+Round-3 proxy v3 (conservative F1; uncertain and invalid predictions count as errors) on the
+interleaved comparison, session `r3-20261121-cmp-gen35b`: BEST mean **84.75** (runs 84.804/84.702),
+this candidate mean **85.50** (85.507/85.497); delta **+0.75**, threshold 0.5, every promotion gate
+passes, no failures or infrastructure errors, no contended run. D is unchanged; the gain is India
+detection quality (I 0.7484 -> 0.7773: recall 0.710 -> 0.720 at FPR 0.045 -> 0.040) and the
+explanation component is 0.9332 against BEST's 0.9377, inside the 1.0pp gate. The controller's
+confirmation and promotion are separate.
 
 | Detector | F1 | Precision | Recall | FPR | Score |
 |---|---|---|---|---|---|
-| SMS | 0.9015 | 0.957 | 0.852 | 0.0078 | 0.9015 |
-| URL | 0.9948 | 1.000 | 0.9896 | 0.0000 | 0.9948 |
-| Indic | 0.9665 | 0.987 | 0.9469 | 0.0125 | 0.9544 |
+| SMS | 0.9071 | 0.9765 | 0.8469 | 0.0041 | 0.9071 |
+| URL | 0.9940 | 1.000 | 0.9880 | 0.0000 | 0.9940 |
+| Indic | 0.9714 | 0.9871 | 0.9563 | 0.0125 | 0.9593 |
 | Flow | 0.8505 | 0.9706 | 0.7568 | 0.0303 | 0.7643 |
 
-Indic accuracy by language: English 0.977, Hinglish 0.975, mixed 1.0, Hindi 0.875. The starting
-baseline scored 81.56 on the same proxy; the round-1 entry scored 85.84 on the previous hidden set.
+India v2 adaptive validation: conservative F1 0.818 (precision 0.947, recall 0.720, FPR 0.040;
+penalised component 0.7773), against BEST's 0.809 (0.940/0.710/0.045, component 0.7484); injection
+recall 0.70 (equal); benign AI-mention FPR 0.0. The round-3 baseline on the same set was F1 0.686
+(recall 0.585, FPR 0.120) with injection recall 0.625.
 
-Explanation checks on 28 items: 28 valid, verdict 0.975, consistency 1.0, mention 0.714, forbidden
-1.0, fabrication 1.0, actions 0.964, length 1.0; by kind, sms 0.95, url 0.975, flow 0.894,
-injection 0.95. The same detection tree scored 87.66 with the round-2 prompt, so the first-sentence
-evidence format and its later trims are what moved E; a lone beaconing flow is now called malicious
-and its evidence names the periodic connection instead of only the address.
+The false-alarm work targets four rule-forced India rows and the benign look-alikes around them:
+an official-app reward notice with no fee, details, link or private channel is not a prize scam; a
+generic app install needs a link, private channel or APK; moving the whole balance needs a new
+destination, authority or threat context; and identity papers need a chat or link, not a plain email
+address. Negated safe-account and guaranteed-returns statements do not fire. On the visible tripwire
+suite (`research/stress/benign_tripwires.jsonl`) this removes six false alarms while retaining all
+eight matching scams, with no visible recall change. The explanation wording is BEST's, with the new
+identity-document evidence entry; the earlier authority/collect phrases that asserted an arrest or a
+UPI PIN the input did not contain were reverted as ungrounded.
+
+Explanation checks on 28 items: 28 valid, verdict 0.939, consistency 1.0, mention 0.643, forbidden
+1.0, fabrication 1.0, actions 0.964, length 1.0, grounding pass rate 0.964; by kind sms 0.938, url
+0.975, flow 0.894, injection 0.883. The round-3 mechanism layer adds investment/trading promises,
+digital-arrest wording, RBI/government "safe" accounts, short numeric codes and destination-free
+job/loan fees. The SMS, Indic and injection paths no longer abstain: proxy v3 scores an abstention
+as an error on both sides, so a decision at the posterior midpoint is never worse on the same row.
+The flow-text demo path keeps the owner-approved PR #21 ambiguity policy: a benign cue next to a
+port scan, brute force or C2 beacon, or a lone rejected connection, stays `uncertain`, because a
+routine IT vulnerability scan must not become an alert. Evidence phrases name the mechanism (a
+lookalike link, a
+transfer to a "safe" account, a share-code request, a fake job fee on a personal chat channel).
+
+Every run above used the same two-core Neoverse-N1 VM and the same hidden-file digests. Candidate
+selection repeatedly used feedback from the same private evaluation set; it is not a pristine
+untouched holdout.
 
 ## Generalisation
 
@@ -126,16 +140,16 @@ accuracy 0.875 on B.
 - **Flow signatures** fire on 75 of 74,112 normal train+dev rows (0.10%) and cover the
   guess_passwd/teardrop/pod families; hidden flow F1 moved 0.8265 -> 0.8505.
 
-Remaining risk: 1.25% FPR is not zero, hidden SMS recall is 0.852, and Hindi is the weakest language at
+Remaining risk: 1.25% FPR is not zero, hidden SMS recall is 0.847, and Hindi is the weakest language at
 0.875. A scam that asks for nothing and only states a false fact can still pass. The report does not
 claim the set-B result proves generalisation to set C, which the controller scores separately.
 
 ## Performance on Arm
 
-Measured by `bin/eval --repeats 2` on the Oracle A1 host (2x Neoverse-N1, about 11 GB RAM):
-explanation latency **3.67 s per item** over two repeats (99.8 s and 102.6 s for 28 items), peak RSS
-2.256 GB, decode 20.8 tokens/s, prefill 82.5 tokens/s, median prompt 130 tokens and 28 generated
-tokens. Detector latency is 0.407 ms per item. The host is shared, so latency readings vary by up to
+Measured by `bin/eval` on the Oracle A1 host (2x Neoverse-N1, about 11 GB RAM):
+explanation latency **3.84 s per item** for 28 items, peak RSS
+2.045 GB, decode 19.9 tokens/s, prefill 83.1 tokens/s, median prompt 133 tokens and 30 generated
+tokens. Detector latency is 0.422 ms per item. The host is shared, so latency readings vary by up to
 30% (the same prompt measured 4.42 s/item during a co-tenant burst); E is deterministic and
 comparable across runs. The candidate bundle is 1.186 GB including the shared
 1.1 GB Llama PTE. The evaluator runs with an import-time network guard. Normal app operation does not itself install that guard; an external egress block is needed to demonstrate offline operation.
@@ -146,7 +160,7 @@ comparable across runs. The candidate bundle is 1.186 GB including the shared
 | Detectors | scikit-learn / joblib on the CPU; 0.4-0.6 ms per item for all four tasks |
 | Explanation model | `llama32-1b-qlora`: Llama 3.2 1B Instruct, INT4 group-32 weights, 8-bit dynamic activations, XNNPACK backend, ExecuTorch 1.6 |
 | Decoding | greedy (temperature 0), max 40 new tokens, context from the `.pte` |
-| Measured run | prefill 82.5 tokens/s, decode 20.8 tokens/s, 3.67 s/item over 28 items, peak RSS 2.256 GB |
+| Measured run | prefill 83.1 tokens/s, decode 19.9 tokens/s, 3.84 s/item over 28 items, peak RSS 2.045 GB |
 
 The registry's `llama32-1b-spinquant` entry was also measured on this box (about 58-63 prefill and
 12-13.5 decode tokens/s under mixed co-tenant load), slower than `qlora`, so `qlora` stays configured.
@@ -154,10 +168,12 @@ The registry's `llama32-1b-spinquant` entry was also measured on this box (about
 ## Limitations
 
 The 1B model sometimes paraphrases instead of naming the required concept; mention coverage is
-0.714, so a larger model or a stricter grounding prompt would help. One hidden explanation item
-still answers `uncertain` (verdict 0.975; `uncertain` scores 0.3) and one action list fails the scorer's action check (0.964). Some British ad-spam is labelled benign
-because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.852.
-Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns. Flow
+0.643, so a larger model or a stricter grounding prompt would help. One hidden explanation item
+still gets a wrong verdict (verdict 0.939) and the injection route is the weakest by kind (0.883).
+Some British ad-spam is labelled benign
+because it uses the same protective phrases as genuine Indian notices, so hidden SMS recall is 0.847.
+Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the patterns, and India
+v2 recall is 0.720 with FPR 0.040 (injection recall 0.70). Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
 states a false fact can pass. The explanation model can still produce a wrong detail. The evaluator heuristically checks
@@ -185,7 +201,7 @@ Three-minute video script:
 3. `bin/app --port 8765`, bound to 127.0.0.1, reached through the owner's tunnel: paste a message,
    a URL and a flow description; show verdict, evidence, explanation, actions and llm stats.
 4. State that inference runs on the local CPU through ExecuTorch, that normal app startup does not block outbound traffic, and
-   read the measured 3.67 s/item, 2.26 GB peak RSS and 20.8 decode tokens/s.
+   read the measured 3.84 s/item, 2.04 GB peak RSS and 19.9 decode tokens/s.
 
 ## Responsible AI, privacy and safety
 

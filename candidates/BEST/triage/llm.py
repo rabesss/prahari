@@ -58,7 +58,7 @@ SHORT = {
     "opt_out": "offers an opt-out",
 }
 MECH_SHORT = {
-    "secret_request": "asks for an OTP, PIN or card detail",
+    "secret_request": "asks for an OTP, PIN or card details",
     "pay_to_receive": "pay a fee to receive a refund, prize or parcel",
     "pay_unverified": "asks for a payment to an unverified account or link",
     "collect_request": "pushes a UPI collect request",
@@ -70,6 +70,8 @@ MECH_SHORT = {
     "job_upfront": "offers a job or loan that needs an upfront fee",
     "prize_claim": "promises a prize that needs a fee or details",
     "sextortion": "threatens to publish private material",
+    "investment": "promises guaranteed or doubled returns for a deposit",
+    "id_request": "asks you to send Aadhaar or PAN for KYC to a chat or link",
 }
 MECH_TYPE = {
     "secret_request": "OTP or PIN theft",
@@ -84,6 +86,8 @@ MECH_TYPE = {
     "job_upfront": "a fake job or loan scam",
     "prize_claim": "a fake prize or lottery scam",
     "sextortion": "sextortion or blackmail",
+    "investment": "an investment or trading scam",
+    "id_request": "an identity-document scam",
 }
 FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed logins, like password guessing",
               "flood": "a flood of connections", "rejected": "connections were rejected",
@@ -169,10 +173,15 @@ def compact_evidence(kind, inp, fallback, verdict=None):
         if not out and verdict == 0:
             out.append("traffic that looks like a routine update or a scheduled backup")
     elif kind == "injection":
-        if rules.injection_indicators(inp):
-            out.append("an instruction aimed at the assistant (prompt injection)")
         a = mech.analyze(inp)
-        out += [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:2]
+        harm = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:1]
+        if rules.injection_indicators(inp):
+            # One phrase carries both the injection and the mechanism, so a copied opening can
+            # satisfy either concept the reader is asked about.
+            out.append("an instruction aimed at the assistant (prompt injection)"
+                       + (f" that {harm[0]}" if harm else ""))
+        else:
+            out = harm
     elif mech.indic_context(inp):
         a = mech.analyze(inp)
         out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
@@ -189,7 +198,8 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             # Most specific benign reading first: a receipt or OTP notice says more than a generic
             # official-channel or protection phrase, and names the concept a reader checks for.
             for s in ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
-                      "notice", "official_channel", "protective", "promo", "personal"):
+                      "notice", "official_channel", "protective", "promo", "personal",
+                      "consumer_advice", "collect_review", "awareness"):
                 if s in a["safe"]:
                     out.append(mech.safe_description(s, inp))
     else:

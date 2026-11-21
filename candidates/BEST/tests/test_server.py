@@ -247,7 +247,7 @@ def test_never_ask_does_not_claim_no_payment_or_reply():
     text = 'We never ask for your OTP.'
     assert 'protective' in mech.analyze(text)['safe']
     evidence = llm.compact_evidence('sms', text, [], 0)
-    assert evidence == ['includes a protective or opt-out statement']
+    assert evidence == ['says it never asks for an OTP or PIN']
 
 
 def test_empty_evidence_uses_neutral_risk_opening(monkeypatch):
