@@ -11,7 +11,7 @@ This is a production plan, not evidence of a recording, real-phone operation or 
 | 1:25–1:45 | **Separate text-rule path:** select Network event in the UI and use the port-scan description preset. Show its rule verdict and Llama explanation with on-screen timing. Explain that it independently reclassifies text and does not explain the replay model's verdict; the two can disagree. |
 | 1:45–2:05 | Show the hard benign bank-debit preset and its evidence and explanation. The benign label reads “NO RISK FOUND — still verify”; it is not a safety guarantee. |
 | 2:05–2:25 | Enter `connections rejected` as a network description: this exercises the rule path's uncertain case. Show the actual result and cautious action. If the actual result differs, disclose it and investigate rather than staging success. |
-| 2:25–2:50 | Summarise: VM benchmark about 3.8–4.8 s/item and 2.05–2.34 GB process-tree peak RSS (systemd scope memory.peak, including page cache); no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
+| 2:25–2:50 | Summarise: VM benchmark about 3.8 s/item and 2.05 GB peak cgroup memory (systemd scope memory.peak, including page cache); no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
 
 Inference runs locally and inputs reach the local app over loopback. Downloading the model requires network access; the app itself does not block outbound traffic. Offline claims cover only what was tested.
 

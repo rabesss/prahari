@@ -14,11 +14,11 @@ Prahari is an Arm CPU prototype that helps people assess suspicious messages, li
 
 Round-3 measurements are from Oracle, an Arm Neoverse-N1 VM with two vCPUs [S8].
 
-- Shipped `candidates/BEST` is gen51 plus post-review conservative rule fixes (PR #30, content hash `b9e16a6e…`). gen51 (`46f30b36…`) was promoted after a controller 3+3 interleaved confirmation; the PR #30 fixes were checked with the same evaluator, without a new 3+3 confirmation.
+- Shipped `candidates/BEST` is gen51 plus post-review conservative rule fixes (PR #30, content hash `b9e16a6e…`). gen51 (`46f30b36…`) was promoted after a confirmation that ran three baseline and three candidate evaluations alternately; the PR #30 fixes were checked with the same evaluator, without a new confirmation.
 - Conservative F1 of the shipped rules: SMS **0.922**, URL **0.994**, Indic **0.950**, NSL-KDD flow replay **0.850**. These evaluation sets were used repeatedly during development.
 - On the sealed final holdout, gen51 improved combined F1 from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. The PR #30 fixes came after the holdout runs and were not scored on it. False alarms remain high.
 - In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules caught 20 scams (PR #21 baseline 13) and flagged 5 harmless messages (baseline 3). Messages that mix an official channel with an unofficial WhatsApp, mobile number or link can still be marked safe.
-- End-to-end time was about **3.8–4.8 s/item**; process-tree peak RSS was about **2.05–2.34 GB**, measured by systemd scope `memory.peak`, which includes page cache.
+- In the shipped version's final evaluation, end-to-end time was about **3.8 s/item** and peak memory was **2.05 GB**. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB.
 - A blind manual audit of 20 holdout explanations found 5 correct, 8 weak and 7 wrong; 4 made false claims about the input and 16 gave generic or misdirected advice.
 
 **What is not done yet.** Live network capture and a measured physical-phone run remain unverified or planned. A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. The Arm results come from a shared cloud VM, and an independently blocked-egress demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
@@ -62,7 +62,7 @@ The message layer combines TF-IDF and a logistic classifier with Indian-context 
 
 ## Arm and ExecuTorch optimisation
 
-**Target and method.** Measurements were made on Oracle, an aarch64 Neoverse-N1 VM with two vCPUs. End-to-end processing took about 3.8–4.8 s per item; process-tree peak RSS was about 2.05–2.34 GB using systemd scope `memory.peak`, which includes page cache. Shared-host load can affect timing [S8].
+**Target and method.** Measurements were made on Oracle, an aarch64 Neoverse-N1 VM with two vCPUs. In the shipped version's final evaluation, end-to-end time was about 3.8 s/item and peak memory was 2.05 GB. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB. Shared-host load can affect timing [S8].
 
 **Model and backend.** Prahari uses the ExecuTorch XNNPACK CPU backend with Llama 3.2 1B Instruct QLoRA. The language model is used to explain detector evidence, not to classify inputs [S2].
 
@@ -91,7 +91,7 @@ Prahari evaluates detection independently from generated explanations. The follo
 
 Historical `eval/run_eval.py` detection metrics gave half credit to uncertain verdicts, and historical language accuracy gave half credit for abstentions. Those earlier aggregates do not include abstention counts and are not directly comparable to the conservative figures above [S3].
 
-**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a controller 3+3 interleaved confirmation. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). After review, PR #30 added conservative rule fixes for messages wrongly marked safe; on the same evaluator it scored 86.3, without a new 3+3 confirmation. It raised SMS F1 and lowered Indic F1, with Indic FPR rising from 0.63% to 4.38%. The table above is for the shipped rules. The rounded means and reported improvements are recorded separately [S8].
+**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a confirmation that ran three baseline and three candidate evaluations alternately. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). After review, PR #30 added conservative rule fixes for messages wrongly marked safe; on the same evaluator it scored 86.3, without a new confirmation. It raised SMS F1 and lowered Indic F1, with Indic FPR rising from 0.63% to 4.38%. The table above is for the shipped rules. The rounded means and reported improvements are recorded separately [S8].
 
 **India v2 adaptive validation.** A different agent authored 400 items blind. Aggregate-only feedback was used for tuning, making this a validation set, not a test. Penalized score I rose from 0.377 at baseline to 0.830 for gen51 and 0.839 for the shipped rules; injection recall was 0.70 (gen51) and 0.725 (shipped), and benign-AI-mention FPR was 0 [S8]. The earlier v1 challenge set was previously exposed and is exploratory only.
 
