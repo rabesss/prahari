@@ -136,3 +136,74 @@ def test_official_branch_with_block_threat_does_not_crash():
     assert a['official_channel'] and 'block_threat' in dict(a['harm'])
     assert mech.decide(0.1, a)[0] == 0
     assert verdict(text) == 0
+
+
+@pytest.mark.parametrize('text', [
+    'Install this app. We will send you the APK on WhatsApp. We never ask for OTP.',
+    'Install this app, We will send you the APK on WhatsApp, We never ask for OTP.',
+    'Bank KYC: buy gift vouchers and send the codes to our manager. No fee is required.',
+    'Install the attached update.apk.',
+])
+def test_round2_protection_does_not_hide_harm(text):
+    assert mech.decide(0.1, mech.analyze(text))[0] == 1
+    assert verdict(text) == 1
+
+
+def test_round2_protection_obeys_gate_and_request_cues():
+    for text in ('We never ask for OTP.', 'No fee is required.'):
+        a = mech.analyze(text)
+        assert mech.decide(0.84, a)[0] == 0
+        assert mech.decide(0.85, a)[0] == 1
+    for text in ('Install the app. We never ask for OTP.',
+                 'Please pay the bill. No fee is required.',
+                 'Enter your OTP in the official app. We never ask for OTP.',
+                 'Buy a voucher and send the code. No fee is required.'):
+        a = mech.analyze(text)
+        assert a['request_cues'], text
+        assert mech.decide(0.84, a)[1] == 0.84
+        assert mech.decide(0.85, a)[0] == 1
+
+
+def test_round2_sentence_boundaries_and_official_host():
+    text = 'Enter your OTP at https://sbi.co.in'
+    assert mech.clauses(text) == [(0, text)]
+    a = mech.analyze(text)
+    assert a['official_host'] and 'secret_request' not in dict(a['harm'])
+    assert verdict(text) == 0
+    assert verdict('Please pay your electricity bill of ₹500 on https://sbi.co.in') == 0
+    assert mech.clauses('Install update.apk. Visit sbi.co.in. Done!') == [
+        (0, 'Install update.apk'), (19, ' Visit sbi.co.in'), (36, ' Done')]
+
+
+def test_round2_destinations_belong_to_the_request():
+    official = 'For KYC, upload your passport in the official app. Read updates in this WhatsApp chat.'
+    private = 'KYC update: upload your Aadhaar to this WhatsApp chat. View your balance in the official app.'
+    assert 'id_request' not in dict(mech.analyze(official)['harm'])
+    assert verdict(official) == 0
+    assert 'id_request' in dict(mech.analyze(private)['harm'])
+    assert verdict(private) == 1
+    text = 'Please pay your electricity bill of ₹500 on https://sbi.co.in. For assistance call 9876543210.'
+    assert not mech.analyze(text)['dest_strong']
+    assert verdict(text) == 0
+    for text in ('Pay ₹500 to 9876543210.', 'Transfer ₹500 on +91 9876543210.',
+                 'Pay ₹500. Send it to 9876543210.'):
+        assert mech.analyze(text)['dest_strong'], text
+
+
+@pytest.mark.parametrize('text', [
+    'Police arrested a gang for fraud. They requested customers to send their OTP. Never share your OTP.',
+    'Police arrested a gang for fraud after they asked victims to share OTP.',
+])
+def test_round2_third_party_reports_are_not_demands(text):
+    a = mech.analyze(text)
+    assert a['report'] and not a['reader_direct']
+    assert 'secret_request' not in dict(a['harm'])
+    assert verdict(text) == 0
+
+
+def test_round2_reader_demands_and_otp_notice():
+    for text in ('Police arrested a gang for fraud. Kindly share your OTP with our agent.',
+                 'Our bank agent is asking for your OTP.'):
+        assert 'secret_request' in dict(mech.analyze(text)['harm'])
+        assert verdict(text) == 1
+    assert verdict('Your OTP is 4821. Never share it with anyone. -SBI') == 0
