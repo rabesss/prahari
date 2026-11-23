@@ -205,3 +205,11 @@ def test_spoofed_alert_with_threat_and_number_is_not_excused():
 def test_electricity_scam_asking_for_otp_gets_otp_advice():
     sms = "Bijli ka bill abhi pay karo warna aaj raat connection cut hoga. Verify ke liye OTP share karo: 98XXX12345"
     assert llm.scam_type("sms", sms, 1) == "OTP or PIN theft"
+
+
+def test_alert_with_any_phone_number_is_not_excused():
+    from triage import mech
+    for spoof in ("SBI: Rs 2450 debited. If not you, block card by calling 98765 43210 to reverse the transaction.",
+                  "SBI: Rs 2450 debited. If not you, block card: call 98765.43210.",
+                  "SBI: Rs 2450 debited. If not you, block card in the app. Call 98765 43210 to reverse the transaction."):
+        assert mech.decide(0.9, mech.analyze(spoof))[0] == 1, spoof
