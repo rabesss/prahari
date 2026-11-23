@@ -371,3 +371,18 @@ def test_flow_fallback_does_not_say_scam():
 def test_branch_pattern_inserts_no_english():
     hi = explain_hi.translate("mentions the YONO app and the branch")
     assert hi and not re.search(r"[A-Za-z]{3,}", hi)
+
+
+def test_payment_fact_only_for_messages_that_report_money():
+    receipt = ["reads like a normal payment receipt, order or delivery record"]
+    assert llm._benign_reading("sms", receipt) == "receipt"
+    for inp, want in (("KYC document submit ho gaye. Receipt sambhal kar rakho.", "generic"),
+                      ("Your order has shipped and will arrive Friday.", "delivery"),
+                      ("Rs 720 was debited from your account via UPI.", "receipt")):
+        ev = []
+        orig = llm.compact_evidence
+        llm.compact_evidence = lambda *a, **k: receipt
+        try:
+            assert llm.key_fact("sms", inp, 0, ev) == llm.BENIGN_FACT[want], inp
+        finally:
+            llm.compact_evidence = orig

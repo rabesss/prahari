@@ -1056,6 +1056,10 @@ BENIGN_FACT = {
 ALL_FACTS = tuple(dict.fromkeys(list(KEY_FACT.values()) + [INJECTION_FACT] + list(BENIGN_FACT.values())))
 
 
+_PAID = re.compile(r"\b(?:debit\w*|credit\w*|paid|payment|refund\w*|received|transferred|withdrawn|txn|upi|"
+                   r"amount|rs\.?|inr|rupees)\b|₹|भुगतान|डेबिट|क्रेडिट|रिफंड|रुपये|राशि", re.I)
+
+
 def _benign_reading(kind, phrases):
     if kind == "flow":
         return "flow"
@@ -1075,7 +1079,12 @@ def _benign_reading(kind, phrases):
 def key_fact(kind, inp, verdict, evidence):
     """The vetted fact the model's sentence is built from, for this item and verdict."""
     if verdict == 0:
-        return BENIGN_FACT[_benign_reading(kind, compact_evidence(kind, inp, evidence, verdict))]
+        reading = _benign_reading(kind, compact_evidence(kind, inp, evidence, verdict))
+        if reading == "receipt" and not _PAID.search(inp or ""):
+            # The detector's receipt reading also covers orders and notices; payment advice only
+            # fits a message that itself reports money moving.
+            reading = "delivery" if re.search(r"order|deliver|shipped|track|parcel|courier", inp or "", re.I) else "generic"
+        return BENIGN_FACT[reading]
     label = scam_type(kind, inp, verdict)
     if kind == "injection" and rules.injection_indicators(inp) and label in ("a scam message", "a message worth checking", ""):
         return INJECTION_FACT
