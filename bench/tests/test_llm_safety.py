@@ -213,3 +213,10 @@ def test_alert_with_any_phone_number_is_not_excused():
                   "SBI: Rs 2450 debited. If not you, block card: call 98765.43210.",
                   "SBI: Rs 2450 debited. If not you, block card in the app. Call 98765 43210 to reverse the transaction."):
         assert mech.decide(0.9, mech.analyze(spoof))[0] == 1, spoof
+
+
+def test_alert_with_any_link_is_not_excused():
+    from triage import mech
+    for spoof in ("SBI: A/c XX1234 debited Rs 2,450. We never ask for OTP. If not you, block your card: http://bit.ly/3abcDe",
+                  "SBI: Rs 2,450 debited via UPI. If not you, block card at onlinesbi.verify-account.com"):
+        assert mech.decide(0.95, mech.analyze(spoof))[0] == 1, spoof

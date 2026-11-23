@@ -955,7 +955,8 @@ def decide(p_model, a, gate=0.85):
         # no private payee, link or secret request it is a deadline, not a threat.
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["receipt"] or a["otp_note"]) and _self_block(a.get("text", "")) and \
-            not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):
+            not (a["hosts"] or a.get("reader_direct") or a["dest_strong"] or a["risky"] or a["secret"] or
+                 a["pay_unverified"]):
         # A bank debit or OTP alert that says "if not you, block your card in the app" tells the
         # reader to protect their own account; with no link, private payee or secret request it is
         # protective advice, not a threat.
