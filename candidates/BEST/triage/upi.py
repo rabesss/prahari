@@ -177,6 +177,10 @@ _OFFICIAL_DESK_WEAK_RE = re.compile(
 )
 # Plain cashback / money-back promo wording that real merchant QRs carry ("5% cashback on purchase").
 _MERCHANT_PROMO_RE = re.compile(r"\b(?:get\s+)?(?:\d+\s*%\s*)?(?:cash\s*back|cashback|money\s*back)\b|कैशबैक", re.I)
+_URL_SCAM_WORD_RE = re.compile(r"refund|kyc|cashback|claim|prize|reward|help|support|care|verif|secure|login|update|offer")
+# A promo stops being plain promo when it asks for a payment or action to receive the money.
+_PROMO_BREAKER_RE = re.compile(
+    r"\b(?:receive|claim|credited?\s+to)\b|\bpay\s*(?:rs\.?|inr|₹)?\s*\d", re.I)
 # Small local shops legitimately name a brand they resell ("Airtel Recharge Shop", "Jio Point").
 _LOCAL_SHOP_RE = re.compile(
     r"\b(?:shop|store|kirana|mart|point|corner|traders|enterprises|agency|"
@@ -238,7 +242,7 @@ _PIN_TO_RECEIVE_RE = re.compile(
 
 # Refund / cashback / prize / incoming-payment claim inside a debit QR's `tn` or `pn`.
 _RECEIVE_LURE_RE = re.compile(
-    r"\b(?:refund|cash\s*back|cashback|money\s*back|receive\s+(?:the\s+|your\s+)?(?:money|payment|amount|funds?|cash|rs\.?|inr|₹)|"
+    r"\b(?:refund|cash\s*back|cashback|money\s*back|receive\s+(?:the\s+|your\s+)?(?:money|payment|amount|funds?|cash|rs\.?|inr|₹)(?!\s*(?:receipt|confirmation|details|link|sms|alert))|"
     r"get\s*(?:rs\.?|inr|₹)\s*\d[\d,]*|pay\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*\s*(?:to|and)\s*(?:get|receive|win)\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*|"
     r"paise\s*(?:pa+ne|pa+o|milne|milenge|receive)|paisa\s*(?:pa+ne|pa+o|milne|milega|receive)|"
     r"credit\s+(?:to|in|into)\s+(?:your\s+)?(?:account|bank|upi|a/c)|"
@@ -485,7 +489,7 @@ def parse_upi(text: str) -> dict | None:
     mam = params.get("mam", "")
     cu = params.get("cu", "")
     # A second tn must not hide a scam note behind an innocent first one: keep every distinct note.
-    tn = " / ".join(duplicates["tn"]) if "tn" in duplicates else params.get("tn", "")
+    tn = " ; ".join(duplicates["tn"]) if "tn" in duplicates else params.get("tn", "")
     mc = params.get("mc", "")
     tr = params.get("tr", "")
     tid = params.get("tid", "")
@@ -699,7 +703,8 @@ def analyze_upi(text: str) -> dict:
             )
 
     # 2. Prompt injection inside tn / pn / mn / pa, and characters no real UPI ID can hold
-    if (note_and_name or pa) and rules.injection_indicators(" ; ".join(x for x in (note_and_name, pa) if x)):
+    all_values = " ; ".join(v for vals in parsed["params_multi"].values() for v in vals if v)
+    if all_values and rules.injection_indicators(all_values):
         add(
             "prompt_injection",
             "high",
@@ -719,7 +724,7 @@ def analyze_upi(text: str) -> dict:
     # 3. Collect / AutoPay mandate / "scan or enter PIN to receive money" trick
     has_pin_receive = bool(_PIN_TO_RECEIVE_RE.search(note_and_name))
     cleaned_for_lure = _LEGIT_CREDIT_CARD_RE.sub(" ", note_and_name)
-    if valid_mc and not _OFFICIAL_DESK_RE.search(pn):
+    if valid_mc and not _OFFICIAL_DESK_RE.search(pn) and not _PROMO_BREAKER_RE.search(cleaned_for_lure):
         cleaned_for_lure = _MERCHANT_PROMO_RE.sub(" ", cleaned_for_lure)
     has_receive_lure = bool(_RECEIVE_LURE_RE.search(cleaned_for_lure))
 
@@ -980,8 +985,9 @@ def analyze_upi(text: str) -> dict:
         host_l = (rules.host_of(u) or "").lower()
         own_tokens = {t for t in re.split(r"[^a-z0-9]+", vpa_user.lower()) if len(t) >= 4}
         own_tokens |= {tok for _l, _c, toks in pn_brands for tok in toks if len(tok) >= 3}
+        label = host_l.split(".")[-3 if host_l.endswith(".co.in") else -2] if "." in host_l else ""
         if unames <= {"brand_lookalike", "brand_mention"} and re.search(r"\.(?:com|in|co\.in|org|net|gov\.in)$", host_l) \
-                and any(t in host_l.split(".")[-3 if host_l.endswith(".co.in") else -2] for t in own_tokens):
+                and label in own_tokens and not _URL_SCAM_WORD_RE.search(label):
             continue
         strong_url = unames & {"brand_lookalike", "digit_swap", "ip_host", "shortener", "punycode", "homoglyph", "hidden_chars", "at_sign"}
         if strong_url:
@@ -1346,7 +1352,7 @@ def prompt_snippet(text: str) -> str:
         safe_url = parsed["url"].replace(".", "[.]")
         parts.append(f"Ref URL: {clean(safe_url, 64)}")
     if parsed["recur"] or parsed["amrule"]:
-        parts.append(f"Mandate: {parsed['recur'] or 'recurring'} {parsed['amrule']}".strip())
+        parts.append(f"Mandate: {clean(parsed['recur'] or 'recurring', 16)} {clean(parsed['amrule'], 8)}".strip())
     out = "; ".join(parts)
     return out if len(out) <= 320 else out[:317] + "..."
 
