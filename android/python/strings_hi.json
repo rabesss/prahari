@@ -202,7 +202,8 @@
   "The detector and Llama 3.2 run on this emulator's CPU.": "डिटेक्टर और Llama 3.2 इस एम्युलेटर के CPU पर चलते हैं।",
   "Runs on the emulator's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation.": "यह ExecuTorch से इस एम्युलेटर के CPU पर चलता है (INT4, XNNPACK)। यह सिर्फ़ व्याख्या लिखता है।",
   "The on-device checker could not start.": "फ़ोन पर जांच सिस्टम शुरू नहीं हो सका।",
-  "Couldn't load the on-device model.": "फ़ोन पर मौजूद मॉडल लोड नहीं हो सका।"
+  "Couldn't load the on-device model.": "फ़ोन पर मौजूद मॉडल लोड नहीं हो सका।",
+  "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown.": "यह अलर्ट अपना ही लिंक या नंबर देता है, इसलिए इसे संदिग्ध माना गया है। AI की टिप्पणी पहले के नतीजे के लिए लिखी गई थी, इसलिए नहीं दिखाई गई।"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",

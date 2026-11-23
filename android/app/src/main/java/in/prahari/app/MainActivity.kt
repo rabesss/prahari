@@ -84,7 +84,9 @@ private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
-private val OWN_HOST = Regex("(?i)\\b(?:https?://)?((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,24})\\b")
+// Hosts in any script (internationalised domains such as a Devanagari .भारत name count too).
+private val OWN_HOST = Regex("(?i)(?<![\\p{L}\\p{M}\\p{N}_-])((?:[\\p{L}\\p{N}][\\p{L}\\p{M}\\p{N}-]*\\.)+\\p{L}[\\p{L}\\p{M}]{1,23})(?![\\p{L}\\p{M}\\p{N}_-])")
+private val OWN_URL = Regex("(?i)(?:https?://|www\\.)([^\\s/?#<>\"']+)")
 private val OWN_IP = Regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b")
 private val OWN_MOBILE = Regex("(?<![0-9])(?:\\+?91[ -]?)?[6-9][0-9]{4}[ -]?[0-9]{5}(?![0-9])")
 private val OWN_OTHER = Regex("(?i)\\.apk\\b|\\*\\d{2,3}\\*")
@@ -106,7 +108,8 @@ private fun officialHost(host: String): Boolean {
 /** True when the text offers a contact of its own: an unofficial link, IP, APK, USSD code or private mobile. */
 private fun hasOwnContact(text: String): Boolean =
     OWN_MOBILE.containsMatchIn(text) || OWN_IP.containsMatchIn(text) || OWN_OTHER.containsMatchIn(text) ||
-        OWN_HOST.findAll(text).any { !officialHost(it.groupValues[1]) }
+        OWN_HOST.findAll(text).any { !officialHost(it.groupValues[1]) } ||
+        OWN_URL.findAll(text).any { !officialHost(it.groupValues[1].substringBefore(':').trimEnd('.', ',', ')', ']')) }
 
 /**
  * How a result that carries the vetted bank debit or check step is shown, or null for no change.
@@ -123,6 +126,7 @@ private fun bankAlertLevel(verdict: JSONObject, value: String): String? {
     return if (hasOwnContact(value)) "warn" else "alert"
 }
 
+private const val RAISED_NOTE = "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown."
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
 private const val QR_REQUEST = 41
@@ -2224,6 +2228,15 @@ class MainActivity : Activity() {
         val error = result.optString("error", "")
         val explanation = result.optString("explanation", "").trim()
         replacedSlot?.visibility = if (result.optBoolean("replaced")) View.VISIBLE else View.GONE
+        // The app raised a cleared bank alert to SUSPICIOUS because it names its own link or number.
+        // Llama wrote for the detector's NO RISK reading, so its text would contradict the banner.
+        if (bankAlertLevel(job.verdict, job.value) == "warn" && job.verdict.optString("level") == "clear") {
+            replacedSlot?.visibility = View.GONE
+            view.text = t(RAISED_NOTE)
+            view.setTextColor(T.ink2)
+            view.setTypeface(view.typeface, Typeface.ITALIC)
+            return
+        }
         if (error.isNotEmpty() || explanation.isEmpty()) {
             val lead = when {
                 error.contains("Model files are missing", ignoreCase = true) ->
