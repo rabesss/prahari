@@ -14,7 +14,7 @@ Prahari is an Arm CPU prototype that helps people assess suspicious messages, li
 
 Round-3 measurements are from Oracle, an Arm Neoverse-N1 VM with two vCPUs [S8].
 
-- Shipped `candidates/BEST` is gen51 plus later rule and advice changes, content hash `4ea1d89a…` ([S8]). Proxy v3 is **86.26**, including explanation score **0.929**. Scam-specific vetted steps replace unsafe generated advice. A bank debit alert that suggests blocking the card in the bank app is SUSPICIOUS. Detector F1 is unchanged.
+- Shipped `candidates/BEST` is gen51 plus later rule and advice changes, content hash `1e08f778…` ([S8]). Proxy v3 is **86.26**, including explanation score **0.929**. Scam-specific vetted steps replace unsafe generated advice. A bank debit alert that suggests blocking the card in the bank app is SUSPICIOUS. Detector F1 is unchanged.
 - Conservative F1 of the shipped rules: SMS **0.922**, URL **0.994**, Indic **0.950**, NSL-KDD flow replay **0.850**. These evaluation sets were used repeatedly during development.
 - On the sealed final holdout, gen51 improved combined F1 from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. PR #30–35 came after the holdout runs and were not scored on it. False alarms remain high.
 - In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules catch 21 scams (PR #21 baseline 13) and flag 5 harmless messages (baseline 3). Messages that mix an official channel with an unofficial WhatsApp, mobile number or link can still be marked safe.

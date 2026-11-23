@@ -95,7 +95,12 @@
     "Never stay on a video call with police; report it at cybercrime.gov.in.": "पुलिस के साथ वीडियो कॉल पर कभी न रहें; cybercrime.gov.in पर रिपोर्ट करें।",
     "Not your payment? Block it in your bank app and call 1930.": "यह पेमेंट आपका नहीं? बैंक ऐप में ब्लॉक करें और 1930 पर कॉल करें।",
     "Report the message or call on Sanchar Saathi Chakshu.": "इस मैसेज या कॉल की रिपोर्ट Sanchar Saathi Chakshu पर करें।",
-    "Tell your family; report at cybercrime.gov.in, or call 1930 if money was lost.": "परिवार को बताएं; cybercrime.gov.in पर रिपोर्ट करें, पैसे जाने पर 1930 पर कॉल करें।"
+    "Tell your family; report at cybercrime.gov.in, or call 1930 if money was lost.": "परिवार को बताएं; cybercrime.gov.in पर रिपोर्ट करें, पैसे जाने पर 1930 पर कॉल करें।",
+    "Check the firewall logs for the scanning address and block it.": "फ़ायरवॉल लॉग में स्कैन करने वाला पता देखें और उसे ब्लॉक करें।",
+    "Check the payment in your bank app, not through any link or number in the message.": "अपने बैंक ऐप में पेमेंट जांचें, मैसेज के किसी लिंक या नंबर से नहीं।",
+    "Didn't make this payment? Call 1930 and block the card or UPI in your bank app.": "पेमेंट आपका नहीं? 1930 डायल करें, बैंक ऐप में कार्ड या UPI ब्लॉक करें।",
+    "Looks like a bank debit or OTP alert": "बैंक से पैसे कटने या OTP के अलर्ट जैसा लगता है",
+    "Scammers copy these alerts; confirm it in your bank app": "ठग ऐसे अलर्ट की नकल करते हैं; इसे अपने बैंक ऐप में पक्का करें"
   },
   "buttons": {
     "report_chakshu": {

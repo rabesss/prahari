@@ -177,6 +177,8 @@ def compact_evidence(kind, inp, fallback, verdict=None):
     A NO RISK verdict that overruled a harm signal is reported by its benign reading, never by
     the dismissed harm phrase.
     """
+    if _debit_alert(kind, inp, verdict):
+        return [DEBIT_LINE]
     out = []
     dismissed = False
     if kind == "url":
@@ -258,6 +260,17 @@ def compact_evidence(kind, inp, fallback, verdict=None):
     return out[:2]
 
 
+DEBIT_LINE = "looks like a bank debit or OTP alert; scammers copy these"
+
+
+def _debit_alert(kind, inp, verdict):
+    """A SUSPICIOUS debit or OTP alert: real or copied, it is described as an alert to confirm."""
+    if verdict != "uncertain" or kind not in ("sms", "injection") or not inp:
+        return False
+    a = mech.analyze(inp)
+    return bool(a["receipt"] or a["otp_note"])
+
+
 def benign_evidence(kind, inp, evidence, verdict):
     """The evidence lines a UI should show for a checked item.
 
@@ -267,6 +280,8 @@ def benign_evidence(kind, inp, evidence, verdict):
     other item keeps the detector's lines.
     """
     lines = list(evidence or [])
+    if _debit_alert(kind, inp, verdict):
+        return ["Looks like a bank debit or OTP alert", "Scammers copy these alerts; confirm it in your bank app"]
     if verdict != 0 or kind not in ("sms", "injection") or not mech.indic_context(inp):
         return lines
     a = mech.analyze(inp)
@@ -280,6 +295,8 @@ def scam_type(kind, inp, verdict):
     """A short, human scam-type phrase derived from the same rules the detector used."""
     if verdict == 0:
         return ""
+    if _debit_alert(kind, inp, verdict):
+        return "a bank debit alert to confirm"
     if kind == "url":
         names = {n for n, _ in rules.url_indicators(inp)}
         if names & {"brand_lookalike", "digit_swap"}:
@@ -618,7 +635,7 @@ ACTIONS = {
     0: ["Verify in the official app; never share your OTP or PIN."],
 }
 FLOW_ACTIONS = {
-    1: ["Block the source address at the firewall or router.",
+    1: ["Check the firewall logs for the scanning address and block it.",
         "Check the target machine's logs and change any exposed passwords.",
         "Keep the device and router firmware updated."],
     "uncertain": ["Check with your IT team and review the logs."],
@@ -740,7 +757,7 @@ TYPE_ADVICE = {
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
         "If you entered details, call your bank to block card, UPI and netbanking."]),
-    "a port scan": (None, ["Block the source address at the firewall or router.",
+    "a port scan": (None, ["Check the firewall logs for the scanning address and block it.",
                            "Close unused ports and turn off remote admin.",
                            "Check the logs for logins that follow the scan."]),
     "a brute-force login": (None, ["Block the source address and limit login attempts.",
@@ -752,7 +769,8 @@ TYPE_ADVICE = {
 }
 
 
-DEBIT_STEP = "Not your payment? Block it in your bank app and call 1930."
+DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
+CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
 
 
 def advice_for(kind, verdict, inp):
@@ -763,7 +781,7 @@ def advice_for(kind, verdict, inp):
             # A debit or OTP alert, real or copied: the step that matters is what to do if the
             # reader did not make the payment.
             base = (ACTIONS)[verdict]
-            return base[0], [DEBIT_STEP] + [x for x in base if x != DEBIT_STEP][:2]
+            return base[0], [DEBIT_STEP, CHECK_STEP if verdict == "uncertain" else base[0]]
     if verdict == 1 and inp is not None:
         tail, acts = TYPE_ADVICE.get(scam_type(kind, inp, verdict), (None, None))
         if acts:

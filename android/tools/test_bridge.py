@@ -37,7 +37,7 @@ hi = mobile._actions_hi([
     'This step is not in the table.',
 ])
 assert hi == ['लिंक पर क्लिक न करें और मैसेज का जवाब न दें।', '']
-assert mobile._actions_hi([mobile.llm.DEBIT_STEP])[0].startswith('यह पेमेंट')
+assert mobile._actions_hi([mobile.llm.DEBIT_STEP])[0].startswith('पेमेंट आपका नहीं')
 
 # Link evidence: brand imitation or a digit swap leads; everything else keeps detector order.
 link_ev = [
