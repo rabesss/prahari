@@ -1733,9 +1733,11 @@ class MainActivity : Activity() {
             val countWord = t(if (evidence.size == 1) "signal" else "signals")
             add(header, txt("${evidence.size} $countWord", 11f, T.ink3, 600, raw = true), -2, -2)
             add(evidenceCard, header)
-            evidence.forEach { item ->
+            val quotes = strings(data.optJSONArray("evidence_quotes"))
+            evidence.forEachIndexed { index, item ->
                 val chip = row().apply { gravity = Gravity.TOP; background = shape(p.chip, 12f); pad(this, 10, 8, 12, 8) }
                 add(chip, icon(if (calm) R.drawable.ic_check_circle else R.drawable.ic_alert_circle, 16, p.chipText), 16, 16)
+                val column = col()
                 val translated = if (L10n.hindi) t(item) else item
                 val shown = if (L10n.hindi && translated != item) translated else sentence(item)
                 val text = SpannableString(shown)
@@ -1744,7 +1746,18 @@ class MainActivity : Activity() {
                     text.setSpan(StyleSpan(Typeface.BOLD), match.range.first, match.range.last + 1, 0)
                     text.setSpan(RelativeSizeSpan(13f / 14f), match.range.first, match.range.last + 1, 0)
                 }
-                add(chip, txt(text, 14f, p.chipText, 400, 20), 0, -2, left = 8, weight = 1f)
+                add(column, txt(text, 14f, p.chipText, 400, 20))
+                val quote = quotes.getOrNull(index).orEmpty()
+                if (quote.isNotEmpty()) {
+                    val quoteView = txt("“$quote”", 12f, T.ink2, 400, 16, raw = true).apply {
+                        isClickable = false
+                        linksClickable = false
+                        setTextIsSelectable(false)
+                    }
+                    add(column, quoteView, top = 2)
+                }
+                add(chip, column, 0, -2, left = 8, weight = 1f)
+                chip.isClickable = false
                 add(evidenceCard, chip, -1, -2, top = 8)
             }
             add(body, evidenceCard, top = 12)

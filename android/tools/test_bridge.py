@@ -118,6 +118,18 @@ assert not mobile.ends_with_replacement(
 assert not mobile.ends_with_replacement('', 'sms', 1, kyc)
 print('replacement-sentence flag passed')
 
+kyc_q = mobile.quote_span('threatens to block the account or service', kyc)
+assert 'account will be blocked' in kyc_q and 'http' not in kyc_q
+link = 'http://amaz0n-refund-help.top/claim?id=8812'
+link_q = mobile.quote_span('the domain amaz0n-refund-help.top swaps letters for digits to imitate a brand', link)
+assert 'amaz0n' in link_q and 'http://' not in link_q and '[.]' in link_q and '8812' not in link_q
+debit_q = mobile.quote_span('looks like a bank debit or OTP alert; scammers copy these', bank)
+assert '482910' not in debit_q and '•' in debit_q
+assert mobile.quote_span('reads like a routine bill reminder', 'hello there friend') == ''
+assert mobile.quote_span('points to the official app or channel',
+    'Your electricity bill of Rs 1,240 is due on 15 Dec. Pay through the mahadiscom app; no link is attached.') == ''
+print('evidence quote spans passed')
+
 # End to end through the shipped detector, with only NumPy available.
 class Echo:
     def generate(self, prompt):
