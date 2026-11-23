@@ -386,3 +386,19 @@ def test_payment_fact_only_for_messages_that_report_money():
             assert llm.key_fact("sms", inp, 0, ev) == llm.BENIGN_FACT[want], inp
         finally:
             llm.compact_evidence = orig
+
+
+# --- PR #50 review round 2 (CodeRabbit) --------------------------------------------------------
+
+def test_no_payment_statement_is_not_a_receipt():
+    assert llm._benign_reading("sms", ["says no payment is needed"]) == "no_fee"
+
+
+def test_inserted_opening_is_not_model_text():
+    opening = "This message is DANGEROUS: asks for a payment or fee"
+    tail = "Do not pay; check the request in the official app first."
+    c = ctx("Pay the fee now.", 1, "sms", llm.KEY_FACT["a fake payment request"])
+    with pytest.raises(ValueError):
+        llm.validate(opening + ". " + tail, opening, c, vetted=[tail], model_opening=False)
+    text, _ = llm.validate(opening + ". " + tail, opening, c, vetted=[tail], model_opening=True)
+    assert text.startswith(opening)

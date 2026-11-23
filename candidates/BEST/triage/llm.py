@@ -545,7 +545,8 @@ class Explainer:
         ctx = _CTX.get(prompt)
         if ctx:
             text, report = validate(text, opening, ctx, vetted=[tail] if tail else [],
-                                    generated_tokens=stats.get("generated_tokens"))
+                                    generated_tokens=stats.get("generated_tokens"),
+                                    model_opening=bool(opening) and opening in raw)
             stats["validator"] = report
             replaced = replaced or report["fact_added"]
         stats["replaced"] = replaced
@@ -1064,10 +1065,10 @@ def _benign_reading(kind, phrases):
     if kind == "flow":
         return "flow"
     first = (phrases[0] if phrases else "").lower()
-    for key, pat in (("otp", r"otp notification"), ("receipt", r"payment|refund|receipt"),
+    for key, pat in (("otp", r"otp notification"), ("no_fee", r"says no (?:fee|charge|payment)"),
+                     ("receipt", r"payment|refund|receipt"),
                      ("delivery", r"order|delivery|tracking"),
                      ("bill", r"bill reminder"), ("official_domain", r"official domain"),
-                     ("no_fee", r"says no (?:fee|charge|payment)"),
                      ("protective", r"never asks|says no |protective|not to share"),
                      ("official_channel", r"official app|official channel|mentions .* branch|mentions the branch"),
                      ("personal", r"personal conversation")):
@@ -1244,7 +1245,7 @@ def _split(text, opening=None):
     return head + [s for s in re.split(r"(?<=[.!?;])\s+", text) if s.strip()]
 
 
-def validate(text, opening, ctx, vetted=(), generated_tokens=None):
+def validate(text, opening, ctx, vetted=(), generated_tokens=None, model_opening=True):
     """(text, report): drop generated sentences the item does not support.
 
     The opening is the detector's own evidence and is kept. A dropped sentence is replaced by the
@@ -1274,8 +1275,14 @@ def validate(text, opening, ctx, vetted=(), generated_tokens=None):
             dropped.append(why)
         else:
             kept.append(sent)
-    model_kept = [k for k in kept if k.strip() not in vetted]
-    if not model_kept:
+    # Model text is what remains after removing vetted sentences (matched as whole strings, since
+    # a vetted sentence may itself contain a semicolon) and an opening _consistent re-inserted.
+    rest = " ".join(kept)
+    for v in sorted(vetted, key=len, reverse=True):
+        rest = rest.replace(v, " ")
+    if opening and not model_opening:
+        rest = rest.replace(opening + ".", " ", 1).replace(opening, " ", 1)
+    if not re.search(r"\w", rest):
         # Nothing the model wrote survived (no copied opening, every sentence unsupported): the
         # explanation is reported as failed rather than replaced by fixed text alone.
         raise ValueError("explanation contained no supported model sentence")
