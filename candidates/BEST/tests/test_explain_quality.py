@@ -73,6 +73,7 @@ def test_key_fact_follows_the_verdict():
     ("Check the firewall for open ports.", "Your KYC is expiring, call now.", 1, "sms", "wrong_channel"),
     ("यह संदेश खतरनाक है।", "Share your OTP now.", 1, "sms", "script_mixing"),
     ("I checked the official SBI app for OTP details.", "Your OTP is 4821.", 0, "sms", "first_person"),
+    ("This is a known phishing attempt to steal data.", "http://sbi-kyc.example/login", 1, "url", "overclaim"),
 ])
 def test_validator_drops_unsupported(sent, inp, verdict, kind, reason):
     assert llm.unsupported(sent, ctx(inp, verdict, kind)) == reason
@@ -236,3 +237,55 @@ def test_hindi_summary_shape(kind, inp):
     s = explain_hi.summary_hi(kind, inp, lab, ev)
     assert s and "{" not in s and not re.search(r"\b(?:the|and|asks|link)\b", s)
     assert "amaz0n-refund-help.top" not in s  # risky hosts are defanged
+
+
+# --- PR #50 review round 1 (gpt-6.1-terra) -----------------------------------------------------
+
+def test_no_surviving_model_text_is_a_failure_not_fixed_text():
+    opening = "This message is DANGEROUS: asks for a payment or fee"
+    fact = llm.KEY_FACT["a fake payment request"]
+    with pytest.raises(ValueError):
+        llm.validate("The sender asks for your OTP.", opening, ctx("Pay your bill now.", 1, "sms", fact))
+
+
+def test_helpline_allowlist_matches_domain_boundaries():
+    c = ctx("Share your OTP now.", 1, "sms")
+    assert llm.unsupported("Report it at cybercrime.gov.in.attacker.com today.", c) == "domain_not_in_input"
+    assert llm.unsupported("Report it at www.cybercrime.gov.in or call 1930.", c) is None
+
+
+def test_link_fact_never_excuses_a_link_claim():
+    fact = llm.KEY_FACT["a fake payment request"]
+    assert "link" in fact
+    c = ctx("Pay your bill now.", 1, "sms", fact)
+    assert llm.unsupported("The message contains a phishing link.", c) == "link_not_in_input"
+    assert llm.unsupported("Never pay through a link from a message.", c) is None
+
+
+def test_delivery_update_gets_delivery_advice_not_payment_advice():
+    assert llm._benign_reading("sms", ["reads like a normal order or delivery record"]) == "delivery"
+    assert llm._benign_reading("sms", ["reads like a normal tracking update"]) == "delivery"
+    assert llm._benign_reading("sms", ["reads like a normal payment receipt, order or delivery record"]) == "receipt"
+    assert "payment" not in llm.BENIGN_FACT["delivery"]
+
+
+def test_qr_fact_makes_no_absolute_claim_about_scanning():
+    fact = llm.KEY_FACT["a QR-code payment scam"]
+    assert "only sends" not in fact and fact.startswith("Never")
+
+
+# --- PR #50 review round 1 (CodeRabbit) --------------------------------------------------------
+
+def test_numbers_are_compared_whole_not_concatenated():
+    c = ctx("Payment of INR 100 received. Reference 234.", 0, "sms")
+    assert llm.unsupported("The payment was 100234 rupees.", c) == "number_not_in_input"
+    assert llm.unsupported("If you did not pay the 100 check reference 234.", c) is None
+
+
+@hindi
+def test_cleared_debit_alert_uses_the_alert_heading():
+    inp = "Bank alert: Rs 720 was debited through UPI. If unrecognised, contact your bank immediately."
+    lab, _, ev = detect.classify_any("sms", inp)
+    s = explain_hi.summary_hi("sms", inp, lab, ev)
+    if lab == 0 and llm.DEBIT_STEP in llm.actions_for("sms", lab, inp):
+        assert s.startswith(explain_hi.table()["alert_heading"]["hi"])

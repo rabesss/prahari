@@ -999,56 +999,57 @@ def actions_for(kind, verdict, inp=None):
 # and so does validate() below). The model is asked to tell the reader "why" from this fact; when
 # its sentence fails validation, the fact itself is used.
 KEY_FACT = {
-    "OTP or PIN theft": "Never share your OTP or PIN because no bank or officer needs it.",
-    "UPI collect-request fraud": "Never enter your UPI PIN to receive money because it only sends money.",
-    "a QR-code payment scam": "Never scan a QR code to receive money because scanning only sends money.",
+    "OTP or PIN theft": "Never share your OTP or PIN because banks never ask for them.",
+    "UPI collect-request fraud": "Never enter your UPI PIN to receive money because the PIN is only for paying.",
+    "a QR-code payment scam": "Never scan a QR code to receive money because receiving money needs no scan.",
     "an advance-fee scam": "Never pay a fee from a message to get a refund or prize or parcel.",
     "a payment fraud": "Never pay an account or link from a message and check bills in the official app.",
     "a fake payment request": "Never pay an account or link from a message and check bills in the official app.",
-    "a remote-access app scam": "Never install a screen-sharing app for a caller because it shows them your OTPs.",
-    "a crypto payment scam": "Never send crypto to someone who contacted you because it cannot be taken back.",
+    "a remote-access app scam": "Never install a screen-sharing app someone asks for because it lets them see your OTPs.",
+    "a crypto payment scam": "Never send crypto to someone who contacted you because it usually cannot be recovered.",
     "a safe-account transfer scam": "Never move money to a safe account because no bank or officer asks that.",
-    "a fake police or customs threat": "Never pay a caller claiming to be police or customs because digital arrest is fake.",
-    "an account-blocking scam": "Ignore the threat because banks do not block accounts by SMS.",
-    "an account-blocking threat": "Ignore the threat because banks do not block accounts by SMS.",
+    "a fake police or customs threat": "Never pay anyone claiming to be police or customs because real officers do not collect money this way.",
+    "an account-blocking scam": "Ignore the threat and check your account only in the official app.",
+    "an account-blocking threat": "Ignore the threat and check your account only in the official app.",
     "a fake KYC or account check": "Never update KYC through a link or number from a message.",
-    "a fake job or loan scam": "Never pay a fee upfront for a job or loan because real ones do not charge first.",
-    "a fake job or task scam": "Never pay a deposit for a job or task because real jobs pay you instead.",
+    "a fake job or loan scam": "Never pay a fee upfront for a job or loan because upfront fees are a common scam sign.",
+    "a fake job or task scam": "Never pay a deposit for a job or task because deposits are a common scam sign.",
     "a fake prize or lottery scam": "Never pay a fee or share bank details to claim a prize.",
     "a fake lottery or prize scam": "Never pay a fee or share bank details to claim a prize.",
     "sextortion or blackmail": "Do not pay a blackmailer because paying usually brings more demands.",
     "an extortion threat": "Do not pay a threat because paying usually brings more demands.",
-    "an investment or trading scam": "Never trust guaranteed or doubled returns because real investments cannot promise them.",
+    "an investment or trading scam": "Never trust guaranteed or doubled returns because they are a common investment scam sign.",
     "an identity-document scam": "Never send Aadhaar or PAN copies over chat or a link.",
-    "a gift-card scam": "Never pay anyone with gift cards because no real company or officer takes them.",
+    "a gift-card scam": "Never pay anyone with gift cards because gift-card payment is a common scam sign.",
     "an impersonation scam": "Do not trust the name in the message and check through a number you already have.",
     "an electricity disconnection scam": "Never pay a bill through a number or link from a message.",
     "a phishing link on a lookalike domain": "Do not open it because the address only imitates a known name.",
     "a shortened link that hides its destination": "Do not open it because a short link hides the real website.",
     "a phishing link": "Do not log in on this page because fake sites copy real login pages.",
     "a link worth checking": "Check the address carefully or open the official app instead.",
-    "a scam message": "Do not reply or act on it because it pressures you for money or details.",
+    "a scam message": "Do not reply or act on it until you check through a number you already trust.",
     "a message worth checking": "Check with the sender through a number you already trust before acting.",
     "a bank debit alert to confirm": "Check the payment in your bank app because scammers copy bank alerts.",
-    "a port scan": "Check the firewall logs because a port scan maps services before an attack.",
+    "a port scan": "Check the firewall logs because a port scan can map services before an attack.",
     "a brute-force login": "Check the logins because many failed attempts usually mean password guessing.",
     "a flood or denial-of-service attempt": "Check the traffic because a flood of connections can knock a service offline.",
     "command-and-control beaconing": "Check the device because regular check-ins to one address can mean malware.",
-    "a privilege-escalation attempt": "Check the machine because a root attempt means someone wants full control.",
-    "suspicious network traffic": "Check this traffic with your IT team because it matches attack patterns.",
+    "a privilege-escalation attempt": "Check the machine because a root attempt can mean someone wants full control.",
+    "suspicious network traffic": "Check this traffic with your IT team because it resembles attack traffic.",
     "unusual network traffic": "Check whether anyone expected this traffic.",
 }
 INJECTION_FACT = "Do not follow it because orders aimed at an AI checker are a trick."
 BENIGN_FACT = {
     "receipt": "If you did not make this payment check it in your bank app.",
     "otp": "Never share this code with anyone who asks for it.",
+    "delivery": "Check the delivery status only in the seller's or courier's official app.",
     "bill": "Check bills only in the official app or website.",
     "official_domain": "Check that the address stays the same before you log in.",
     "protective": "Never share your OTP or PIN as the message itself advises.",
     "official_channel": "Check anything it mentions in the official app only.",
     "personal": "Never share an OTP or PIN even with people you know.",
     "flow": "Check with your IT team only if this traffic was not expected.",
-    "generic": "Never share an OTP or PIN with anyone who asks later.",
+    "generic": "Check anything important only in official apps or numbers you already know.",
 }
 ALL_FACTS = tuple(dict.fromkeys(list(KEY_FACT.values()) + [INJECTION_FACT] + list(BENIGN_FACT.values())))
 
@@ -1057,7 +1058,8 @@ def _benign_reading(kind, phrases):
     if kind == "flow":
         return "flow"
     first = (phrases[0] if phrases else "").lower()
-    for key, pat in (("otp", r"otp notification"), ("receipt", r"receipt|order|delivery|tracking"),
+    for key, pat in (("otp", r"otp notification"), ("receipt", r"payment|refund|receipt"),
+                     ("delivery", r"order|delivery|tracking"),
                      ("bill", r"bill reminder"), ("official_domain", r"official domain"),
                      ("protective", r"never asks|says no |protective|not to share"),
                      ("official_channel", r"official app|official channel|mentions .* branch|mentions the branch"),
@@ -1120,6 +1122,8 @@ _V_MESSAGE = re.compile(r"\b(?:message|sms|text|link|url|click|sender|reply|otp|
 _V_HEDGE = re.compile(r"\b(?:scam\w*|phishing|fraud\w*|suspicious|malicious|cautious|caution|beware|wary|"
                       r"risky|dangerous|unsafe|harm\w*)\b", re.I)
 _V_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd|me|my|mine|we|we're|we've|our)\b")
+_V_OVERCLAIM = re.compile(r"\b(?:known|confirmed|proven)\s+(?:scam\w*|phishing|fraud\w*|malicious|attack\w*)|"
+                          r"\b(?:definitely|certainly|undoubtedly)\b|\b100 ?%", re.I)
 _V_VAGUE = re.compile(r"\s*(?:please\s+)?(?:be|stay|remain)\s+(?:very\s+)?(?:cautious|careful|vigilant|wary|alert)\b", re.I)
 _V_DOMAIN = re.compile(r"(?<![\w@.])(?:https?://)?(?:[a-z0-9-]+(?:\.|\[\.\]))+[a-z]{2,}\b", re.I)
 _V_HELP = ("cybercrime.gov.in", "sancharsaathi.gov.in")
@@ -1152,14 +1156,21 @@ def unsupported(sent, ctx):
     if _V_FIRST_PERSON.search(sent):
         # "I checked the official app", "my top priority": the model claiming actions it never took.
         return "first_person"
+    if verdict != 0 and _V_OVERCLAIM.search(sent):
+        # "a known phishing attempt": the detector flags signs, it does not confirm a scam.
+        return "overclaim"
     if verdict == 0 and any(not _negated(c, m) for c in _clauses(sent) for m in _V_HEDGE.finditer(c)):
         return "hedge_against_verdict"
     if verdict != 0 and _V_VAGUE.match(sent):
         # "Be cautious of suspicious messages ..." names no step and no reason.
         return "vague"
     # A link, website or attachment the item does not have, in advice or claim alike.
-    if kind != "url" and not _has_link(inp) and _V_CUES["link"][0].search(sent) and not _V_CUES["link"][0].search(fact):
-        return "link_not_in_input"
+    if kind != "url" and not _has_link(inp) and _V_CUES["link"][0].search(sent):
+        # A claim that the item has a link is never excused; advice that names a link is
+        # excused only when the vetted fact itself is about links.
+        claims = [c for c in _clauses(sent) if _V_CUES["link"][0].search(c) and not _V_ADVICE.search(c)]
+        if claims or not _V_CUES["link"][0].search(fact):
+            return "link_not_in_input"
     if _V_CUES["email"][0].search(sent) and not _V_CUES["email"][1].search(inp):
         return "email_not_in_input"
     if _V_DEVICE.search(sent) and not _V_DEVICE.search(inp) and not _V_DEVICE.search(fact):
@@ -1168,14 +1179,14 @@ def unsupported(sent, ctx):
         return "wrong_channel"
     if kind in ("sms", "injection", "url") and _V_NETWORK.search(sent) and not _V_NETWORK.search(inp):
         return "wrong_channel"
-    digits = re.sub(r"\D", "", inp)
+    numbers = {re.sub(r"\D", "", n) for n in re.findall(r"\d[\d,]*", inp)}
     for num in re.findall(r"\d[\d,]{2,}", sent):
         d = re.sub(r"\D", "", num)
-        if d != "1930" and d not in digits:
+        if d != "1930" and d not in numbers:
             return "number_not_in_input"
     for m in _V_DOMAIN.finditer(sent):
         host = re.sub(r"^https?://", "", m.group(0).lower()).replace("[.]", ".").rstrip(".")
-        if "." in host and host not in low_inp and not any(h in host for h in _V_HELP):
+        if "." in host and host not in low_inp and not any(host == h or host.endswith("." + h) for h in _V_HELP):
             return "domain_not_in_input"
     for clause in _clauses(sent):
         if _V_ADVICE.search(clause):
@@ -1245,6 +1256,11 @@ def validate(text, opening, ctx, vetted=()):
             dropped.append(why)
         else:
             kept.append(sent)
+    model_kept = [k for k in kept if k.strip() not in vetted]
+    if not model_kept:
+        # Nothing the model wrote survived (no copied opening, every sentence unsupported): the
+        # explanation is reported as failed rather than replaced by fixed text alone.
+        raise ValueError("explanation contained no supported model sentence")
     has_body = any(not (i == 0 and opening and k.startswith(opening)) for i, k in enumerate(kept))
     added = False
     if fact and (dropped or not has_body) and fact not in " ".join(kept):

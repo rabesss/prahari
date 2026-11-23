@@ -82,6 +82,9 @@ def summary_hi(kind, inp, verdict, evidence):
     t = table()
     key = "uncertain" if verdict == "uncertain" else str(int(verdict))
     head = ((t.get("verdict", {}).get(key) or {}).get(_noun(kind)) or {}).get("hi")
+    if verdict == 0 and llm.DEBIT_STEP in llm.actions_for(kind, verdict, inp):
+        # The app shows a cleared bank-debit alert as CHECK ALERT, not NO RISK; the summary agrees.
+        head = (t.get("alert_heading") or {}).get("hi") or head
     if not head:
         return ""
     phrases = llm.compact_evidence(kind, inp, evidence, verdict)
