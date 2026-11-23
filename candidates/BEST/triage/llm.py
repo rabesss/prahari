@@ -383,15 +383,34 @@ _COMPLY = re.compile(r"(?:verify|update|complete|click|tap|open|visit|follow|cal
                      r"submit|confirm|login|log|signin|sign|download|install|reply|respond|contact|"
                      r"link|provide|enter|scan|accept|approve)", re.I)
 _NEGATOR = {"not", "never", "don't", "dont", "avoid", "refuse", "without", "nor"}
-_BREAK = {"and", "but", "then", "so", "to", "instead"}
+_BREAK = {"and", "but", "then", "so", "to", "instead", ",", ";", ":", "-"}
+# A trusted channel only excuses going to that channel (open, call, contact, visit, use, check),
+# never paying, sharing or entering anything, and never a contact the message itself supplied.
 _TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|website|number|branch)|"
                       r"number on (?:your|the back of your) card|directly with your bank|1930|cybercrime)\b", re.I)
-_SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|this number|the number in|the message)\b", re.I)
+_CHANNEL_VERB = {"open", "call", "contact", "visit", "use", "check"}
+_SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|provided|given|mentioned|"
+                          r"listed|requested|sent|above|below|this number|that number)\b", re.I)
 
 
 def _unsafe_advice(sent, verdict):
     if verdict == 0:
         return False
+    words = re.findall(r"[a-z']+|[,;:-]", sent.lower())
+    trusted = bool(_TRUSTED.search(sent)) and not _SCAM_OBJECT.search(sent)
+    for i, w in enumerate(words):
+        if not _COMPLY.fullmatch(w):
+            continue
+        negated = False
+        for prev in reversed(words[max(0, i - 5):i]):
+            if prev in _BREAK:
+                break
+            if prev in _NEGATOR:
+                negated = True
+                break
+        if not negated and not (trusted and w in _CHANNEL_VERB):
+            return True
+    return False
     words = re.findall(r"[a-z']+", sent.lower())
     trusted = bool(_TRUSTED.search(sent)) and not _SCAM_OBJECT.search(sent)
     for i, w in enumerate(words):

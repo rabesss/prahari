@@ -52,7 +52,9 @@ def test_negation_must_govern_the_verb():
     for bad in ("Verify the KYC process to avoid suspension with no delay.",
                 "Do not delay and submit your OTP.",
                 "Update your details now, it is not hard.",
-                "Do not share your PIN, but click the link to verify KYC."):
+                "Do not share your PIN, but click the link to verify KYC.",
+                "Do not delay, submit your OTP.",
+                "Do not worry, verify your KYC immediately."):
         assert llm._unsafe_advice(bad, 1), bad
     for ok in ("Do not click the link or reply to the message.",
                "Never share your OTP or PIN with anyone.",
@@ -62,7 +64,10 @@ def test_negation_must_govern_the_verb():
 
 def test_trusted_channel_must_not_name_the_scam_contact():
     assert llm._unsafe_advice("Call the number in the message, which you already know.", 1)
+    assert llm._unsafe_advice("Open the official app and pay the requested fee.", 1)
+    assert llm._unsafe_advice("Call the number provided in this SMS, which you already know.", 1)
     assert not llm._unsafe_advice("Open the official app you already use to check.", 1)
+    assert not llm._unsafe_advice("Call your bank on the number you already trust.", 1)
 
 
 def test_unsafe_text_glued_to_the_opening_is_removed():
