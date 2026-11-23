@@ -88,6 +88,12 @@ MECH_TYPE = {
     "sextortion": "sextortion or blackmail",
     "investment": "an investment or trading scam",
     "id_request": "an identity-document scam",
+    "qr_payment": "a QR-code payment scam",
+    "extortion": "an extortion threat",
+    "gift_card": "a gift-card scam",
+    "impersonation": "an impersonation scam",
+    "phish_link": "a phishing link",
+    "payment_request_private": "a payment fraud",
 }
 FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed logins, like password guessing",
               "flood": "a flood of connections", "rejected": "connections were rejected",
@@ -96,9 +102,10 @@ FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed
               "root": "a root-access attempt"}
 # Replacement sentence for unsafe generated advice, remembered per built prompt (bounded).
 _TAILS = {}
-TYPE_PRIORITY = ["sextortion", "safe_account", "remote_access", "collect_request", "pay_to_receive",
-                 "authority_threat", "secret_request", "crypto_transfer", "investment", "job_upfront",
-                 "prize_claim", "id_request", "block_threat", "pay_unverified"]
+TYPE_PRIORITY = ["sextortion", "extortion", "safe_account", "remote_access", "collect_request", "qr_payment",
+                 "pay_to_receive", "authority_threat", "secret_request", "crypto_transfer", "gift_card",
+                 "investment", "job_upfront", "prize_claim", "id_request", "block_threat", "impersonation",
+                 "phish_link", "pay_unverified", "payment_request_private"]
 _POWER = re.compile(r"electricity|power cut|bijli|बिजली|meter|discom|connection (?:will be )?(?:cut|kat)", re.I)
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
               "at_sign", "no_https", "official_domain"}
@@ -399,7 +406,7 @@ _NEGATED = re.compile(r"\b(?:not|never|no|n't|without)\b", re.I)
 # the scam's link, code or number.
 _COMPLY = re.compile(r"(?:verify|update|complete|click|tap|open|visit|follow|call|pay|share|send|"
                      r"submit|confirm|login|log|signin|sign|download|install|reply|respond|contact|"
-                     r"link|provide|enter|scan|accept|approve|transfer|deposit|remit|wire|dial|grant|comply|cooperate)", re.I)
+                     r"link|provide|enter|scan|accept|approve|move|transfer|deposit|remit|wire|dial|grant|comply|cooperate)", re.I)
 _NEGATOR = {"not", "never", "don't", "dont", "avoid", "refuse", "without", "nor"}
 _BREAK = {"and", "but", "then", "so", "to", "instead", ",", ";", ":", "-"}
 # A trusted channel only excuses going to that channel (open, call, contact, visit, use, check),
@@ -550,7 +557,7 @@ TYPE_ADVICE = {
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
         "Report the SMS on Sanchar Saathi Chakshu."]),
-    "OTP or PIN theft": ("Never share an OTP, PIN or CVV with anyone.", [
+    "OTP or PIN theft": ("Never share your OTP or PIN or CVV with anyone.", [
         "Never share your OTP, UPI PIN or CVV.",
         "If you shared it, freeze your card in the bank app.",
         REPORT]),
@@ -558,11 +565,11 @@ TYPE_ADVICE = {
         "Do not pay a fee from a link or message to receive anything.",
         "Check any parcel charge in the India Post or courier app.",
         "Report the SMS on Sanchar Saathi Chakshu."]),
-    "a fake lottery or prize scam": ("Ignore it; a real prize never needs a fee.", [
+    "a fake lottery or prize scam": ("Ignore it; never pay a fee to receive a prize.", [
         "Never pay a fee or tax to receive a prize.",
         "Never share bank details, PIN or Aadhaar.",
         "Block the sender and report on Sanchar Saathi Chakshu."]),
-    "a fake prize or lottery scam": ("Ignore it; a real prize never needs a fee.", [
+    "a fake prize or lottery scam": ("Ignore it; never pay a fee to receive a prize.", [
         "Never pay a fee or tax to receive a prize.",
         "Never share bank details, PIN or Aadhaar.",
         "Block the sender and report on Sanchar Saathi Chakshu."]),
@@ -574,7 +581,7 @@ TYPE_ADVICE = {
         "Never pay a fee upfront for a job or loan.",
         "Do not install loan apps sent over chat.",
         REPORT]),
-    "UPI collect-request fraud": ("Decline it; receiving money never needs your UPI PIN.", [
+    "UPI collect-request fraud": ("Never enter your UPI PIN to receive money.", [
         "Decline the request; receiving money never needs a UPI PIN.",
         "Block the UPI ID in your payment app.",
         "Call 1930 at once if money was debited."]),
@@ -582,11 +589,11 @@ TYPE_ADVICE = {
         "Never install AnyDesk, QuickSupport or other screen-sharing apps.",
         "If one is open, switch on airplane mode and uninstall it.",
         "Freeze your cards in the bank app and call 1930."]),
-    "sextortion or blackmail": ("Do not pay; save the messages and report them.", [
+    "sextortion or blackmail": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
         "Save screenshots, block the sender and lock your profiles.",
         "Report it confidentially at cybercrime.gov.in."]),
-    "a fake police or customs threat": ("Hang up; real police never arrest anyone over video.", [
+    "a fake police or customs threat": ("Never stay on a video call with police; check by calling 1930.", [
         "Hang up; there is no such thing as a digital arrest.",
         "Never move money to a safe account for anyone.",
         "Tell your family and report at cybercrime.gov.in or call 1930."]),
@@ -606,7 +613,7 @@ TYPE_ADVICE = {
         "Never send crypto or gift cards to a stranger.",
         "Block the sender.",
         REPORT]),
-    "an identity-document scam": ("Never send Aadhaar, PAN or passport copies over chat.", [
+    "an identity-document scam": ("Never send Aadhaar or PAN or passport copies over chat.", [
         "Never send ID documents over WhatsApp or a link.",
         "Use only the official app or office for KYC.",
         "Report the SMS on Sanchar Saathi Chakshu."]),
@@ -618,15 +625,31 @@ TYPE_ADVICE = {
         "Do not pay to an account or link from a message.",
         "Check any bill or request in the official app.",
         REPORT]),
-    "a phishing link on a lookalike domain": ("Do not open the link; use the official app instead.", [
+    "a QR-code payment scam": ("Never scan a QR code to receive money.", [
+        "Never scan a QR code or enter a UPI PIN to receive money.",
+        "Decline the request in your payment app.",
+        REPORT]),
+    "an extortion threat": ("Do not pay; report it at cybercrime.gov.in.", [
+        "Do not pay; paying leads to more demands.",
+        "Save screenshots and block the sender.",
+        "Report it at cybercrime.gov.in or call 1930."]),
+    "a gift-card scam": ("Never pay anyone with gift cards.", [
+        "Never pay with gift cards or vouchers.",
+        "Block the sender.",
+        REPORT]),
+    "an impersonation scam": ("Ignore the message; check with the organisation in its official app.", [
+        "Do not reply or use any contact from the message.",
+        "Check through the official app or the number you already have.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "a phishing link on a lookalike domain": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
         "If you entered card details, freeze the card in the bank app."]),
-    "a shortened link that hides its destination": ("Do not open the link; use the official app instead.", [
+    "a shortened link that hides its destination": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
         "If you entered card details, freeze the card in the bank app."]),
-    "a phishing link": ("Do not open the link; use the official app instead.", [
+    "a phishing link": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
         "If you entered card details, freeze the card in the bank app."]),
