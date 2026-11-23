@@ -177,6 +177,8 @@ _OFFICIAL_DESK_WEAK_RE = re.compile(
 )
 # Plain cashback / money-back promo wording that real merchant QRs carry ("5% cashback on purchase").
 _MERCHANT_PROMO_RE = re.compile(r"\b(?:get\s+)?(?:\d+\s*%\s*)?(?:cash\s*back|cashback|money\s*back)\b|कैशबैक", re.I)
+_HARD_FEE_RE = re.compile(
+    r"\b(?:job|task|prize|lottery|parcel|kyc|withdrawal|payout|bonus|refund|work\s*from\s*home|registration)\b", re.I)
 _URL_SCAM_WORD_RE = re.compile(r"refund|kyc|cashback|claim|prize|reward|help|support|care|verif|secure|login|update|offer")
 # A promo stops being plain promo when it asks for a payment or action to receive the money.
 _PROMO_BREAKER_RE = re.compile(
@@ -439,12 +441,12 @@ def parse_upi(text: str) -> dict | None:
             action = path.split("/", 1)[1] or "pay"
         else:
             action = host or path or "pay"
-        if scheme == "upi" and action not in _KNOWN_UPI_ACTIONS:
-            unknown_action = True
     else:
         scheme = "raw"
         action = "pay"
         query = cleaned
+    if scheme in ("upi", "intent") and action not in _KNOWN_UPI_ACTIONS:
+        unknown_action = True
 
     raw_pairs = parse_qsl(query, keep_blank_values=True)
     params_multi: dict[str, list[str]] = {}
@@ -956,7 +958,9 @@ def analyze_upi(text: str) -> dict:
     if _UPFRONT_SCAM_FEE_RE.search(note_and_name):
         add(
             "upfront_fee_note",
-            "low" if (valid_mc and not is_mobile_vpa and not pn_official_desk) else "high",
+            # Only a loan/processing charge on a genuine merchant QR (NBFC fee) is weak; job, task, prize,
+            # parcel, KYC or payout fees stay high whatever mc the QR carries.
+            "low" if (valid_mc and not is_mobile_vpa and not pn_official_desk and not _HARD_FEE_RE.search(note_and_name)) else "high",
             "the transaction note asks for an upfront processing, verification or release fee",
             "asks for an upfront processing or verification fee",
             "tn",
@@ -1333,7 +1337,7 @@ def prompt_snippet(text: str) -> str:
         return text[:300]
     def clean(v: str, n: int) -> str:
         # Payload fields are attacker text: one line, no fence-closing quotes, bounded length.
-        return re.sub(r"\s+", " ", v).replace('"""', '"')[:n]
+        return re.sub(r'"{2,}', '"', re.sub(r"\s+", " ", v))[:n]
 
     parts = [f"Intent: {parsed['scheme']}://{clean(parsed['action'], 20)}"]
     if parsed["pa"]:

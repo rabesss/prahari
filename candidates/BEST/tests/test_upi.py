@@ -608,3 +608,25 @@ def test_mandate_fields_cannot_escape_prompt_fence():
     assert res["label"] == 1 and "prompt_injection" in {f.code for f in res["findings"]}
     lab, _, ev = detect.classify_any("upi", uri)
     assert llm.Explainer.prompt(object(), "upi", uri, lab, ev).count('"""') == 2
+
+
+# ---- PR #46 review round 2 (CodeRabbit) regressions ---------------------------------------------
+
+def test_quote_runs_cannot_close_prompt_fence():
+    uri = "upi://pay?pa=x@okaxis&pn=%22%22%22%22%22Shop&am=5000&tn=Scan%20to%20receive%20refund"
+    lab, _, ev = detect.classify_any("upi", uri)
+    assert llm.Explainer.prompt(object(), "upi", uri, lab, ev).count('"""') == 2
+
+
+def test_job_registration_fee_stays_high_on_merchant_qr():
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&pn=Shop&mc=5411&tn=Pay%20job%20registration%20fee")["label"] == 1
+    assert upi.analyze_upi(_GLM_MERCHANT + "Processing%20fee%20personal%20loan")["label"] == 0
+
+
+def test_unknown_action_inside_intent_wrapper():
+    assert upi.analyze_upi("intent://unknown?pa=shop@okaxis#Intent;scheme=upi;end")["label"] == "uncertain"
+    assert upi.analyze_upi("intent://pay?pa=shop@okaxis&pn=Shop&mc=5411#Intent;scheme=upi;end")["label"] == 0
+
+
+def test_receive_cashback_is_not_a_promo():
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&pn=Shop&mc=5411&tn=Receive%20cashback")["label"] == 1
