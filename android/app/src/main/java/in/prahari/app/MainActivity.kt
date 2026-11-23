@@ -126,6 +126,7 @@ private fun bankAlertLevel(verdict: JSONObject, value: String): String? {
     return if (hasOwnContact(value)) "warn" else "alert"
 }
 
+private const val OWN_CONTACT_LINE = "Sends you to its own link or number; real bank alerts point to the bank app or a toll-free line"
 private const val RAISED_NOTE = "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown."
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
@@ -1925,8 +1926,11 @@ class MainActivity : Activity() {
         // contact of its own it shows the amber CHECK THIS ALERT banner; with an unofficial link
         // or a private number it is shown as SUSPICIOUS, even when the detector cleared it.
         val alertLevel = bankAlertLevel(data, job.value)
-        val level = if (alertLevel == "warn") "warn" else data.optString("level", "clear")
-        val evidence = strings(data.optJSONArray("evidence"))
+        val rawLevel = data.optString("level", "clear")
+        val level = if (alertLevel == "warn") "warn" else rawLevel
+        // A raised alert must not show the detector's benign reading ("reads like a normal receipt").
+        val evidence = if (alertLevel == "warn" && rawLevel == "clear") listOf(OWN_CONTACT_LINE)
+            else strings(data.optJSONArray("evidence"))
         val actions = strings(data.optJSONArray("actions"))
         val clear = level == "clear"
         val bankAlert = alertLevel == "alert"

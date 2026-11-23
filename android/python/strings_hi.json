@@ -371,7 +371,8 @@
   "gives its own number, chat or link to act on": "काम करने के लिए अपना नंबर, चैट या लिंक देता है",
   "no scam mechanism was found in the link": "इस लिंक में ठगी का कोई तरीका नहीं मिला",
   "no scam mechanism was found in the text": "इस मैसेज में ठगी का कोई तरीका नहीं मिला",
-  "no scam mechanism was found in the message": "इस मैसेज में ठगी का कोई तरीका नहीं मिला"
+  "no scam mechanism was found in the message": "इस मैसेज में ठगी का कोई तरीका नहीं मिला",
+  "Sends you to its own link or number; real bank alerts point to the bank app or a toll-free line": "यह अपना ही लिंक या नंबर देता है; असली बैंक अलर्ट बैंक ऐप या टोल-फ़्री नंबर बताते हैं"
  },
  "skip": [
   "$label · $hi",
