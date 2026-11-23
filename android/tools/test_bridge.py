@@ -67,6 +67,44 @@ def _calls(name, src):
 def _lits(blob):
     return re.findall(r'"((?:\\.|[^"\\])*)"', blob)
 
+def _split_args(blob):
+    """Top-level arguments of a call, respecting strings and nested brackets."""
+    out, buf, depth, quote, esc = [], [], 0, False, False
+    for ch in blob:
+        if quote:
+            buf.append(ch)
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                quote = False
+            continue
+        if ch == '"':
+            quote = True
+        elif ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            out.append(''.join(buf)); buf = []
+            continue
+        buf.append(ch)
+    out.append(''.join(buf))
+    return out
+
+def _arg_lit(blob, nth):
+    """The string literal that is argument nth itself, or None."""
+    args = _split_args(blob)
+    if nth >= len(args):
+        return None
+    m = re.fullmatch(r'\s*"((?:\\.|[^"\\])*)"\s*', args[nth])
+    return m.group(1) if m else None
+
+assert _arg_lit('this, "Offline", 12', 1) == 'Offline'
+assert _arg_lit('"Check", f(a, "x")', 0) == 'Check'
+assert _arg_lit('f(a, "x"), "Label"', 1) == 'Label'
+
 _SLOT = {
     'n': r'(\d+)', 'count': r'(\d+)', 'tld': r'([A-Za-z0-9]+)',
     'host': r"([^\s']+)", 'reg': r"([^\s']+)", 'ip': r"([^\s']+)",
@@ -130,9 +168,9 @@ for _fn, _nth in (
     ('iconButton', 1), ('iconText', 1), ('asButton', 1), ('a11yText', 1), ('bottom', 1),
 ):
     for _args in _calls(_fn, _kt):
-        _found = _lits(_args)
-        if len(_found) > _nth:
-            _used.add(_found[_nth])
+        _lit = _arg_lit(_args, _nth)
+        if _lit is not None:
+            _used.add(_lit)
 for _args in _calls('t', _kt):
     _found = _lits(_args)
     if _found:

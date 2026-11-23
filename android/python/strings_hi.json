@@ -700,6 +700,30 @@
    "hi": "{host} लिंक छोटा करने वाली साइट है"
   },
   {
+   "en": "no request for a {things} in the message",
+   "hi": "इस मैसेज में {things} की कोई मांग नहीं है"
+  },
+  {
+   "en": "no scam mechanism was found in the message",
+   "hi": "इस मैसेज में ठगी का कोई तरीका नहीं मिला"
+  },
+  {
+   "en": "no request for a {things} in the link",
+   "hi": "इस लिंक में {things} की कोई मांग नहीं है"
+  },
+  {
+   "en": "no scam mechanism was found in the link",
+   "hi": "इस लिंक में ठगी का कोई तरीका नहीं मिला"
+  },
+  {
+   "en": "no request for a {things} in the text",
+   "hi": "इस टेक्स्ट में {things} की कोई मांग नहीं है"
+  },
+  {
+   "en": "no scam mechanism was found in the text",
+   "hi": "इस टेक्स्ट में ठगी का कोई तरीका नहीं मिला"
+  },
+  {
    "en": "no request for a {things} in the {what}",
    "hi": "इस {what} में {things} की कोई मांग नहीं है"
   },

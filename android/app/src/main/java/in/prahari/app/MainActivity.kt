@@ -84,6 +84,12 @@ private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
+private val OWN_LINK = Regex("(?i)\\b(?:https?://|www\\.)|\\b[a-z0-9-]{2,}\\.(?:com|in|co|net|org|top|xyz|live|click|info|site|online|app|ly|me|io|link|shop|store|cc|biz|vip|icu)\\b")
+private val OWN_MOBILE = Regex("(?<![0-9])(?:\\+?91[ -]?)?[6-9][0-9]{4}[ -]?[0-9]{5}(?![0-9])")
+
+/** True when the text offers its own link or a private Indian mobile number. */
+private fun hasOwnContact(text: String): Boolean = OWN_LINK.containsMatchIn(text) || OWN_MOBILE.containsMatchIn(text)
+
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
 private const val QR_REQUEST = 41
@@ -561,6 +567,9 @@ class MainActivity : Activity() {
     private var speech: TextToSpeech? = null
     private var announcedJob = Int.MIN_VALUE
     private var speaking = false
+    // Bumped by stopSpeech(); a TTS engine that finishes starting after the user left the result
+    // (Back, pause, stop) sees a stale request and stays silent.
+    private var speechRequest = 0
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
     private var backCallback: OnBackInvokedCallback? = null
@@ -1745,6 +1754,7 @@ class MainActivity : Activity() {
     }
 
     private fun stopSpeech() {
+        speechRequest++
         speaking = false
         try { speech?.stop() } catch (_: Throwable) {}
         refreshListen()
@@ -1759,9 +1769,10 @@ class MainActivity : Activity() {
         }
         val ready = speech
         if (ready == null) {
+            val request = ++speechRequest
             speech = TextToSpeech(applicationContext) { status ->
                 runOnUiThread {
-                    if (isDestroyed) return@runOnUiThread
+                    if (isDestroyed || isFinishing || request != speechRequest || screen != "result") return@runOnUiThread
                     if (status != TextToSpeech.SUCCESS || speech == null) {
                         toast(n("voice_missing"))
                         return@runOnUiThread
@@ -1778,7 +1789,11 @@ class MainActivity : Activity() {
         val engine = speech ?: return
         val chosen = chooseVoice(engine, hindiScript, englishScript) ?: return
         try {
-            engine.voice = chosen.first
+            // setVoice reports failure by return code, not only by throwing.
+            if (engine.setVoice(chosen.first) != TextToSpeech.SUCCESS) {
+                toast(n("voice_missing"))
+                return
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "voice select failed", t)
             toast(n("voice_missing"))
@@ -1857,8 +1872,10 @@ class MainActivity : Activity() {
         val actions = strings(data.optJSONArray("actions"))
         val clear = level == "clear"
         // A bank debit or OTP alert is not relabelled when the verdict is already DANGEROUS.
+        // A copied alert that carries a link or a private mobile number keeps its SUSPICIOUS title:
+        // genuine bank alerts point to the bank app or a toll-free line, never to those.
         val bankAlert = (level == "clear" || level == "warn") &&
-            actions.any { it == DEBIT_STEP || it == CHECK_STEP }
+            actions.any { it == DEBIT_STEP || it == CHECK_STEP } && !hasOwnContact(job.value)
         val p = if (bankAlert) palette("warn").copy(title = "CHECK THIS ALERT", hindi = "अलर्ट जांचें") else palette(level)
         val calm = clear && !bankAlert
         val fallback = when {
