@@ -145,9 +145,40 @@ def _short_host(name, desc):
     return desc[:70]
 
 
+# Benign readings, most specific first: a receipt or OTP notice says more than a generic
+# official-channel or protection phrase, and names the concept a reader checks for.
+SAFE_ORDER = ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
+              "notice", "official_channel", "protective", "promo", "personal",
+              "consumer_advice", "collect_review", "awareness")
+
+
+def _safe_evidence(a, inp):
+    return [mech.safe_description(s, inp) for s in SAFE_ORDER if s in a["safe"]]
+
+
+def _harm_evidence(a, inp):
+    """Mechanism phrases for a scam, most concrete first, then any lookalike host."""
+    out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
+    # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
+    # shortest phrases keeps one copied sentence while covering both, instead of dropping the
+    # second mechanism (the model only copies the first phrase).
+    if len(out) >= 2 and len(out[0]) + len(out[1]) <= 78:
+        out = [f"{out[0]} and {out[1]}"] + out[2:]
+    for r in a["risky"]:
+        ph = _short_host("brand_lookalike", r) if "lookalike" in r else r[:70]
+        if ph not in out:
+            out.append(ph)
+    return out or _safe_evidence(a, inp)
+
+
 def compact_evidence(kind, inp, fallback, verdict=None):
-    """Short evidence phrases, ordered most concrete first, from the same rules the detector used."""
+    """Short evidence phrases, ordered most concrete first, from the same rules the detector used.
+
+    A NO RISK verdict that overruled a harm signal is reported by its benign reading, never by
+    the dismissed harm phrase.
+    """
     out = []
+    dismissed = False
     if kind == "url":
         ev = rules.url_indicators(inp)
         host = rules.host_of(inp)
@@ -193,28 +224,19 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             # satisfy either concept the reader is asked about.
             out.append("an instruction aimed at the assistant (prompt injection)"
                        + (f" that {harm[0]}" if harm else ""))
+        elif verdict == 0 and a["harm"]:
+            # Same analysis as messages below: a NO RISK opening never repeats the dismissed threat.
+            dismissed, out = True, _safe_evidence(a, inp)
         else:
             out = harm
     elif mech.indic_context(inp):
         a = mech.analyze(inp)
-        out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
-        # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
-        # shortest phrases keeps one copied sentence while covering both, instead of dropping the
-        # second mechanism (the model only copies the first phrase).
-        if len(out) >= 2 and len(out[0]) + len(out[1]) <= 78:
-            out = [f"{out[0]} and {out[1]}"] + out[2:]
-        for r in a["risky"]:
-            ph = _short_host("brand_lookalike", r) if "lookalike" in r else r[:70]
-            if ph not in out:
-                out.append(ph)
-        if not out:
-            # Most specific benign reading first: a receipt or OTP notice says more than a generic
-            # official-channel or protection phrase, and names the concept a reader checks for.
-            for s in ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
-                      "notice", "official_channel", "protective", "promo", "personal",
-                      "consumer_advice", "collect_review", "awareness"):
-                if s in a["safe"]:
-                    out.append(mech.safe_description(s, inp))
+        if verdict == 0 and a["harm"]:
+            # The verdict overruled the harm signal: a bank alert's own "if not you, block your
+            # card" is protective advice, not a threat. Name the benign reading instead.
+            dismissed, out = True, _safe_evidence(a, inp)
+        else:
+            out = _harm_evidence(a, inp)
     else:
         ev = indicrules.indicators(inp)[0]
         risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
@@ -227,11 +249,31 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             s = SHORT.get(n) or d[:70]
             if s not in out:
                 out.append(s)
-    if not out:
+    # The detector's own lines repeat the dismissed harm phrase, so they are no fallback for it.
+    # With no benign reading to show, the prompt keeps its neutral opening.
+    if not out and not dismissed:
         out = [str(e)[:70] for e in fallback[:2]]
-    if not out and verdict == 0:
+    if not out and verdict == 0 and not dismissed:
         out = ["no request for a secret, payment or link in the text"]
     return out[:2]
+
+
+def benign_evidence(kind, inp, evidence, verdict):
+    """The evidence lines a UI should show for a checked item.
+
+    The detector lists a harm phrase first even when it overruled that signal, so a NO RISK result
+    can sit above "threatens to block the account or service". For such a message the benign
+    reading replaces the dismissed phrase; with no benign reading the phrase is left out. Every
+    other item keeps the detector's lines.
+    """
+    lines = list(evidence or [])
+    if verdict != 0 or kind not in ("sms", "injection") or not mech.indic_context(inp):
+        return lines
+    a = mech.analyze(inp)
+    if not a["harm"]:
+        return lines
+    harm = {d for _, d in a["harm"]}
+    return _safe_evidence(a, inp)[:5] + [line for line in lines if line not in harm]
 
 
 def scam_type(kind, inp, verdict):
@@ -361,9 +403,11 @@ class Explainer:
         verdict = _prompt_verdict(prompt)
         # The first user header is ours; the untrusted snippet comes after the kind word.
         user = prompt.split("<|start_header_id|>user<|end_header_id|>\n\n", 1)[-1]
-        tail = (None if user.startswith(KIND_WORD["flow"]) or verdict == 0 else
-                _TAILS.get(prompt) or ACTIONS[verdict][0])
-        text = _consistent(text, verdict, _forced_sentence(prompt), tail)
+        flow = user.startswith(KIND_WORD["flow"])
+        # A network event gets no compliance check; its tail only replaces disruptive advice.
+        tail = (None if verdict == 0 else
+                _TAILS.get(prompt) or (FLOW_ACTIONS if flow else ACTIONS)[verdict][0])
+        text = _consistent(text, verdict, _forced_sentence(prompt), tail, flow=flow)
         return text, stats
 
     def _run(self, prompt):
@@ -416,7 +460,7 @@ _TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|webs
 _CHANNEL_VERB = {"open", "call", "contact", "visit", "use", "check"}
 _SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|email|e-mail|whatsapp|"
                           r"chat|caller|sender|provided|given|mentioned|listed|requested|sent|above|below|"
-                          r"this number|that number|the number in)\b|\d{4,}|https?://|www\.", re.I)
+                          r"this number|that number|the number in)\b|(?!1930\b)\d{4,}|https?://|www\.", re.I)
 
 
 def _unsafe_advice(sent, verdict):
@@ -439,6 +483,44 @@ def _unsafe_advice(sent, verdict):
     return False
 
 
+# Operational advice that takes systems down: a generated "Immediately disconnect all affected
+# systems" for a port scan is unvetted and disruptive. On a DANGEROUS or SUSPICIOUS network event
+# a sentence that carries one of these, not governed by its own negation, is replaced by the vetted
+# flow action. Ordinary advice (block the source address, check the logs, change passwords, update
+# firmware, contact your IT team) uses none of them.
+_DISRUPTIVE = re.compile(
+    r"\bdisconnect\w*|\bshut(?:s|ting)?\w*[^.;,!?]{0,30}\bdown\b|\bshutdown\b|"
+    r"\bpower(?:s|ing)?[\s-]*(?:off|down)\b|\bunplug\w*|"
+    r"\bwip(?:e|ing)\w*|\beras(?:e|es|ed|ing)\b|\bformat(?:s|ted|ting)?\b|\bre-?install\w*|"
+    r"\bfactory[\s-]*(?:reset\w*|settings|defaults)\b|\breset\w*[^.;,!?]{0,30}\bfactory\b|"
+    r"\bdelet\w*|\bdisabl\w*|\btak\w*[^.;,!?]{0,40}\boffline\b|\bisolat\w*|\bpay(?:ing|ments?)?\b|"
+    r"\bransom\b", re.I)
+
+
+def _disruptive_flow_advice(sent, verdict):
+    """True when a network-event sentence gives an operational instruction that is not negated,
+    such as "disconnect all affected systems", "wipe the drive" or "pay the ransom".
+
+    The negation test is the one _unsafe_advice uses: each verb needs a negator of its own in a
+    short window that an "and", "but" or "then" breaks.
+    """
+    if verdict == 0:
+        return False
+    low = re.sub(r"n['\u2019]t\b", " not", sent.lower())  # "shouldn't power off" is a negation too
+    for m in _DISRUPTIVE.finditer(low):
+        before = re.findall(r"[a-z']+|[,;:-]", low[:m.start()])
+        negated = False
+        for prev in reversed(before[-5:]):
+            if prev in _BREAK:
+                break
+            if prev in _NEGATOR:
+                negated = True
+                break
+        if not negated:
+            return True
+    return False
+
+
 def _forced_sentence(prompt):
     """The required opening sentence, e.g. 'This link is DANGEROUS: URL shortener bit.ly'."""
     tail = prompt.rsplit('Start your answer with exactly: "', 1)
@@ -451,7 +533,7 @@ def _prompt_verdict(prompt):
     return 1 if tail.startswith("DANGEROUS") else 0 if tail.startswith("NO RISK FOUND") else "uncertain"
 
 
-def _consistent(text, verdict, opening=None, safe_tail=None):
+def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """Drop a sentence that asserts the opposite of the detector's verdict or urges compliance.
 
     The model occasionally adds "this looks legitimate" to a scam explanation, or advice such as
@@ -461,17 +543,22 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
     Compliance is only checked when safe_tail is given (messages and links, not network events);
     a removed compliance sentence is replaced by safe_tail, a vetted action, so the reader still
     gets advice and the explanation keeps its length.
+
+    A network event (flow) gets no compliance check: contacting the IT team or updating firmware
+    is ordinary advice there. Its safe_tail, the vetted flow action, replaces a sentence that
+    gives a disruptive operational instruction instead (_disruptive_flow_advice).
     """
     if not text:
         return text
     sents = re.split(r"(?<=[.!?;])\s+", text)
     dropped = []
+    check = _disruptive_flow_advice if flow else _unsafe_advice
 
-    def comply(i, sent):
+    def unsafe(i, sent):
         if not safe_tail:
             return False
         rest = sent[len(opening):] if (i == 0 and opening and sent.startswith(opening)) else sent
-        if _unsafe_advice(rest, verdict):
+        if check(rest, verdict):
             dropped.append(sent)
             return True
         return False
@@ -485,13 +572,13 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
         return out
 
     if verdict == "uncertain":
-        kept = [s for i, s in enumerate(sents) if not comply(i, s)]
+        kept = [s for i, s in enumerate(sents) if not unsafe(i, s)]
         return with_tail(kept) or text
     keep = []
     for i, sent in enumerate(sents):
         if re.search(r"\bas an ai\b|\bi cannot help\b|\bi can't help\b", sent, re.I):
             continue
-        if comply(i, sent):
+        if unsafe(i, sent):
             continue
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)
@@ -534,7 +621,7 @@ FLOW_ACTIONS = {
     1: ["Block the source address at the firewall or router.",
         "Check the target machine's logs and change any exposed passwords.",
         "Keep the device and router firmware updated."],
-    "uncertain": ["Confirm the activity with your IT team and review the logs."],
+    "uncertain": ["Check with your IT team and review the logs."],
     0: ["Confirm the activity with your IT team if unexpected."],
 }
 
@@ -548,23 +635,23 @@ TYPE_ADVICE = {
     "a fake KYC or account check": ("Do not open the link; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an account-blocking threat": ("Ignore the threat; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an account-blocking scam": ("Ignore the threat; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "OTP or PIN theft": ("Never share your OTP or PIN or CVV with anyone.", [
         "Never share your OTP, UPI PIN or CVV.",
-        "If you shared it, freeze your card in the bank app.",
+        "If you shared it, call your bank to block the card and UPI.",
         REPORT]),
     "an advance-fee scam": ("Do not pay from the message; check any charge in the official app.", [
         "Do not pay a fee from a link or message to receive anything.",
-        "Check any parcel charge in the India Post or courier app.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Check any parcel charge on the courier's official website.",
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a fake lottery or prize scam": ("Ignore it; never pay a fee to receive a prize.", [
         "Never pay a fee or tax to receive a prize.",
         "Never share bank details, PIN or Aadhaar.",
@@ -588,15 +675,15 @@ TYPE_ADVICE = {
     "a remote-access app scam": ("Never install screen-sharing apps a caller asks for.", [
         "Never install AnyDesk, QuickSupport or other screen-sharing apps.",
         "If one is open, switch on airplane mode and uninstall it.",
-        "Freeze your cards in the bank app and call 1930."]),
+        "From another phone, call your bank to freeze cards and UPI."]),
     "sextortion or blackmail": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
         "Save screenshots, block the sender and lock your profiles.",
         "Report it confidentially at cybercrime.gov.in."]),
-    "a fake police or customs threat": ("Never stay on a video call with police; check by calling 1930.", [
+    "a fake police or customs threat": ("Never stay on a video call with police; report it at cybercrime.gov.in.", [
         "Hang up; there is no such thing as a digital arrest.",
         "Never move money to a safe account for anyone.",
-        "Tell your family and report at cybercrime.gov.in or call 1930."]),
+        "Tell your family; report at cybercrime.gov.in, or call 1930 if money was lost."]),
     "a safe-account transfer scam": ("Never move money to a safe account for anyone.", [
         "Never move money to a safe account for anyone.",
         "Hang up and call your bank on the number on your card.",
@@ -604,10 +691,10 @@ TYPE_ADVICE = {
     "an electricity disconnection scam": ("Ignore the number; check your bill in the official app.", [
         "Do not call the number or open the link in the SMS.",
         "Check your bill in your electricity board's official app.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an investment or trading scam": ("Never send money to a personal account for trading.", [
         "Never send money to a personal account for trading.",
-        "Check the adviser or broker on SEBI's official website.",
+        "Check the adviser on SEBI Check before sending money.",
         REPORT]),
     "a crypto payment scam": ("Never send crypto to someone who contacted you.", [
         "Never send crypto or gift cards to a stranger.",
@@ -616,7 +703,7 @@ TYPE_ADVICE = {
     "an identity-document scam": ("Never send Aadhaar or PAN or passport copies over chat.", [
         "Never send ID documents over WhatsApp or a link.",
         "Use only the official app or office for KYC.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a payment fraud": ("Do not pay; check the request in the official app first.", [
         "Do not pay to an account or link from a message.",
         "Check any bill or request in the official app.",
@@ -640,19 +727,19 @@ TYPE_ADVICE = {
     "an impersonation scam": ("Ignore the message; check with the organisation in its official app.", [
         "Do not reply or use any contact from the message.",
         "Check through the official app or the number you already have.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a phishing link on a lookalike domain": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a shortened link that hides its destination": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a phishing link": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a port scan": (None, ["Block the source address at the firewall or router.",
                            "Close unused ports and turn off remote admin.",
                            "Check the logs for logins that follow the scan."]),
@@ -665,8 +752,18 @@ TYPE_ADVICE = {
 }
 
 
+DEBIT_STEP = "Not your payment? Block it in your bank app and call 1930."
+
+
 def advice_for(kind, verdict, inp):
     """(replacement sentence, vetted actions) for one checked item."""
+    if verdict in (0, "uncertain") and kind == "sms" and inp is not None:
+        a = mech.analyze(inp)
+        if a["receipt"] or a["otp_note"]:
+            # A debit or OTP alert, real or copied: the step that matters is what to do if the
+            # reader did not make the payment.
+            base = (ACTIONS)[verdict]
+            return base[0], [DEBIT_STEP] + [x for x in base if x != DEBIT_STEP][:2]
     if verdict == 1 and inp is not None:
         tail, acts = TYPE_ADVICE.get(scam_type(kind, inp, verdict), (None, None))
         if acts:

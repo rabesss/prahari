@@ -948,6 +948,11 @@ def decide(p_model, a, gate=0.85):
     # secret request or a payment to an unverified payee survives the official-channel test.
     if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"} and \
             not ("block_threat" in harm and CONTACT_NUMBER.search(a.get("text", ""))):
+        # A block or disconnection threat that also points to the official app may still carry a
+        # scammer's contact in any spelling (split numbers, handles, obfuscated links), so it is
+        # never cleared outright: it is SUSPICIOUS and the reader checks in the official app.
+        if "block_threat" in harm and p_model >= 0.5:
+            return "uncertain", min(p_model, 0.6), a
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["bill"] or a["notice"] or a["appointment"]) and \
             not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):
@@ -957,10 +962,10 @@ def decide(p_model, a, gate=0.85):
     if set(harm) == {"block_threat"} and (a["receipt"] or a["otp_note"]) and _self_block(a.get("text", "")) and \
             not (a["hosts"] or a.get("reader_direct") or a["dest_strong"] or a["risky"] or a["secret"] or
                  a["pay_unverified"]):
-        # A bank debit or OTP alert that says "if not you, block your card in the app" tells the
-        # reader to protect their own account; with no link, private payee or secret request it is
-        # protective advice, not a threat.
-        return 0, min(p_model, 0.45), a
+        # A bank debit or OTP alert that says "if not you, block your card in the app" may be the
+        # bank's own protective advice, but a spoof can copy it, so it is never cleared outright:
+        # it is SUSPICIOUS, and the reader checks the payment in the bank app.
+        return ("uncertain", min(p_model, 0.6), a) if p_model >= 0.5 else (0, min(p_model, 0.45), a)
     # The proxy scores abstention as a miss on both sides, so a binary call at the posterior
     # midpoint is never worse than "uncertain" and is right more often than always-benign.
     return (1 if p_model >= 0.5 else 0), p_model, a
