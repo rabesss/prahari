@@ -1693,16 +1693,17 @@ class MainActivity : Activity() {
         return box
     }
 
-    /** Verdict line and vetted steps only. The message and the Llama text are not spoken. */
-    private fun speechScript(p: Palette, why: String, actions: List<String>, actionsHi: List<String>): String {
-        val title = if (L10n.hindi) t(p.title).let { if (it != p.title) it else p.hindi } else p.title
+    /** Verdict title and vetted steps only. The message, the evidence line and the Llama text stay silent. */
+    private fun speechScript(p: Palette, actions: List<String>, actionsHi: List<String>, hindi: Boolean): String {
+        val looked = if (hindi) L10n.t(p.title) else p.title
+        val title = if (hindi && looked == p.title) p.hindi else looked
         val steps = actions.mapIndexed { i, action ->
-            if (L10n.hindi) actionsHi.getOrNull(i).orEmpty().ifBlank { t(action) } else action
+            if (hindi) actionsHi.getOrNull(i).orEmpty().ifBlank { L10n.t(action) } else action
         }
-        return (listOf(title, why) + steps).filter { it.isNotBlank() }.joinToString("\n")
+        return onDevice((listOf(title) + steps).filter { it.isNotBlank() }.joinToString("\n"))
     }
 
-    private fun listenButton(p: Palette, script: String): LinearLayout {
+    private fun listenButton(p: Palette, hindiScript: String, englishScript: String): LinearLayout {
         val box = row().apply {
             gravity = Gravity.CENTER
             minimumHeight = dp(48)
@@ -1712,7 +1713,7 @@ class MainActivity : Activity() {
         val label = txt(n("listen"), 15f, p.on, 700, raw = true)
         listenLabel = label
         add(box, label, -2, -2)
-        box.setOnClickListener { toggleSpeech(script) }
+        box.setOnClickListener { toggleSpeech(hindiScript, englishScript) }
         asButton(box, n("listen"))
         return box
     }
@@ -1730,7 +1731,8 @@ class MainActivity : Activity() {
         refreshListen()
     }
 
-    private fun toggleSpeech(script: String) {
+    private fun toggleSpeech(hindiScript: String, englishScript: String) {
+        val script = if (L10n.hindi) hindiScript else englishScript
         if (script.isBlank()) return
         if (speaking) {
             stopSpeech()
@@ -1745,28 +1747,25 @@ class MainActivity : Activity() {
                         toast(n("voice_missing"))
                         return@runOnUiThread
                     }
-                    speakNow(script)
+                    speakNow(hindiScript, englishScript)
                 }
             }
             return
         }
-        speakNow(script)
+        speakNow(hindiScript, englishScript)
     }
 
-    private fun speakNow(script: String) {
+    private fun speakNow(hindiScript: String, englishScript: String) {
         val engine = speech ?: return
-        val voice = offlineVoice(engine, L10n.hindi)
-        if (voice == null) {
-            toast(n("voice_missing"))
-            return
-        }
+        val chosen = chooseVoice(engine, hindiScript, englishScript) ?: return
         try {
-            engine.voice = voice
+            engine.voice = chosen.first
         } catch (t: Throwable) {
             Log.e(TAG, "voice select failed", t)
             toast(n("voice_missing"))
             return
         }
+        val script = chosen.second
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
@@ -1786,22 +1785,42 @@ class MainActivity : Activity() {
         refreshListen()
     }
 
-    /** Offline voices only. A network voice is never selected, and a missing pack shows a message. */
-    private fun offlineVoice(engine: TextToSpeech, hindi: Boolean): Voice? {
-        val lang = if (hindi) "hi" else "en"
-        val voices = try { engine.voices } catch (t: Throwable) {
-            Log.e(TAG, "voice list failed", t)
-            null
-        } ?: return null
-        fun offline(v: Voice): Boolean {
-            if (v.isNetworkConnectionRequired) return false
-            if (!v.locale.language.equals(lang, ignoreCase = true)) return false
-            val features = v.features ?: emptySet()
-            if (features.any { it.equals("notInstalled", ignoreCase = true) || it.contains("network", ignoreCase = true) }) return false
-            return true
+    /**
+     * Offline voices only. A network voice is never selected.
+     * Hindi needs an installed hi-IN voice; otherwise read the English script, or say no voice is installed.
+     */
+    private fun chooseVoice(engine: TextToSpeech, hindiScript: String, englishScript: String): Pair<Voice, String>? {
+        fun offline(language: String, country: String?): Voice? {
+            val voices = try { engine.voices } catch (t: Throwable) {
+                Log.e(TAG, "voice list failed", t)
+                null
+            } ?: return null
+            val ready = voices.filter { voice ->
+                if (voice.isNetworkConnectionRequired) return@filter false
+                if (!voice.locale.language.equals(language, ignoreCase = true)) return@filter false
+                if (country != null && !voice.locale.country.equals(country, ignoreCase = true)) return@filter false
+                val features = voice.features ?: emptySet()
+                if (features.any { it.equals("notInstalled", ignoreCase = true) || it.contains("network", ignoreCase = true) }) return@filter false
+                true
+            }
+            return ready.firstOrNull()
         }
-        val ready = voices.filter { offline(it) }
-        return ready.firstOrNull { it.locale.country.equals("IN", ignoreCase = true) } ?: ready.firstOrNull()
+        if (L10n.hindi) {
+            offline("hi", "IN")?.let { return it to hindiScript }
+            val english = offline("en", "IN") ?: offline("en", null)
+            if (english == null) {
+                toast(n("voice_missing"))
+                return null
+            }
+            toast(n("hindi_voice_english"))
+            return english to englishScript
+        }
+        val english = offline("en", "IN") ?: offline("en", null)
+        if (english == null) {
+            toast(n("voice_missing"))
+            return null
+        }
+        return english to englishScript
     }
 
     internal fun presentResult(job: Bridge.Job) {
@@ -1843,7 +1862,7 @@ class MainActivity : Activity() {
             add(b, txt(t("Type") + ": " + kind, 12f, p.on, 500, 16, raw = true), top = 8)
         }
         val actionsHi = strings(data.optJSONArray("actions_hi"))
-        add(b, listenButton(p, speechScript(p, why, actions, actionsHi)), -1, -2, top = 12)
+        add(b, listenButton(p, speechScript(p, actions, actionsHi, true), speechScript(p, actions, actionsHi, false)), -1, -2, top = 12)
         add(body, b, top = 12)
         b.post { if (!isDestroyed) b.announceForAccessibility("${t(p.title)}. $why") }
         val steps = card()
@@ -2551,6 +2570,16 @@ class MainActivity : Activity() {
         dialog.show()
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         scroll.requestApplyInsets()
+    }
+
+    override fun onPause() {
+        stopSpeech()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        stopSpeech()
+        super.onStop()
     }
 
     override fun onDestroy() {
