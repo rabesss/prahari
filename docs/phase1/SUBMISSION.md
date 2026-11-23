@@ -15,7 +15,7 @@
   - [ ] Add a root `LICENSE` file (e.g., MIT or Apache-2.0) or explicit copyright notice.
   - [ ] Decide whether to rewrite personal Gmail in commit `721209c7bf` and whether to remove internal scratch notes (`AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`).
   - [ ] Run `gitleaks detect --source . --no-banner --redact` and confirm zero real secrets.
-- [ ] **4. Verify third-party licences & attributions:** Confirm **Built with Llama** and Llama 3.2 Community License links, CC BY 4.0 dataset citations and NSL-KDD non-redistribution in `candidates/BEST/DATA.md`, and zero weights/raw datasets in Git.
+- [ ] **4. Verify third-party licences & attributions:** Confirm **Built with Llama** and Llama 3.2 Community License links, CC BY 4.0 dataset citations and the NSL-KDD citation (UNB requires citing the dataset and Tavallaee et al. 2009) in `candidates/BEST/DATA.md`, and zero weights/raw datasets in Git.
 - [ ] **5. Record & verify the 2-minute 1080p 16:9 MP4 demo video** following [demo-video.md](demo-video.md):
   - [ ] Download final green `arm64-v8a` APK from `main` CI (`prahari-debug-apk`), install on physical Samsung Galaxy S23 (RTL), stage verified `.pte`/`tokenizer.model`, enable **Airplane Mode (`✈`)**, and record live checks + `SecurityException` + Arm Linux `--demo` / `bin/monitor`.
   - [ ] Confirm `1920x1080`, `16:9`, `<= 120 s`, H.264 + AAC audio via `ffprobe`.
