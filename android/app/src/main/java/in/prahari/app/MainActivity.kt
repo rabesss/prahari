@@ -6,7 +6,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -28,6 +31,7 @@ import android.text.style.MetricAffectingSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
+import android.text.format.DateUtils
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -79,6 +83,7 @@ private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val TAG = "Prahari"
+private const val QR_REQUEST = 41
 
 private class Cancelled : RuntimeException("Check cancelled")
 
@@ -355,6 +360,13 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         if (!Bridge.still(id)) return
         val job = Bridge.Job(id, mode, value, started, verdict)
         if (!Bridge.publish(id, job)) return
+        Bridge.app?.let { ctx ->
+            try {
+                HistoryStore.add(ctx, mode, level, value)
+            } catch (t: Throwable) {
+                Log.e(TAG, "history save failed", t)
+            }
+        }
         // Step 1 and the safety steps are both done once verdict() returns. Step 2 keeps spinning.
         Bridge.checkStage = 1
         Bridge.ui { act ->
@@ -864,7 +876,11 @@ class MainActivity : Activity() {
                 if (job != null) presentResult(job) else showHome()
             }
             "network" -> showNetwork(false)
-            else -> if (restored != null) presentResult(restored) else showHome()
+            else -> when {
+                restored != null -> presentResult(restored)
+                savedInstanceState?.getString("screen") == "history" -> showHistory()
+                else -> showHome()
+            }
         }
         requestModel(false)
     }
@@ -1135,7 +1151,9 @@ class MainActivity : Activity() {
         add(offline, offlineText, 0, -2, left = 12, weight = 1f)
         add(offline, icon(R.drawable.ic_chevron_right, 20, T.ink3), 20, 20)
         asButton(offline, "Prove it's offline. Try to reach the internet from this app.")
-        add(body, offline, top = 16)
+        add(body, navRow(R.drawable.ic_list, L10n.n("recent"), L10n.n("history_toggle")) { showHistory() }, top = 16)
+        add(body, navRow(R.drawable.ic_link, L10n.n("qr_check"), "") { pickQr() }, top = 8)
+        add(body, offline, top = 8)
         centeredNote(body, iconText(R.drawable.ic_lock, "Nothing you paste leaves this phone", T.ink3, 12f, 13), 12)
         setContentView(root)
     }
@@ -2076,6 +2094,175 @@ class MainActivity : Activity() {
             }
             add(body, means, top = 12)
         }
+    }
+
+    private fun navRow(iconId: Int, title: String, subtitle: String, action: () -> Unit): LinearLayout {
+        val line = row().apply {
+            background = ripple(shape(T.white, 16f, 1, T.outline2))
+            pad(this, 14, 12, 12, 12)
+            minimumHeight = dp(48)
+            setOnClickListener { action() }
+        }
+        val bubble = FrameLayout(this).apply {
+            background = shape(T.brandC, 20f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(icon(iconId, 20, T.brand), FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
+        }
+        add(line, bubble, 40, 40)
+        val text = col()
+        add(text, txt(title, 15f, T.ink, 600, 20, raw = true))
+        if (subtitle.isNotBlank()) add(text, txt(subtitle, 13f, T.ink2, 400, 18, raw = true))
+        add(line, text, 0, -2, left = 12, weight = 1f)
+        add(line, icon(R.drawable.ic_chevron_right, 20, T.ink3), 20, 20)
+        asButton(line, if (subtitle.isBlank()) title else "$title. $subtitle")
+        return line
+    }
+
+    private fun showHistory() {
+        screen = "history"
+        visibleJob = null
+        networkBody = null
+        val root = root(L10n.n("recent"))
+        add(root, bar(L10n.n("recent"), true), -1, -2)
+        val body = scrollBody(root)
+        val enabled = HistoryStore.enabled(this)
+        val toggle = row().apply {
+            background = shape(T.white, 16f, 1, T.outline2)
+            pad(this, 14, 8, 14, 8)
+            minimumHeight = dp(48)
+        }
+        add(toggle, txt(L10n.n("history_toggle"), 15f, T.ink, 600, 20, raw = true), 0, -2, weight = 1f)
+        val sw = Switch(this).apply {
+            isChecked = enabled
+            contentDescription = L10n.n("history_toggle")
+            setOnCheckedChangeListener { _, on ->
+                HistoryStore.setEnabled(this@MainActivity, on)
+                post { showHistory() }
+            }
+        }
+        add(toggle, sw, -2, -2)
+        add(body, toggle)
+        val items = HistoryStore.list(this)
+        if (!enabled) add(body, txt(L10n.n("history_off"), 13f, T.ink2, 400, 18, raw = true), top = 12)
+        if (items.isEmpty()) {
+            add(body, txt(L10n.n("history_empty"), 15f, T.ink2, 400, 22, raw = true), top = 16)
+        }
+        items.forEach { entry ->
+            val card = card()
+            val title = when (entry.level) {
+                "danger" -> t("DANGEROUS")
+                "warn" -> t("SUSPICIOUS")
+                else -> t("NO RISK FOUND")
+            }
+            val whenText = DateUtils.getRelativeTimeSpanString(entry.at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
+            add(card, txt("$title · ${t(modeNames[entry.mode.coerceIn(0, modeNames.lastIndex)])}", 15f, T.ink, 700, 20, raw = true))
+            add(card, txt(whenText.toString(), 12f, T.ink3, 400, 16, raw = true), top = 2)
+            if (entry.snippet.isNotBlank()) add(card, txt(entry.snippet, 14f, T.ink2, 400, 20, raw = true), top = 6)
+            add(body, card, top = 10)
+        }
+        bottom(root, L10n.n("clear_history"), outlined = true) {
+            HistoryStore.clear(this)
+            showHistory()
+        }
+        setContentView(root)
+    }
+
+    private fun pickQr() {
+        val intent = if (Build.VERSION.SDK_INT >= 33) {
+            Intent(android.provider.MediaStore.ACTION_PICK_IMAGES).apply { type = "image/*" }
+        } else {
+            Intent(Intent.ACTION_GET_CONTENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }
+        }
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, QR_REQUEST)
+        } catch (t: Throwable) {
+            Log.e(TAG, "photo picker failed", t)
+            toast(L10n.n("qr_fail"))
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != QR_REQUEST || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        Thread({
+            val text = try {
+                loadQrBitmap(uri)?.let { decodeQr(it) }
+            } catch (t: Throwable) {
+                Log.e(TAG, "qr decode failed", t)
+                null
+            }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                if (text.isNullOrBlank()) {
+                    toast(L10n.n("qr_fail"))
+                    return@runOnUiThread
+                }
+                // The decoded text is checked here. It is never opened as a link or a UPI intent.
+                inputValue = text
+                beginCheck(detectMode(text), text)
+            }
+        }, "prahari-qr").start()
+    }
+
+    private fun loadQrBitmap(uri: Uri): Bitmap? {
+        return try {
+            if (Build.VERSION.SDK_INT >= 28) {
+                val source = ImageDecoder.createSource(contentResolver, uri)
+                ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    val big = maxOf(info.size.width, info.size.height)
+                    if (big > 720) {
+                        val scale = 720.0 / big
+                        decoder.setTargetSize(
+                            (info.size.width * scale).toInt().coerceAtLeast(1),
+                            (info.size.height * scale).toInt().coerceAtLeast(1)
+                        )
+                    }
+                }
+            } else {
+                contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "image read failed", t)
+            null
+        }
+    }
+
+    /** Local decoder only. Versions above 10 and micro QR come back empty. */
+    private fun decodeQr(bitmap: Bitmap): String? {
+        val big = maxOf(bitmap.width, bitmap.height)
+        val sample = if (big > 720) {
+            val scale = 720f / big
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt().coerceAtLeast(21),
+                (bitmap.height * scale).toInt().coerceAtLeast(21),
+                true
+            )
+        } else bitmap
+        val w = sample.width
+        val h = sample.height
+        val pixels = IntArray(w * h)
+        sample.getPixels(pixels, 0, w, 0, 0, w, h)
+        if (sample !== bitmap) sample.recycle()
+        val gray = ByteArray(w * h)
+        for (i in pixels.indices) {
+            val color = pixels[i]
+            val y = (Color.red(color) * 30 + Color.green(color) * 59 + Color.blue(color) * 11) / 100
+            gray[i] = y.toByte()
+        }
+        if (!Python.isStarted()) return null
+        val raw = Python.getInstance().getModule("qrdec").callAttr("decode_gray", gray, w, h) ?: return null
+        val text = raw.toString()
+        if (text.isBlank() || text == "None") return null
+        return text
     }
 
     private fun showAbout() {

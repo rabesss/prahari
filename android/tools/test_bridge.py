@@ -28,6 +28,48 @@ for key, item in hi['new'].items():
     assert 'en' in item and 'hi' in item, key
 print('hindi string table shape passed')
 
+import qrdec
+_HI = """
+111111100101001111111
+100000100001001000001
+101110101110101011101
+101110101100001011101
+101110100110001011101
+100000100001101000001
+111111101010101111111
+000000000111100000000
+000110110010100001100
+001000011010010010110
+101001101000001011110
+101011001000000001100
+001111110011000001111
+000000001101000101000
+111111101010011110010
+100000100000110111011
+101110101011011101101
+101110101011110011100
+101110100011011000111
+100000100101100010110
+111111100001001001110
+""".split()
+assert qrdec.decode_modules([[c == '1' for c in row] for row in _HI]) == 'HI'
+_n = len(_HI)
+_scale, _quiet = 4, 4
+_side = (_n + _quiet * 2) * _scale
+_gray = [255] * (_side * _side)
+for _r, _row in enumerate(_HI):
+    for _c, _bit in enumerate(_row):
+        if _bit != '1':
+            continue
+        for _dy in range(_scale):
+            for _dx in range(_scale):
+                _y = (_r + _quiet) * _scale + _dy
+                _x = (_c + _quiet) * _scale + _dx
+                _gray[_y * _side + _x] = 0
+assert qrdec.decode_gray(bytes(_gray), _side, _side) == 'HI'
+assert qrdec.decode_modules([[False] * 21 for _ in range(21)]) is None
+print('qr decoder fixture passed')
+
 for blocked in ('joblib', 'sklearn', 'scipy', 'pandas', 'torch', 'executorch'):
     sys.modules[blocked] = None
 import mobile
