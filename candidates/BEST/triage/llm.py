@@ -335,7 +335,8 @@ class Explainer:
                     stats["retried"] = True
                     stats["evidence_only"] = True
         verdict = _prompt_verdict(prompt)
-        user = prompt.rsplit("<|start_header_id|>user<|end_header_id|>\n\n", 1)[-1]
+        # The first user header is ours; the untrusted snippet comes after the kind word.
+        user = prompt.split("<|start_header_id|>user<|end_header_id|>\n\n", 1)[-1]
         tail = None if user.startswith(KIND_WORD["flow"]) or verdict == 0 else ACTIONS[verdict][0]
         text = _consistent(text, verdict, _forced_sentence(prompt), tail)
         return text, stats
@@ -373,18 +374,39 @@ _MAL_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
 _CONTRAST = re.compile(r"\b(?:but|however|although|though|yet|except|while)\b", re.I)
 _NEGATED = re.compile(r"\b(?:not|never|no|n't|without)\b", re.I)
 # Advice that does what a scam asks ("Immediately verify the KYC process to avoid suspension").
-# On a DANGEROUS or SUSPICIOUS item, a sentence that urges the reader to comply is removed; warnings
-# ("Do not click", "never share") and advice to use a channel the reader already trusts are kept.
-_COMPLY = re.compile(r"\b(?:verify|update|complete|click|tap|open|visit|follow|call|pay|share|send|"
-                     r"submit|confirm|log ?in|sign ?in|download|install|reply|respond|contact|link|"
-                     r"provide|enter|scan|accept|approve)\b", re.I)
-_SAFE_CHANNEL = re.compile(r"\b(?:avoid (?:\w+ing|the link|links?|it|this|them)|don't|do not|never|not|no|refuse|ignore|report|block|delete|"
-                           r"official (?:app|website|number|branch)|you already (?:trust|know|use)|"
-                           r"trusted|directly with your bank|1930|cybercrime)\b", re.I)
+# On a DANGEROUS or SUSPICIOUS item, a sentence that urges the reader to comply is removed. Each
+# compliance verb must be governed by its own negation ("do not click the link or reply"), checked
+# in a short window that an "and", "but" or "then" breaks ("do not delay and submit your OTP" is
+# still unsafe). Advice to use a channel the reader already trusts is kept unless it also names
+# the scam's link, code or number.
+_COMPLY = re.compile(r"(?:verify|update|complete|click|tap|open|visit|follow|call|pay|share|send|"
+                     r"submit|confirm|login|log|signin|sign|download|install|reply|respond|contact|"
+                     r"link|provide|enter|scan|accept|approve)", re.I)
+_NEGATOR = {"not", "never", "don't", "dont", "avoid", "refuse", "without", "nor"}
+_BREAK = {"and", "but", "then", "so", "to", "instead"}
+_TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|website|number|branch)|"
+                      r"number on (?:your|the back of your) card|directly with your bank|1930|cybercrime)\b", re.I)
+_SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|this number|the number in|the message)\b", re.I)
 
 
 def _unsafe_advice(sent, verdict):
-    return verdict != 0 and bool(_COMPLY.search(sent)) and not _SAFE_CHANNEL.search(sent)
+    if verdict == 0:
+        return False
+    words = re.findall(r"[a-z']+", sent.lower())
+    trusted = bool(_TRUSTED.search(sent)) and not _SCAM_OBJECT.search(sent)
+    for i, w in enumerate(words):
+        if not _COMPLY.fullmatch(w):
+            continue
+        negated = False
+        for prev in reversed(words[max(0, i - 5):i]):
+            if prev in _BREAK:
+                break
+            if prev in _NEGATOR:
+                negated = True
+                break
+        if not negated and not trusted:
+            return True
+    return False
 
 
 def _forced_sentence(prompt):
@@ -416,12 +438,17 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
     dropped = []
 
     def comply(i, sent):
-        if safe_tail and _unsafe_advice(sent, verdict) and not (i == 0 and opening and sent.startswith(opening)):
+        if not safe_tail:
+            return False
+        rest = sent[len(opening):] if (i == 0 and opening and sent.startswith(opening)) else sent
+        if _unsafe_advice(rest, verdict):
             dropped.append(sent)
             return True
         return False
 
     def with_tail(kept):
+        if dropped and opening and not any(k.startswith(opening) for k in kept):
+            kept = [opening + "."] + kept
         out = " ".join(kept).strip()
         if dropped and safe_tail and safe_tail not in out:
             out = (out + " " + safe_tail).strip()
@@ -447,7 +474,7 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
                for clause in clauses for claim in opposite.finditer(clause)):
             continue
         keep.append(sent)
-    if not keep:
+    if not keep and not (dropped and opening):
         raise ValueError("explanation contained no consistent sentence")
     return with_tail(keep)
 
