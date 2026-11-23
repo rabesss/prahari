@@ -12,5 +12,4 @@ candidates/*/artifacts/*.joblib
 !candidates/BEST/artifacts/*.joblib
 !candidates/indic1/artifacts/*.joblib
 
-# Rendered report: built from docs/phase1/report.md, attached at submission, not committed
-docs/phase1/report.pdf
+# Final report PDF (docs/phase1/report.pdf) is tracked so judges see it directly in the public repo.

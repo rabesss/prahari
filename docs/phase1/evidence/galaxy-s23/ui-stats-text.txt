@@ -1,0 +1,150 @@
+== kyc-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  WHY IT'S FLAGGED · संकेत
+  3 signals
+  Sends you to a lookalike page and asks you to act there
+  Threatens to block, cut or freeze an account, SIM or connection
+  The domain sbi-kyc.in-verify.top imitates 'sbi' on .top
+  Explained on this phone by Llama 3.2
+  This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  255 ms · 664 ms
+  255 ms
+  Detector
+  664 ms
+  First token
+  42.6 t/s
+  Decode speed
+  Total 2.00 s · Memory 1692.4 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  Check another · दूसरा जाँचें
+
+== kyc-warm1-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  6 ms · 510 ms
+  6 ms
+  Detector
+  510 ms
+  First token
+  43.4 t/s
+  Decode speed
+  Total 1.20 s · Memory 1708.0 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked
+  Check another · दूसरा जाँचें
+
+== kyc-warm2-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Threatens to block, cut or freeze an account, SIM or connection
+  The domain sbi-kyc.in-verify.top imitates 'sbi' on .top
+  Explained on this phone by Llama 3.2
+  This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  6 ms · 499 ms
+  YOU CHECKED · आपने जाँचा
+  Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked
+  Check another · दूसरा जाँचें
+
+== kyc-warm3-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  6 ms · 508 ms
+  6 ms
+  Detector
+  508 ms
+  First token
+  42.9 t/s
+  Decode speed
+  Total 1.21 s · Memory 1724.8 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked
+  Check another · दूसरा जाँचें
+
+== bank-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This message needs a check: looks like a bank debit or OTP alert; scammers copy these. This message needs a check: looks like a bank debit or OTP alert; scammers copy these. Do not act on the message until you verify it.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  17 ms · 615 ms
+  17 ms
+  Detector
+  615 ms
+  First token
+  39.8 t/s
+  Decode speed
+  Total 1.50 s · Memory 1737.5 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app.
+  Check another · दूसरा जाँचें
+
+== link-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top. Can I help you with something else? Do not open the link; check the official app instead.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  183 ms · 594 ms
+  183 ms
+  Detector
+  594 ms
+  First token
+  39.1 t/s
+  Decode speed
+  Total 3.53 s · Memory 1781.2 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  http://amaz0n-refund-help.top/claim?id=8812
+  Check another · दूसरा जाँचें
+
+== port-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This network event is DANGEROUS: traffic to 200 different ports on 10.0.0.5. Check the firewall logs for the scanning address and block it.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  5 ms · 650 ms
+  5 ms
+  Detector
+  650 ms
+  First token
+  38.6 t/s
+  Decode speed
+  Total 1.49 s · Memory 1772.6 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected
+  Check another · दूसरा जाँचें
+
+== kyc-airplane-stats.xml (uiautomator dump, visible text)
+  Result
+  Offline
+  Explained on this phone by Llama 3.2
+  This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.
+  AI-written and can be wrong. Follow the steps above.
+  On-device stats
+  8 ms · 657 ms
+  8 ms
+  Detector
+  657 ms
+  First token
+  39.0 t/s
+  Decode speed
+  Total 1.42 s · Memory 1772.6 MB | Llama 3.2 1B INT4 · ExecuTorch · XNNPACK | CPU ABI: arm64-v8a
+  YOU CHECKED · आपने जाँचा
+  Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked
+  Check another · दूसरा जाँचें
+

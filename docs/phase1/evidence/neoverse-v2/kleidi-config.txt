@@ -1,0 +1,8 @@
+.venv/lib/python3.12/site-packages/executorch/lib/libexecutorch_kernels_torchao.so: kleidiai: matmul_clamp_f32_qai8dxp1x8_qsi4c32p8x8_1x8x32_neon_dotprod
+.venv/lib/python3.12/site-packages/executorch/lib/libexecutorch_kernels_torchao.so: kleidiai: matmul_clamp_f32_qai8dxp1x4_qsi4c32p8x4_1x8_neon_dotprod, matmul_clamp_f32_qai8dxp4x4_qsi4c32p8x4_4x8_neon_dotprod
+.venv/lib/python3.12/site-packages/executorch/lib/libexecutorch_kernels_optimized.so: _ZN10executorch7cpublas22kleidiai_bfloat16_gemmENS0_13TransposeTypeES1_lllfPKN3c108BFloat16ElS5_lfPfl
+.venv/lib/python3.12/site-packages/executorch/lib/libexecutorch_kernels_optimized.so: _ZN10executorch7cpublas27gemm_uses_kleidiai_bfloat16ENS0_13TransposeTypeEl
+.venv/lib/python3.12/site-packages/executorch/lib/libexecutorch_kernels_optimized.so: run_kleidiai_sme2_bfloat16_gemm
+.venv/lib/python3.12/site-packages/executorch/extension/llm/custom_ops/libcustom_ops_aot_lib.so: _ZN10executorch7cpublas27gemm_uses_kleidiai_bfloat16ENS0_13TransposeTypeEl
+.venv/lib/python3.12/site-packages/executorch/extension/llm/custom_ops/libcustom_ops_aot_lib.so: _ZN10executorch7cpublas22kleidiai_bfloat16_gemmENS0_13TransposeTypeES1_lllfPKN3c108BFloat16ElS5_lfPfl
+.venv/lib/python3.12/site-packages/executorch/extension/llm/custom_ops/libcustom_ops_aot_lib.so: run_kleidiai_sme2_bfloat16_gemm

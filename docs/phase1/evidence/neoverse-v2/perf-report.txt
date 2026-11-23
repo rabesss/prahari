@@ -1,0 +1,191 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cpu-clock:pppH'
+# Event count (approx.): 22444444220
+#
+# Overhead  Command  Shared Object                                 Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+# ........  .......  ............................................  .........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    23.27%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm
+            |
+            ---kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm
+               kai_run_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_neon_i8mm
+               0xfffeef3c57bc
+               0xfffeef2feec0
+               |          
+               |--11.70%--0xfffeef308114
+               |          pthreadpool_parallelize_2d_tile_2d_dynamic
+               |          0xfffeef3c8a28
+               |          xnn_invoke_runtime
+               |          executorch::backends::xnnpack::delegate::XNNExecutor::forward
+               |          executorch::backends::XnnpackBackend::execute
+               |          executorch::runtime::Method::execute_instruction
+               |          executorch::runtime::Method::execute
+               |          executorch::extension::module::Module::execute
+               |          executorch::extension::llm::TextDecoderRunner::step
+               |          executorch::extension::llm::TextPrefiller::prefill_chunk
+               |          executorch::extension::llm::TextPrefiller::prefill
+               |          executorch::extension::llm::TextPrefiller::prefill
+               |          executorch::extension::llm::TextLLMRunner::generate
+               |          0xfffebdcee310
+               |          0xfffebdd0dbd0
+               |          0xfffebdd07688
+               |          0xfffebdce8c94
+               |          cfunction_vectorcall_FASTCALL_KEYWORDS
+               |          _PyEval_EvalFrameDefault
+               |          PyEval_EvalCode
+               |          builtin_exec
+               |          cfunction_vectorcall_FASTCALL_KEYWORDS
+               |          _PyEval_EvalFrameDefault
+               |          pymain_run_module
+               |          Py_RunMain
+               |          pymain_main
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --11.57%--0xfffeef307c14
+                          start_thread
+                          thread_start
+
+    20.57%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+            |
+            ---kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+               kai_run_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+               0xfffeef3c57bc
+               0xfffeef2fee34
+               |          
+               |--10.89%--0xfffeef307c14
+               |          start_thread
+               |          thread_start
+               |          
+                --9.68%--0xfffeef308114
+                          pthreadpool_parallelize_2d_tile_2d_dynamic
+                          0xfffeef3c8a28
+                          xnn_invoke_runtime
+                          executorch::backends::xnnpack::delegate::XNNExecutor::forward
+                          executorch::backends::XnnpackBackend::execute
+                          executorch::runtime::Method::execute_instruction
+                          executorch::runtime::Method::execute
+                          executorch::extension::module::Module::execute
+                          executorch::extension::llm::TextDecoderRunner::step
+                          executorch::extension::llm::TextTokenGenerator::generate
+                          executorch::extension::llm::TextLLMRunner::generate
+                          0xfffebdcee310
+                          0xfffebdd0dbd0
+                          0xfffebdd07688
+                          0xfffebdce8c94
+                          cfunction_vectorcall_FASTCALL_KEYWORDS
+                          _PyEval_EvalFrameDefault
+                          PyEval_EvalCode
+                          builtin_exec
+                          cfunction_vectorcall_FASTCALL_KEYWORDS
+                          _PyEval_EvalFrameDefault
+                          pymain_run_module
+                          Py_RunMain
+                          pymain_main
+=== kai kleidiai xnn symbols ===
+    23.27%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm
+            ---kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm
+               kai_run_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_neon_i8mm
+               |          xnn_invoke_runtime
+               |          executorch::backends::xnnpack::delegate::XNNExecutor::forward
+               |          executorch::backends::XnnpackBackend::execute
+    20.57%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+            ---kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+               kai_run_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+                          xnn_invoke_runtime
+                          executorch::backends::xnnpack::delegate::XNNExecutor::forward
+                          executorch::backends::XnnpackBackend::execute
+                       |                     |--1.58%--kai_run_rhs_pack_nxk_qsi4c32p_qsu4c32s1s0
+                       |                     |          xnn_create_fully_connected_nc_qp8_f32_qb4w
+                       |                     |          xnn_create_runtime_v4
+                       |                     |          executorch::backends::xnnpack::delegate::XNNCompiler::compileModel
+                       |                     |          executorch::backends::XnnpackBackend::init
+                       |                     |--1.13%--xnn_plan_memory
+                       |                     |          executorch::backends::xnnpack::delegate::XNNExecutor::prepare_args
+                       |                     |          executorch::backends::XnnpackBackend::execute
+                       |                                xnn_create_fully_connected_nc_qp8_f32_qc8w
+                       |                                xnn_create_runtime_v4
+                       |                                executorch::backends::xnnpack::delegate::XNNCompiler::compileModel
+                       |                                executorch::backends::XnnpackBackend::init
+                                              --0.72%--kai_run_rhs_pack_nxk_qsi4c32p_qsu4c32s1s0
+                                                        xnn_create_fully_connected_nc_qp8_f32_qb4w
+                                                        xnn_create_runtime_v4
+                                                        executorch::backends::xnnpack::delegate::XNNCompiler::compileModel
+                                                        executorch::backends::XnnpackBackend::init
+     5.63%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_matmul_clamp_f32_qai8dxp1x8_qsi8cxp4x8_1x4_neon_dotprod
+            ---kai_run_matmul_clamp_f32_qai8dxp1x8_qsi8cxp4x8_1x4_neon_dotprod
+               |          xnn_invoke_runtime
+               |          executorch::backends::xnnpack::delegate::XNNExecutor::forward
+               |          executorch::backends::XnnpackBackend::execute
+     3.20%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_rhs_pack_nxk_qsi4c32p_qsu4c32s1s0
+     0.77%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_rhs_pack_nxk_qsi8cxp_qsi8cx_neon
+            ---kai_run_rhs_pack_nxk_qsi8cxp_qsi8cx_neon
+               kai_run_rhs_pack_nxk_qsi8cxp_qsi8cx_neon
+               xnn_create_fully_connected_nc_qp8_f32_qc8w
+               xnn_create_runtime_v4
+               executorch::backends::xnnpack::delegate::XNNCompiler::compileModel
+               executorch::backends::XnnpackBackend::init
+     0.68%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_lhs_quant_pack_qai8dxp_f32
+            ---kai_run_lhs_quant_pack_qai8dxp_f32
+     0.50%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b00
+     0.45%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e0c
+     0.32%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b0c
+     0.27%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b18
+     0.27%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107b18
+     0.23%  python   libexecutorch_backend_xnnpack.so              [.] executorch::backends::xnnpack::delegate::convertF32TensorToBF16
+     0.18%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef93c
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] memcpy@plt
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8af4
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8af8
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef870
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000efa64
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] executorch::backends::xnnpack::delegate::XNNExecutor::convert_outputs
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] xnn_define_blockwise_quantized_tensor_value_v2
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b14
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef86c
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000efa6c
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000001079d4
+     0.09%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000001079d8
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] executorch::backends::xnnpack::delegate::XNNExecutor::prepare_args
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_lhs_quant_pack_qai8dxp_f32@plt
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] xnn_datatype_log2_size_bits
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] xnn_invoke_runtime
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000065420
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x000000000006542c
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000065438
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000780f4
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x000000000007866c
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000079380
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x000000000008b728
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000943c8
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x000000000009b598
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8adc
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef878
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef880
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef888
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef894
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef8c4
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef8d4
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef8e8
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef958
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef970
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000efa60
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000106ffc
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107000
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107004
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107008
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107014
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000001079d0
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107b24
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107b28
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000001086b0
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e1c
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e2c
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e60
+     0.05%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e7c
