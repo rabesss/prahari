@@ -23,6 +23,9 @@ from . import rules
 
 MAX_UPI_LEN = 4096
 _HIDDEN_RE = re.compile(r"[\u200b-\u200f\u2060\ufeff\u00ad]")
+# ZWJ/ZWNJ are part of Malayalam chillu and Urdu/Indic names; they only hide something next to ASCII text.
+_SUSPICIOUS_HIDDEN_RE = re.compile(
+    r"[\u200b\u200e\u200f\u2060\ufeff\u00ad]|(?<=[\x21-\x7e])[\u200c\u200d]|[\u200c\u200d](?=[\x21-\x7e])")
 
 # Recognized URI schemes for UPI QR codes and Indian PSP intent links.
 _UPI_SCHEME_RE = re.compile(
@@ -131,7 +134,7 @@ _IMPERSONATED_ENTITIES = [
     ("HDFC Bank", "bank", r"\b(?:hdfc(?:\s+bank)?)\b", ("hdfc", "payzapp")),
     ("ICICI Bank", "bank", r"\b(?:icici(?:\s+bank)?|imobile)\b", ("icici", "imobile", "pockets")),
     ("Axis Bank", "bank", r"\b(?:axis\s+bank)\b", ("axis", "axb")),
-    ("Kotak Bank", "bank", r"\b(?:kotak\s+mahindra(?:\s+bank)?|kotak\s+bank)\b", ("kotak", "kmbl", "kmb")),
+    ("Kotak Bank", "bank", r"\b(?:kotak\s+(?:mahindra|bank|securities|life|general|811))\b|^\s*kotak\s*$", ("kotak", "kmbl", "kmb")),
     ("PNB", "bank", r"\b(?:pnb|punjab\s+national\s+bank)\b", ("pnb",)),
     ("RBI", "gov", r"\b(?:rbi|reserve\s+bank(?:\s+of\s+india)?)\b", ("rbi",)),
     ("NPCI", "gov", r"\b(?:npci|bhim\s+upi)\b", ("npci", "bhim")),
@@ -142,7 +145,8 @@ _IMPERSONATED_ENTITIES = [
     ("EPFO", "gov", r"\b(?:epfo|pf\s+office)\b", ("epfo",)),
     ("India Post", "gov", r"\b(?:india\s+post|indiapost|speed\s+post)\b", ("indiapost", "ippb", "post")),
     ("Police / Cyber Cell", "gov", r"\b(?:police|cyber\s*(?:cell|crime|police)|cbi|ncb|customs\s+(?:department|dept|office|officer)|"
-     r"(?:high|supreme|district|sessions|family)\s+court|court\s+(?:fine|summons|order|warrant))\b", ()),
+     r"(?:high|supreme|district|sessions|family)\s+court|court\s+(?:fine|summons|order|warrant)|customs)\b"
+     r"|(?<!food\s)(?<!tennis\s)(?<!badminton\s)(?<!basketball\s)(?<!food-)\bcourt\b(?!\s*yard)", ()),
     ("Amazon", "ecom", r"\b(?:amazon(?:\s+pay|\s+india)?)\b", ("amazon", "amzn", "apl")),
     ("Flipkart", "ecom", r"\b(?:flipkart)\b", ("flipkart", "fkrt", "fk")),
     ("IRCTC", "travel", r"\b(?:irctc)\b", ("irctc",)),
@@ -164,7 +168,8 @@ _IMPERSONATED_ENTITIES = [
 
 # Official/support/scam-desk words in payee name (`pn`) that make a personal VPA or P2P MCC suspicious.
 _OFFICIAL_DESK_RE = re.compile(
-    r"\b(?:customer\s*care|help\s*desk|helpline|refund|cashback|"
+    r"\b(?:customer\s*(?:care|support|service)|support\s*(?:desk|team)|claims?\s*(?:department|dept|desk)|"
+    r"customs\s*(?:clearance|department|dept|office)|help\s*desk|helpline|refund|cashback|"
     r"kyc|verif(?:y|ication)|official|disconnection|prize|lottery|winner|"
     r"billing\s*desk|care\s*team|fraud\s*team|security\s*team)\b",
     re.I,
@@ -172,7 +177,7 @@ _OFFICIAL_DESK_RE = re.compile(
 # Generic words ("SG Tech Support", "XYZ Travel Desk", "Cell City Mobiles", "Quick Claim Assist") are
 # ordinary small-business names; they read as an official desk only next to a claimed organisation.
 _OFFICIAL_DESK_WEAK_RE = re.compile(
-    r"\b(?:support|desk|department|dept|officer|cell|recovery|claim|clearance|customs)\b",
+    r"\b(?:support|desk|department|dept|officer|cell|recovery|claim|clearance)\b",
     re.I,
 )
 # Plain cashback / money-back promo wording that real merchant QRs carry ("5% cashback on purchase").
@@ -181,6 +186,17 @@ _HARD_FEE_RE = re.compile(
     r"\b(?:job|task|prize|lottery|parcel|kyc|withdrawal|payout|bonus|refund|work\s*from\s*home|registration)\b", re.I)
 _URL_SCAM_WORD_RE = re.compile(r"refund|kyc|cashback|claim|prize|reward|help|support|care|verif|secure|login|update|offer")
 # A promo stops being plain promo when it asks for a payment or action to receive the money.
+# Routine on a merchant QR ("Courier charge"), the classic parcel/customs scam on a personal one.
+_PERSONAL_PARCEL_FEE_RE = re.compile(
+    r"\b(?:customs|parcel|courier|package|shipment)\b[^.;!?।\n]{0,30}\b(?:fee|charge|duty|clearance|release)\b", re.I)
+# Group companies carry the bank's name legitimately (ICICI Lombard, PNB MetLife, SBI Life, HDFC Ergo).
+_GROUP_COMPANY_RE = re.compile(
+    r"\b(?:lombard|prudential|metlife|ergo|life|general\s+insurance|insurance|securities|mutual\s+fund|amc|"
+    r"housing\s+finance|asset\s+management|cards?|capital)\b", re.I)
+# Payment aggregators settle for big brands on their own handles (Netflix via Razorpay).
+_AGGREGATOR_HANDLE_RE = re.compile(r"razorpay|rzp|payu|cashfree|ccavenue|billdesk|juspay|pinelabs|easebuzz|instamojo")
+# Agent/registration words that, next to a bank or government name on a personal mobile UPI ID, still need a check.
+_AGENT_WORD_RE = re.compile(r"\b(?:agents?|registered|associates|consultants?|advis[eo]rs?)\b", re.I)
 _PROMO_BREAKER_RE = re.compile(
     r"\b(?:receive|claim|credited?\s+to)\b|\bpay\s*(?:rs\.?|inr|₹)?\s*\d", re.I)
 # Small local shops legitimately name a brand they resell ("Airtel Recharge Shop", "Jio Point").
@@ -229,12 +245,12 @@ _PIN_TO_RECEIVE_RE = re.compile(
     r"[^.;!?।\n]{0,35}(?:enter|using|with|via|by|dal\w*|daal\w*|डाल\w*)"
     r"[^.;!?।\n]{0,20}(?:upi\s*)?(?:pin|mpin|पिन)"
     r"|scan(?:(?!\bpay)[^.;!?।\n]){0,25}(?:to\s+)?(?:receive\b|"
-    r"(?:get|claim|credit|collect)\s+(?:(?:your|the|a|an)\s+)?(?:money|payment|amount|refund|cashback|cash|paisa|paise|funds?|prize|reward|rs\.?|inr|₹)|paise\s*pa+ne|paisa\s*pa+ne|पैसे\s*पाने|प्राप्त\s*करने)"
+    r"get\s+paid\b|(?:get|claim|credit|collect)\s+(?:(?:your|the|a|an)\s+)?(?:money|payment|amount|refund|cashback|cash|paisa|paise|funds?|prize|reward|gift|bonus|rs\.?|inr|₹)|paise\s*pa+ne|paisa\s*pa+ne|पैसे\s*पाने|प्राप्त\s*करने)"
     r"|(?:approve|accept|confirm)[^.;!?।\n]{0,25}(?:to\s+)?(?:receive|claim|credit|refund|cashback|"
     r"get\s+(?:(?:your|the)\s+)?(?:money|payment|amount|refund|cashback|paisa|paise|rs\.?|₹))"
     # Hindi grammar puts the goal before the action: "पैसे पाने के लिए स्कैन करें", "UPI PIN डालकर राशि प्राप्त करें".
     r"|(?:upi\s*)?(?:pin|mpin|पिन)\s*(?:डाल\w*|दर्ज\s*कर\w*|daal\w*|dal\w*|enter\w*)[^।;!?\n]{0,30}"
-    r"(?:पैसे|पैसा|राशि|प्राप्त|पाने|मिलेंगे|रिफंड|कैशबैक|paisa|paise|refund|cashback|receive)"
+    r"(?:पैसे|पैसा|प्राप्त\s*कर|पाने|मिलेंगे|रिफंड|कैशबैक|paisa|paise|refund|cashback|receive)"
     r"|(?:पैसे|पैसा|राशि|रिफंड|कैशबैक|पेमेंट)\s*(?:पाने|प्राप्त\s*करने|लेने)[^।;!?\n]{0,25}(?:स्कैन|scan|पिन|pin)"
     r"|(?:paisa|paise|refund|cashback|payment)\s*(?:milne|pane|paane|lene)\s*(?:ke|k)\s*(?:liye|lie)[^.;!?\n]{0,20}(?:scan|pin)"
     r"|scan[^.;!?\n]{0,20}(?:paisa|paise|refund|cashback)\s*(?:pa+o|pa\s*lo|lo|milega|milenge)"
@@ -244,18 +260,23 @@ _PIN_TO_RECEIVE_RE = re.compile(
 
 # Refund / cashback / prize / incoming-payment claim inside a debit QR's `tn` or `pn`.
 _RECEIVE_LURE_RE = re.compile(
-    r"\b(?:refund|cash\s*back|cashback|money\s*back|receive\s+(?:the\s+|your\s+)?(?:money|payment|amount|funds?|cash|rs\.?|inr|₹)(?!\s*(?:receipt|confirmation|details|link|sms|alert))|"
-    r"get\s*(?:rs\.?|inr|₹)\s*\d[\d,]*|pay\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*\s*(?:to|and)\s*(?:get|receive|win)\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*|"
+    r"\b(?:refund|cash\s*back|cashback|money\s*back|"
+    r"receive\s+(?:the\s+|your\s+)?(?:money|payment|amount|funds?|cash|reward|gift|prize|bonus)(?!\s*(?:receipt|confirmation|details|link|sms|alert))|"
+    r"receive\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*(?![\d,])|payment\s+receive|pay\s+receive|"
+    # "Get Rs 100 off", "get Rs 1299 worth of products", "you get Rs 100 change" are discounts, not credits.
+    r"get\s*(?:rs\.?|inr|₹)\s*\d[\d,]*(?![\d,])(?!\s*(?:off|discount|worth|instant|talktime|change|extra\s+off))|"
+    r"pay\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*\s*(?:to|and)\s*(?:get|receive|win)\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*(?![\d,])(?!\s*(?:off|discount|worth|instant|talktime))|"
     r"paise\s*(?:pa+ne|pa+o|milne|milenge|receive)|paisa\s*(?:pa+ne|pa+o|milne|milega|receive)|"
     r"credit\s+(?:to|in|into)\s+(?:your\s+)?(?:account|bank|upi|a/c)|"
     r"(?:instant|order|tax|itr|gst|ticket|bank|amazon|flipkart|paytm|phonepe)\s+refund|"
-    r"claim\s+(?:your\s+)?(?:prize|reward|refund|cashback|winnings?|lottery)|claim\s+your\s+(?:bonus|amount|money|gift|voucher|subsidy)|"
+    r"claim\s+(?:your\s+)?(?:prize|reward|refund|cashback|winnings?|lottery|gift)|claim\s+your\s+(?:amount|money|voucher|subsidy)|"
+    r"(?<!no\s)claim\s+(?:your\s+)?bonus|"
     r"lottery|lucky\s*draw|jackpot|you\s+won|prize\s*(?:money|claim|win|winner)|winner\s*(?:payout|claim|prize)|"
     r"olx\s*(?:payment|buyer|receive|credit|advance|deal)|army\s*(?:buyer|officer|payment|receive)|"
     r"subsidy\s*(?:credit|receive|claim)|pm\s*kisan\s*(?:claim|receive|credit|payout)|"
     r"salary\s*credit|payout\s*receive|withdrawal\s*credit|credit\s*amount)\b"
     r"|रिफंड|धनवापसी|कैशबैक|इनाम|लॉटरी|पैसे\s*(?:पाएं|पाएँ|पाने|प्राप्त|मिलेंगे|आएंगे|आएँगे)|पैसा\s*(?:पाएं|पाने|मिलेगा)"
-    r"|(?:राशि|पेमेंट|भुगतान)\s*प्राप्त",
+    r"|(?:राशि|पेमेंट|भुगतान)\s*प्राप्त\s*कर",
     re.I,
 )
 _LEGIT_CREDIT_CARD_RE = re.compile(r"\bcredit\s*card\s*(?:bill|payment|due|repayment|emi)\b", re.I)
@@ -273,7 +294,7 @@ _BLOCK_DISCONNECT_RE = re.compile(
     r"\b(?:account|khata|sim|card|electricity|power|bijli|light|meter|connection|upi|number)\b"
     r"[^.;!?।\n]{0,30}\b(?:block\w*|suspend\w*|cut\b|kat\b|disconnect\w*|deactivat\w*|freez\w*|band\b)"
     r"|\b(?:avoid|prevent)\s+(?:disconnection|blocking|suspension|cut[- ]?off|account\s*block)\b"
-    r"|(?:बिजली|खाता|सिम|अकाउंट|कनेक्शन|नंबर)\s*(?:कट|बंद|ब्लॉक|निलंबित)",
+    r"|(?:बिजली|खाता|सिम|अकाउंट|कनेक्शन)\s*(?:कट|बंद|ब्लॉक|निलंबित)",
     re.I,
 )
 _AUTHORITY_CUSTOMS_RE = re.compile(
@@ -330,6 +351,7 @@ _HIGH_P2P_AMOUNT = 49000.0
 _HIGH_LIMIT_MCCS = frozenset({"6211", "6300", "6012", "6010", "6540", "8062", "8011", "8211", "8220", "8241",
                               "8244", "8249", "8299", "9311", "9399", "9222", "4900", "7011", "4511", "4722"})
 _UPI_P2P_CAP = 100000.0
+_UPI_MERCHANT_CAP = 500000.0
 
 
 @dataclass(frozen=True)
@@ -346,7 +368,7 @@ _EDGE_NOISE_RE = re.compile(r"^(?:\s|" + _HIDDEN_RE.pattern + r")+|(?:\s|" + _HI
 
 def _clean_invisible(text: str) -> tuple[str, bool]:
     cleaned = _HIDDEN_RE.sub("", text)
-    return cleaned, cleaned != text
+    return cleaned, bool(_SUSPICIOUS_HIDDEN_RE.search(text))
 
 
 def is_upi_payload(text: str) -> bool:
@@ -463,7 +485,7 @@ def parse_upi(text: str) -> dict | None:
                 double_encoded = True
                 v = v2
         v_clean = _HIDDEN_RE.sub("", v)
-        if v_clean != v:
+        if v_clean != v and _SUSPICIOUS_HIDDEN_RE.search(v):
             had_hidden = True
             v = v_clean.strip()
         params_multi.setdefault(k, []).append(v)
@@ -509,7 +531,6 @@ def parse_upi(text: str) -> dict | None:
 
     is_mandate = (
         action == "mandate"
-        or purpose == "14"
         or bool(recur or amrule or params.get("validityend") or params.get("recurvalue"))
     )
     if is_mandate:
@@ -734,15 +755,15 @@ def analyze_upi(text: str) -> dict:
         add(
             "receive_money_trick",
             "high",
-            "asks you to scan or enter your UPI PIN to receive money; a upi://pay QR always sends money out of your account",
-            "asks to scan or enter a UPI PIN to receive money (a upi://pay QR only sends money out)",
+            "asks you to scan or enter your UPI PIN to receive money; paying or approving a UPI request only sends money out of your account",
+            "asks to scan or enter a UPI PIN to receive money (a UPI payment only sends money out)",
             "tn",
         )
     elif has_receive_lure:
         add(
             "receive_money_trick",
             "high",
-            "promises a refund, cashback, prize or incoming payment, but a UPI payment QR only sends money out of your account",
+            "promises a refund, cashback, prize or incoming payment, but paying or approving a UPI request only sends money out of your account",
             "promises a refund or incoming payment on a UPI QR that sends money out of your account",
             "tn" if _RECEIVE_LURE_RE.search(_LEGIT_CREDIT_CARD_RE.sub(" ", tn)) else "pn",
         )
@@ -903,7 +924,8 @@ def analyze_upi(text: str) -> dict:
                     f"payee name '{pn}' does not match UPI ID {pa}",
                     "pn",
                 )
-            elif valid_mc and not _MERCHANT_VPA_PREFIX_RE.match(vpa_user):
+            elif valid_mc and not _MERCHANT_VPA_PREFIX_RE.match(vpa_user) and not _GROUP_COMPANY_RE.search(pn) \
+                    and not _AGGREGATOR_HANDLE_RE.search(vpa_handle):
                 # Any QR can carry a 4-digit mc, so it cannot vouch for the name. Real brand QRs put the
                 # brand in the UPI ID (amazonupi@apl, bsesrajdhani.bbps@hdfcbank); flag for a check.
                 add(
@@ -913,6 +935,15 @@ def analyze_upi(text: str) -> dict:
                     f"payee name '{pn}' is not reflected in UPI ID {pa}",
                     "pn",
                 )
+    elif pn_brands and pn_local_shop and is_mobile_vpa and _AGENT_WORD_RE.search(pn) \
+            and any(cat in ("bank", "gov") for _, cat, _ in pn_brands):
+        add(
+            "payee_vpa_mismatch",
+            "medium",
+            f"payee name '{pn}' names '{pn_brands[0][0]}' but pays a personal mobile-number UPI ID {pa}",
+            f"'{pn}' names '{pn_brands[0][0]}' on personal mobile UPI ID {pa}",
+            "pn",
+        )
     elif pn_official_desk and pa and "@" in pa and (is_mobile_vpa or not is_merchant_fmt):
         add(
             "payee_vpa_mismatch",
@@ -947,7 +978,7 @@ def analyze_upi(text: str) -> dict:
             "threatens account blocking or disconnection in the payment note",
             "tn",
         )
-    if _AUTHORITY_CUSTOMS_RE.search(note_and_name):
+    if _AUTHORITY_CUSTOMS_RE.search(note_and_name) or (not is_merchant_fmt and _PERSONAL_PARCEL_FEE_RE.search(note_and_name)):
         add(
             "authority_threat_note",
             "high",
@@ -960,7 +991,8 @@ def analyze_upi(text: str) -> dict:
             "upfront_fee_note",
             # Only a loan/processing charge on a genuine merchant QR (NBFC fee) is weak; job, task, prize,
             # parcel, KYC or payout fees stay high whatever mc the QR carries.
-            "low" if (valid_mc and not is_mobile_vpa and not pn_official_desk and not _HARD_FEE_RE.search(note_and_name)) else "high",
+            ("low" if _MERCHANT_VPA_PREFIX_RE.match(vpa_user) else "medium")
+            if (valid_mc and not is_mobile_vpa and not pn_official_desk and not _HARD_FEE_RE.search(note_and_name)) else "high",
             "the transaction note asks for an upfront processing, verification or release fee",
             "asks for an upfront processing or verification fee",
             "tn",
@@ -1058,12 +1090,20 @@ def analyze_upi(text: str) -> dict:
                     f"pre-fills Rs {amt_str} above the Rs 1,00,000 P2P limit",
                     "am",
                 )
-            elif valid_mc and amount_num > _UPI_P2P_CAP and mc not in _HIGH_LIMIT_MCCS:
+            elif is_mobile_vpa and amount_num > _UPI_P2P_CAP:
                 add(
                     "amount_above_cap",
-                    "high" if is_mobile_vpa else "medium",
-                    f"pre-fills Rs {amt_str}, above the standard Rs 1,00,000 UPI limit for merchant code {mc}",
-                    f"pre-fills Rs {amt_str} above the Rs 1,00,000 UPI limit",
+                    "medium",
+                    f"pre-fills Rs {amt_str} to a personal mobile-number UPI ID, above the standard Rs 1,00,000 person-to-person limit",
+                    f"pre-fills Rs {amt_str} to a personal UPI ID above the Rs 1,00,000 P2P limit",
+                    "am",
+                )
+            elif valid_mc and amount_num > _UPI_MERCHANT_CAP and mc not in _HIGH_LIMIT_MCCS:
+                add(
+                    "amount_above_cap",
+                    "medium",
+                    f"pre-fills Rs {amt_str}, far above normal UPI per-payment limits",
+                    f"pre-fills Rs {amt_str}, far above normal UPI limits",
                     "am",
                 )
             elif not is_merchant_fmt and (amount_num >= _HIGH_P2P_AMOUNT or int(amount_num) in {49990, 49999, 99990, 99999}):
