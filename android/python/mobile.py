@@ -118,6 +118,118 @@ def _flow_json(text):
     return (1 if p >= .1 else 0), p, ev
 
 
+_QUOTE_STOP = {
+    'about', 'after', 'also', 'anyone', 'asks', 'been', 'before', 'check', 'common', 'customer',
+    'details', 'domain', 'found', 'from', 'have', 'into', 'link', 'looks', 'message', 'mobile',
+    'never', 'number', 'official', 'only', 'other', 'personal', 'phone', 'please', 'reads',
+    'report', 'says', 'sender', 'share', 'sites', 'that', 'their', 'there', 'these', 'this',
+    'those', 'through', 'update', 'using', 'verify', 'what', 'when', 'where', 'which', 'while',
+    'will', 'with', 'your',
+}
+_QUOTE_SHORT = ('otp', 'kyc', 'pin', 'cvv', 'upi', 'pan', 'atm')
+
+
+def _stem(word):
+    w = word.lower()
+    for suf in ('ing', 'ed', 'es', 's'):
+        if len(w) > len(suf) + 3 and w.endswith(suf):
+            return w[:-len(suf)]
+    return w
+
+
+def _defang(span):
+    def one(match):
+        url = match.group(0)
+        url = re.sub(r'(?i)^https?', 'hxxp', url)
+        return url.replace('.', '[.]')
+    return re.sub(r'(?i)https?://\S+|www\.\S+', one, span)
+
+
+def _mask_codes(span):
+    """Mask OTP-like 4–8 digit runs. Longer numbers are masked as a block."""
+    span = re.sub(r'(?<!\d)(\d{10,})(?!\d)', lambda m: '•' * len(m.group(1)), span)
+    return re.sub(r'(?<!\d)(\d{4,8})(?!\d)', lambda m: '•' * len(m.group(1)), span)
+
+
+def _clip(span, limit=48):
+    span = span.strip()
+    if len(span) <= limit:
+        return span
+    return span[:limit - 1].rstrip() + '…'
+
+
+def quote_span(evidence, text, limit=48):
+    """Short span of the user's text that an evidence line refers to, or ''.
+
+    Hosts and numbers have to occur in the message. A keyword quote needs two
+    content-word hits, or one long hit, inside 48 characters. Nothing is invented.
+    """
+    ev = str(evidence or '')
+    src = str(text or '')
+    if not ev.strip() or not src.strip():
+        return ''
+    low_ev = ev.lower()
+    low = src.lower()
+    urls = list(re.finditer(r'(?i)https?://[^\s<>"\']+|www\.[^\s<>"\']+', src))
+    hosts = re.findall(r'(?i)\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', ev)
+    for match in urls:
+        host_m = re.search(r'(?i)(?:https?://)?([^/\s:?#]+)', match.group(0))
+        host = (host_m.group(1) if host_m else '').lower().strip('.')
+        if host and (host in low_ev or any(h.lower() in host or host in h.lower() for h in hosts)):
+            return _clip(_mask_codes(_defang(match.group(0))), limit)
+    if len(urls) == 1 and hosts:
+        return _clip(_mask_codes(_defang(urls[0].group(0))), limit)
+
+    hits = []
+    stems = []
+    for word in re.findall(r'[A-Za-z\u0900-\u097F]{4,}', ev):
+        stem = _stem(word)
+        if stem in _QUOTE_STOP or word.lower() in _QUOTE_STOP or len(stem) < 4:
+            continue
+        stems.append(stem)
+    for word in re.findall(r'(?i)\b(?:otp|kyc|pin|cvv|upi|pan|atm)\b', ev):
+        stems.append(word.lower())
+    for stem in dict.fromkeys(stems):
+        for match in re.finditer(re.escape(stem), low):
+            if match.start() and low[match.start() - 1].isalpha():
+                continue
+            hits.append((match.start(), match.end(), 3 if len(stem) >= 7 or stem in _QUOTE_SHORT else 1))
+    if re.search(r'(?i)otp|pin|cvv|password|number|call|mobile|phone', ev):
+        for match in re.finditer(r'(?<!\d)(\d{4,})(?!\d)', src):
+            hits.append((match.start(), match.end(), 3))
+    for number in re.findall(r'\d{4,}', ev):
+        at = src.find(number)
+        if at >= 0:
+            hits.append((at, at + len(number), 3))
+    if not hits:
+        return ''
+    hits.sort()
+    best = None
+    best_score = 0
+    for i, (start, end, score) in enumerate(hits):
+        window_end = end
+        total = score
+        for start2, end2, score2 in hits[i + 1:]:
+            if end2 - start > limit:
+                break
+            window_end = max(window_end, end2)
+            total += score2
+        strong = total >= 2 or score >= 3
+        if strong and total > best_score:
+            best_score = total
+            best = (start, window_end)
+    if not best:
+        return ''
+    start, end = best
+    while start > 0 and not src[start - 1].isspace() and end - (start - 1) <= limit:
+        start -= 1
+    while end < len(src) and not src[end].isspace() and (end + 1) - start <= limit:
+        end += 1
+    span = src[start:end].strip(' \t\r\n.,;:\'"')
+    span = _clip(_mask_codes(_defang(span)), limit)
+    return span if len(span) >= 3 else ''
+
+
 def verdict(kind, text):
     """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds."""
     t0 = time.perf_counter()
@@ -137,6 +249,7 @@ def verdict(kind, text):
     _last.clear(); _last.update(kind=kind, text=text, lab=lab, ev=ev)
     out = {'verdict': VERDICT[lab], 'level': {1: 'danger', 'uncertain': 'warn', 0: 'clear'}[lab],
            'score': score, 'scam_type': scam, 'evidence': ev,
+           'evidence_quotes': [quote_span(line, text) for line in ev],
            'actions': actions, 'actions_hi': _actions_hi(actions),
            'buttons': _HINDI['buttons'], 'detector_ms': ms}
     report = _report_buttons(kind, lab, scam, actions)
@@ -145,11 +258,44 @@ def verdict(kind, text):
     return json.dumps(out, ensure_ascii=False)
 
 
+def _replacement_pool(kind, lab, text):
+    """Vetted sentences that replace a generated line, from advice_for and ACTIONS."""
+    pool = []
+    seen = set()
+
+    def add(sentence):
+        line = (sentence or '').strip()
+        if line and line not in seen:
+            seen.add(line)
+            pool.append(line)
+
+    try:
+        add(llm.advice_for(kind, lab, text)[0])
+    except Exception:
+        pass
+    table = llm.FLOW_ACTIONS if kind == 'flow' else llm.ACTIONS
+    for acts in table.values():
+        if acts:
+            add(acts[0])
+    for tail, _acts in llm.TYPE_ADVICE.values():
+        add(tail)
+    return pool
+
+
+def ends_with_replacement(explanation, kind, lab, text):
+    """True when the explanation ends on a vetted sentence substituted for model text."""
+    body = (explanation or '').strip()
+    if not body:
+        return False
+    return any(body.endswith(sent) for sent in _replacement_pool(kind, lab, text))
+
+
 def explain(runner):
     """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
     ex = BridgeExplainer(runner)
     text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
-    return json.dumps({'explanation': text, 'llm': stats}, ensure_ascii=False)
+    replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
+    return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 
 def check(kind, text, runner):

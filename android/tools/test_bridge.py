@@ -5,6 +5,71 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'candidates/BEST'), str(ROOT/'android/python')]
 # Chaquopy installs only NumPy: block the desktop-only packages so an import of
 # any of them fails here as it would on the phone.
+import intake
+assert intake.detect_mode('http://amaz0n-refund-help.top/claim') == 1
+assert intake.detect_mode('  https://www.irctc.co.in/nget/train-search  ') == 1
+assert intake.detect_mode('upi://pay?pa=refund@ybl&am=5000') == 1
+assert intake.detect_mode('www.example.com/path') == 1
+assert intake.detect_mode('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked') == 0
+assert intake.detect_mode('Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein.') == 0
+assert intake.detect_mode('see https://example.com please') == 0
+assert intake.detect_mode('tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected') == 2
+assert intake.detect_mode('{"num_failed_logins": 4, "serror_rate": 1}') == 2
+assert intake.detect_mode('') == 0
+assert intake.detect_mode('{not json}') == 0
+print('share-text mode detection passed')
+
+hi = json.loads((ROOT / 'android/python/strings_hi.json').read_text(encoding='utf-8'))
+assert set(hi) >= {'ui', 'evidence', 'skip', 'new'}
+assert isinstance(hi['ui'], dict) and hi['ui']['Check on this phone']
+assert isinstance(hi['evidence'], dict) and any('{host}' in k for k in hi['evidence'])
+assert isinstance(hi['skip'], list) and hi['skip']
+for key, item in hi['new'].items():
+    assert 'en' in item and 'hi' in item, key
+print('hindi string table shape passed')
+
+import qrdec
+_HI = """
+111111100101001111111
+100000100001001000001
+101110101110101011101
+101110101100001011101
+101110100110001011101
+100000100001101000001
+111111101010101111111
+000000000111100000000
+000110110010100001100
+001000011010010010110
+101001101000001011110
+101011001000000001100
+001111110011000001111
+000000001101000101000
+111111101010011110010
+100000100000110111011
+101110101011011101101
+101110101011110011100
+101110100011011000111
+100000100101100010110
+111111100001001001110
+""".split()
+assert qrdec.decode_modules([[c == '1' for c in row] for row in _HI]) == 'HI'
+_n = len(_HI)
+_scale, _quiet = 4, 4
+_side = (_n + _quiet * 2) * _scale
+_gray = [255] * (_side * _side)
+for _r, _row in enumerate(_HI):
+    for _c, _bit in enumerate(_row):
+        if _bit != '1':
+            continue
+        for _dy in range(_scale):
+            for _dx in range(_scale):
+                _y = (_r + _quiet) * _scale + _dy
+                _x = (_c + _quiet) * _scale + _dx
+                _gray[_y * _side + _x] = 0
+assert qrdec.decode_gray(bytes(_gray), _side, _side) == 'HI'
+assert qrdec.decode_modules([[False] * 21 for _ in range(21)]) is None
+print('qr decoder fixture passed')
+
 for blocked in ('joblib', 'sklearn', 'scipy', 'pandas', 'torch', 'executorch'):
     sys.modules[blocked] = None
 import mobile
@@ -81,6 +146,31 @@ assert mobile._report_buttons('sms', 'uncertain', 'OTP or PIN theft', [mobile.ll
 assert mobile._report_buttons('flow', 1, 'a port scan', ['Block the source address at the firewall or router.']) is None
 assert mobile._report_buttons('sms', 0, '', ['Verify in the official app; never share your OTP or PIN.']) is None
 print('hindi steps, link order, benign evidence and report buttons passed')
+
+kyc = ('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top '
+       'or the account will be blocked')
+tail = mobile.llm.advice_for('sms', 1, kyc)[0]
+assert tail and mobile.ends_with_replacement('This message is DANGEROUS. ' + tail, 'sms', 1, kyc)
+assert mobile.ends_with_replacement(
+    'This message is DANGEROUS. Do not click the link or reply to the message.',
+    'sms', 1, kyc)
+assert not mobile.ends_with_replacement(
+    'This message is DANGEROUS. It asks for an OTP and a password.',
+    'sms', 1, kyc)
+assert not mobile.ends_with_replacement('', 'sms', 1, kyc)
+print('replacement-sentence flag passed')
+
+kyc_q = mobile.quote_span('threatens to block the account or service', kyc)
+assert 'account will be blocked' in kyc_q and 'http' not in kyc_q
+link = 'http://amaz0n-refund-help.top/claim?id=8812'
+link_q = mobile.quote_span('the domain amaz0n-refund-help.top swaps letters for digits to imitate a brand', link)
+assert 'amaz0n' in link_q and 'http://' not in link_q and '[.]' in link_q and '8812' not in link_q
+debit_q = mobile.quote_span('looks like a bank debit or OTP alert; scammers copy these', bank)
+assert '482910' not in debit_q and '•' in debit_q
+assert mobile.quote_span('reads like a routine bill reminder', 'hello there friend') == ''
+assert mobile.quote_span('points to the official app or channel',
+    'Your electricity bill of Rs 1,240 is due on 15 Dec. Pay through the mahadiscom app; no link is attached.') == ''
+print('evidence quote spans passed')
 
 # End to end through the shipped detector, with only NumPy available.
 class Echo:
