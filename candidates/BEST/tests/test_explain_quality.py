@@ -293,8 +293,8 @@ def test_cleared_debit_alert_uses_the_alert_heading():
     inp = "Bank alert: Rs 720 was debited through UPI. If unrecognised, contact your bank immediately."
     lab, _, ev = detect.classify_any("sms", inp)
     s = explain_hi.summary_hi("sms", inp, lab, ev)
-    if lab == 0 and llm.DEBIT_STEP in llm.actions_for("sms", lab, inp):
-        assert s.startswith(explain_hi.table()["alert_heading"]["hi"])
+    assert lab == 0 and llm.DEBIT_STEP in llm.actions_for("sms", lab, inp)
+    assert s.startswith(explain_hi.table()["alert_heading"]["hi"])
 
 
 # --- PR #50 review round 1 (GLM 5.4) -----------------------------------------------------------
@@ -424,3 +424,33 @@ def test_unsafe_only_output_with_inserted_opening_fails():
     c = ctx("Share your OTP to unblock the account.", 1, "sms", llm.KEY_FACT["OTP or PIN theft"])
     with pytest.raises(ValueError):
         llm.validate(out, opening, c, vetted=[tail], model_opening=False)
+
+
+# --- PR #50 review round 2 (GLM 5.4) -----------------------------------------------------------
+
+@pytest.mark.parametrize("phrase,want", [
+    ("reads like a routine bill reminder with a payment due", "bill"),
+    ("says no payment or OTP is needed", "no_fee"),
+    ("says no payment is needed", "no_fee"),
+    ("no request for a secret, payment or link in the text", "generic"),
+    ("no request for a secret or payment in the text", "generic"),
+    ("no request for a payment or link in the text", "generic"),
+    ("reads like a normal refund receipt", "receipt"),
+])
+def test_benign_readings(phrase, want):
+    assert llm._benign_reading("sms", [phrase]) == want
+
+
+def test_and_before_advice_starts_an_advice_clause():
+    c = ctx("Your account will be blocked today.", 1, "sms")
+    assert llm.unsupported("Hang up and call your bank on the number on your card.", c) is None
+
+
+def test_upi_id_is_not_an_email_address():
+    c = ctx("Send Rs 500 to 98765@ybl to clear customs.", 1, "sms")
+    assert llm.unsupported("It asks you to send details by email.", c) == "email_not_in_input"
+
+
+def test_malware_hedge_on_a_cleared_flow_is_dropped():
+    c = ctx("nightly backup traffic to the NAS at 2 am", 0, "flow")
+    assert llm.unsupported("This traffic may carry malware to the target machine.", c) == "hedge_against_verdict"

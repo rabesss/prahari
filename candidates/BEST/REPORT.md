@@ -171,7 +171,7 @@ states a false fact can pass. The explanation model can still produce a wrong de
 sentences that name a link, number or domain the item does not contain, or make an unsupported
 OTP, payment, app, KYC or call claim, and substitutes a vetted key fact; it is a set of rules, not
 a guarantee, and it cannot correct a wrong detector evidence phrase, which the opening repeats. In
-blind audits on fresh 20-item sets (`../../research/explain-audit.md`) most remaining wrong
+blind audits on fresh 20-item sets (`research/explain-audit.md` in the repository) most remaining wrong
 explanations came from wrong detector evidence. Llama 3.2 1B cannot write usable Hindi, so Hindi
 mode shows a fixed-text Hindi summary of the detector result next to the English Llama text.
 

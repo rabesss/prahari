@@ -1021,7 +1021,7 @@ KEY_FACT = {
     "sextortion or blackmail": "Do not pay a blackmailer because paying usually brings more demands.",
     "an extortion threat": "Do not pay a threat because paying usually brings more demands.",
     "an investment or trading scam": "Never trust guaranteed or doubled returns because they are a common investment scam trick.",
-    "an identity-document scam": "Never share Aadhaar or PAN copies on chat apps or websites.",
+    "an identity-document scam": "Never share Aadhaar or PAN copies on a chat app or with someone who messaged you.",
     "a gift-card scam": "Never pay anyone with gift cards because gift-card payment is a common scam trick.",
     "an impersonation scam": "Do not trust the name in the message and check through a number you already have.",
     "an electricity disconnection scam": "Never pay a bill using a number or web address from a message.",
@@ -1065,9 +1065,11 @@ def _benign_reading(kind, phrases):
     if kind == "flow":
         return "flow"
     first = (phrases[0] if phrases else "").lower()
+    if first.startswith(("no request", "no scam mechanism", "no lookalike")):
+        return "generic"  # an absence statement names "payment" without being a receipt
     for key, pat in (("otp", r"otp notification"), ("no_fee", r"says no (?:fee|charge|payment)"),
                      ("bill", r"bill reminder"),
-                     ("receipt", r"payment|refund|receipt"),
+                     ("receipt", r"payment|refund|receipt"),  # after bill, no-fee and absence
                      ("delivery", r"order|delivery|tracking"),
                      ("official_domain", r"official domain"),
                      ("protective", r"never asks|says no |protective|not to share"),
@@ -1109,6 +1111,10 @@ _V_ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delet
                        r"when|unless|you should|you may want to|please|it is safer to|i would say)\b", re.I)
 _V_NOTE = re.compile(r"^\s*(?:please\s+)?(?:note|be aware|remember)\s+(?:that\s+)?", re.I)
 _V_SPLIT = re.compile(r"[,;।!?:]|\b(?:and then|so|but)\b", re.I)
+# As in the proxy: "and" before an advice word starts a new (advice) clause.
+_V_AND_ADVICE = re.compile(r"\band\s+(?=(?:you should|you may want to|please|it is safer to|never|don't|do not|report|"
+                           r"call|block|delete|verify|check|contact|ignore)\b)", re.I)
+_V_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _V_NEG = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b", re.I)
 _V_CUES = {
     "payment": (re.compile(r"\b(?:pay(?:ment|ing|s)?|transfer|money|funds|fee|deposit|recharge|collect request)\b", re.I),
@@ -1134,17 +1140,17 @@ _V_DEVICE = re.compile(r"\b(?:computer|laptop|virus|viruses|malware|spyware|hack
 _V_NETWORK = re.compile(r"\b(?:firewall|ports?|ip address|router|server|traffic)\b", re.I)
 _V_MESSAGE = re.compile(r"\b(?:message|sms|text|link|url|click|sender|reply|otp|pin|upi)\b", re.I)
 _V_HEDGE = re.compile(r"\b(?:scam\w*|phishing|fraud\w*|suspicious|malicious|cautious|caution|beware|wary|"
-                      r"risky|dangerous|unsafe|harm\w*)\b", re.I)
+                      r"risky|dangerous|unsafe|harm\w*|malware|virus\w*)\b", re.I)
 _V_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd)\b|\b(?i:me|my|mine|we|we're|we've|our)\b")
 _V_OVERCLAIM = re.compile(r"\b(?:known|confirmed|proven)\s+(?:scam\w*|phishing|fraud\w*|malicious|attack\w*)|"
-                          r"\b(?:definitely|certainly|undoubtedly)\b|\b100 ?%", re.I)
+                          r"\b(?:definitely|certainly|undoubtedly)\b", re.I)
 _V_VAGUE = re.compile(r"\s*(?:please\s+)?(?:be|stay|remain)\s+(?:very\s+)?(?:cautious|careful|vigilant|wary|alert)\b", re.I)
 _V_DOMAIN = re.compile(r"(?<![\w@.])(?:https?://)?(?:[a-z0-9-]+(?:\.|\[\.\]))+[a-z]{2,}\b", re.I)
 _V_HELP = ("cybercrime.gov.in", "sancharsaathi.gov.in", "cert-in.org.in", "sachet.rbi.org.in")
 
 
 def _clauses(sent):
-    return [c for c in _V_SPLIT.split(sent) if c and c.strip()]
+    return [p for c in _V_SPLIT.split(sent) if c and c.strip() for p in _V_AND_ADVICE.split(c) if p.strip()]
 
 
 def _negated(clause, m):
@@ -1185,7 +1191,7 @@ def unsupported(sent, ctx):
         claims = [c for c in _clauses(sent) if _V_CUES["link"][0].search(c) and not _V_ADVICE.search(c)]
         if claims or not _V_CUES["link"][0].search(fact):
             return "link_not_in_input"
-    if _V_CUES["email"][0].search(sent) and not (_V_CUES["email"][1].search(inp) or "@" in inp):
+    if _V_CUES["email"][0].search(sent) and not (_V_CUES["email"][1].search(inp) or _V_EMAIL.search(inp)):
         return "email_not_in_input"
     if kind != "flow" and _V_DEVICE.search(sent) and not _V_DEVICE.search(inp) and not _V_DEVICE.search(fact):
         return "device_not_in_input"

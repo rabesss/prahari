@@ -18,7 +18,7 @@ Bharat AI-SoC Challenge 2026, PS3 entry. It checks pasted SMS/WhatsApp-style mes
    attempts to remove sentences that contradict the verdict, an honesty validator drops generated
    sentences the item does not support (a link, number or domain that is not there, an
    unsupported OTP/payment claim, hedges against a NO RISK verdict, first-person or overclaiming
-   lines) and puts the fact in their place (`llm.validator`, `llm.replaced`), and a refusal falls
+   lines) and, when that would not let fixed text outweigh the model's own tokens, puts the fact in their place (`llm.validator`, `llm.replaced`), and a refusal falls
    back to an evidence-only prompt. `bin/explain` also returns `summary_hi`, a fixed-text Hindi
    summary built from the detector result (not model text; the 1B model cannot write reliable
    Hindi). Fixed remediation steps (1930 helpline,

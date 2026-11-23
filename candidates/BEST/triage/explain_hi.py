@@ -8,7 +8,8 @@ English Llama explanation instead of asking the model for Hindi. The summary is
 
 where the evidence phrase is the one the English opening uses (llm.compact_evidence) and the key
 fact is the one the English prompt is grounded in (llm.key_fact). Every string comes from
-explain_hi.json, translated through General Translation and checked by a second reviewer. A
+explain_hi.json: evidence phrases reuse the app's Hindi table (android/python/strings_hi.json) where
+the English matches, and the rest are written for this table (no machine translation). A
 phrase the table does not know (a truncated detector line, a new rule) is never guessed: the
 summary uses the per-verdict fallback reason instead. Hosts of risky links are defanged.
 """
