@@ -90,7 +90,8 @@ def summary_hi(kind, inp, verdict, evidence):
     phrases = llm.compact_evidence(kind, inp, evidence, verdict)
     reason = translate(phrases[0]) if phrases else None
     if not reason:
-        reason = (t.get("fallback_reason", {}).get(key) or {}).get("hi", "")
+        table_key = "fallback_reason_network" if kind == "flow" else "fallback_reason"
+        reason = (t.get(table_key, {}).get(key) or {}).get("hi", "")
     fact = t.get("facts", {}).get(llm.key_fact(kind, inp, verdict, evidence), "")
     out = f"{head}: {reason}" if reason else head
     out = out.rstrip("।. ") + "।"

@@ -46,7 +46,10 @@ def cmd_explain(a):
                     "category": scam_type(kind, inp, lab),
                     "actions": actions_for(kind, lab, inp), "evidence_used": ev}
         # Fixed-text Hindi summary from the detector result (not model text; see explain_hi.py).
-        hi = summary_hi(kind, inp, lab, ev)
+        try:
+            hi = summary_hi(kind, inp, lab, ev)
+        except Exception:  # an aid only; a table problem must never stop the explain run
+            hi = ""
         if hi:
             row["summary_hi"] = hi
         try:

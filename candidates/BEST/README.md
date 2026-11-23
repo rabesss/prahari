@@ -13,9 +13,15 @@ Bharat AI-SoC Challenge 2026, PS3 entry. It checks pasted SMS/WhatsApp-style mes
    three high-precision intrusion signatures on top.
 2. **Advisory layer:** Llama 3.2 1B Instruct (INT4 QLoRA, ExecuTorch `.pte`) turns the verdict, type
    and top evidence phrase into a short explanation. The compact prompt neutralises live links,
-   forces a verdict-first sentence and asks for the evidence phrase verbatim; a heuristic filter
-   attempts to remove sentences that contradict the verdict, and a refusal falls back to an
-   evidence-only prompt. Fixed remediation steps (1930 helpline,
+   forces a verdict-first sentence, asks for the evidence phrase verbatim and grounds the model's
+   own sentence in one vetted key fact for that kind of scam (or benign reading); a heuristic filter
+   attempts to remove sentences that contradict the verdict, an honesty validator drops generated
+   sentences the item does not support (a link, number or domain that is not there, an
+   unsupported OTP/payment claim, hedges against a NO RISK verdict, first-person or overclaiming
+   lines) and puts the fact in their place (`llm.validator`, `llm.replaced`), and a refusal falls
+   back to an evidence-only prompt. `bin/explain` also returns `summary_hi`, a fixed-text Hindi
+   summary built from the detector result (not model text; the 1B model cannot write reliable
+   Hindi). Fixed remediation steps (1930 helpline,
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
 

@@ -11,4 +11,6 @@
 | Indian-context synthetic messages | Project-generated Indian-context messages used in training/development and a separate synthetic generator run for evaluation; see split and generator documentation | original work (this project) | generated for this project |
 | Llama 3.2 1B Instruct QLoRA INT4 .pte | explanations | Llama 3.2 Community License | https://huggingface.co/executorch-community |
 
+| Hindi summary strings (`triage/explain_hi.json`) | fixed-text Hindi summary in Hindi mode | original work (this project) | evidence phrases reuse the app's Hindi table (`android/python/strings_hi.json`) where the English matches; the remaining phrases, key facts and verdict lines were written for this project; no machine-translation service output is used |
+
 Datasets and model weights are not committed to the repository.

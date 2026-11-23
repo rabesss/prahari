@@ -167,9 +167,13 @@ Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the p
 v2 recall is 0.720 with FPR 0.040 (injection recall 0.70). Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
-states a false fact can pass. The explanation model can still produce a wrong detail. The evaluator heuristically checks
-explanations for certain invented domains and long numbers; the application does not filter generated text
-for invented domains or numbers and does not guarantee that fabrications or unsafe advice are caught.
+states a false fact can pass. The explanation model can still produce a wrong detail. An honesty validator now drops generated
+sentences that name a link, number or domain the item does not contain, or make an unsupported
+OTP, payment, app, KYC or call claim, and substitutes a vetted key fact; it is a set of rules, not
+a guarantee, and it cannot correct a wrong detector evidence phrase, which the opening repeats. In
+blind audits on fresh 20-item sets (`../../research/explain-audit.md`) most remaining wrong
+explanations came from wrong detector evidence. Llama 3.2 1B cannot write usable Hindi, so Hindi
+mode shows a fixed-text Hindi summary of the detector result next to the English Llama text.
 
 ## Demo plan
 
