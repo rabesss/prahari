@@ -1508,8 +1508,8 @@ class MainActivity : Activity() {
         if (pa.isNotBlank()) rows.add(Triple("UPI ID", pa, true))
         rows.add(Triple("Amount", if (amt.isNotBlank()) "$cu $amt" else t("Entered by you"), amt.isNotBlank()))
         val cat = when {
-            isMerchant -> "MCC $mc"
             mc.isNotBlank() -> "MCC $mc"
+            isMerchant -> t("Merchant")
             else -> t("Personal / P2P")
         }
         rows.add(Triple("Category", cat, isMerchant))
