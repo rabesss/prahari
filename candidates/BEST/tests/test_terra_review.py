@@ -153,10 +153,17 @@ def test_round2_protection_does_not_hide_harm(text):
 
 
 def test_round2_protection_obeys_gate_and_request_cues():
+    # A bare reassurance with no request and no contact of its own gives the reader nothing to act
+    # on, so a high text-model score alone no longer flags it (fp-fix: contact gate). With a phone
+    # number of its own the model score still decides.
     for text in ('We never ask for OTP.', 'No fee is required.'):
         a = mech.analyze(text)
         assert mech.decide(0.84, a)[0] == 0
-        assert mech.decide(0.85, a)[0] == 1
+        assert mech.decide(0.99, a)[0] == 0
+    for text in ('We never ask for OTP. Call 9876501234.', 'No fee is required. WhatsApp 9876501234.'):
+        a = mech.analyze(text)
+        assert a['own_contact'], text
+        assert mech.decide(0.99, a)[0] == 1
     for text in ('Install the app. We never ask for OTP.',
                  'Pay now. We never ask for OTP.',
                  'We require a voucher code. No fee is required.',
