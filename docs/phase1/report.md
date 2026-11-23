@@ -1,27 +1,27 @@
 ---
 title: "Prahari: offline threat triage on Arm"
 subtitle: "Bharat AI-SoC Challenge 2026–27, PS3 | Phase 1 technical report"
-date: "21 November 2026"
+date: "23 November 2026"
 geometry: margin=0.85in
 fontsize: 11pt
 ---
 
 ## Summary
 
-Prahari is an Arm CPU prototype that helps people assess suspicious messages, links and described network events without a cloud inference service. Small trained detectors and transparent rules produce a verdict and evidence; a Llama 3.2 1B model running through ExecuTorch turns that evidence into plain-language guidance. Its Indian-context mechanism layer looks for actions such as sharing an OTP, paying an unverified recipient or responding to a service-disconnection threat, while recognising cues in ordinary notices. A separate trained network model scores NSL-KDD feature records as dataset replay. The system is designed to help a person decide what to check next, not to act automatically or certify safety [S1, S2].
+Prahari is an Arm CPU prototype that helps people assess suspicious messages, links and described network events without a cloud inference service. Small trained detectors and transparent rules produce a verdict and evidence; a Llama 3.2 1B model running through ExecuTorch turns that evidence into plain-language guidance. Its Indian-context layer looks for requests for OTPs or payments and service-disconnection threats, while recognising ordinary notices. A separate trained network model scores NSL-KDD feature records as dataset replay. The system is designed to help a person decide what to check next, not to act automatically or certify safety [S1, S2].
 
 ## Highlights
 
 Round-3 measurements are from Oracle, an Arm Neoverse-N1 VM with two vCPUs [S8].
 
-- Shipped `candidates/BEST` is gen51 plus post-review conservative rule fixes (PR #30, content hash `b9e16a6e…`). gen51 (`46f30b36…`) was promoted after a confirmation that ran three baseline and three candidate evaluations alternately; the PR #30 fixes were checked with the same evaluator, without a new confirmation. On 23 Nov an advice-safety filter was added to the Llama layer (content hash `9f1f1dfe…`): on a dangerous or suspicious message or link, a generated sentence that urges the reader to comply (for example "verify your KYC") is replaced by a fixed safe action. Detector verdicts are unchanged; proxy v3 86.1 against 85.6 and 85.8 for `b9e16a6e…` on the same day. The same day, scam-specific vetted actions replaced the generic list (content hash `4ea1d89a…`), and a genuine bank alert that tells the reader to block their own card is now SUSPICIOUS rather than DANGEROUS (never NO RISK, since a spoof can copy it); detector F1 is unchanged and the reviewer adversarial suite catches 21 of 24 scams (was 20).
+- Shipped `candidates/BEST` is gen51 plus later rule and advice changes, content hash `4ea1d89a…` ([S8]). Proxy v3 is **86.26**, including explanation score **0.929**. Scam-specific vetted steps replace unsafe generated advice. A bank debit alert that suggests blocking the card in the bank app is SUSPICIOUS. Detector F1 is unchanged.
 - Conservative F1 of the shipped rules: SMS **0.922**, URL **0.994**, Indic **0.950**, NSL-KDD flow replay **0.850**. These evaluation sets were used repeatedly during development.
-- On the sealed final holdout, gen51 improved combined F1 from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. The PR #30 fixes came after the holdout runs and were not scored on it. False alarms remain high.
-- In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules caught 20 scams (PR #21 baseline 13) and flagged 5 harmless messages (baseline 3). Messages that mix an official channel with an unofficial WhatsApp, mobile number or link can still be marked safe.
-- In the shipped version's final evaluation, end-to-end time was about **3.8 s/item** and peak memory was **2.05 GB**. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB.
+- On the sealed final holdout, gen51 improved combined F1 from **0.709 to 0.802**, while FPR rose from **0.29 to 0.31**. PR #30–35 came after the holdout runs and were not scored on it. False alarms remain high.
+- In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules catch 21 scams (PR #21 baseline 13) and flag 5 harmless messages (baseline 3). Messages that mix an official channel with an unofficial WhatsApp, mobile number or link can still be marked safe.
+- In the PR #30 evaluation (`b9e16a6e…`), end-to-end time was about **3.8 s/item** and peak memory was **2.05 GB**. This is systemd cgroup `memory.peak`, including page cache, not process RSS.
 - A blind manual audit of 20 holdout explanations found 5 correct, 8 weak and 7 wrong; 4 made false claims about the input and 16 gave generic or misdirected advice.
 
-**What is not done yet.** Live network capture and a measured physical-phone run remain unverified or planned. A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. The Arm results come from a shared cloud VM, and an independently blocked-egress demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
+**What is not done yet.** Live network capture and a physical-phone Llama run remain unverified. Android generation has been demonstrated on an x86_64 emulator; the Arm measurements are from a shared cloud VM, and an independently blocked-egress Linux demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
 
 \newpage
 
@@ -62,19 +62,29 @@ The message layer combines TF-IDF and a logistic classifier with Indian-context 
 
 ## Arm and ExecuTorch optimisation
 
-**Target and method.** Measurements were made on Oracle, an aarch64 Neoverse-N1 VM with two vCPUs. In the shipped version's final evaluation, end-to-end time was about 3.8 s/item and peak memory was 2.05 GB. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB. Shared-host load can affect timing [S8].
+**Target and method.** Measurements were made on Oracle, an aarch64 Neoverse-N1 VM with two vCPUs. In the PR #30 evaluation (`b9e16a6e…`), end-to-end time was about 3.8 s/item and peak memory was 2.05 GB. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB. Shared-host load can affect timing [S8].
 
 **Model and backend.** Prahari uses the ExecuTorch XNNPACK CPU backend with Llama 3.2 1B Instruct QLoRA. The language model is used to explain detector evidence, not to classify inputs [S2].
 
-**Keep detection fast.** Llama is invoked for explanation, not classification. The small detector produces a verdict and selected evidence first; the advisory model receives a compact prompt and generates at most 40 new tokens with greedy decoding in the Linux reference runner; the draft Android port uses callback-count stopping, not a guaranteed token cap. This makes the cost of the language model visible and keeps it out of the detector path [S2].
+**Keep detection fast.** Llama is invoked for explanation, not classification. The small detector produces a verdict and selected evidence first; the advisory model receives a compact prompt and generates at most 40 new tokens with greedy decoding in the Linux reference runner; the Android app uses callback-count stopping, not a guaranteed token cap. This makes the cost of the language model visible and keeps it out of the detector path [S2].
 
 **Compact the prompt.** An evidence-first prompt and bounded generation reduce the amount of text passed to the model. Shared-host measurements do not establish a controlled latency gain from prompt compaction [S4].
 
 **KleidiAI.** KleidiAI micro-kernels are linked into the installed ExecuTorch 1.6.0 XNNPACK backend; dispatch on Neoverse-N1 was not profiled; no speedup claimed. The 17 November symbol inspection found 517 `kai_` symbols in the XNNPACK backend library; its command, additional library counts and limitations are recorded in the evidence ledger [S5]. Symbol presence alone does not establish that a particular inference used those kernels.
 
-## Android deployment (in progress)
+## Android deployment
 
-A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. Device identity, permissions, latency, throughput and peak memory will be recorded after a real-phone run [S7].
+The app in `android/` ran the shipped detector and Llama 3.2 1B end to end on an Android 14 x86_64 emulator, using an x86_64 build and ExecuTorch Android 1.5.1. It used the same QLoRA `.pte` (SHA-256 `ab7b7ebf…`) as the Linux runner. The pictured KYC check took 274 ms in the detector. Emulator timings are labelled as x86, not Arm timings; a physical Arm phone run remains pending [S7].
+
+The result places the Hindi and English verdict first, followed by numbered scam-specific vetted steps with Hindi lines reviewed by Gemini 4 Neon. For scam messages and links before loss, “Report on Sanchar Saathi Chakshu” is primary and “Lost money? Call 1930” secondary; 1930 is primary when money is already gone, and cybercrime.gov.in is used for sextortion or extortion. Evidence follows, then the Llama card warns “AI-written and can be wrong. Follow the steps above.” On-device stats are collapsed by default. A genuine-looking bank debit alert is SUSPICIOUS and first advises “Not your payment? Block it in your bank app and call 1930.” A rule override does not clear a message as NO RISK when the model leans scam and the message offers another contact such as a link, number, chat handle or UPI ID.
+
+The app declares no `INTERNET` permission. “Prove it's offline” attempts HTTPS and displays the OS refusal only for a real permission error; the screenshot shows Android's `SecurityException`. Calls and browser visits use separate apps. Model files must be staged first. Mockups used Mobbin iOS references and Figma; Gemini 4 Neon reviewed UX and India-specific safety copy, and GPT-6.1 Terra wrote the app code [S7].
+
+![KYC result: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-a.png){width=27%} ![Llama and expanded stats: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-c.png){width=27%}
+
+![Bank debit alert: Android 14 emulator (x86_64)](img/app-r8-bankdebit-a.png){width=27%} ![Permission test: Android 14 emulator (x86_64)](img/app-20-network.png){width=27%}
+
+*Top: KYC result and steps; Llama and expanded stats. Bottom: bank debit alert; permission test. Each: Android 14 emulator (x86_64).*
 
 \newpage
 
@@ -91,13 +101,13 @@ Prahari evaluates detection independently from generated explanations. The follo
 
 Historical `eval/run_eval.py` detection metrics gave half credit to uncertain verdicts, and historical language accuracy gave half credit for abstentions. Those earlier aggregates do not include abstention counts and are not directly comparable to the conservative figures above [S3].
 
-**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a confirmation that ran three baseline and three candidate evaluations alternately. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). After review, PR #30 added conservative rule fixes for messages wrongly marked safe; on the same evaluator it scored 86.3, without a new confirmation. It raised SMS F1 and lowered Indic F1, with Indic FPR rising from 0.63% to 4.38%. The table above is for the shipped rules. The rounded means and reported improvements are recorded separately [S8].
+**Round-3 optimisation.** Proxy v3 is an internal engineering score on a 100-point scale, not an official judging score. Candidates were evaluated with gates and isolated runs; gen51 was promoted after a confirmation that ran three baseline and three candidate evaluations alternately. Mean proxy history: PR #21 baseline 73.4 → gen13b 84.7 (+11.31) → gen35b 85.1 (+0.85) → gen51 86.6 (+1.92). After review, PR #30 added conservative rule fixes for messages wrongly marked safe; on the same evaluator it scored 86.3, without a new confirmation. It raised SMS F1 and lowered Indic F1, with Indic FPR rising from 0.63% to 4.38%. The current proxy v3 is 86.26; the table above is for the shipped rules. The rounded means and reported improvements are recorded separately [S8].
 
 **India v2 adaptive validation.** A different agent authored 400 items blind. Aggregate-only feedback was used for tuning, making this a validation set, not a test. Penalized score I rose from 0.377 at baseline to 0.830 for gen51 and 0.839 for the shipped rules; injection recall was 0.70 (gen51) and 0.725 (shipped), and benign-AI-mention FPR was 0 [S8]. The earlier v1 challenge set was previously exposed and is exploratory only.
 
 ### Sealed holdout
 
-The final holdout contained 184 items after independent label review: 84 malicious and 100 benign, with 155 SMS-route and 29 injection-route items. A different model family (Gemini) authored it blind in a different style. It was never seen during development and stayed off the dev box until freeze. The baseline and gen51 were each scored once; a review-fix revision of gen51 was scored once more and gave the same results. The later PR #30 fixes were not scored on the holdout, so the table describes gen51, not the exact shipped rules [S8].
+The final holdout contained 184 items after independent label review: 84 malicious and 100 benign, with 155 SMS-route and 29 injection-route items. A different model family (Gemini) authored it blind in a different style. It was never seen during development and stayed off the dev box until freeze. The baseline and gen51 were each scored once; a review-fix revision of gen51 was scored once more and gave the same results. The later PR #30–35 changes were not scored on the holdout, so the table describes gen51, not the exact shipped rules [S8].
 
 | Metric | PR #21 baseline | gen51 |
 |:--|--:|--:|
@@ -116,7 +126,7 @@ The final holdout contained 184 items after independent label review: 84 malicio
 
 The pre-registered ship rule required F1 no more than 2 percentage points below baseline and FPR no more than 2 points above; gen51 passed at FPR +2.0 points. False alarms were high for both systems on hard benign look-alikes. About 12 of gen51's 31 false positives contain placeholder `.example` links; the rest are genuine benign notices, especially safety advisories mentioning scam tactics [S8].
 
-**Known rule limits.** In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules caught 20 scams (PR #21 baseline 13) and flagged 5 harmless messages (baseline 3). The 4 missed scams mix an official channel with an unofficial one: an official app and then a WhatsApp number, a disconnection threat with a mobile number next to the official app, or a KYC reminder with an unofficial link. They are documented, not patched, because each new rule raised false alarms and the holdout could not be reused to check a fix. A benign verdict reads “NO RISK FOUND — still verify”, never “safe” [S8].
+**Known rule limits.** In a reviewer-written adversarial suite of 24 scams and 13 harmless messages, the shipped rules catch 21 scams (PR #21 baseline 13) and flag 5 harmless messages (baseline 3). The 3 missed scams mix an official channel with an unofficial one: an official app and then a WhatsApp number, or a KYC reminder that sends the reader to an unofficial link. They are documented, not patched, because each new rule raised false alarms and the holdout could not be reused to check a fix. A benign verdict reads “NO RISK FOUND — still verify”, never “safe” [S8].
 
 **Data and splits.** SMS sources are UCI SMS Spam and Mendeley SMS Phishing, and the URL source is PhiUSIIL; their stated licences are CC BY 4.0. Flow records come from NSL-KDD, described as UNB research use. Indian seed datasets are credited to karanverma19 (Apache-2.0) and bolewara (CC BY 4.0); the categorised Indian-context evaluation uses project-generated synthetic messages [S6]. The model weights and datasets are separately acquired. Source terms should be checked before redistribution.
 
@@ -132,7 +142,7 @@ Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 13
 | [karanverma19 Indian seed](https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset) and [bolewara Hinglish seed](https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset) | Apache-2.0 and CC BY 4.0, respectively | 136 combined seed rows in training; per-source counts are not reported. |
 | Project-generated Indian-context messages | Original project work | Visible messages split within each category: train 256, dev 64; separate generator run for evaluation 320. |
 
-Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored after freeze on the baseline, gen51 and one gen51 review-fix revision, not on the final PR #30 rules. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths no longer output `uncertain`, because the conservative metric counts abstention as an error. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
+Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored after freeze on the baseline, gen51 and one gen51 review-fix revision, not on the later PR #30–35 changes. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths no longer output `uncertain`, because the conservative metric counts abstention as an error. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
 
 **Category holdout.** Leaving each of 32 visible categories out of text-model training yielded pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate [S4]. The script prints a misleading macro label.
 
@@ -140,15 +150,15 @@ Candidate selection repeatedly used feedback from the same hidden evaluation set
 
 ## Explanation, safety and user experience
 
-Prahari separates a detector's verdict from the explanation so that users can inspect the evidence alongside the language model's advice. For a message, the mechanism layer can identify a request for a secret or a fee, a threat, or a benign transaction notice. The UI presents the verdict, score, evidence, Llama explanation, fixed actions and timing. For suspicious communications, the advice directs the user to avoid acting on the message and to use a trusted channel [S2].
+Prahari separates a detector's verdict from the explanation so that users can inspect the evidence alongside the language model's advice. For a message, the mechanism layer can identify a request for a secret or a fee, a threat, or a benign transaction notice. The Android result places fixed actions before evidence and the Llama explanation, with timing in collapsed stats. For suspicious communications, the advice directs the user to avoid acting on the message and to use a trusted channel [S2, S7].
 
-The prompt identifies incoming content as data rather than instructions, neutralises live URLs, and requests a verdict-first explanation grounded in selected evidence. Injection patterns are recognised; refusal retries and a heuristic contradiction filter address some failure modes. These are practical guards, not a proof that untrusted content cannot influence generation or that advice is correct. The model can still make a wrong assertion or give unsafe advice [S2].
+The prompt identifies incoming content as data rather than instructions, neutralises live URLs, and requests a verdict-first explanation grounded in selected evidence. Injection patterns are recognised; refusal retries and a heuristic contradiction filter address some failure modes. These are practical guards, not a proof that untrusted content cannot influence generation or that advice is correct. Generated advice urging compliance with a suspicious message or link is replaced with the scam type’s vetted sentence; disruptive generated network advice such as “disconnect all systems” is replaced by a vetted step. PR #31 and PR #33 were reviewed by GPT-6.1 Terra, GLM 5.4, CodeRabbit and two independent Grok 4.7 reviewers; a CI stress regression merged with PR #33 was fixed forward in PR #35. The model can still make a wrong assertion or give unsafe advice [S2, S8].
 
 A blind manual audit of 20 sealed-holdout explanations found 5 correct, 8 weak and 7 wrong. Four made false claims about the input and 16 gave generic or misdirected advice. Common failures included flagging safety advisories that mention scam tactics, boilerplate advice especially in Hindi and Hinglish, and treating placeholder `.example` links as evidence [S8]. Earlier automated checks were narrow heuristics, not a factuality or safety rate. Understanding by non-experts has not been independently measured.
 
 ### Offline use
 
-Inference runs locally; inputs reach the local app over loopback. Downloading the model requires network access, and the app itself does not block outbound traffic. The controller evaluation used an import-time guard that blocks non-loopback connections; offline claims cover only what was tested. An independently verified egress restriction remains needed for the demo. Inspect the installed Android APK permissions before making claims about it [S2, S7].
+On Linux, inference runs locally and inputs reach the app over loopback; normal startup does not block outbound traffic. The controller evaluation used an import-time guard that blocks non-loopback connections, and an independently verified Linux egress restriction remains needed for the demo. The Android app declares no `INTERNET` permission and its emulator test showed Android blocking its HTTPS request. Downloading and staging model files requires a separate network-capable device or process [S2, S7].
 
 \newpage
 
@@ -158,7 +168,7 @@ Prahari is a triage prototype. It misses some attacks and raises false alarms; o
 
 Phase 2 will turn the prototype into a more representative edge system:
 
-1. Complete the Android app, run it offline on a real Arm phone, and record device identity, permissions, latency, throughput and peak memory.
+1. Run the Android app offline on a real Arm phone, and record device identity, permissions, latency, throughput and peak memory.
 2. Implement permission-aware live capture and a documented feature pipeline, then measure detection and false alarms on representative traffic.
 3. Expand Indic-language coverage with consented, licensed data and independent evaluation, including difficult benign notices and new scam families.
 4. Improve and test grounding, injection resistance, unsafe advice and comprehension with non-expert users; keep uncertainty and human verification visible.
@@ -181,6 +191,6 @@ These are planned activities rather than completed validation [S7].
 
 [S8] Controller-provided round-3 aggregate results, confirmation, sealed-holdout run and blind explanation audit; provenance and holdout hash in `docs/phase1/EVIDENCE.md`. Item texts are withheld until after submission.
 
-[S7] `docs/BRAINSTORM.md` and `candidates/BEST/REPORT.md`, baseline `2fdc142`; Android build status supplied by the controller, 17 November 2026.
+[S7] Android emulator execution and design provenance supplied by the controller, 23 November 2026; screenshots and scope in `docs/phase1/EVIDENCE.md`. Physical-phone testing remains planned.
 
 The [evidence ledger](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/docs/phase1/EVIDENCE.md) records commands, measurements and their limits. The rendered PDF is built locally from this source and attached at submission.

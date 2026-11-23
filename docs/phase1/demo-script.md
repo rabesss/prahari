@@ -1,41 +1,19 @@
-# Prahari demo shot list — target 2:50
+# Prahari demo v2 shot list — about 3:00
 
-This is a production plan, not evidence of a recording, real-phone operation or egress block. A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. Rehearse and verify actual results before recording. Never show hidden data or per-item hidden predictions. Do not click a suspicious link. Llama results can vary; show the actual verdict and timing, even if wrong.
+This is a production plan, not evidence of a finished recording or physical-phone operation. The Android detector and Llama have run end to end on an Android 14 x86_64 emulator; a physical Arm phone run is pending. Rehearse and show actual results and timing. Do not show hidden data or item-level hidden predictions, or open a suspicious link.
 
 | Time | Shot and narration |
 |:--|:--|
-| 0:00–0:20 | Identify Prahari and target hardware. Show aarch64 CPU identity. State the workflow is advisory. Establish the offline proof using one variant below before inference. |
-| 0:20–0:45 | Enter an invented Hinglish electricity scam, e.g. “Bijli ka bill abhi pay karo warna connection cut hoga. OTP share karo.” Show verdict, evidence, on-screen Llama explanation, safe actions and displayed generation time. Do not claim an expected verdict without rehearsal. |
-| 0:45–1:05 | Show the app's lookalike phishing URL preset. Show evidence, explanation and timing without opening it. |
-| 1:05–1:25 | **Dataset replay:** prepare one licensed, visible real NSL-KDD feature record locally in the `bin/predict --task flow` JSONL schema (`id` and 41 named `features`); run `candidates/BEST/bin/predict --task flow --in <visible-record.jsonl> --out <result.jsonl>` with `HC_PY` configured. Show the resulting model verdict and evidence. Do not commit or display private data. This is not live capture. Choose the visible record in rehearsal; licence and permission must allow this use. If `data/dev/flow.jsonl` is provisioned, extract its first record locally with the snippet below; the dataset is not committed. |
-| 1:25–1:45 | **Separate text-rule path:** select Network event in the UI and use the port-scan description preset. Show its rule verdict and Llama explanation with on-screen timing. Explain that it independently reclassifies text and does not explain the replay model's verdict; the two can disagree. |
-| 1:45–2:05 | Show the hard benign bank-debit preset and its evidence and explanation. The benign label reads “NO RISK FOUND — still verify”; it is not a safety guarantee. |
-| 2:05–2:25 | Enter `connections rejected` as a network description: this exercises the rule path's uncertain case. Show the actual result and cautious action. If the actual result differs, disclose it and investigate rather than staging success. |
-| 2:25–2:50 | Summarise: VM benchmark about 3.8 s/item and 2.05 GB peak cgroup memory (systemd scope memory.peak, including page cache); no phone benchmark yet. State limitations: no live capture, synthetic tests, possible wrong advice. |
+| 0:00–0:10 | Title: Prahari, an advisory offline threat-triage prototype. |
+| 0:10–0:25 | Identify Oracle's two-vCPU Neoverse-N1 Arm cloud VM and show its CPU identity. It is not a physical phone. |
+| 0:25–0:35 | Explain offline scope: Linux inference is local over loopback but normal startup does not block egress; an independently verified egress block is pending unless shown. Model acquisition needs network access. |
+| 0:35–1:05 | Two desktop clips: show a visible invented electricity scam and a lookalike URL, with actual verdicts, evidence and Llama explanations. Do not open the link. |
+| 1:05–1:25 | Flow slide: the trained NSL-KDD feature model scores dataset replay, while the UI's network description is separately classified by text rules; results can disagree. There is no live capture. |
+| 1:25–1:40 | Android 14 emulator (x86_64): select KYC scam SMS and show the actual Hindi and English verdict and numbered vetted steps with Hindi lines. |
+| 1:40–1:52 | Show “Report on Sanchar Saathi Chakshu” and “Lost money? Call 1930”. Explain Chakshu is for scam messages or links before loss; 1930 is primary when money is already lost, and cybercrime.gov.in is used for sextortion or extortion. |
+| 1:52–2:05 | Scroll through evidence to the Llama card and its warning, then expand on-device stats. Point out that the displayed x86 timings are not Arm timings. |
+| 2:05–2:17 | Show the genuine-looking bank debit alert as SUSPICIOUS and its first step: “Not your payment? Block it in your bank app and call 1930.” |
+| 2:17–2:40 | Select “Prove it's offline” and show the actual Android permission refusal. The app has no INTERNET permission; external dialler and browser actions use separate apps. Model files were staged beforehand. |
+| 2:40–3:00 | Summary: local detection and advisory explanations, false positives and missed scams, no live capture, and physical Arm phone testing still pending. |
 
-Inference runs locally and inputs reach the local app over loopback. Downloading the model requires network access; the app itself does not block outbound traffic. Offline claims cover only what was tested.
-
-## Offline proof variants
-
-**A. Remote real Android phone — planned; on-device generation is unverified.** Show the real phone identity and app build. Inspect the installed APK manifest/permissions and show that it declares no `android.permission.INTERNET`; stage model and assets beforehand. Run the same local inference with the remote-control connection retained. No INTERNET permission is evidence about that APK, not proof of every device network condition. Record phone model, OS, ABI, memory, model version and actual timing. Do not present this variant as implemented until it works.
-
-**B. Arm Linux server — conditional on an owner-provided egress block.** Show `uname -m` and `lscpu`; identify the environment as a cloud VM, not a physical edge device. An administrator must arrange a verified external egress block while preserving the SSH/loopback control path; do not disable an existing remote connection. Show a controlled outbound request failing under the same restriction, then run the application and show a result. The evaluator's import guard is a separate test, not proof normal app startup enforces a block. If the block cannot be established and verified, label offline proof pending. Organizer acceptance of a cloud VM is unconfirmed.
-
-## Prepare the replay on the demo host
-
-From the repository root, with the visible data already provisioned, create an input outside the repository. This selects only `id` and `features`, not the gold label. Review the applicable NSL-KDD terms before showing it.
-
-```sh
-D=$(mktemp -d)
-python - "$D" <<'PY'
-import sys
-import json
-from pathlib import Path
-r = json.loads(Path('data/dev/flow.jsonl').open().readline())
-Path(sys.argv[1], 'flow.jsonl').write_text(json.dumps({'id': 'replay', 'features': r['features']}) + '\n')
-PY
-candidates/BEST/bin/predict --task flow --in "$D/flow.jsonl" --out "$D/result.jsonl"
-cat "$D/result.jsonl"
-```
-
-The replay command outputs a numeric label (1 malicious, 0 benign), score and evidence. Model acquisition and the data-preparation pipeline are prerequisites; do not use hidden records.
+Android's offline proof reports an OS refusal only when the request encounters a permission error; show the actual outcome. A failed request for another reason is not permission proof. If separately demonstrating an Arm Linux egress block, an administrator must arrange and verify it while preserving the SSH/loopback control path; otherwise label that proof pending. Organiser acceptance of the cloud VM is unconfirmed.
