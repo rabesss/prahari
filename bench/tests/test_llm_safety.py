@@ -66,6 +66,9 @@ def test_trusted_channel_must_not_name_the_scam_contact():
     assert llm._unsafe_advice("Call the number in the message, which you already know.", 1)
     assert llm._unsafe_advice("Open the official app and pay the requested fee.", 1)
     assert llm._unsafe_advice("Call the number provided in this SMS, which you already know.", 1)
+    assert llm._unsafe_advice("Call the number in the email, which you already know.", 1)
+    assert llm._unsafe_advice("Open the official app and call 9876543210.", 1)
+    assert llm._unsafe_advice("Open the official app or visit www.sbi-help.top.", 1)
     assert not llm._unsafe_advice("Open the official app you already use to check.", 1)
     assert not llm._unsafe_advice("Call your bank on the number you already trust.", 1)
 

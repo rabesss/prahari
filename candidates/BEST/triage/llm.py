@@ -389,8 +389,9 @@ _BREAK = {"and", "but", "then", "so", "to", "instead", ",", ";", ":", "-"}
 _TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|website|number|branch)|"
                       r"number on (?:your|the back of your) card|directly with your bank|1930|cybercrime)\b", re.I)
 _CHANNEL_VERB = {"open", "call", "contact", "visit", "use", "check"}
-_SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|provided|given|mentioned|"
-                          r"listed|requested|sent|above|below|this number|that number)\b", re.I)
+_SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|email|e-mail|whatsapp|"
+                          r"chat|caller|sender|provided|given|mentioned|listed|requested|sent|above|below|"
+                          r"this number|that number|the number in)\b|\d{4,}|https?://|www\.", re.I)
 
 
 def _unsafe_advice(sent, verdict):
