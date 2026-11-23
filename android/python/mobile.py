@@ -145,11 +145,44 @@ def verdict(kind, text):
     return json.dumps(out, ensure_ascii=False)
 
 
+def _replacement_pool(kind, lab, text):
+    """Vetted sentences that replace a generated line, from advice_for and ACTIONS."""
+    pool = []
+    seen = set()
+
+    def add(sentence):
+        line = (sentence or '').strip()
+        if line and line not in seen:
+            seen.add(line)
+            pool.append(line)
+
+    try:
+        add(llm.advice_for(kind, lab, text)[0])
+    except Exception:
+        pass
+    table = llm.FLOW_ACTIONS if kind == 'flow' else llm.ACTIONS
+    for acts in table.values():
+        if acts:
+            add(acts[0])
+    for tail, _acts in llm.TYPE_ADVICE.values():
+        add(tail)
+    return pool
+
+
+def ends_with_replacement(explanation, kind, lab, text):
+    """True when the explanation ends on a vetted sentence substituted for model text."""
+    body = (explanation or '').strip()
+    if not body:
+        return False
+    return any(body.endswith(sent) for sent in _replacement_pool(kind, lab, text))
+
+
 def explain(runner):
     """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
     ex = BridgeExplainer(runner)
     text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
-    return json.dumps({'explanation': text, 'llm': stats}, ensure_ascii=False)
+    replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
+    return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 
 def check(kind, text, runner):

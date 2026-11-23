@@ -105,6 +105,19 @@ assert mobile._report_buttons('flow', 1, 'a port scan', ['Block the source addre
 assert mobile._report_buttons('sms', 0, '', ['Verify in the official app; never share your OTP or PIN.']) is None
 print('hindi steps, link order, benign evidence and report buttons passed')
 
+kyc = ('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top '
+       'or the account will be blocked')
+tail = mobile.llm.advice_for('sms', 1, kyc)[0]
+assert tail and mobile.ends_with_replacement('This message is DANGEROUS. ' + tail, 'sms', 1, kyc)
+assert mobile.ends_with_replacement(
+    'This message is DANGEROUS. Do not click the link or reply to the message.',
+    'sms', 1, kyc)
+assert not mobile.ends_with_replacement(
+    'This message is DANGEROUS. It asks for an OTP and a password.',
+    'sms', 1, kyc)
+assert not mobile.ends_with_replacement('', 'sms', 1, kyc)
+print('replacement-sentence flag passed')
+
 # End to end through the shipped detector, with only NumPy available.
 class Echo:
     def generate(self, prompt):

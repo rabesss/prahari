@@ -69,11 +69,15 @@ private object T {
     val warnC = Color.parseColor("#FFF3D6"); val onWarnC = Color.parseColor("#5E3A00")
     val ok = Color.parseColor("#1E7B3C"); val okBanner = Color.parseColor("#E5F4EA")
     val okLine = Color.parseColor("#A9D6B6"); val onOk = Color.parseColor("#0D4F27")
+    // NO RISK is slate, not green: a clear result must not look like a promise of safety.
+    val slateBg = Color.parseColor("#ECEFF1"); val slateInk = Color.parseColor("#263238")
+    val slateLine = Color.parseColor("#B0BEC5")
 }
 
 private const val MODEL_FILE = "Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte"
 private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
+private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val TAG = "Prahari"
 
 private class Cancelled : RuntimeException("Check cancelled")
@@ -524,6 +528,7 @@ class MainActivity : Activity() {
     private var speech: TextToSpeech? = null
     private var speaking = false
     private var listenLabel: TextView? = null
+    private var replacedSlot: LinearLayout? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
@@ -556,7 +561,16 @@ class MainActivity : Activity() {
     private fun ripple(bg: GradientDrawable) = RippleDrawable(ColorStateList.valueOf(0x33121626), bg, null)
 
     /** User-facing English goes through [t]. Pass raw for the message itself, a quote, or Llama text. */
-    private fun t(english: String): String = L10n.t(english)
+    private fun emulator() = (Build.SUPPORTED_ABIS.firstOrNull() ?: "").startsWith("x86")
+
+    private fun t(english: String): String {
+        var key = english
+        if (emulator()) {
+            if (key == "On-device · usually 2–4 s") key = "On-device"
+            key = key.replace("this phone", "this emulator")
+        }
+        return L10n.t(key)
+    }
 
     private fun txt(value: CharSequence, size: Float, color: Int = T.ink, weight: Int = 400, line: Int = 0, raw: Boolean = false) = TextView(this).apply {
         val shown: CharSequence = if (!raw && value is String) t(value) else value
@@ -1410,7 +1424,7 @@ class MainActivity : Activity() {
     private fun palette(level: String) = when (level) {
         "danger" -> Palette(T.danger, T.white, T.dangerC, T.onDanger, T.onDanger, R.drawable.ic_octagon_x, 0x2EFFFFFF, "DANGEROUS", "खतरनाक")
         "warn" -> Palette(T.warnBanner, T.onWarn, T.warnC, T.onWarnC, T.warn, R.drawable.ic_triangle_alert, 0x1F2B1B00, "SUSPICIOUS", "संदिग्ध")
-        else -> Palette(T.okBanner, T.onOk, T.okBanner, T.onOk, T.onOk, R.drawable.ic_shield, T.white, "NO RISK FOUND", "कोई खतरा नहीं मिला")
+        else -> Palette(T.slateBg, T.slateInk, T.slateBg, T.slateInk, T.slateInk, R.drawable.ic_shield, T.white, "NO RISK FOUND", "कोई खतरा नहीं मिला")
     }
     private fun sentence(s: String): String = s.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
     private fun strings(a: JSONArray?): List<String> = if (a == null) emptyList() else (0 until a.length()).map { a.optString(it) }
@@ -1436,17 +1450,17 @@ class MainActivity : Activity() {
     private fun checkedMeta(mode: Int, elapsedMs: Double): String {
         val tail = formatMs(elapsedMs)
         val name = modeNames[mode.coerceIn(0, modeNames.lastIndex)]
-        return if (L10n.hindi) "${t(name)} · ${t("checked on this phone")} · $tail"
-        else "$name · checked on this phone in $tail"
+        val where = if (emulator()) "checked on this emulator" else "checked on this phone"
+        return if (L10n.hindi) "${t(name)} · ${t(where)} · $tail" else "$name · $where in $tail"
     }
 
     private fun banner(p: Palette, why: String, meta: String, metaIcon: Int, stillVerify: Boolean = false): LinearLayout {
-        val box = col().apply { background = shape(p.fill, 20f, if (stillVerify) 1 else 0, T.okLine); pad(this, 18, 18, 18, 16) }
+        val box = col().apply { background = shape(p.fill, 20f, if (stillVerify) 1 else 0, T.slateLine); pad(this, 18, 18, 18, 16) }
         val top = row()
         val bubble = FrameLayout(this).apply {
             background = shape(p.iconFill, 26f)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(icon(p.glyph, 30, if (stillVerify) T.ok else p.on), FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
+            addView(icon(p.glyph, 30, p.on), FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
         }
         add(top, bubble, 52, 52)
         val titles = col()
@@ -1457,8 +1471,8 @@ class MainActivity : Activity() {
             isAccessibilityHeading = true
         })
         if (stillVerify) {
-            val verify = iconText(R.drawable.ic_alert_circle, "Still verify · फिर भी जाँच लें", T.onOk, 13f, 14).apply {
-                background = shape(T.white, 13f, 1, T.okLine)
+            val verify = iconText(R.drawable.ic_alert_circle, "Still verify · फिर भी जाँच लें", p.on, 13f, 14).apply {
+                background = shape(T.white, 13f, 1, T.slateLine)
                 pad(this, 8, 5, 8, 5)
             }
             val verifyLabel = verify.getChildAt(1) as TextView
@@ -1597,23 +1611,28 @@ class MainActivity : Activity() {
         networkBody = null
         val data = job.verdict
         val level = data.optString("level", "clear")
-        val p = palette(level)
-        val clear = level == "clear"
         val evidence = strings(data.optJSONArray("evidence"))
         val actions = strings(data.optJSONArray("actions"))
-        val fallback = when (level) {
-            "danger" -> "Strong scam signals found."
-            "warn" -> "Some warning signs found."
+        val clear = level == "clear"
+        // A copied bank debit is not "no risk". The detector can clear it; the screen asks for a check.
+        val alert = clear && actions.any { it == DEBIT_STEP }
+        val p = if (alert) palette("warn").copy(title = "CHECK ALERT", hindi = "अलर्ट जांचें") else palette(level)
+        val calm = clear && !alert
+        val fallback = when {
+            alert -> "Some warning signs found."
+            level == "danger" -> "Strong scam signals found."
+            level == "warn" -> "Some warning signs found."
             else -> "No scam signals found."
         }
         // The one-line "why" is the first evidence line (benign reading when the verdict is clear).
-        val why = verdictLine(evidence, fallback, clear)
+        val why = verdictLine(evidence, fallback, calm)
         val elapsed = if (job.totalMs >= 0) job.totalMs else SystemClock.elapsedRealtime() - job.started
         val root = root("${p.title}. ${p.hindi}")
         add(root, bar("Result", true, lang = true), -1, -2)
         val body = scrollBody(root)
         add(body, modeSwitcher(selectedMode, job.value), -1, -2)
-        val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble()), modeIcons[selectedMode], clear)
+        val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble()), modeIcons[selectedMode], calm)
+        if (job.mode == 2) add(b, txt(L10n.n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
         data.optString("scam_type", "").takeIf { it.isNotBlank() }?.let { scam ->
             val kind = if (L10n.hindi) t(scam) else sentence(scam)
@@ -1693,9 +1712,15 @@ class MainActivity : Activity() {
                 add(steps, buttons, top = 14)
             }
         }
-        if (clear) {
+        if (clear && mode == 0) {
             divider(steps, 12)
             add(steps, iconText(R.drawable.ic_alert_circle, "Scammers copy real messages. If it asks for money or a code, check in the official app first.", T.ink2, 13f, 16, flex = true).apply {
+                minimumHeight = dp(48)
+                setPadding(0, dp(8), 0, dp(8))
+            }, top = 8)
+        } else if (clear && mode == 1) {
+            divider(steps, 12)
+            add(steps, iconText(R.drawable.ic_alert_circle, L10n.n("link_caveat"), T.ink2, 13f, 16, flex = true).apply {
                 minimumHeight = dp(48)
                 setPadding(0, dp(8), 0, dp(8))
             }, top = 8)
@@ -1710,7 +1735,7 @@ class MainActivity : Activity() {
             add(evidenceCard, header)
             evidence.forEach { item ->
                 val chip = row().apply { gravity = Gravity.TOP; background = shape(p.chip, 12f); pad(this, 10, 8, 12, 8) }
-                add(chip, icon(if (clear) R.drawable.ic_check_circle else R.drawable.ic_alert_circle, 16, p.chipText), 16, 16)
+                add(chip, icon(if (calm) R.drawable.ic_check_circle else R.drawable.ic_alert_circle, 16, p.chipText), 16, 16)
                 val translated = if (L10n.hindi) t(item) else item
                 val shown = if (L10n.hindi && translated != item) translated else sentence(item)
                 val text = SpannableString(shown)
@@ -1726,6 +1751,14 @@ class MainActivity : Activity() {
         }
         val llama = card(T.surface2, false)
         add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
+        val replaced = row().apply {
+            visibility = View.GONE
+            background = shape(T.brandC, 12f)
+            pad(this, 8, 4, 10, 4)
+        }
+        add(replaced, txt(L10n.n("replaced_chip"), 12f, T.brand, 600, 16, raw = true))
+        replacedSlot = replaced
+        add(llama, replaced, -2, -2, top = 8)
         val explainRow = row().apply { gravity = Gravity.TOP; isBaselineAligned = false }
         val accent = View(this).apply {
             setBackgroundColor(T.brand)
@@ -1836,6 +1869,7 @@ class MainActivity : Activity() {
         val result = job.explanation ?: return
         val error = result.optString("error", "")
         val explanation = result.optString("explanation", "").trim()
+        replacedSlot?.visibility = if (result.optBoolean("replaced")) View.VISIBLE else View.GONE
         if (error.isNotEmpty() || explanation.isEmpty()) {
             val lead = when {
                 error.contains("Model files are missing", ignoreCase = true) ->
@@ -2061,7 +2095,9 @@ class MainActivity : Activity() {
         add(sheet, head, top = 14)
         val descriptions = listOf(
             Triple(R.drawable.ic_wifi_off, "Runs fully offline", "The app has no internet permission, so nothing you check can be sent anywhere. Airplane mode works."),
-            Triple(R.drawable.ic_cpu, "Llama 3.2 1B on this phone", "Runs on the phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."),
+            Triple(R.drawable.ic_cpu, "Llama 3.2 1B on this phone",
+                if (emulator()) "Runs on the emulator's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."
+                else "Runs on the phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."),
             Triple(R.drawable.ic_shield_check, "A detector decides the verdict", "Scam signals are checked by the detector. The verdict never depends on the AI text."),
             Triple(R.drawable.ic_list, "Safety steps are fixed", "Steps come from a vetted list (Sanchar Saathi Chakshu, 1930, cybercrime.gov.in), never from the AI."),
             Triple(R.drawable.ic_alert_circle, "Best effort, not a guarantee", "No checker catches every scam. If in doubt, don't pay; report on Sanchar Saathi Chakshu, or call 1930 if money was lost.")
