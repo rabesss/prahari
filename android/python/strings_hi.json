@@ -123,7 +123,86 @@
   "टैप करने से पहले जाँचें · works with no internet": "टैप करने से पहले जाँचें · इंटरनेट के बिना चलता है",
   "The model files are not on this phone, so Llama did not write an explanation. The verdict and the steps above are complete.": "मॉडल फ़ाइलें इस फ़ोन पर नहीं हैं, इसलिए Llama ने व्याख्या नहीं लिखी। ऊपर का फैसला और कदम पूरे हैं।",
   "Llama could not be loaded on this phone. The verdict and the steps above are complete.": "Llama इस फ़ोन पर लोड नहीं हो सका। ऊपर का फैसला और कदम पूरे हैं।",
-  "Explanation unavailable on this phone. The verdict and the steps above are complete.": "इस फ़ोन पर व्याख्या उपलब्ध नहीं। ऊपर का फैसला और कदम पूरे हैं।"
+  "Explanation unavailable on this phone. The verdict and the steps above are complete.": "इस फ़ोन पर व्याख्या उपलब्ध नहीं। ऊपर का फैसला और कदम पूरे हैं।",
+  "Works with no internet": "इंटरनेट के बिना चलता है",
+  "Scam and threat check": "ठगी और खतरे की जाँच",
+  "CHECK THIS ALERT": "अलर्ट जांचें",
+  "CHECK ALERT": "अलर्ट जांचें",
+  "Looks like a bank alert. Scammers copy these, so check it in your bank app.": "यह बैंक का अलर्ट लगता है। ठग ऐसे अलर्ट की नकल करते हैं, इसलिए अपने बैंक ऐप में जांचें।",
+  "The on-device model rated this like known scam messages; no single phrase decided it.": "फ़ोन के मॉडल ने इसे ठगी वाले मैसेज जैसा पाया। किसी एक वाक्य ने यह तय नहीं किया।",
+  "Hindi voice not installed — reading in English": "हिंदी की आवाज़ नहीं मिली — अंग्रेज़ी में पढ़ रहे हैं",
+  "Shared text — review, then tap Check": "शेयर किया गया टेक्स्ट — देख लें, फिर जांचें दबाएं",
+  "Check another": "दूसरा जांचें",
+  "Still verify": "फिर भी जांच लें",
+  "Advanced": "उन्नत",
+  "CONNECTED": "कनेक्ट हो गया",
+  "Blocked": "रोक दिया गया",
+  "Connected": "कनेक्ट हो गया",
+  "Request": "अनुरोध",
+  "Tested just now": "अभी जांचा",
+  "Testing whether this app can open a connection": "देख रहे हैं कि यह ऐप कनेक्शन खोल पाता है या नहीं",
+  "Messages and links you check never leave this phone.": "आप जो मैसेज और लिंक जांचते हैं, वे इस फ़ोन से बाहर नहीं जाते।",
+  "The detector and Llama 3.2 run on this phone's Arm CPU.": "डिटेक्टर और Llama 3.2 इस फ़ोन के Arm CPU पर चलते हैं।",
+  "Runs on this phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation.": "यह ExecuTorch से इस फ़ोन के CPU पर चलता है (INT4, XNNPACK)। यह सिर्फ़ व्याख्या लिखता है।",
+  "Calls to 1930, Sanchar Saathi Chakshu or cybercrime.gov.in use your phone's dialler and browser, not this app.": "1930, Sanchar Saathi Chakshu या cybercrime.gov.in आपके डायलर और ब्राउज़र में खुलते हैं, इस ऐप में नहीं।",
+  "Steps come from a vetted list (Sanchar Saathi Chakshu, 1930, cybercrime.gov.in), never from the AI.": "कदम जांची हुई सूची से आते हैं (Sanchar Saathi Chakshu, 1930, cybercrime.gov.in), AI से नहीं।",
+  "No checker catches every scam. If in doubt, don't pay; report on Sanchar Saathi Chakshu, or call 1930 if money was lost.": "कोई जांच हर ठगी नहीं पकड़ती। शक हो तो पैसे न दें। Sanchar Saathi Chakshu पर रिपोर्ट करें। पैसे चले गए हों तो 1930 पर कॉल करें।",
+  "x86 emulator: not Arm timings": "x86 एम्युलेटर: यह Arm का समय नहीं है",
+  "Total": "कुल",
+  "Memory": "मेमोरी",
+  "Unable to open": "खोल नहीं सके",
+  "Check failed": "जांच नहीं हो सकी",
+  "The model may not run on this device.": "शायद यह मॉडल इस डिवाइस पर नहीं चलता।",
+  "On-device stats, expanded": "फ़ोन पर जांच के आंकड़े, खुले हैं",
+  "Expanded": "खुला है",
+  "Collapsed": "बंद है",
+  "Language": "भाषा",
+  "English": "अंग्रेज़ी",
+  "Hindi": "हिंदी",
+  "selected": "चुना गया",
+  "sample": "नमूना",
+  "a bank debit alert to confirm": "बैंक से पैसे कटने का अलर्ट, जांच लें",
+  "a phishing link on a lookalike domain": "असली जैसी नकली साइट का लिंक",
+  "a shortened link that hides its destination": "छोटा लिंक, असली पता छिपा है",
+  "a phishing link": "नकली लिंक",
+  "a link worth checking": "जांच करने लायक लिंक",
+  "a port scan": "पोर्ट स्कैन",
+  "a brute-force login": "बार-बार पासवर्ड आज़माने की कोशिश",
+  "a flood or denial-of-service attempt": "बहुत सारे कनेक्शन से सेवा रोकने की कोशिश",
+  "command-and-control beaconing": "किसी और के नियंत्रण का संकेत",
+  "a privilege-escalation attempt": "ज़्यादा अधिकार पाने की कोशिश",
+  "suspicious network traffic": "संदिग्ध नेटवर्क ट्रैफ़िक",
+  "unusual network traffic": "असामान्य नेटवर्क ट्रैफ़िक",
+  "an electricity disconnection scam": "बिजली काटने की ठगी",
+  "a scam message": "ठगी का मैसेज",
+  "a message worth checking": "जांच करने लायक मैसेज",
+  "sextortion or blackmail": "धमकी देकर पैसे मांगना",
+  "a fake police or customs threat": "नकली पुलिस या कस्टम की धमकी",
+  "OTP or PIN theft": "OTP या PIN चुराने की कोशिश",
+  "UPI collect-request fraud": "UPI कलेक्ट रिक्वेस्ट की ठगी",
+  "a remote-access app scam": "स्क्रीन-शेयरिंग ऐप की ठगी",
+  "a fake job or task scam": "नकली नौकरी या टास्क की ठगी",
+  "a fake lottery or prize scam": "नकली लॉटरी या इनाम की ठगी",
+  "a fake KYC or account check": "नकली KYC या खाता जांच",
+  "an account-blocking threat": "खाता बंद करने की धमकी",
+  "a fake payment request": "नकली पेमेंट की मांग",
+  "an advance-fee scam": "पहले पैसे मांगने वाली ठगी",
+  "a payment fraud": "पेमेंट की ठगी",
+  "a crypto payment scam": "क्रिप्टो पेमेंट की ठगी",
+  "a safe-account transfer scam": "सेफ़ अकाउंट में पैसे भेजने की ठगी",
+  "an account-blocking scam": "खाता बंद करने की ठगी",
+  "a fake job or loan scam": "नकली नौकरी या लोन की ठगी",
+  "a fake prize or lottery scam": "नकली इनाम या लॉटरी की ठगी",
+  "an investment or trading scam": "निवेश या ट्रेडिंग की ठगी",
+  "an identity-document scam": "पहचान पत्र की ठगी",
+  "a QR-code payment scam": "QR कोड से पेमेंट की ठगी",
+  "an extortion threat": "धमकी देकर पैसे ऐंठना",
+  "a gift-card scam": "गिफ़्ट कार्ड की ठगी",
+  "an impersonation scam": "किसी और बनकर की गई ठगी",
+  "The detector and Llama 3.2 run on this emulator's CPU.": "डिटेक्टर और Llama 3.2 इस एम्युलेटर के CPU पर चलते हैं।",
+  "Runs on the emulator's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation.": "यह ExecuTorch से इस एम्युलेटर के CPU पर चलता है (INT4, XNNPACK)। यह सिर्फ़ व्याख्या लिखता है।",
+  "The on-device checker could not start.": "फ़ोन पर जांच सिस्टम शुरू नहीं हो सका।",
+  "Couldn't load the on-device model.": "फ़ोन पर मौजूद मॉडल लोड नहीं हो सका।"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
@@ -257,7 +336,41 @@
   "threatens to cut a service or block an account": "सेवा बंद करने या खाता ब्लॉक करने की धमकी देता है",
   "threatens to publish private material": "निजी चीज़ें या जानकारी सार्वजनिक करने की धमकी देता है",
   "threatens to publish private material unless you pay": "पैसे न देने पर निजी जानकारी या सामग्री सार्वजनिक करने की धमकी देता है",
-  "tries to inject instructions into the assistant": "सहायक (AI) में अपने निर्देश डालने की कोशिश करता है"
+  "tries to inject instructions into the assistant": "सहायक (AI) में अपने निर्देश डालने की कोशिश करता है",
+  "a link runs on past its domain ending, hiding where it really goes": "लिंक डोमेन के आगे भी चलता है, असली पता छिप जाता है",
+  "says there is no hurry": "कहता है कि जल्दी करने की ज़रूरत नहीं",
+  "reads like a normal refund receipt": "सामान्य रिफ़ंड रसीद जैसा लगता है",
+  "reads like a normal order or delivery record": "सामान्य ऑर्डर या डिलीवरी की जानकारी जैसा लगता है",
+  "reads like a normal tracking update": "सामान्य ट्रैकिंग अपडेट जैसा लगता है",
+  "says it never asks for OTP": "कहता है कि वह OTP कभी नहीं मांगता",
+  "says it never asks for PIN": "कहता है कि वह PIN कभी नहीं मांगता",
+  "says it never asks for CVV": "कहता है कि वह CVV कभी नहीं मांगता",
+  "says it never asks for PASSWORD": "कहता है कि वह पासवर्ड कभी नहीं मांगता",
+  "says it never asks for CODE": "कहता है कि वह कोड कभी नहीं मांगता",
+  "says no fee is needed": "कहता है कि कोई फ़ीस नहीं चाहिए",
+  "says no charge is needed": "कहता है कि कोई अतिरिक्त चार्ज नहीं चाहिए",
+  "says no payment is needed": "कहता है कि कोई पेमेंट नहीं चाहिए",
+  "says no OTP is needed": "कहता है कि OTP नहीं चाहिए",
+  "says no PIN is needed": "कहता है कि PIN नहीं चाहिए",
+  "mentions the branch": "शाखा का ज़िक्र करता है",
+  "failed login attempts recorded on the connection": "इस कनेक्शन पर लॉगिन की कोशिशें फेल हुईं",
+  "malformed packet fragments, typical of a teardrop or pod flood": "खराब पैकेट के टुकड़े, जो सेवा ठप करने की कोशिश में आम हैं",
+  "malformed packet fragments, typical of a teardrop or ping-of-death flood": "खराब पैकेट के टुकड़े, जो सेवा ठप करने की कोशिश में आम हैं",
+  "source and destination are the same host and port": "स्रोत और गंतव्य एक ही मशीन और पोर्ट हैं",
+  "most connections were half-open (SYN errors)": "ज़्यादातर कनेक्शन अधूरे रह गए (SYN त्रुटि)",
+  "the host contacted many different services": "इस होस्ट ने कई अलग सेवाओं से संपर्क किया",
+  "a root shell was obtained": "सिस्टम का पूरा अधिकार (root) मिल गया",
+  "no lookalike or risky-domain signals": "नकली या खतरनाक डोमेन का कोई संकेत नहीं",
+  "a raw IP address instead of a name": "वेबसाइट के नाम की जगह सीधा IP पता",
+  "no HTTPS": "HTTPS नहीं है",
+  "an @ sign hides the destination": "@ चिह्न असली पता छिपाता है",
+  "an unusually long or hyphenated domain": "डोमेन सामान्य से लंबा है या उसमें कई डैश (-) हैं",
+  "unofficial domain": "यह आधिकारिक डोमेन नहीं है",
+  "traffic that looks like a routine update or a scheduled backup": "सामान्य अपडेट या तय समय के बैकअप जैसा ट्रैफ़िक",
+  "gives its own number, chat or link to act on": "काम करने के लिए अपना नंबर, चैट या लिंक देता है",
+  "no scam mechanism was found in the link": "इस लिंक में ठगी का कोई तरीका नहीं मिला",
+  "no scam mechanism was found in the text": "इस मैसेज में ठगी का कोई तरीका नहीं मिला",
+  "no scam mechanism was found in the message": "इस मैसेज में ठगी का कोई तरीका नहीं मिला"
  },
  "skip": [
   "$label · $hi",
@@ -305,8 +418,8 @@
    "hi": "Prahari से जांचें"
   },
   "shared_banner": {
-   "en": "Shared text — review before checking",
-   "hi": "शेयर किया टेक्स्ट — जांच से पहले देख लें"
+   "en": "Shared text — review, then tap Check",
+   "hi": "शेयर किया गया टेक्स्ट — देख लें, फिर जांचें दबाएं"
   },
   "detected_mode": {
    "en": "Detected: %s",
@@ -451,6 +564,152 @@
   "voice_missing": {
    "en": "No offline voice installed",
    "hi": "इस फ़ोन पर ऑफ़लाइन आवाज़ नहीं है"
+  },
+  "hindi_voice_english": {
+   "en": "Hindi voice not installed — reading in English",
+   "hi": "हिंदी की आवाज़ नहीं मिली — अंग्रेज़ी में पढ़ रहे हैं"
+  },
+  "check_this_alert": {
+   "en": "CHECK THIS ALERT",
+   "hi": "अलर्ट जांचें"
+  },
+  "bank_alert_line": {
+   "en": "Looks like a bank alert. Scammers copy these, so check it in your bank app.",
+   "hi": "यह बैंक का अलर्ट लगता है। ठग ऐसे अलर्ट की नकल करते हैं, इसलिए अपने बैंक ऐप में जांचें।"
+  },
+  "model_only_evidence": {
+   "en": "The on-device model rated this like known scam messages; no single phrase decided it.",
+   "hi": "फ़ोन के मॉडल ने इसे ठगी वाले मैसेज जैसा पाया। किसी एक वाक्य ने यह तय नहीं किया।"
+  },
+  "works_offline": {
+   "en": "Works with no internet",
+   "hi": "इंटरनेट के बिना चलता है"
+  },
+  "app_subtitle": {
+   "en": "Scam and threat check",
+   "hi": "ठगी और खतरे की जाँच"
+  },
+  "language_name": {
+   "en": "Language",
+   "hi": "भाषा"
   }
- }
+ },
+ "templates": [
+  {
+   "en": "the domain {host} imitates '{brand}' on .{tld}",
+   "hi": "डोमेन {host}, '{brand}' जैसा नकली नाम है और .{tld} पर बना है"
+  },
+  {
+   "en": "the domain {host} imitates '{brand}' and uses .{tld}, a throwaway registry",
+   "hi": "डोमेन {host}, '{brand}' की नकल करता है और थोड़े समय का डोमेन .{tld} इस्तेमाल करता है"
+  },
+  {
+   "en": "the domain {host} imitates '{brand}' in a hyphenated lookalike name",
+   "hi": "डोमेन {host} डैश (-) लगाकर '{brand}' से मिलते-जुलते नकली नाम की नकल करता है"
+  },
+  {
+   "en": "the domain {host} is a hyphenated lookalike of '{brand}'",
+   "hi": "डोमेन {host}, '{brand}' से मिलता-जुलता नकली नाम है और बीच में डैश (-) है"
+  },
+  {
+   "en": "the domain {host} is a URL shortener that hides its destination",
+   "hi": "डोमेन {host} लिंक को छोटा करता है, इसलिए असली पता छिप जाता है"
+  },
+  {
+   "en": "the domain {host} uses .{tld}, common for throwaway scam sites",
+   "hi": "डोमेन {host} .{tld} पर खत्म होता है। ऐसी साइटें अक्सर ठगी के लिए बनती हैं"
+  },
+  {
+   "en": "the domain {host} swaps letters for digits to imitate a brand",
+   "hi": "डोमेन {host} किसी ब्रांड की नकल करने के लिए अक्षरों की जगह नंबर इस्तेमाल करता है"
+  },
+  {
+   "en": "the domain {host} is unusually long or hyphenated",
+   "hi": "डोमेन {host} सामान्य से ज़्यादा लंबा है या इसमें कई डैश (-) हैं"
+  },
+  {
+   "en": "the domain {host} mixes in non-Latin characters to imitate a name",
+   "hi": "डोमेन {host} किसी नाम की नकल करने के लिए अंग्रेज़ी से अलग अक्षर मिलाता है"
+  },
+  {
+   "en": "the domain {host} uses punycode, which can hide a lookalike name",
+   "hi": "डोमेन {host} में punycode है, जो नकली नाम को छिपा सकता है"
+  },
+  {
+   "en": "the domain {host} uses the name '{b}' but is not that company's official site",
+   "hi": "डोमेन {host} में '{b}' नाम है, लेकिन यह उस कंपनी की आधिकारिक वेबसाइट नहीं है"
+  },
+  {
+   "en": "the domain {reg} is an official domain",
+   "hi": "डोमेन {reg} एक आधिकारिक डोमेन है"
+  },
+  {
+   "en": "the domain ends in .{tld}, common for scam sites",
+   "hi": "डोमेन .{tld} पर खत्म होता है, जो ठगी वाली साइटों में आम है"
+  },
+  {
+   "en": "the domain ends in .{tld}, common for throwaway scam sites",
+   "hi": "डोमेन .{tld} पर खत्म होता है, जो थोड़े समय की ठगी वाली साइटों में आम है"
+  },
+  {
+   "en": "the link points to a raw IP address ({host})",
+   "hi": "लिंक किसी वेबसाइट के नाम के बजाय सीधे IP पते ({host}) पर ले जाता है"
+  },
+  {
+   "en": "the link uses a URL shortener ({reg}) that hides the real destination",
+   "hi": "लिंक छोटे किए गए URL ({reg}) का इस्तेमाल करता है, जिससे असली वेबसाइट छिप जाती है"
+  },
+  {
+   "en": "traffic to {n} different ports on {host}",
+   "hi": "{host} पर {n} अलग-अलग पोर्ट का ट्रैफ़िक"
+  },
+  {
+   "en": "traffic to {n} different ports",
+   "hi": "{n} अलग-अलग पोर्ट का ट्रैफ़िक"
+  },
+  {
+   "en": "traffic involving {host}",
+   "hi": "{host} से जुड़ा ट्रैफ़िक"
+  },
+  {
+   "en": "{n} failed login attempts on the connection",
+   "hi": "इस कनेक्शन पर {n} बार लॉगिन की कोशिश फेल हुई"
+  },
+  {
+   "en": "{n} failed logins",
+   "hi": "{n} बार लॉगिन फेल हुआ"
+  },
+  {
+   "en": "official domain {host}",
+   "hi": "{host} आधिकारिक डोमेन है"
+  },
+  {
+   "en": "lookalike domain {host}",
+   "hi": "{host} असली जैसा नकली डोमेन है"
+  },
+  {
+   "en": "risky .{tld} lookalike domain {host}",
+   "hi": "{host} खतरनाक .{tld} वाला नकली डोमेन है"
+  },
+  {
+   "en": "unofficial domain {host} (.{tld})",
+   "hi": "{host} आधिकारिक डोमेन नहीं है (.{tld})"
+  },
+  {
+   "en": "URL shortener {host}",
+   "hi": "{host} लिंक छोटा करने वाली साइट है"
+  },
+  {
+   "en": "no request for a {things} in the {what}",
+   "hi": "इस {what} में {things} की कोई मांग नहीं है"
+  },
+  {
+   "en": "no scam mechanism was found in the {what}",
+   "hi": "इस {what} में ठगी का कोई तरीका नहीं मिला"
+  },
+  {
+   "en": "mentions {things} and the branch",
+   "hi": "{things} और शाखा का ज़िक्र करता है"
+  }
+ ]
 }

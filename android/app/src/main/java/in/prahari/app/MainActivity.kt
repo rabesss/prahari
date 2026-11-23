@@ -404,13 +404,13 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         Log.e(TAG, "check failed", t)
         Bridge.fail(id)
         if (!Bridge.still(id)) return
-        val message = "Check failed: ${errorText(t)}. The model may not run on this device."
+        val detail = errorText(t)
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
             act.inputValue = value
             act.selectedMode = mode
             act.showHome()
-            act.toast(message)
+            act.failureToast(detail)
         }
     }
 }
@@ -545,7 +545,6 @@ class MainActivity : Activity() {
     private var ignoreBackUntil = 0L
 
     private val modeNames = arrayOf("SMS", "Link", "Network")
-    private val modeHindi = arrayOf("संदेश", "लिंक", "नेटवर्क")
     private val modeIcons = intArrayOf(R.drawable.ic_message, R.drawable.ic_link, R.drawable.ic_activity)
     private val labels = arrayOf("Message you received", "Link you want to open", "Network event or flow JSON")
     private val hints = arrayOf(
@@ -575,14 +574,23 @@ class MainActivity : Activity() {
     /** User-facing English goes through [t]. Pass raw for the message itself, a quote, or Llama text. */
     private fun emulator() = (Build.SUPPORTED_ABIS.firstOrNull() ?: "").startsWith("x86")
 
-    private fun t(english: String): String {
-        var key = english
-        if (emulator()) {
-            if (key == "On-device · usually 2–4 s") key = "On-device"
-            key = key.replace("this phone", "this emulator")
-        }
-        return L10n.t(key)
+    /**
+     * Lookup first, then swap the device word. Replacing "this phone" before the lookup
+     * missed every Hindi line, so the emulator showed English chrome.
+     * On x86 the visible text never says "this phone" or "इस फ़ोन". arm64 keeps both.
+     */
+    private fun onDevice(text: String): String {
+        if (!emulator() || text.isEmpty()) return text
+        return text
+            .replace("this phone's", "this emulator's")
+            .replace("this phone", "this emulator")
+            .replace("इसी फ़ोन", "इसी एम्युलेटर")
+            .replace("इस फ़ोन", "इस एम्युलेटर")
     }
+
+    private fun t(english: String): String = onDevice(L10n.t(english))
+
+    private fun n(key: String): String = onDevice(L10n.n(key))
 
     private fun txt(value: CharSequence, size: Float, color: Int = T.ink, weight: Int = 400, line: Int = 0, raw: Boolean = false) = TextView(this).apply {
         val shown: CharSequence = if (!raw && value is String) t(value) else value
@@ -628,18 +636,20 @@ class MainActivity : Activity() {
         background = shape(fill, 16f, if (border) 1 else 0, T.outline2)
         pad(this, 16, 14, 16, 14)
     }
+    /** English mode is English only. Hindi mode is the bundled line, with [hi] if the table has no entry. */
     private fun heading(en: String, hi: String): TextView {
-        if (L10n.hindi) {
-            val label = t(en).let { if (it != en) it else hi.ifBlank { en } }
-            return txt(label, 11f, T.ink2, 700, 16, raw = true).apply { isAccessibilityHeading = true }
-        }
-        val label = en.uppercase(Locale.ROOT)
-        val full = "$label · $hi"
-        return txt(full, 11f, T.ink2, 700, 16, raw = true).apply {
+        val looked = L10n.t(en)
+        val label = if (L10n.hindi) {
+            val chosen = if (looked != en) looked else hi.ifBlank { en }
+            onDevice(chosen)
+        } else en.uppercase(Locale.ROOT)
+        return txt(label, 11f, T.ink2, 700, 16, raw = true).apply {
             isAccessibilityHeading = true
-            val spaced = SpannableString(full)
-            spaced.setSpan(Tracking(0.04f), 0, label.length, 0)
-            text = spaced
+            if (!L10n.hindi) {
+                val spaced = SpannableString(label)
+                spaced.setSpan(Tracking(0.04f), 0, label.length, 0)
+                text = spaced
+            }
         }
     }
     private fun iconText(id: Int, text: String, color: Int, size: Float = 14f, iconSize: Int = 18, flex: Boolean = false): LinearLayout = row().apply {
@@ -825,15 +835,19 @@ class MainActivity : Activity() {
         if (isDestroyed) return
         Toast.makeText(this, t(message).take(400), Toast.LENGTH_LONG).show()
     }
+
+    internal fun failureToast(detail: String) {
+        toast(t("Check failed") + ": " + detail + " " + t("The model may not run on this device."))
+    }
     private fun hideKeyboard() {
         if (!::input.isInitialized) return
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
         input.windowToken?.let { imm.hideSoftInputFromWindow(it, 0) }
     }
     private fun modelProblem(): String? {
-        Bridge.pythonError?.let { return "The on-device checker could not start. $it" }
-        Bridge.missing?.let { return it }
-        Bridge.loadError?.let { return "Couldn't load the on-device model. $it" }
+        Bridge.pythonError?.let { return t("The on-device checker could not start.") + " " + it }
+        Bridge.missing?.let { return t("Model files missing") + " " + it }
+        Bridge.loadError?.let { return t("Couldn't load the on-device model.") + " " + it }
         return null
     }
 
@@ -978,8 +992,8 @@ class MainActivity : Activity() {
         val brand = row().apply { minimumHeight = dp(60); pad(this, 16, 4, 8, 4) }
         add(brand, logo(), 36, 36)
         val name = col()
-        add(name, txt("Prahari", 20f, T.ink, 700, 24))
-        add(name, txt("प्रहरी · scam & threat check", 12f, T.ink3, 500, 16))
+        add(name, txt("Prahari", 20f, T.ink, 700, 24, raw = true))
+        add(name, txt(n("app_subtitle"), 12f, T.ink3, 500, 16, raw = true))
         add(brand, name, 0, -2, left = 10, weight = 1f)
         add(brand, langToggle { showHome() }, -2, -2)
         add(brand, iconButton(R.drawable.ic_info, "About Prahari") { showAbout() }, 48, 48)
@@ -987,7 +1001,7 @@ class MainActivity : Activity() {
         val body = col().apply { pad(this, 16, 0, 16, 8) }
         add(all, body, -1, 0, weight = 1f)
         add(body, txt("Check before you tap", 24f, T.ink, 700, 30).apply { isAccessibilityHeading = true }, top = 2)
-        add(body, txt("टैप करने से पहले जाँचें · works with no internet", 14f, T.ink2, 400, 20), top = 2)
+        add(body, txt(n("works_offline"), 14f, T.ink2, 400, 20, raw = true), top = 2)
         val seg = row().apply { minimumHeight = dp(52); background = shape(T.surface2, 14f); pad(this, 4, 4, 4, 4) }
         val segments = mutableListOf<LinearLayout>()
         val inputCard = col().apply { pad(this, 16, 14, 16, 8) }
@@ -1040,18 +1054,10 @@ class MainActivity : Activity() {
             faceLabel.textAlignment = View.TEXT_ALIGNMENT_CENTER
             faceLabel.maxLines = 2
             faceLabel.ellipsize = TextUtils.TruncateAt.END
-            val hindi = txt(modeHindi[i], 11f, T.ink2, 500).apply {
-                gravity = Gravity.CENTER
-                textAlignment = View.TEXT_ALIGNMENT_CENTER
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-            }
             add(segment, face, -2, -2)
-            if (!L10n.hindi) add(segment, hindi, -1, -2)
             cap(faceLabel, segment, 24)
-            cap(hindi, segment, 8)
             segment.setOnClickListener { selectedMode = i; refreshSegments() }
-            asButton(segment, "${modeNames[i]}, ${modeHindi[i]}")
+            asButton(segment, modeNames[i])
             segments.add(segment)
             add(seg, segment, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
         }
@@ -1099,7 +1105,7 @@ class MainActivity : Activity() {
                     input.setSelection(input.text.length)
                 }
             }
-            asButton(chip, "${sample.label}, ${modeNames[sample.mode]} sample")
+            asButton(chip, t(sample.label) + ", " + t(modeNames[sample.mode]))
             add(chips, chip, -2, -2, left = if (chips.childCount == 0) 0 else 8)
         }
         add(body, HorizontalScrollView(this).apply {
@@ -1108,7 +1114,6 @@ class MainActivity : Activity() {
             addView(chips)
         }, -1, -2, top = 4)
         val check = button("Check on this phone", R.drawable.ic_shield_check) { startCheck() }.apply {
-            contentDescription = "Check on this phone. इस फ़ोन पर जाँचें"
             minimumHeight = dp(56)
         }
         modelStatusSlot = col().apply { accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
@@ -1151,8 +1156,8 @@ class MainActivity : Activity() {
         add(offline, offlineText, 0, -2, left = 12, weight = 1f)
         add(offline, icon(R.drawable.ic_chevron_right, 20, T.ink3), 20, 20)
         asButton(offline, "Prove it's offline. Try to reach the internet from this app.")
-        add(body, navRow(R.drawable.ic_list, L10n.n("recent"), L10n.n("history_toggle")) { showHistory() }, top = 16)
-        add(body, navRow(R.drawable.ic_link, L10n.n("qr_check"), "") { pickQr() }, top = 8)
+        add(body, navRow(R.drawable.ic_list, n("recent"), n("history_toggle")) { showHistory() }, top = 16)
+        add(body, navRow(R.drawable.ic_link, n("qr_check"), "") { pickQr() }, top = 8)
         add(body, offline, top = 8)
         centeredNote(body, iconText(R.drawable.ic_lock, "Nothing you paste leaves this phone", T.ink3, 12f, 13), 12)
         setContentView(root)
@@ -1280,7 +1285,8 @@ class MainActivity : Activity() {
             }
             add(chip, label, 0, -2, left = 4, weight = 1f)
             chip.setOnClickListener { if (i != selected) beginCheck(i, value) }
-            asButton(chip, if (on) "${modeNames[i]}, ${modeHindi[i]}, selected" else "Change to ${modeNames[i]}, ${modeHindi[i]}")
+            val modeLabel = t(modeNames[i])
+            asButton(chip, if (on) "$modeLabel, ${t("selected")}" else "${t("Change to")} $modeLabel")
             add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
         }
         return seg
@@ -1329,7 +1335,7 @@ class MainActivity : Activity() {
         val ring = FrameLayout(this)
         val progress = ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
             indeterminateTintList = ColorStateList.valueOf(T.brand)
-            contentDescription = "Checking on this phone"
+            contentDescription = t("Checking on this phone")
         }
         ring.addView(progress, FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER))
         val center = FrameLayout(this).apply {
@@ -1344,7 +1350,6 @@ class MainActivity : Activity() {
             isAccessibilityHeading = true
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }, top = 18)
-        add(body, txt("इस फ़ोन पर जाँच हो रही है", 14f, T.ink2, 400, 20).apply { gravity = Gravity.CENTER }, top = 4)
         modelProblem()?.let { problem ->
             add(body, txt(problem, 13f, T.onDanger, 400, 18).apply { gravity = Gravity.CENTER }, top = 8)
         }
@@ -1464,12 +1469,13 @@ class MainActivity : Activity() {
         return if (clear) "$line ${t("That is not a guarantee it is safe.")}" else line
     }
 
-    /** English keeps the existing "checked on this phone in …" line. Hindi uses the lookup. */
+    /** "SMS · checked on this phone in 1.2 s", with the Hindi line when that mode is on. */
     private fun checkedMeta(mode: Int, elapsedMs: Double): String {
         val tail = formatMs(elapsedMs)
         val name = modeNames[mode.coerceIn(0, modeNames.lastIndex)]
-        val where = if (emulator()) "checked on this emulator" else "checked on this phone"
-        return if (L10n.hindi) "${t(name)} · ${t(where)} · $tail" else "$name · $where in $tail"
+        val where = t("checked on this phone")
+        val shownName = t(name)
+        return if (L10n.hindi) "$shownName · $where · $tail" else "$shownName · $where in $tail"
     }
 
     private fun banner(p: Palette, why: String, meta: String, metaIcon: Int, stillVerify: Boolean = false): LinearLayout {
@@ -1482,14 +1488,14 @@ class MainActivity : Activity() {
         }
         add(top, bubble, 52, 52)
         val titles = col()
-        val big = if (L10n.hindi) t(p.title).let { if (it != p.title) it else p.hindi } else p.title
-        if (!L10n.hindi) add(titles, txt(p.hindi, 15f, p.on, 600, 20, raw = true))
+        val looked = L10n.t(p.title)
+        val big = onDevice(if (L10n.hindi && looked != p.title) looked else if (L10n.hindi) p.hindi else p.title)
         add(titles, txt(big, if (stillVerify) 25f else 28f, p.on, 800, 32, raw = true).apply {
             if (!containsIndic(big)) letterSpacing = .02f
             isAccessibilityHeading = true
         })
         if (stillVerify) {
-            val verify = iconText(R.drawable.ic_alert_circle, "Still verify · फिर भी जाँच लें", p.on, 13f, 14).apply {
+            val verify = iconText(R.drawable.ic_alert_circle, n("still_verify"), p.on, 13f, 14).apply {
                 background = shape(T.white, 13f, 1, T.slateLine)
                 pad(this, 8, 5, 8, 5)
             }
@@ -1523,17 +1529,17 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
             background = ripple(shape(Color.TRANSPARENT, 14f, 1, p.on))
         }
-        val label = txt(L10n.n("listen"), 15f, p.on, 700, raw = true)
+        val label = txt(n("listen"), 15f, p.on, 700, raw = true)
         listenLabel = label
         add(box, label, -2, -2)
         box.setOnClickListener { toggleSpeech(script) }
-        asButton(box, L10n.n("listen"))
+        asButton(box, n("listen"))
         return box
     }
 
     private fun refreshListen() {
         val label = listenLabel ?: return
-        val word = if (speaking) L10n.n("stop") else L10n.n("listen")
+        val word = if (speaking) n("stop") else n("listen")
         label.text = word
         (label.parent as? View)?.contentDescription = word
     }
@@ -1556,7 +1562,7 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     if (isDestroyed) return@runOnUiThread
                     if (status != TextToSpeech.SUCCESS || speech == null) {
-                        toast(L10n.n("voice_missing"))
+                        toast(n("voice_missing"))
                         return@runOnUiThread
                     }
                     speakNow(script)
@@ -1571,14 +1577,14 @@ class MainActivity : Activity() {
         val engine = speech ?: return
         val voice = offlineVoice(engine, L10n.hindi)
         if (voice == null) {
-            toast(L10n.n("voice_missing"))
+            toast(n("voice_missing"))
             return
         }
         try {
             engine.voice = voice
         } catch (t: Throwable) {
             Log.e(TAG, "voice select failed", t)
-            toast(L10n.n("voice_missing"))
+            toast(n("voice_missing"))
             return
         }
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -1593,7 +1599,7 @@ class MainActivity : Activity() {
         })
         val code = engine.speak(script, TextToSpeech.QUEUE_FLUSH, Bundle(), "prahari")
         if (code == TextToSpeech.ERROR) {
-            toast(L10n.n("voice_missing"))
+            toast(n("voice_missing"))
             return
         }
         speaking = true
@@ -1650,7 +1656,7 @@ class MainActivity : Activity() {
         val body = scrollBody(root)
         add(body, modeSwitcher(selectedMode, job.value), -1, -2)
         val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble()), modeIcons[selectedMode], calm)
-        if (job.mode == 2) add(b, txt(L10n.n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
+        if (job.mode == 2) add(b, txt(n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
         data.optString("scam_type", "").takeIf { it.isNotBlank() }?.let { scam ->
             val kind = if (L10n.hindi) t(scam) else sentence(scam)
@@ -1659,7 +1665,7 @@ class MainActivity : Activity() {
         val actionsHi = strings(data.optJSONArray("actions_hi"))
         add(b, listenButton(p, speechScript(p, why, actions, actionsHi)), -1, -2, top = 12)
         add(body, b, top = 12)
-        b.post { if (!isDestroyed) b.announceForAccessibility("${p.title}. ${p.hindi}. $why") }
+        b.post { if (!isDestroyed) b.announceForAccessibility("${t(p.title)}. $why") }
         val steps = card()
         add(steps, heading(if (clear) "Before you act" else "Do this now", if (clear) "कार्य करने से पहले" else "अभी यह करें"))
         actions.forEachIndexed { i, action ->
@@ -1738,7 +1744,7 @@ class MainActivity : Activity() {
             }, top = 8)
         } else if (clear && mode == 1) {
             divider(steps, 12)
-            add(steps, iconText(R.drawable.ic_alert_circle, L10n.n("link_caveat"), T.ink2, 13f, 16, flex = true).apply {
+            add(steps, iconText(R.drawable.ic_alert_circle, n("link_caveat"), T.ink2, 13f, 16, flex = true).apply {
                 minimumHeight = dp(48)
                 setPadding(0, dp(8), 0, dp(8))
             }, top = 8)
@@ -1787,7 +1793,7 @@ class MainActivity : Activity() {
             background = shape(T.brandC, 12f)
             pad(this, 8, 4, 10, 4)
         }
-        add(replaced, txt(L10n.n("replaced_chip"), 12f, T.brand, 600, 16, raw = true))
+        add(replaced, txt(n("replaced_chip"), 12f, T.brand, 600, 16, raw = true))
         replacedSlot = replaced
         add(llama, replaced, -2, -2, top = 8)
         val explainRow = row().apply { gravity = Gravity.TOP; isBaselineAligned = false }
@@ -1797,9 +1803,9 @@ class MainActivity : Activity() {
         }
         add(explainRow, accent, 3, -1)
         val known = modelProblem()
-        val placeholder = if (known == null) "Writing an explanation on this phone…"
-        else "Explanation unavailable on this phone. The verdict and the steps above are complete.\n$known"
-        explanationText = txt(placeholder, 15f, T.ink2, 400, 22).apply {
+        val placeholder = if (known == null) t("Writing an explanation on this phone…")
+        else t("Explanation unavailable on this phone. The verdict and the steps above are complete.") + "\n" + known
+        explanationText = txt(placeholder, 15f, T.ink2, 400, 22, raw = true).apply {
             if (known == null) setTypeface(typeface, Typeface.ITALIC)
             includeFontPadding = true
             isFallbackLineSpacing = true
@@ -1821,7 +1827,7 @@ class MainActivity : Activity() {
         }
         add(llama, explainRow, top = 12)
         add(llama, iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true), top = 12)
-        if (L10n.hindi) add(llama, txt(L10n.n("ai_english"), 12f, T.ink3, 600, 16, raw = true), top = 6)
+        if (L10n.hindi) add(llama, txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true), top = 6)
         add(body, llama, top = 12)
         val stats = card()
         val header = row().apply { minimumHeight = dp(48) }
@@ -1852,7 +1858,7 @@ class MainActivity : Activity() {
             if (mode != 0) typeface = Typeface.MONOSPACE
         }, top = 10)
         add(body, checked, top = 12)
-        bottom(root, "Check another · दूसरा जाँचें") { goHome(true) }
+        bottom(root, n("check_another")) { goHome(true) }
         setContentView(root)
         if (job.explanation != null) applyExplanation(job)
     }
@@ -1865,8 +1871,8 @@ class MainActivity : Activity() {
     private fun describeStats(expanded: Boolean) {
         val header = statsHeader ?: return
         val summary = statsSummary?.text ?: ""
-        header.contentDescription = "On-device stats, ${if (expanded) "expanded" else "collapsed"}. $summary"
-        if (Build.VERSION.SDK_INT >= 30) header.stateDescription = if (expanded) "Expanded" else "Collapsed"
+        header.contentDescription = t(if (expanded) "On-device stats, expanded" else "On-device stats, collapsed") + ". $summary"
+        if (Build.VERSION.SDK_INT >= 30) header.stateDescription = t(if (expanded) "Expanded" else "Collapsed")
     }
 
     private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?) {
@@ -1887,9 +1893,11 @@ class MainActivity : Activity() {
         }
         add(details, tiles, top = 4)
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "—"
-        val foot = "Total ${total?.let { formatMs(it.toDouble()) } ?: "—"} · Memory ${pss?.let { String.format(Locale.US, "%.1f MB", it) } ?: "—"}\nLlama 3.2 1B INT4 · ExecuTorch · XNNPACK\nCPU ABI: $abi" +
-            if (abi.startsWith("x86")) "\nx86 emulator: not Arm timings" else ""
-        add(details, txt(foot, 12f, T.ink3, 400, 18).apply { typeface = Typeface.MONOSPACE }, top = 12)
+        val foot = t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
+            t("Memory") + " ${pss?.let { String.format(Locale.US, "%.1f MB", it) } ?: "—"}\n" +
+            "Llama 3.2 1B INT4 · ExecuTorch · XNNPACK\nCPU ABI: $abi" +
+            if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
+        add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
         summary.text = "${values[0]} · ${values[1]}"
         describeStats(details.visibility == View.VISIBLE)
     }
@@ -1931,7 +1939,7 @@ class MainActivity : Activity() {
         try {
             startActivity(intent)
         } catch (e: Exception) {
-            toast("Unable to open: ${errorText(e)}")
+            toast(t("Unable to open") + ": " + errorText(e))
         }
     }
     private fun dial() = launch(Intent(Intent.ACTION_DIAL, Uri.parse("tel:1930")))
@@ -2034,9 +2042,9 @@ class MainActivity : Activity() {
             blocked -> "This app cannot connect. Android blocked the request because Prahari has no internet permission."
             else -> "This alone does not prove the app is offline."
         }
-        val banner = banner(p, why, "Tested just now · took ${net.elapsed} ms", R.drawable.ic_lock)
+        val banner = banner(p, why, t("Tested just now") + " · ${net.elapsed} ms", R.drawable.ic_lock)
         add(body, banner)
-        banner.post { if (!isDestroyed) banner.announceForAccessibility("${p.title}. ${p.hindi}. $why") }
+        banner.post { if (!isDestroyed) banner.announceForAccessibility("${t(p.title)}. $why") }
         val tried = card()
         add(tried, heading("What we tried", "हमने क्या आज़माया"))
         fun pairRow(key: String, value: View) {
@@ -2122,8 +2130,8 @@ class MainActivity : Activity() {
         screen = "history"
         visibleJob = null
         networkBody = null
-        val root = root(L10n.n("recent"))
-        add(root, bar(L10n.n("recent"), true), -1, -2)
+        val root = root(n("recent"))
+        add(root, bar(n("recent"), true), -1, -2)
         val body = scrollBody(root)
         val enabled = HistoryStore.enabled(this)
         val toggle = row().apply {
@@ -2131,10 +2139,10 @@ class MainActivity : Activity() {
             pad(this, 14, 8, 14, 8)
             minimumHeight = dp(48)
         }
-        add(toggle, txt(L10n.n("history_toggle"), 15f, T.ink, 600, 20, raw = true), 0, -2, weight = 1f)
+        add(toggle, txt(n("history_toggle"), 15f, T.ink, 600, 20, raw = true), 0, -2, weight = 1f)
         val sw = Switch(this).apply {
             isChecked = enabled
-            contentDescription = L10n.n("history_toggle")
+            contentDescription = n("history_toggle")
             setOnCheckedChangeListener { _, on ->
                 HistoryStore.setEnabled(this@MainActivity, on)
                 post { showHistory() }
@@ -2143,9 +2151,9 @@ class MainActivity : Activity() {
         add(toggle, sw, -2, -2)
         add(body, toggle)
         val items = HistoryStore.list(this)
-        if (!enabled) add(body, txt(L10n.n("history_off"), 13f, T.ink2, 400, 18, raw = true), top = 12)
+        if (!enabled) add(body, txt(n("history_off"), 13f, T.ink2, 400, 18, raw = true), top = 12)
         if (items.isEmpty()) {
-            add(body, txt(L10n.n("history_empty"), 15f, T.ink2, 400, 22, raw = true), top = 16)
+            add(body, txt(n("history_empty"), 15f, T.ink2, 400, 22, raw = true), top = 16)
         }
         items.forEach { entry ->
             val card = card()
@@ -2160,7 +2168,7 @@ class MainActivity : Activity() {
             if (entry.snippet.isNotBlank()) add(card, txt(entry.snippet, 14f, T.ink2, 400, 20, raw = true), top = 6)
             add(body, card, top = 10)
         }
-        bottom(root, L10n.n("clear_history"), outlined = true) {
+        bottom(root, n("clear_history"), outlined = true) {
             HistoryStore.clear(this)
             showHistory()
         }
@@ -2181,7 +2189,7 @@ class MainActivity : Activity() {
             startActivityForResult(intent, QR_REQUEST)
         } catch (t: Throwable) {
             Log.e(TAG, "photo picker failed", t)
-            toast(L10n.n("qr_fail"))
+            toast(n("qr_fail"))
         }
     }
 
@@ -2201,7 +2209,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 if (text.isNullOrBlank()) {
-                    toast(L10n.n("qr_fail"))
+                    toast(n("qr_fail"))
                     return@runOnUiThread
                 }
                 // The decoded text is checked here. It is never opened as a link or a UPI intent.
@@ -2290,14 +2298,12 @@ class MainActivity : Activity() {
         add(head, logo(), 36, 36)
         val title = col()
         add(title, txt("How Prahari works", 20f, T.ink, 700, 26).apply { isAccessibilityHeading = true })
-        add(title, txt("प्रहरी कैसे काम करता है", 13f, T.ink3, 500, 18))
         add(head, title, 0, -2, left = 12, weight = 1f)
         add(sheet, head, top = 14)
         val descriptions = listOf(
             Triple(R.drawable.ic_wifi_off, "Runs fully offline", "The app has no internet permission, so nothing you check can be sent anywhere. Airplane mode works."),
             Triple(R.drawable.ic_cpu, "Llama 3.2 1B on this phone",
-                if (emulator()) "Runs on the emulator's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."
-                else "Runs on the phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."),
+                "Runs on this phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."),
             Triple(R.drawable.ic_shield_check, "A detector decides the verdict", "Scam signals are checked by the detector. The verdict never depends on the AI text."),
             Triple(R.drawable.ic_list, "Safety steps are fixed", "Steps come from a vetted list (Sanchar Saathi Chakshu, 1930, cybercrime.gov.in), never from the AI."),
             Triple(R.drawable.ic_alert_circle, "Best effort, not a guarantee", "No checker catches every scam. If in doubt, don't pay; report on Sanchar Saathi Chakshu, or call 1930 if money was lost.")
