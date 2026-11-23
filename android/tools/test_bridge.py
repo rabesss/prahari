@@ -5,6 +5,20 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'candidates/BEST'), str(ROOT/'android/python')]
 # Chaquopy installs only NumPy: block the desktop-only packages so an import of
 # any of them fails here as it would on the phone.
+import intake
+assert intake.detect_mode('http://amaz0n-refund-help.top/claim') == 1
+assert intake.detect_mode('  https://www.irctc.co.in/nget/train-search  ') == 1
+assert intake.detect_mode('upi://pay?pa=refund@ybl&am=5000') == 1
+assert intake.detect_mode('www.example.com/path') == 1
+assert intake.detect_mode('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked') == 0
+assert intake.detect_mode('Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein.') == 0
+assert intake.detect_mode('see https://example.com please') == 0
+assert intake.detect_mode('tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected') == 2
+assert intake.detect_mode('{"num_failed_logins": 4, "serror_rate": 1}') == 2
+assert intake.detect_mode('') == 0
+assert intake.detect_mode('{not json}') == 0
+print('share-text mode detection passed')
+
 for blocked in ('joblib', 'sklearn', 'scipy', 'pandas', 'torch', 'executorch'):
     sys.modules[blocked] = None
 import mobile

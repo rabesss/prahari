@@ -769,6 +769,13 @@ class MainActivity : Activity() {
             Log.e(TAG, "Python start failed", t)
         }
         installBack()
+        // A share intent stays on the activity across rotation. Only the first create auto-checks.
+        val shared = if (savedInstanceState == null) readShare(intent) else null
+        if (shared != null) {
+            openShared(shared)
+            requestModel(false)
+            return
+        }
         val restored = if (Bridge.phase == "idle") savedJob(savedInstanceState) else null
         when (Bridge.phase) {
             "checking" -> {
@@ -1104,9 +1111,90 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val shared = readShare(intent) ?: return
+        openShared(shared)
+    }
+
+    /** ACTION_SEND uses EXTRA_TEXT. ACTION_PROCESS_TEXT uses EXTRA_PROCESS_TEXT. Never log the text. */
+    private fun readShare(source: Intent?): String? {
+        if (source == null) return null
+        val key = when (source.action) {
+            Intent.ACTION_SEND -> {
+                val type = source.type ?: return null
+                if (!type.startsWith("text/plain")) return null
+                Intent.EXTRA_TEXT
+            }
+            Intent.ACTION_PROCESS_TEXT -> Intent.EXTRA_PROCESS_TEXT
+            else -> return null
+        }
+        val text = source.getCharSequenceExtra(key) ?: source.getStringExtra(key) ?: return null
+        return text.toString()
+    }
+
+    private fun openShared(raw: String) {
+        val text = raw.trim()
+        when {
+            text.isEmpty() -> {
+                toast("Nothing to check.")
+                showHome()
+            }
+            text.length > 100_000 -> {
+                toast("That text is too long to check.")
+                showHome()
+            }
+            else -> beginCheck(detectMode(text), text)
+        }
+    }
+
+    private fun detectMode(text: String): Int {
+        return try {
+            if (!Python.isStarted()) 0
+            else Python.getInstance().getModule("intake").callAttr("detect_mode", text).toInt().coerceIn(0, 2)
+        } catch (t: Throwable) {
+            Log.e(TAG, "mode detection failed", t)
+            0
+        }
+    }
+
+    /** SMS / Link / Network. The selected chip is the auto-detected mode; another tap re-checks. */
+    private fun modeSwitcher(selected: Int, value: String): LinearLayout {
+        val seg = row().apply {
+            minimumHeight = dp(48)
+            background = shape(T.surface2, 14f)
+            pad(this, 4, 4, 4, 4)
+        }
+        for (i in KINDS.indices) {
+            val on = i == selected
+            val chip = row().apply {
+                gravity = Gravity.CENTER
+                minimumHeight = dp(48)
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+                background = if (on) shape(T.white, 10f, 1, T.outline) else null
+            }
+            val color = if (on) T.brand else T.ink2
+            add(chip, icon(modeIcons[i], 16, color), 16, 16)
+            val label = txt(modeNames[i], 13f, color, 700).apply {
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                gravity = Gravity.CENTER
+            }
+            add(chip, label, 0, -2, left = 4, weight = 1f)
+            chip.setOnClickListener { if (i != selected) beginCheck(i, value) }
+            asButton(chip, if (on) "${modeNames[i]}, ${modeHindi[i]}, selected" else "Change to ${modeNames[i]}, ${modeHindi[i]}")
+            add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
+        }
+        return seg
+    }
+
     private fun startCheck() {
         if (!::input.isInitialized) return
-        val value = input.text?.toString() ?: ""
+        beginCheck(selectedMode, input.text?.toString() ?: "")
+    }
+
+    private fun beginCheck(mode: Int, value: String) {
         if (value.isBlank()) {
             toast("Paste a message, link or network event first.")
             return
@@ -1116,12 +1204,12 @@ class MainActivity : Activity() {
             return
         }
         inputValue = value
+        selectedMode = mode.coerceIn(0, KINDS.lastIndex)
         hideKeyboard()
         val id = Bridge.begin()
-        val mode = selectedMode
         val started = SystemClock.elapsedRealtime()
-        showChecking(mode, value)
-        enqueueCheck(id, mode, value, started)
+        showChecking(selectedMode, value)
+        enqueueCheck(id, selectedMode, value, started)
     }
 
     private fun showChecking(mode: Int, value: String) {
@@ -1139,6 +1227,7 @@ class MainActivity : Activity() {
         add(summary, txt(value, 14f, T.ink2, 400, 20).apply { maxLines = 3; ellipsize = TextUtils.TruncateAt.END }, 0, -2, left = 12, weight = 1f)
         add(what, summary)
         add(body, what)
+        add(body, modeSwitcher(mode, value), -1, -2, top = 12)
         val ring = FrameLayout(this)
         val progress = ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
             indeterminateTintList = ColorStateList.valueOf(T.brand)
@@ -1320,10 +1409,11 @@ class MainActivity : Activity() {
         val root = root("${p.title}. ${p.hindi}")
         add(root, bar("Result", true), -1, -2)
         val body = scrollBody(root)
+        add(body, modeSwitcher(selectedMode, job.value), -1, -2)
         val b = banner(p, why, "${modeNames[selectedMode]} · checked on this phone in ${formatMs(elapsed.toDouble())}", modeIcons[selectedMode], clear)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
         data.optString("scam_type", "").takeIf { it.isNotBlank() }?.let { add(b, txt("Type: ${sentence(it)}", 12f, p.on, 500, 16), top = 8) }
-        add(body, b)
+        add(body, b, top = 12)
         b.post { if (!isDestroyed) b.announceForAccessibility("${p.title}. ${p.hindi}. $why") }
         val steps = card()
         add(steps, heading(if (clear) "Before you act" else "Do this now", if (clear) "कार्य करने से पहले" else "अभी यह करें"))
