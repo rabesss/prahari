@@ -16,6 +16,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Debug
 import android.os.SystemClock
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.text.Editable
 import android.text.SpannableString
 import android.text.TextPaint
@@ -518,6 +521,9 @@ class MainActivity : Activity() {
     private val checkTitles = mutableListOf<TextView>()
     private val checkSubs = mutableListOf<TextView>()
     private var aboutDialog: Dialog? = null
+    private var speech: TextToSpeech? = null
+    private var speaking = false
+    private var listenLabel: TextView? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
@@ -921,6 +927,7 @@ class MainActivity : Activity() {
     }
 
     private fun goHome(clear: Boolean = false) {
+        stopSpeech()
         Bridge.cancel()
         if (clear) inputValue = ""
         showHome()
@@ -1263,6 +1270,7 @@ class MainActivity : Activity() {
         }
         inputValue = value
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
+        stopSpeech()
         hideKeyboard()
         val id = Bridge.begin()
         val started = SystemClock.elapsedRealtime()
@@ -1467,7 +1475,119 @@ class MainActivity : Activity() {
         return box
     }
 
+    /** Verdict line and vetted steps only. The message and the Llama text are not spoken. */
+    private fun speechScript(p: Palette, why: String, actions: List<String>, actionsHi: List<String>): String {
+        val title = if (L10n.hindi) t(p.title).let { if (it != p.title) it else p.hindi } else p.title
+        val steps = actions.mapIndexed { i, action ->
+            if (L10n.hindi) actionsHi.getOrNull(i).orEmpty().ifBlank { t(action) } else action
+        }
+        return (listOf(title, why) + steps).filter { it.isNotBlank() }.joinToString("\n")
+    }
+
+    private fun listenButton(p: Palette, script: String): LinearLayout {
+        val box = row().apply {
+            gravity = Gravity.CENTER
+            minimumHeight = dp(48)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = ripple(shape(Color.TRANSPARENT, 14f, 1, p.on))
+        }
+        val label = txt(L10n.n("listen"), 15f, p.on, 700, raw = true)
+        listenLabel = label
+        add(box, label, -2, -2)
+        box.setOnClickListener { toggleSpeech(script) }
+        asButton(box, L10n.n("listen"))
+        return box
+    }
+
+    private fun refreshListen() {
+        val label = listenLabel ?: return
+        val word = if (speaking) L10n.n("stop") else L10n.n("listen")
+        label.text = word
+        (label.parent as? View)?.contentDescription = word
+    }
+
+    private fun stopSpeech() {
+        speaking = false
+        try { speech?.stop() } catch (_: Throwable) {}
+        refreshListen()
+    }
+
+    private fun toggleSpeech(script: String) {
+        if (script.isBlank()) return
+        if (speaking) {
+            stopSpeech()
+            return
+        }
+        val ready = speech
+        if (ready == null) {
+            speech = TextToSpeech(applicationContext) { status ->
+                runOnUiThread {
+                    if (isDestroyed) return@runOnUiThread
+                    if (status != TextToSpeech.SUCCESS || speech == null) {
+                        toast(L10n.n("voice_missing"))
+                        return@runOnUiThread
+                    }
+                    speakNow(script)
+                }
+            }
+            return
+        }
+        speakNow(script)
+    }
+
+    private fun speakNow(script: String) {
+        val engine = speech ?: return
+        val voice = offlineVoice(engine, L10n.hindi)
+        if (voice == null) {
+            toast(L10n.n("voice_missing"))
+            return
+        }
+        try {
+            engine.voice = voice
+        } catch (t: Throwable) {
+            Log.e(TAG, "voice select failed", t)
+            toast(L10n.n("voice_missing"))
+            return
+        }
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                runOnUiThread { if (!isDestroyed) { speaking = false; refreshListen() } }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                runOnUiThread { if (!isDestroyed) { speaking = false; refreshListen() } }
+            }
+        })
+        val code = engine.speak(script, TextToSpeech.QUEUE_FLUSH, Bundle(), "prahari")
+        if (code == TextToSpeech.ERROR) {
+            toast(L10n.n("voice_missing"))
+            return
+        }
+        speaking = true
+        refreshListen()
+    }
+
+    /** Offline voices only. A network voice is never selected, and a missing pack shows a message. */
+    private fun offlineVoice(engine: TextToSpeech, hindi: Boolean): Voice? {
+        val lang = if (hindi) "hi" else "en"
+        val voices = try { engine.voices } catch (t: Throwable) {
+            Log.e(TAG, "voice list failed", t)
+            null
+        } ?: return null
+        fun offline(v: Voice): Boolean {
+            if (v.isNetworkConnectionRequired) return false
+            if (!v.locale.language.equals(lang, ignoreCase = true)) return false
+            val features = v.features ?: emptySet()
+            if (features.any { it.equals("notInstalled", ignoreCase = true) || it.contains("network", ignoreCase = true) }) return false
+            return true
+        }
+        val ready = voices.filter { offline(it) }
+        return ready.firstOrNull { it.locale.country.equals("IN", ignoreCase = true) } ?: ready.firstOrNull()
+    }
+
     internal fun presentResult(job: Bridge.Job) {
+        stopSpeech()
         if (job.id >= 0 && !Bridge.mark(job.id, "result")) return
         shownId = job.id
         visibleJob = job
@@ -1499,11 +1619,12 @@ class MainActivity : Activity() {
             val kind = if (L10n.hindi) t(scam) else sentence(scam)
             add(b, txt(t("Type") + ": " + kind, 12f, p.on, 500, 16, raw = true), top = 8)
         }
+        val actionsHi = strings(data.optJSONArray("actions_hi"))
+        add(b, listenButton(p, speechScript(p, why, actions, actionsHi)), -1, -2, top = 12)
         add(body, b, top = 12)
         b.post { if (!isDestroyed) b.announceForAccessibility("${p.title}. ${p.hindi}. $why") }
         val steps = card()
         add(steps, heading(if (clear) "Before you act" else "Do this now", if (clear) "कार्य करने से पहले" else "अभी यह करें"))
-        val actionsHi = strings(data.optJSONArray("actions_hi"))
         actions.forEachIndexed { i, action ->
             val line = row().apply { gravity = Gravity.TOP }
             val number = txt("${i + 1}", 13f, p.number, 700).apply {
@@ -1989,6 +2110,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        stopSpeech()
+        try { speech?.shutdown() } catch (_: Throwable) {}
+        speech = null
         aboutDialog?.setOnDismissListener(null)
         aboutDialog?.dismiss()
         aboutDialog = null
