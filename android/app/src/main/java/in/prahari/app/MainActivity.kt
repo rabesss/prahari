@@ -84,23 +84,43 @@ private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
-private val OWN_LINK = Regex("(?i)\\b(?:https?://|www\\.)|\\b[a-z0-9-]{2,}\\.(?:com|in|co|net|org|top|xyz|live|click|info|site|online|app|ly|me|io|link|shop|store|cc|biz|vip|icu)\\b")
+private val OWN_HOST = Regex("(?i)\\b(?:https?://)?((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,24})\\b")
+private val OWN_IP = Regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b")
 private val OWN_MOBILE = Regex("(?<![0-9])(?:\\+?91[ -]?)?[6-9][0-9]{4}[ -]?[0-9]{5}(?![0-9])")
+private val OWN_OTHER = Regex("(?i)\\.apk\\b|\\*\\d{2,3}\\*")
+// Sites a genuine bank alert may name. Any other host, an IP, an APK, a USSD forwarding code or a
+// private mobile number is a contact of the sender's own.
+private val OFFICIAL_HOSTS = listOf(
+    "sbi.co.in", "onlinesbi.sbi", "sbicard.com", "hdfcbank.com", "icicibank.com", "axisbank.com", "kotak.com",
+    "bankofbaroda.in", "bankofbaroda.co.in", "bobcard.co.in", "pnbindia.in", "idfcfirstbank.com", "indusind.com",
+    "federalbank.co.in", "yesbank.in", "canarabank.com", "unionbankofindia.co.in", "aubank.in", "rblbank.com",
+    "iob.in", "bankofindia.co.in", "centralbankofindia.co.in", "indianbank.in", "paytm.com", "phonepe.com", "npci.org.in",
+)
+private val OFFICIAL_SUFFIXES = listOf(".gov.in", ".nic.in", ".bank.in")
 
-/** True when the text offers its own link or a private Indian mobile number. */
-private fun hasOwnContact(text: String): Boolean = OWN_LINK.containsMatchIn(text) || OWN_MOBILE.containsMatchIn(text)
+private fun officialHost(host: String): Boolean {
+    val h = host.lowercase()
+    return OFFICIAL_HOSTS.any { h == it || h.endsWith(".$it") } || OFFICIAL_SUFFIXES.any { h.endsWith(it) }
+}
+
+/** True when the text offers a contact of its own: an unofficial link, IP, APK, USSD code or private mobile. */
+private fun hasOwnContact(text: String): Boolean =
+    OWN_MOBILE.containsMatchIn(text) || OWN_IP.containsMatchIn(text) || OWN_OTHER.containsMatchIn(text) ||
+        OWN_HOST.findAll(text).any { !officialHost(it.groupValues[1]) }
 
 /**
- * A bank debit or OTP alert shown as the amber CHECK THIS ALERT banner: the vetted debit or check
- * step is present, the verdict is not DANGEROUS, and the message offers no contact of its own.
- * The result screen and History both use this, so they never disagree.
+ * How a result that carries the vetted bank debit or check step is shown, or null for no change.
+ * "alert": the amber CHECK THIS ALERT banner (no contact of the sender's own). "warn": SUSPICIOUS,
+ * because a copied alert that sends the reader to its own link or number is never NO RISK. A
+ * DANGEROUS verdict is never changed. The result screen and History both use this.
  */
-private fun isBankAlert(verdict: JSONObject, value: String): Boolean {
+private fun bankAlertLevel(verdict: JSONObject, value: String): String? {
     val level = verdict.optString("level", "clear")
-    if (level != "clear" && level != "warn") return false
-    val actions = verdict.optJSONArray("actions") ?: return false
+    if (level != "clear" && level != "warn") return null
+    val actions = verdict.optJSONArray("actions") ?: return null
     val vetted = (0 until actions.length()).any { val a = actions.optString(it); a == DEBIT_STEP || a == CHECK_STEP }
-    return vetted && !hasOwnContact(value)
+    if (!vetted) return null
+    return if (hasOwnContact(value)) "warn" else "alert"
 }
 
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
@@ -399,7 +419,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         if (!Bridge.publish(id, job)) return
         Bridge.app?.let { ctx ->
             try {
-                HistoryStore.add(ctx, mode, if (isBankAlert(verdict, value)) "alert" else level, value)
+                HistoryStore.add(ctx, mode, bankAlertLevel(verdict, value) ?: level, value)
             } catch (t: Throwable) {
                 Log.e(TAG, "history save failed", t)
             }
@@ -1897,14 +1917,15 @@ class MainActivity : Activity() {
         screen = "result"
         networkBody = null
         val data = job.verdict
-        val level = data.optString("level", "clear")
+        // A bank debit or OTP alert is never relabelled when the verdict is DANGEROUS. Without a
+        // contact of its own it shows the amber CHECK THIS ALERT banner; with an unofficial link
+        // or a private number it is shown as SUSPICIOUS, even when the detector cleared it.
+        val alertLevel = bankAlertLevel(data, job.value)
+        val level = if (alertLevel == "warn") "warn" else data.optString("level", "clear")
         val evidence = strings(data.optJSONArray("evidence"))
         val actions = strings(data.optJSONArray("actions"))
         val clear = level == "clear"
-        // A bank debit or OTP alert is not relabelled when the verdict is already DANGEROUS.
-        // A copied alert that carries a link or a private mobile number keeps its SUSPICIOUS title:
-        // genuine bank alerts point to the bank app or a toll-free line, never to those.
-        val bankAlert = isBankAlert(data, job.value)
+        val bankAlert = alertLevel == "alert"
         val p = if (bankAlert) palette("warn").copy(title = "CHECK THIS ALERT", hindi = "अलर्ट जांचें") else palette(level)
         val calm = clear && !bankAlert
         val fallback = when {
