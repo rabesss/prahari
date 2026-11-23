@@ -12,7 +12,7 @@ This is a production plan, not evidence of a finished recording or physical-phon
 | 1:25–1:40 | Android 14 emulator (x86_64): select KYC scam SMS and show the actual Hindi and English verdict and numbered vetted steps with Hindi lines. |
 | 1:40–1:52 | Show “Report on Sanchar Saathi Chakshu” and “Lost money? Call 1930”. Explain Chakshu is for scam messages or links before loss; 1930 is primary when money is already lost, and cybercrime.gov.in is used for sextortion or extortion. |
 | 1:52–2:05 | Scroll through evidence to the Llama card and its warning, then expand on-device stats. Point out that the displayed x86 timings are not Arm timings. |
-| 2:05–2:17 | Show the genuine-looking bank debit alert as SUSPICIOUS and its first step: “Not your payment? Block it in your bank app and call 1930.” |
+| 2:05–2:17 | Show the genuine-looking bank debit alert as SUSPICIOUS and its first step: “Didn't make this payment? Call 1930 and block the card or UPI in your bank app.” |
 | 2:17–2:40 | Select “Prove it's offline” and show the actual Android permission refusal. The app has no INTERNET permission; external dialler and browser actions use separate apps. Model files were staged beforehand. |
 | 2:40–3:00 | Summary: local detection and advisory explanations, false positives and missed scams, no live capture, and physical Arm phone testing still pending. |
 
