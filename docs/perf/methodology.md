@@ -17,7 +17,7 @@ To prevent apples-to-oranges comparisons, every measurement is tagged with its e
 
 - **Detector latency (`detector_ms`):**
   - *Android S23:* Wall time of `mobile.verdict(kind, text)` measured with `time.perf_counter()` inside Python (`android/python/mobile.py`). First check per task pays one-time JSON load (`255 ms` for SMS/Indic, `183 ms` for URL); subsequent warm checks take `5–17 ms`.
-  - *Arm Linux (`bin/eval` on N1):* Batch `bin/predict` wall time divided by item count across SMS (`n=1,162`), URL (`n=7,997`), Indic (`n=320`), and NSL-KDD flow (`n=22,544`), yielding `0.407–0.448 ms/item`.
+  - *Arm Linux (`bin/eval` on N1):* Per-task batch `bin/predict` throughput (`detection.<task>.items_per_s` in `research/evals/ledger.jsonl`, which includes interpreter start and model load) for SMS (`n=1,162`), URL (`n=7,997`), Indic (`n=320`) and NSL-KDD flow (`n=22,544`). Round-3 `ctl-conf51-gen51` runs 1–3: SMS 206–215/s, URL 1,996–2,375/s, Indic 57–64/s, flow 5,342–7,118/s. Earlier per-run records under `research/evals/*/details.json` also report a pooled `performance.detector_ms_per_item` (e.g. 0.407 ms in round-2 `best-confirm`); it varies by detector version and host load.
   - *Arm Linux (`arm_bench.py`):* Per-item `detect.classify_any()` wall time via `time.perf_counter()`.
 - **Time to First Token (`TTFT` / `first_token_ms`):**
   - *Android S23:* Elapsed time from `LlmModule.generate()` entry (`SystemClock.elapsedRealtime()`) to the first `LlmCallback.onResult()` invocation (`MainActivity.kt:458–467`). Model loading already occurred on app startup (`requestModel()`).

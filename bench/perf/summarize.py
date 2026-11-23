@@ -52,7 +52,7 @@ def _row_from_android(data: dict) -> list[dict]:
               if c.get("status", "ok") == "ok"]
     polled = [v for v in polled if v is not None]
     if polled:
-        mem_str = f"{max(polled):.1f} MiB peak PSS (dumpsys polled during checks)"
+        mem_str = f"{max(polled):.1f} MiB highest sampled PSS (dumpsys polled every few hundred ms during checks)"
     elif mem.get("total_pss_mib"):
         mem_str = (f"{mem['total_pss_mib']:.1f} MiB PSS / {mem['total_rss_mib']:.1f} MiB RSS "
                    f"(single dumpsys snapshot after the run, not a peak)")

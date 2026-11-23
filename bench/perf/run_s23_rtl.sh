@@ -2,7 +2,7 @@
 # End-to-end 30-minute Samsung Galaxy S23 Remote Test Lab (RTL) benchmark runner.
 #
 # Prerequisites (done once in browser before running this script):
-#   1. Reserve an arm64 Samsung Galaxy S23 / S23 FE in Samsung Remote Test Lab.
+#   1. Reserve a Samsung Galaxy S23 (SM-S911B, SM8550) in Samsung Remote Test Lab; not an S23 FE.
 #   2. Ensure local TCP port 8888 is free (Samsung RDB client binds 8888).
 #   3. Launch Samsung RDB client -> Remote Debug Bridge -> Connect -> approve USB debugging.
 #   4. Export ANDROID_SERIAL from `adb devices -l` (e.g. export ANDROID_SERIAL=localhost:PORT).
@@ -54,6 +54,12 @@ echo "=== Step 1/5: Verify device identity and arm64 ABI ==="
 ABI="$(adb -s "$SERIAL" shell getprop ro.product.cpu.abilist | tr -d '\r')"
 if [[ "$ABI" != *arm64-v8a* ]]; then
   echo "ERROR: Device ABI ($ABI) is not arm64-v8a." >&2
+  exit 1
+fi
+SOC="$(adb -s "$SERIAL" shell getprop ro.soc.model | tr -d '\r')"
+if [[ "$SOC" != "SM8550" && "${ALLOW_OTHER_SOC:-0}" != "1" ]]; then
+  echo "ERROR: SoC is '$SOC', not SM8550 (Galaxy S23). Results would not be comparable with run 8." >&2
+  echo "       Reserve a Galaxy S23 (SM-S911B), or set ALLOW_OTHER_SOC=1 and label results as a different device." >&2
   exit 1
 fi
 # Keep screen awake via timeout (avoid `svc power stayon true`, which drops Samsung RDB).

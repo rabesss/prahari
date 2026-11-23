@@ -353,7 +353,8 @@ def _median(vals: list, ndigits: int):
     return round(statistics.median(vals), ndigits) if vals else None
 
 
-def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = None, source_note: str = "") -> dict:
+def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = None, source_note: str = "",
+                      chronological: bool = True) -> dict:
     all_rows = rows
     # Aggregates use completed checks only; timed-out or skipped checks stay listed under "checks".
     rows = [r for r in all_rows if r.get("status", "ok") == "ok"]
@@ -382,7 +383,8 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
             "total_s_median": round(statistics.median(tot_vals), 2) if tot_vals else None,
             "total_s_min_max": [min(tot_vals), max(tot_vals)] if tot_vals else None,
             "app_pss_mb_min_max": [min(mem_vals), max(mem_vals)] if mem_vals else None,
-            "app_pss_growth_mb": round(mem_vals[-1] - mem_vals[0], 1) if len(mem_vals) >= 2 else 0.0,
+            # Growth needs rows in run order; parse-dir only knows file names, so it reports None.
+            "app_pss_growth_mb": (round(mem_vals[-1] - mem_vals[0], 1) if len(mem_vals) >= 2 else 0.0) if chronological else None,
             "warm_kyc_ttft_ms_median": round(statistics.median(warm_ttft), 1) if warm_ttft else None,
             "warm_kyc_decode_tps_median": _median([r.get("decode_tps") for r in warm_kyc], 1),
             "warm_kyc_total_s_median": _median([r.get("total_s") for r in warm_kyc], 2),
@@ -410,7 +412,7 @@ def render_android_md(report: dict) -> str:
         )
     lines += [
         "",
-        "| Check | Status | Airplane | Detector (ms) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Peak polled PSS (MiB) |",
+        "| Check | Status | Airplane | Detector (ms) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Highest sampled PSS (MiB) |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for r in report["checks"]:
@@ -468,7 +470,7 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
         rec["check"] = name
         rec["airplane_mode"] = "airplane" in name.lower()
         rows.append(rec)
-    report = summarize_android(dev, rows, mem, source_note=f"Parsed UI XML artifacts from {src}")
+    report = summarize_android(dev, rows, mem, source_note=f"Parsed UI XML artifacts from {src}", chronological=False)
     if args.out_dir:
         write_android_outputs(report, args.out_dir.resolve())
     print(render_android_md(report))
