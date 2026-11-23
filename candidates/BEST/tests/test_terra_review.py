@@ -152,7 +152,7 @@ def test_round2_protection_does_not_hide_harm(text):
     assert verdict(text) == 1
 
 
-def test_round2_protection_obeys_gate_and_request_cues():
+def test_round2_protection_obeys_contact_gate_and_request_cues():
     # A bare reassurance with no request and no contact of its own gives the reader nothing to act
     # on, so a high text-model score alone no longer flags it (fp-fix: contact gate). With a phone
     # number of its own the model score still decides.

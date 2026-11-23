@@ -41,9 +41,60 @@ def test_genuine_warnings_and_alerts_are_not_flagged(text):
     "SBI never asks for your PIN. Update KYC now at sbi-kyc-update.top or your account is blocked.",
     "Do not tell your family. Transfer Rs 50,000 to the safe account now.",
     "If not done by you, share the OTP with our executive to reverse it.",
+    # PR #48 review (gpt-6.1-terra): affirmative orders next to warning words
+    "Share your bank OTP only with our executive.",
+    "RBI never asks for OTP, and share your OTP with our officer.",
+    "If not you, transfer money to the safe account now.",
+    "Never share your PIN with anyone. Share it with our officer to verify.",
+    # PR #48 review (CodeRabbit): a negated tail must not cover the order before it
+    "Share your OTP with our officer, not your family.",
 ])
 def test_scams_with_warning_words_are_still_flagged(text):
     assert verdict(text) == 1, text
+
+
+# PR #48 review (GLM 5.4): orders hidden next to warning words, self-check lead-ins that are really
+# threats, and contactless threats. Main flags each of these at model scores 0.5 and 0.99; so must this.
+GLM_RULE_LAYER = [
+    "Reply with the OTP now, don't delay.",
+    "Share the OTP with our executive now, not anyone else.",
+    "SBI refund ke liye OTP humein bhejein, sabko nahi.",
+    "अपना ओटीपी हमारे एजेंट को दें, दूसरों को ना।",
+    "Never share your OTP with anyone and send the PIN to our executive for verification.",
+    "Agar aapne nahi kiya to apna OTP humein bhej dein taaki transaction reverse ho jaye.",
+    "If anyone calls you share the OTP with them to verify your account",
+    "Your refund of Rs 3,499 is pending. Share the OTP only with our executive to complete it.",
+    "आपके केवाईसी अपडेट के लिए कोई भी ओटीपी हमें तुरंत भेजें।",
+    "To prevent unauthorised access to your SBI account share the OTP received on your phone with our security team.",
+    "Dear SBI customer, if you have not updated your KYC, your account will be blocked today.",
+    "UPCL: If you have not paid the bill, your electricity connection will be cut tonight. Pay now.",
+]
+# Main flags these only on a high model score; the contact gate must let that score through.
+GLM_MODEL_LAYER = [
+    "Share it only with the courier boy when he calls.",
+    "SBI: Your internet banking is locked. Unlock here: sbi-netbanking.pw/verify",
+    "HDFC: Account on hold. Verify at forms.gle/abcXYZ12 today.",
+    "Agar koi bank wala call kare aur OTP mange to turant bata dein.",
+    "Agar aapne SBI account ka KYC update nahi kiya to account band ho jayega.",
+]
+
+
+@pytest.mark.parametrize("text", GLM_RULE_LAYER)
+def test_review_scams_flagged_at_mid_and_high_model_score(text):
+    a = mech.analyze(text)
+    for p in (0.5, 0.99):
+        assert mech.decide(p, a)[0] == 1, (p, text)
+
+
+@pytest.mark.parametrize("text", GLM_MODEL_LAYER)
+def test_review_scams_keep_the_model_backstop(text):
+    assert mech.decide(0.9, mech.analyze(text))[0] == 1, text
+
+
+def test_genuine_advisory_with_negated_list_of_actions_is_not_flagged():
+    text = ("CyberDost: paise receive karne ke liye kabhi UPI PIN daalne ya QR code scan karne ki zaroorat "
+            "nahi hoti. Shikayat 1930 par karein.")
+    assert mech.decide(0.99, mech.analyze(text))[0] != 1
 
 
 def test_contact_gate_needs_something_to_act_on():

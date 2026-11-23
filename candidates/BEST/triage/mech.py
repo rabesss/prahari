@@ -1106,42 +1106,87 @@ _SEG_CONDITION = re.compile(r"\b(?:if|agar|unless|warna|otherwise|toh|varna)\b|(
 _SEG_WARN = re.compile(
     r"\b(?:if|agar|yadi)\s+(?:any\s*one|some\s*one|somebody|anybody|a caller|any caller|a person|"
     r"koi|kisi)\b|(?:अगर|यदि)\s+(?:कोई|किसी)|कोई भी"
-    r"|\bonly\s+(?:to|with)\s+(?:the\s+|our\s+)?(?:delivery|postman|courier|agent|rider|partner|associate|"
-    r"executive)\b|\bonly\s+(?:when|after|upon|at the time)\b|मिलने पर ही|हाथ में मिलने"
+
     r"|\b(?:beware|be careful|be alert|stay alert|saavdhan|savdhan|sawdhan)\b|सावधान|सतर्क", re.I)
 
 
+# A self-check refers to something the reader did not do: "if this was not you", "if you did not
+# make this transaction". "If you have not updated your KYC" is a condition for a threat, not this.
 _SELF_CHECK_SEG = re.compile(
-    r"\bif\s+(?:this|it)?\s*(?:was|is)?\s*(?:not|never)\s+(?:you|done|initiated|requested|authori[sz]ed|"
-    r"made)|\bif\s+(?:you\s+)?(?:did\s*n[o']t|have\s*n[o']t)\b|\bunauthori[sz]ed\b|\bnot\s+(?:done|initiated|"
-    r"authori[sz]ed|made)\s+by\s+you\b|agar\s+(?:yeh|ye|ise)?\s*(?:transaction|lenden)?\s*aapne\s+nahi|"
-    r"(?:यदि|अगर)\s+[^,]{0,40}आपने\s+नहीं", re.I)
+    r"\bif\s+(?:this|it)?\s*(?:was|is)?\s*(?:not|never)\s+(?:you|done by you|initiated by you|requested by you|"
+    r"authori[sz]ed by you|made by you)\b|\bif\s+(?:you\s+)?(?:did\s*n[o']t|didn['\u2019]t)\s+(?:make|do|initiate|"
+    r"authori[sz]e|request|recogni[sz]e|attempt|perform)\b|\bnot\s+(?:done|initiated|authori[sz]ed|made)\s+by\s+you\b|"
+    r"agar\s+(?:yeh|ye|ise)?\s*(?:transaction|lenden|payment|bhugtan|transfer)?\s*aapne\s+nahi\s+(?:kiya|kia)|"
+    r"(?:यदि|अगर)\s+(?:यह\s+)?(?:लेनदेन|भुगतान|ट्रांजैक्शन)?\s*आपने\s+नहीं\s+किया", re.I)
 _SEG_SECRET = re.compile(r"\b(?:otp|pin|cvv|password|passcode)\b|ओटीपी|पिन|पासवर्ड", re.I)
 # A short segment with an order in it ("pay now", "turant paise bhejein") is a request of its own.
 _SEG_COMMAND = re.compile(r"\b(?:pay|send|share|transfer|tell|give|click|call|install|download|enter|type|"
                           r"forward|deposit|scan|approve|reply|bhej\w*|kar[oe]\w*|de\s?d[oe]|bata\w*|daal\w*)\b|"
                           r"करें|करो|भेजें|भेजो|दें|दो|बताएं|बताओ|डालें", re.I)
-_LIST_TAIL = re.compile(r"^\s*(?:or|and|nor|ya|aur|या|और|एवं|तथा)\b", re.I)
+# An order to hand over, pay, send or install. Outside a warning segment it blocks clearing.
+_RISKY_COMMAND = re.compile(r"\b(?:share|send|tell|give|forward|transfer|pay|deposit|install|download|approve|"
+                            r"accept|scan|enter|type|reply|upload|dictate|read out|bhej\w*|bata\w*|de\s?d[oe]|"
+                            r"daal\w*|jama)\b|भेजें|भेजो|बताएं|बताओ|बता दें|दें|दो|डालें|जमा|रिचार्ज|इंस्टॉल", re.I)
+_ATTENTION = re.compile(r"ध्यान दें|dhyan d\w+", re.I)
+_LIST_TAIL = re.compile(r"^\s*(?:or|and|nor|ya|aur|या|और|एवं|तथा)(?=\s|$)", re.I)
 
 
-def _warning_segment(seg):
-    if _SEG_WARN.search(seg) or _SELF_CHECK_SEG.search(seg):
+# A doorstep handover names the delivery: "share the OTP only with the delivery agent", "give the
+# PIN only when collecting the parcel". "Only with our executive" without a delivery is a demand.
+_HANDOVER_SEG = re.compile(r"\b(?:at (?:the|your) (?:door|doorstep)|doorstep|in person|at handover|handover|"
+                           r"hand(?:ing|ed)? over|on delivery|at delivery|at the time of delivery|when (?:collecting|"
+                           r"receiving|you (?:receive|collect|get))|after inspecting|milte (?:waqt|samay)|ghar par)\b|"
+                           r"मिलने पर|हाथ में|घर पर|सुपुर्दगी", re.I)
+_DELIVERY_WORD = re.compile(r"\b(?:deliver\w*|courier|parcel|package|packet|order|shipment|postman|rider|"
+                            r"doorstep|handover|bag|box)\b|डिलीवरी|पार्सल|कूरियर|डाक|सामान|ऑर्डर", re.I)
+
+
+# "Never", "kabhi" or "no need to" governs every verb of its segment ("kabhi UPI PIN daalne ya QR code
+# scan karne ki zaroorat nahi"); a new order joined by "and" is cut into a segment of its own first.
+_WHOLE_NEG = re.compile(r"\b(?:never|kabhi|kabhee|no need|(?:zaroorat|zarurat|jarurat)\s+(?:nahi|nahin))\b|"
+                        r"कभी|(?:ज़रूरत|जरूरत|आवश्यकता)\s+नहीं", re.I)
+_AND_ORDER = re.compile(r"\s(?:and|aur|और)\s+(?:then\s+|please\s+|kindly\s+)?(?=(?:share|send|tell|give|forward|"
+                        r"transfer|pay|deposit|install|download|approve|scan|enter|reply|upload)\b)", re.I)
+
+
+def _ordered(seg, threat=True):
+    """The segment itself orders the reader to hand over, pay, send or install, or threatens them:
+    "if anyone calls, share the OTP", "koi bhi OTP humein bhejein". The order is not negated. In a
+    self-check, "block your card in the app" is the reader's own remedy, so threat words do not count."""
+    if threat and _clause_hit(THREAT, seg):
+        return True
+    if _WHOLE_NEG.search(seg):
+        return False
+    return _clause_hit(_RISKY_COMMAND.pattern, _ATTENTION.sub(" ", seg))
+
+
+def _warning_segment(seg, clause=""):
+    if _HANDOVER_SEG.search(seg) and _DELIVERY_WORD.search(clause or seg) and \
+            not re.search(r"\b(?:call|calls|phone)\b|फोन", seg, re.I):
+        return True
+    if _SELF_CHECK_SEG.search(seg):
+        return not _ordered(seg, threat=False)
+    if _ordered(seg):
+        return False
+    if _SEG_WARN.search(seg):
         return True
     return bool(_SEG_NEG.search(seg) and _SEG_PROTECTED.search(seg) and not _SEG_CONDITION.search(seg))
 
 
 def _segments(clause):
     """(start, end) spans of a clause's segments. A short list item ("card CVV", "or OTP") stays with
-    the segment before it, so a negation covers the whole list it heads."""
+    the segment before it, so a negation covers the whole list it heads. A tail with an order or a
+    negation of its own ("and share your OTP", "not your family") is a segment of its own."""
     cuts = [0] + [m.end() for m in SEG_SPLIT.finditer(clause)]
     cuts += [m.end() for m in re.finditer(r"\s(?:और|aur)\s", clause)]
+    cuts += [m.start() + 1 for m in _AND_ORDER.finditer(clause)]
     cuts = sorted(set(cuts)) + [len(clause)]
     spans = []
     for a, b in zip(cuts, cuts[1:]):
         if not clause[a:b].strip():
             continue
-        if spans and (_LIST_TAIL.match(clause[a:b]) or
-                      (len(clause[a:b].split()) <= 3 and not _SEG_COMMAND.search(clause[a:b]))):
+        if spans and not _SEG_COMMAND.search(clause[a:b]) and not _SEG_NEG.search(clause[a:b]) and \
+                (_LIST_TAIL.match(clause[a:b]) or len(clause[a:b].split()) <= 3):
             spans[-1] = (spans[-1][0], b)
         else:
             spans.append((a, b))
@@ -1158,7 +1203,9 @@ def request_text(text):
         self_check = False
         for a, b in _segments(clause):
             seg = clause[a:b]
-            if _warning_segment(seg) or (self_check and not _SEG_SECRET.search(seg)):
+            if _warning_segment(seg, clause) or (self_check and not _SEG_SECRET.search(seg)
+                                                 and not _ordered(seg, threat=False)
+                                                 and not _clause_hit(BLOCK_FUTURE, seg)):
                 drop.append((off + a, off + b))
                 self_check = self_check or bool(_SELF_CHECK_SEG.search(seg))
     out, last = [], 0
@@ -1176,7 +1223,14 @@ def _warning_only(a):
     if not a["harm"] or a["own_contact"] or a["risky"] or _contact_anywhere(a):
         return False
     rest = request_text(a.get("text", ""))
-    return not analyze(rest)["harm"] if rest.strip() else True
+    if _RISKY_COMMAND.search(_ATTENTION.sub(" ", rest)):
+        # Something outside the warnings still tells the reader to hand over, pay, send or install
+        # ("Never share your PIN. Share it with our officer"): never cleared, whatever re-analysis says.
+        return False
+    if not rest.strip():
+        return True
+    b = analyze(rest)
+    return not (b["harm"] or b["threat"] or b["request_cues"])
 
 
 
@@ -1185,17 +1239,40 @@ PAY_COMMAND = (r"\b(?:pay|recharge|deposit|transfer|top[- ]?up)\b[^.;!?।\n]{0,
                r"(?:rs\.?|inr|₹|rupees|\d)|(?:₹|rs\.?|inr)\s?[\d,]+[^.;!?।\n]{0,30}\b(?:pay|recharge|deposit|"
                r"transfer|bhej\w*|jama)\b|(?:रिचार्ज|भुगतान|जमा|भेज)\S*\s*(?:करें|करो|कीजिए|कीजिये|दें|दो)|"
                r"\b(?:recharge|payment|pay|jama|bhej)\w*\s+(?:karo|karein|karen|kare|kijiye|do|dein|dijiye)\b")
+# A threat in any word order: "account band ho jayega", "will be blocked", "बंद हो जाएगा".
+BLOCK_FUTURE = (r"\b(?:band|block\w*|suspend\w*|freeze|frozen|deactivat\w*|kat|cut|disconnect\w*)\s+"
+                r"(?:ho|kar|kar di|kar diya|kar diye)?\s*(?:jayega|jaega|jayegi|jaegi|jaayega|denge|dega|di jayegi)\b|"
+                r"\bwill be (?:blocked|suspended|frozen|deactivated|closed|disconnected|cut|barred)\b|"
+                r"(?:बंद|ब्लॉक|निलंबित)\s*(?:हो|कर)\s*(?:जाएगा|जाएगी|दिया जाएगा|दी जाएगी)")
+
 
 def _actionable(a):
     """A text-model score alone flags a message only when the reader is given something to act on:
     a contact of the sender's own (a mobile number, a chat, a lookalike or unknown link) or a direct
     request. Genuine bank, OTP, bill and notice messages often score high on vocabulary alone, but
     with no destination and no request a scam has no way to reach its victim."""
-    return bool(a["own_contact"] or a["request_cues"] or a["reader_direct"] or _contact_anywhere(a) or
-                _clause_hit(PAY_COMMAND, a.get("text", "")))
+    text = a.get("text", "")
+    return bool(a["own_contact"] or a["request_cues"] or a["reader_direct"] or a["threat"] or
+                _clause_hit(BLOCK_FUTURE, text) or
+                _contact_anywhere(a) or _clause_hit(PAY_COMMAND, text) or
+                _clause_hit(_RISKY_COMMAND.pattern, _ATTENTION.sub(" ", text)))
 
 
 _HANDLE = re.compile(r"@\w|wa\.me|\bt\.me\b|\(at\)|\[\.\]", re.I)
+# A host written without a scheme on a TLD the main URL pattern does not list ("sbi-netbanking.pw/verify",
+# "forms.gle/abc"): a dotted name with a path, or a hyphenated name, ending in letters.
+_LOOSE_HOST = re.compile(r"\b((?:[a-z0-9-]+\.)+[a-z]{2,10})(?=/[^\s]*|\b)(/\S*)?", re.I)
+
+
+def _loose_hosts(text):
+    out = []
+    for m in _LOOSE_HOST.finditer(text):
+        h = m.group(1).lower()
+        label = h.split(".")[0]
+        if m.group(2) or "-" in label or h in SHORTENERS or h in ("forms.gle", "bit.do", "youtu.be", "t.ly"):
+            if not re.fullmatch(r"(?:rs|inr|no|a/c|ac|ref|txn|e\.g|i\.e|etc)", label):
+                out.append(h)
+    return out
 
 
 def _contact_anywhere(a):
@@ -1203,7 +1280,7 @@ def _contact_anywhere(a):
     to a site that is not official, a mobile number in any spelling, a chat handle or an obfuscated
     link. Unlike own_contact this does not need a clause that asks the reader to act."""
     text = a.get("text", "")
-    return bool(any(not is_official(h) for h in a["hosts"]) or CONTACT_NUMBER.search(text)
+    return bool(any(not is_official(h) for h in a["hosts"] + _loose_hosts(text)) or CONTACT_NUMBER.search(text)
                 or _HANDLE.search(text) or _any(CHAT_CONTACT, text))
 
 def decide(p_model, a, gate=0.85):
@@ -1218,7 +1295,7 @@ def decide(p_model, a, gate=0.85):
     if harm and _warning_only(a):
         # Every harmful mechanism is described, negated or conditional, and there is nowhere of the
         # sender's own to act on: the message warns the reader instead of asking anything.
-        cleared = dict(a, harm=[], safe=list(a["safe"]) + (["awareness"] if "awareness" not in a["safe"] else []))
+        cleared = dict(a, harm=[], safe=list(a["safe"]) + ["warning_only"])
         return 0, min(p_model, 0.40), cleared
     if a.get("report") and not a.get("reader_direct") and not harm:
         # A report describes the scam to a third party; it makes no request of the reader.
@@ -1353,6 +1430,7 @@ SAFE_DESC = {
     "collect_review": "reads like a pending collect-request notice to review",
     "awareness": "reads like a warning or news report about a scam",
     "no_hurry": "says there is no hurry",
+    "warning_only": "its risky words are only safety warnings or checks, with no contact to act on",
 }
 
 
@@ -1391,7 +1469,7 @@ def evidence(a):
             out.append(r)
     if not a["harm"]:
         for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "opt_out", "notice",
-                  "promo", "consumer_advice", "collect_review", "awareness", "no_hurry"):
+                  "promo", "consumer_advice", "collect_review", "awareness", "no_hurry", "warning_only"):
             if s in a["safe"]:
                 out.append(safe_description(s, a['text']))
     return out[:5]

@@ -147,7 +147,7 @@ def test_bank_alert_telling_you_to_block_your_card_is_not_a_threat():
     ok = "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app."
     # fp-fix: a genuine alert whose only harm words sit in its own OTP warning and self-check, with
     # no contact anywhere, is now cleared (0) instead of hedged; it must never be flagged.
-    assert mech.decide(0.9, mech.analyze(ok))[0] in (0, "uncertain")
+    assert mech.decide(0.9, mech.analyze(ok))[0] == 0
     bad = "SBI: Rs 2,450 debited via UPI. If not you, block card at http://sbi-block-card.top within 2 hours."
     assert mech.decide(0.9, mech.analyze(bad))[0] == 1
 

@@ -56,9 +56,9 @@ def main(argv):
                 c = metrics(pr)
                 print(f"    {cat:28s} n={c['n']:3d} fp={c['fp']} fn={c['fn']}")
             for r, (lab, s, ev) in zip(rows, preds):
-                if (r["y"] == 1) != (lab == 1):
+                if (r["y"] == 1 and lab != 1) or (r["y"] == 0 and lab != 0):
                     kind = "FP" if r["y"] == 0 else "FN"
-                    print(f"  {kind} {r['id']} {r.get('category')} pred={lab} s={float(s):.2f} ev={ev[:2]}\n     {r['text'][:200]}")
+                    print(f"  {kind} {r.get('id', '?')} {r.get('category')} pred={lab} s={float(s):.2f} ev={ev[:2]}\n     {r['text'][:200]}")
 
 
 if __name__ == "__main__":
