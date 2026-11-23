@@ -335,3 +335,82 @@ def test_disruptive_check_is_not_applied_to_messages():
     sms = "Dear customer your SBI KYC expired, update now at sbi-kyc.in-verify.top or account will be blocked"
     text = OPEN + ". Immediately disconnect all affected systems."
     assert _explain("sms", sms, 1, mech.evidence(mech.analyze(sms)), text) == text
+
+
+# NO RISK results that overruled a harm signal: the opening and the evidence give the benign
+# reading, never the dismissed threat.
+BANK_ALERT = ("SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. "
+              "If not you, block card in YONO app.")
+RECEIPT = "No risk found for this message: reads like a normal payment receipt, order or delivery record"
+
+
+def test_no_risk_opening_names_the_benign_reading_not_the_overruled_threat():
+    from triage import mech
+    a = mech.analyze(BANK_ALERT)
+    verdict = mech.decide(0.2, a)[0]  # a model that does not lean scam clears it
+    assert verdict == 0 and a["harm"]
+    prompt = llm.Explainer.prompt(object(), "sms", BANK_ALERT, verdict, mech.evidence(a))
+    assert llm._forced_sentence(prompt) == RECEIPT
+    assert "threatens" not in prompt
+    for kind in ("sms", "injection"):
+        assert "threatens" not in " ".join(llm.compact_evidence(kind, BANK_ALERT, mech.evidence(a), verdict))
+
+
+def test_no_risk_explanation_keeps_the_benign_opening():
+    from triage import mech
+    text = RECEIPT + ". Never share the OTP with anyone."
+    assert _explain("sms", BANK_ALERT, 0, mech.evidence(mech.analyze(BANK_ALERT)), text) == text
+
+
+def test_no_risk_without_a_benign_reading_does_not_name_the_harm():
+    from triage import mech
+    job = "Earn Rs 3000 daily from home. WhatsApp us for the task."
+    a = mech.analyze(job)
+    assert mech.decide(0.2, a)[0] == 0 and a["harm"] and not a["safe"]
+    assert llm.compact_evidence("sms", job, mech.evidence(a), 0) == []
+    prompt = llm.Explainer.prompt(object(), "sms", job, 0, mech.evidence(a))
+    assert llm._forced_sentence(prompt) == "This message was checked; review it carefully before acting"
+    assert "easy daily income" not in prompt
+    assert llm.benign_evidence("sms", job, mech.evidence(a), 0) == []
+
+
+def test_scam_openings_are_unchanged():
+    from triage import mech
+    kyc = "Dear customer your SBI KYC expired, update now at sbi-kyc.in-verify.top or account will be blocked"
+    safe_account = ("CBI officer here. Your parcel had drugs. Stay on video call and transfer Rs 50000 "
+                    "to the RBI safe account.")
+    customs = "Your parcel is held at customs. Pay a delivery fee of Rs 200 to receive parcel at http://x.top"
+    # A real threat still opens on the threat, even next to a receipt that reads as safe.
+    spoof = "SBI: Rs 2,450 debited via UPI. If not you, block card at http://sbi-block-card.top within 2 hours."
+    unverified = "This message is DANGEROUS: asks for a payment to an unverified account or link"
+    for text, opening in ((kyc, OPEN), (spoof, OPEN), (safe_account, unverified),
+                          (customs, "This message is DANGEROUS: pay a fee to receive a refund, prize or parcel")):
+        a = mech.analyze(text)
+        assert mech.decide(0.9, a)[0] == 1
+        got = llm._forced_sentence(llm.Explainer.prompt(object(), "sms", text, 1, mech.evidence(a)))
+        assert got == opening, text
+
+
+def test_no_risk_openings_without_a_harm_signal_are_unchanged():
+    from triage import mech
+    otp = "Your OTP for login is 448213. Do not share it with anyone, not even bank staff."
+    for text, opening in (("We never ask for your OTP.", "No risk found for this message: says it never asks for OTP"),
+                          (otp, "No risk found for this message: reads like a normal OTP notification")):
+        a = mech.analyze(text)
+        assert not a["harm"]
+        got = llm._forced_sentence(llm.Explainer.prompt(object(), "sms", text, 0, mech.evidence(a)))
+        assert got == opening
+
+
+def test_benign_evidence_swaps_an_overruled_threat_for_safe_descriptions():
+    from triage import mech
+    assert llm.benign_evidence("sms", BANK_ALERT, mech.evidence(mech.analyze(BANK_ALERT)), 0) == [
+        "reads like a normal payment receipt, order or delivery record",
+        "reads like a normal OTP notification",
+        "includes a protective statement"]
+    # Every other item keeps the detector's lines.
+    assert llm.benign_evidence("sms", BANK_ALERT, ["threatens to block"], 1) == ["threatens to block"]
+    assert llm.benign_evidence("url", BANK_ALERT, ["official domain sbi.co.in"], 0) == ["official domain sbi.co.in"]
+    otp = "Your OTP for login is 448213. Do not share it with anyone, not even bank staff."
+    line = "reads like a normal OTP notification"
+    assert llm.benign_evidence("sms", otp, [line], 0) == [line]

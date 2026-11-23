@@ -145,9 +145,40 @@ def _short_host(name, desc):
     return desc[:70]
 
 
+# Benign readings, most specific first: a receipt or OTP notice says more than a generic
+# official-channel or protection phrase, and names the concept a reader checks for.
+SAFE_ORDER = ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
+              "notice", "official_channel", "protective", "promo", "personal",
+              "consumer_advice", "collect_review", "awareness")
+
+
+def _safe_evidence(a, inp):
+    return [mech.safe_description(s, inp) for s in SAFE_ORDER if s in a["safe"]]
+
+
+def _harm_evidence(a, inp):
+    """Mechanism phrases for a scam, most concrete first, then any lookalike host."""
+    out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
+    # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
+    # shortest phrases keeps one copied sentence while covering both, instead of dropping the
+    # second mechanism (the model only copies the first phrase).
+    if len(out) >= 2 and len(out[0]) + len(out[1]) <= 78:
+        out = [f"{out[0]} and {out[1]}"] + out[2:]
+    for r in a["risky"]:
+        ph = _short_host("brand_lookalike", r) if "lookalike" in r else r[:70]
+        if ph not in out:
+            out.append(ph)
+    return out or _safe_evidence(a, inp)
+
+
 def compact_evidence(kind, inp, fallback, verdict=None):
-    """Short evidence phrases, ordered most concrete first, from the same rules the detector used."""
+    """Short evidence phrases, ordered most concrete first, from the same rules the detector used.
+
+    A NO RISK verdict that overruled a harm signal is reported by its benign reading, never by
+    the dismissed harm phrase.
+    """
     out = []
+    dismissed = False
     if kind == "url":
         ev = rules.url_indicators(inp)
         host = rules.host_of(inp)
@@ -193,28 +224,19 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             # satisfy either concept the reader is asked about.
             out.append("an instruction aimed at the assistant (prompt injection)"
                        + (f" that {harm[0]}" if harm else ""))
+        elif verdict == 0 and a["harm"]:
+            # Same analysis as messages below: a NO RISK opening never repeats the dismissed threat.
+            dismissed, out = True, _safe_evidence(a, inp)
         else:
             out = harm
     elif mech.indic_context(inp):
         a = mech.analyze(inp)
-        out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
-        # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
-        # shortest phrases keeps one copied sentence while covering both, instead of dropping the
-        # second mechanism (the model only copies the first phrase).
-        if len(out) >= 2 and len(out[0]) + len(out[1]) <= 78:
-            out = [f"{out[0]} and {out[1]}"] + out[2:]
-        for r in a["risky"]:
-            ph = _short_host("brand_lookalike", r) if "lookalike" in r else r[:70]
-            if ph not in out:
-                out.append(ph)
-        if not out:
-            # Most specific benign reading first: a receipt or OTP notice says more than a generic
-            # official-channel or protection phrase, and names the concept a reader checks for.
-            for s in ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
-                      "notice", "official_channel", "protective", "promo", "personal",
-                      "consumer_advice", "collect_review", "awareness"):
-                if s in a["safe"]:
-                    out.append(mech.safe_description(s, inp))
+        if verdict == 0 and a["harm"]:
+            # The verdict overruled the harm signal: a bank alert's own "if not you, block your
+            # card" is protective advice, not a threat. Name the benign reading instead.
+            dismissed, out = True, _safe_evidence(a, inp)
+        else:
+            out = _harm_evidence(a, inp)
     else:
         ev = indicrules.indicators(inp)[0]
         risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
@@ -227,11 +249,31 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             s = SHORT.get(n) or d[:70]
             if s not in out:
                 out.append(s)
-    if not out:
+    # The detector's own lines repeat the dismissed harm phrase, so they are no fallback for it.
+    # With no benign reading to show, the prompt keeps its neutral opening.
+    if not out and not dismissed:
         out = [str(e)[:70] for e in fallback[:2]]
-    if not out and verdict == 0:
+    if not out and verdict == 0 and not dismissed:
         out = ["no request for a secret, payment or link in the text"]
     return out[:2]
+
+
+def benign_evidence(kind, inp, evidence, verdict):
+    """The evidence lines a UI should show for a checked item.
+
+    The detector lists a harm phrase first even when it overruled that signal, so a NO RISK result
+    can sit above "threatens to block the account or service". For such a message the benign
+    reading replaces the dismissed phrase; with no benign reading the phrase is left out. Every
+    other item keeps the detector's lines.
+    """
+    lines = list(evidence or [])
+    if verdict != 0 or kind not in ("sms", "injection") or not mech.indic_context(inp):
+        return lines
+    a = mech.analyze(inp)
+    if not a["harm"]:
+        return lines
+    harm = {d for _, d in a["harm"]}
+    return _safe_evidence(a, inp)[:5] + [line for line in lines if line not in harm]
 
 
 def scam_type(kind, inp, verdict):
