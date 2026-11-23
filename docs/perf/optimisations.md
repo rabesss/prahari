@@ -1,0 +1,52 @@
+# Hardware & Runtime Optimisation Techniques in Prahari
+
+This inventory lists every optimisation technique relevant to Arm edge deployment of Prahari,
+strictly separating **(A) shipped and measured**, **(B) runtime tuning knobs supported by the
+benchmark harness**, **(C) experimental / unmerged work**, and **(D) techniques intentionally not
+used**. Every quantitative claim traces to [`docs/perf/README.md`](README.md) and
+[`docs/perf/methodology.md`](methodology.md).
+
+## A. Shipped & Measured Optimisations (Active on `main`)
+
+| Technique | Exact Implementation | Measured Effect (Traced to Artifacts) |
+|---|---|---|
+| **1. 4-bit Group-32 QLoRA Quantisation + 8-bit Dynamic Activations + 8-bit Embeddings (`QLORA_INT4_EO8`)** | Official Meta ExecuTorch export `Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte` (`models/registry.json`: `llama32-1b-qlora`). 4-bit symmetric group-32 weights (`qsi4c32p`), per-token dynamic 8-bit activations (`qai8dxp`), 8-bit quantized embeddings/output (`EO8`), QLoRA-adapted for quality retention. | Cuts model size to **1.100 GiB** (`1,181,451,008 B`, ~2.2× smaller than FP16 ~2.47 GB), fitting comfortably inside a smartphone's memory budget (**1.66 GiB** PSS on Galaxy S23). Selected over `llama32-1b-spinquant` after Oracle N1 testing measured QLoRA faster (`~80–83` prefill / `~20–21` decode tok/s vs SpinQuant `58–63` prefill / `12–13.5` decode tok/s under mixed load). |
+| **2. ExecuTorch + XNNPACK Delegate with Arm KleidiAI Micro-Kernels (`i8mm` & `dotprod`)** | Linux uses `executorch==1.6.0` (`TextLLMRunner` + XNNPACK delegate); Android uses `org.pytorch:executorch-android:1.5.1` (`LlmModule` + `libexecutorch.so` `arm64-v8a` XNNPACK, plus CI source-build option for ExecuTorch 1.6.0 with `-DEXECUTORCH_XNNPACK_ENABLE_KLEIDI=ON`). | **Neoverse-V2 `perf record` directly confirmed dispatch:** `kai_*` KleidiAI kernels consume **54.17%** of whole-process CPU time (`23.27%` `neon_i8mm` 4-bit prefill matmul + `20.57%` `neon_dotprod` 4-bit decode matvec + `5.63%` 8-bit `dotprod` + `3.97%` weight packing + `0.73%` activation quant/pack). Achieves **46.7 tok/s** (2T) and **104.6 tok/s** (8T) on Neoverse-V2, and **38.6–43.4 tok/s** on physical Galaxy S23 (`arm64-v8a`). |
+| **3. Hybrid Two-Stage Architecture (Classical Detectors First, Asynchronous Llama Advisory Second)** | Stage 1 runs lightweight local scikit-learn / portable NumPy models + deterministic mechanism rules (`candidates/BEST/triage/detect.py`, `mech.py`; `android/python/mobile.py`) before invoking Llama. Stage 1 is authoritative for verdict, score, evidence, and vetted safety steps; Llama only writes a 1–2 sentence plain-language explanation. On Android (`MainActivity.kt:355–401`), Stage 1 renders the verdict and vetted steps immediately while Stage 2 runs asynchronously on `Bridge.worker`. | Keeps classification completely out of the LLM critical path: Stage 1 takes **0.407–0.448 ms/item** on Neoverse-N1 (`290` SMS/s, `2,456` URL/s, `7,500` flow/s) and **5–17 ms** warm on Galaxy S23 (vs `1.20–1.50 s` warm total with Llama). Users see actionable safety steps in `<20 ms` warm on phone, and detector artefacts total just **4.33 MiB** (Linux joblibs). |
+| **4. Evidence-First Prompt Compaction** | `candidates/BEST/triage/llm.py` strips boilerplate, compresses detector evidence into a single concrete opening phrase (`compact_evidence`), neutralises live URLs (`example[.]top`), caps input snippets at 320 chars, and uses a terse 24-token system prompt. | On Oracle Neoverse-N1 (`research/evals/*/details.json`), compacting median prompt length from **222 → 199 → 137 → 130 tokens** (and median output **37 → 34 → 29 → 28 tokens**) reduced end-to-end latency from **5.39 s → 4.72 s → 4.00 s → 3.67 s/item** (−31.9% wall time; mixed host load caveat applies, token reduction is deterministic) while *improving* explanation quality score `E` (`0.8875 → 0.9473` in round 2). |
+| **5. Bounded Greedy Decoding, Dynamic `seqLen`, & KV-Cache + CPU Flash SDPA** | Greedy decoding (`temperature=0.0`, zero beam/sampling search overhead), hard output cap `max_new_tokens=40` on Linux (`config.json`) and 40-callback stop (`module.stop()`) on Android (`MainActivity.kt:471`). `.pte` is exported with `use_kv_cache=1`, `use_sdpa_with_kv_cache=1` (dispatches `cpu_flash_attention<float, 32, 512>`), `enable_dynamic_shape=1`, `max_context_len=2048`. Android clamps `seqLen` per prompt to `[256, 2048]` (`MainActivity.kt:483`). | Bounds worst-case decode latency to ≤40 steps (~0.9 s decode on S23, ~0.85 s on V2 2T, ~2.0 s on N1) and keeps sampling overhead at `1–3 ms` per item (`offline-proof.txt`). Note: Android 1.5.1 AAR does not forward `LlmGenerationConfig.maxNewTokens` natively, so the 40-callback stop is an approximate guard rather than a strict token cap. |
+| **6. Single-Instance Model Preload & Weight-Packing Reuse** | Android `MainActivity.kt` (`requestModel()` / `Bridge.module`) loads `LlmModule` once on a dedicated background worker and reuses it across checks. Linux `app/server.py` keeps a process-wide `_ex` singleton (`Explainer`); `bin/explain` loads once per batch. | Amortises the one-time **~2.01–2.37 s** `.pte` load + XNNPACK weight packing (`kai_run_rhs_pack_*`, `3.97%` CPU share in a 6-item batch). On Neoverse-V2 (2T), avoiding reload drops per-check latency from **4.02–4.06 s** (cold item 1) to **1.04–1.74 s** (warm items 2–6; mean **1.265 s**). On Galaxy S23, warm KYC checks run in **1.20–1.21 s** with **499–510 ms** TTFT. |
+| **7. Dependency-Free Portable Detector Export on Android** | `android/tools/export_models.py` exports the four scikit-learn 1.9.1 joblib models into pure JSON weights (`android/python/portable.py` + NumPy 1.26.2), eliminating scikit-learn, SciPy, and joblib from the Android APK and avoiding cross-version pickle incompatibility on Python 3.10 arm64. | Keeps the `arm64-v8a` APK to **45.75 MiB** (portable JSONs = `3.30 MiB` compressed / `14.00 MiB` uncompressed), preserves exact parity against reference fixtures, and achieves **5–17 ms** warm Stage-1 classification on Galaxy S23 (`183–255 ms` on first cold load of a model JSON). |
+
+## B. Runtime Tuning Knobs (Benchmarked / Supported in Harness, Not Hardcoded in App Defaults)
+
+| Technique | Current State in Codebase | Measured Effect / Quantified Impact |
+|---|---|---|
+| **1. XNNPACK Threadpool Sizing & CPU Affinity Pinning** | `bench/common.py` and `bin/eval` set `OMP_NUM_THREADS=2` for detectors. `candidates/BEST/triage/llm.py` leaves ExecuTorch at its default threadpool size; `bench/perf/arm_bench.py` supports `--threads` (pre-load `_unsafe_reset_threadpool(n)`, strictly before `.pte` load per ExecuTorch issue #24765) and `--pin-cpus` (`taskset -c`). Android ExecuTorch 1.5.1 uses built-in `cpuinfo` big-core detection (no Java pinning API). | On Arm Neoverse-V2 (1 → 2 → 4 → 8 threads, 3 repeats × 6 items): warm prefill scales **112.8 → 221.6 → 412.2 → 751.2 tok/s (6.66×)**, warm decode scales **25.7 → 46.7 → 76.0 → 104.3 tok/s (4.06×)**, warm TTFT drops **1,060 → 540 → 290 → 159 ms**, and warm item wall drops **2.317 → 1.265 → 0.777 → 0.534 s**. |
+| **2. Detector-First Gating (Skip Llama on `NO RISK FOUND` Items)** | **Not enabled by default** in `candidates/BEST/bin/explain` or Android `MainActivity.kt` (both explain every checked item, including benign ones, so users always get a plain-language rationale; the Linux web UI exposes an opt-in checkbox). `bench/perf/arm_bench.py --gating-mode flagged-only` implements and benchmarks this policy cleanly without altering `BEST`. | Because Stage 1 runs in **5–17 ms** warm on Galaxy S23 (and **0.41 ms** on Linux) vs **~1.20–1.50 s** with Llama, enabling flagged-only gating skips Llama on every cleared message — saving **~99% of per-check latency and CPU compute on benign traffic** (e.g., on a realistic 90% benign / 10% suspicious inbox mix, mean latency drops from ~1.25 s/msg to ~0.13 s/msg with zero change to detection recall). |
+
+## C. Measured in Experimental Branches / Archives (NOT Merged into `main`)
+
+Reported transparently so judges see measured headroom without overstating what is shipped:
+
+| Experiment | Location | Measured Effect | Status |
+|---|---|---|---|
+| **Portable detector regex literal pre-screening + flattened flow forest + fused TF-IDF** | Archived `/var/tmp/prahari-archive/oracle-perf-projects-20261123.tar.zst` (`glm54-portable-perf`) | **1.94×** speedup on 4,120 visible dev items on Oracle N1 (`2.775 s → 1.428 s`; `indic` `3.98 → 1.83 ms/item`, cutting regex searches `126,754 → 29,245`), max numerical diff `1.2e-15`. | Not yet merged into `android/python/portable.py` |
+| **Streaming sentence-2 / early-refusal `TextLLMRunner.stop()` + tighter prompt** | Branch `origin/perf/llama-neon` (`candidates/perf-neon/triage/llm.py`) | Compacts prompt by ~23–28 further tokens (220-char snippet cap), stops refusals at ~4–6 tokens instead of 30–40, and halts at sentence 2 end. | Experimental branch; not merged into `candidates/BEST` |
+
+## D. Techniques Intentionally NOT Used (Design Trade-offs)
+
+1. **Cross-request prompt / KV-cache prefix caching:** **Deliberately disabled.** Both Linux
+   (`self.runner.reset()` in `triage/llm.py:537`) and Android (`module.resetContext()` in
+   `MainActivity.kt:456`) clear KV state before every single check. Because inputs are untrusted
+   SMS/URL strings that may contain prompt-injection attempts, resetting context per item prevents
+   cross-message contamination at a small cost (~24 system-prompt tokens ≈ `~100 ms` prefill on S23 /
+   `~35 ms` on V2 8T).
+2. **Vendor-locked NPU/GPU delegates (QNN / Vulkan / CoreML):** **Not used in Phase 1.** Targeting
+   ExecuTorch's CPU XNNPACK + KleidiAI backend guarantees one portable `.pte` binary runs identically
+   across Armv8/Armv9 Linux (Neoverse-N1, Neoverse-V2, Raspberry Pi 5) and Armv9 Android phones
+   (Qualcomm Snapdragon / MediaTek / Exynos) with zero per-SoC offline recompilation.
+3. **LLM-based classification:** **Rejected by design.** Running Llama as the classifier would add
+   `>1.2 s` per message even on benign traffic, hurt precision on Indian scam edge cases, and make
+   verdicts vulnerable to prompt injection. Keeping classification in `4.33 MiB` local detectors +
+   rules is faster, deterministic, and injection-resistant.
