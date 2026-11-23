@@ -181,12 +181,12 @@ def build_eval_and_mem_chart() -> Path:
     # Panel A: F1 & FPR across project sets, v3 held-back, and sealed holdout
     _style_ax(ax1)
     labels = [
-        "Project SMS\n(n=1,162)",
-        "Project URL\n(n=7,997)",
-        "Project Indic\n(n=320)",
-        "Project Flow\n(n=22.5k)",
-        "v3 Holdout\n(n=81)",
-        "Sealed\n(n=184)",
+        "SMS\nn=1,162",
+        "URL\nn=7,997",
+        "Indic\nn=320",
+        "Flow\nn=22.5k",
+        "v3 held-\nback n=81",
+        "Sealed\nn=184",
     ]
     f1_vals = [0.925, 0.994, 0.969, 0.850, 0.889, 0.784]
     # Post-PR #42 SMS dev-set FPR was not recorded, so it is plotted as "n/r" rather than guessed.
@@ -224,7 +224,9 @@ def build_eval_and_mem_chart() -> Path:
     # Panel B: Galaxy S23 dumpsys meminfo PSS breakdown (KB -> MB)
     _style_ax(ax2)
     cats = ["Native Heap\n(Llama+XNNPACK)", "Private\nOther", "Graphics\n(EGL/GL)", "Code\n(.so/.apk/.jar)", "Java Heap,\nSys & Stack"]
-    mb = [1566.1, 59.8, 58.7, 37.4, 22.9]  # sums to 1,744.8 MB (1,744,842 KB PSS)
+    # dumpsys reports KiB; convert to MiB so the figure matches the GiB totals.
+    kib = [1566056, 59764, 58676, 37420, 11044 + 10566 + 1316]  # App Summary rows, sum 1,744,842 KiB
+    mb = [v / 1024 for v in kib]
     cols = [INDIGO, BLUE, TEAL, AMBER, SLATE]
     y = np.arange(len(cats))[::-1]
     ax2.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
@@ -232,17 +234,17 @@ def build_eval_and_mem_chart() -> Path:
     bars = ax2.barh(y, mb, height=0.58, color=cols, zorder=3)
     ax2.set_yticks(y)
     ax2.set_yticklabels(cats, fontsize=8.6)
-    ax2.set_xlim(0, 2020)
-    ax2.set_xlabel("Proportional Set Size — PSS (MB, decimal 10³ KB)", fontsize=9.2, color=SLATE)
+    ax2.set_xlim(0, 1950)
+    ax2.set_xlabel("Proportional Set Size — PSS (MiB)", fontsize=9.2, color=SLATE)
     ax2.tick_params(axis="x", labelsize=9)
     for b, v in zip(bars, mb):
-        pct = 100.0 * v / 1744.842
-        ax2.text(v + 24, b.get_y() + b.get_height() / 2, f"{v:.1f} MB ({pct:.1f}%)", va="center", ha="left", fontsize=8.0, color="#0F172A", fontweight="bold")
+        pct = 100.0 * v / (1744842 / 1024)
+        ax2.text(v + 24, b.get_y() + b.get_height() / 2, f"{v:,.0f} MiB ({pct:.1f}%)", va="center", ha="left", fontsize=8.0, color="#0F172A", fontweight="bold")
     ax2.set_title("B. Galaxy S23 Memory Footprint (dumpsys meminfo)", fontsize=10.0, fontweight="bold", color="#0F172A", pad=10)
     ax2.text(
         0.97,
         0.07,
-        "TOTAL PSS: 1,744.8 MB (1.66 GiB)\nTOTAL RSS: 1,867.4 MB (1.78 GiB)\nSwapPss: 23 KB · Native Heap: 89.8%",
+        "TOTAL PSS: 1,704 MiB (1.66 GiB)\nTOTAL RSS: 1,824 MiB (1.78 GiB)\nSwapPss: 23 KiB · Native Heap: 89.8%",
         transform=ax2.transAxes,
         ha="right",
         va="bottom",

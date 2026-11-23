@@ -12,7 +12,7 @@ Prahari has been measured end to end on three Arm targets (all running the exact
 
 | Target hardware | Runtime / setup | Warm TTFT | Decode speed | End-to-end / item | Memory | Offline proof |
 |:--|:--|--:|--:|--:|--:|:--|
-| **Samsung Galaxy S23 (`SM-S911B`)** (Snapdragon 8 Gen 2, `arm64-v8a`, Android 14, Samsung RTL) | ExecuTorch Android 1.5.1 XNNPACK, Chaquopy portable detectors | **510 ms** (499–510 ms warm; 657 ms airplane) | **43.4 tok/s** warm (39.0 tok/s airplane) | **1.20 s** warm (**1.42 s** airplane mode) | **1,745 MB PSS** / 1,867 MB RSS (`dumpsys meminfo`) | Airplane mode (`airplane_mode_on=1`) + `SecurityException` (no `INTERNET` permission) |
+| **Samsung Galaxy S23 (`SM-S911B`)** (Snapdragon 8 Gen 2, `arm64-v8a`, Android 14, Samsung RTL) | ExecuTorch Android 1.5.1 XNNPACK, Chaquopy portable detectors | **510 ms** (499–510 ms warm; 657 ms airplane) | **43.4 tok/s** warm (39.0 tok/s airplane) | **1.20 s** warm (**1.42 s** airplane mode) | **1.66 GiB PSS** / 1.78 GiB RSS (`dumpsys meminfo`) | Airplane mode (`airplane_mode_on=1`) + `SecurityException` (no `INTERNET` permission) |
 | **Arm Neoverse-V2 Linux** (8 online vCPUs, Debian 12, `i8mm` + `asimddp`) | ExecuTorch 1.6.0 XNNPACK, Python 3.12 (`perf` profiled) | **922 ms** (2T) / **527 ms** (8T) | **46.7 tok/s** (2T) / **104.6 tok/s** (8T) | **1.73 s** (2T) / **0.98 s** (8T) | **2,392 MiB** runner RSS | OS network namespace cut (`unshare -n`: HTTPS/DNS/TCP fail; 6/6 inference succeeds) |
 | **Oracle Arm Neoverse-N1 VM** (2 vCPUs, Ubuntu 24.04, eval baseline) | ExecuTorch 1.6.0 XNNPACK, Python 3.12 | — | **19.9 tok/s** | **3.84 s** (eval range 3.8–4.8 s) | **2.05 GB** cgroup `memory.peak` | Evaluation import-time network guard |
 
@@ -98,6 +98,8 @@ candidates/BEST/bin/monitor --seconds 6                # add --explain for local
 ## Build the final report PDF
 
 The PDF at [`docs/phase1/report.pdf`](docs/phase1/report.pdf) is built reproducibly (charts + XeLaTeX layout, verified `< 10 MB`) via:
+
+Needs `matplotlib` and `numpy` (`pip install matplotlib`), `pandoc`, XeLaTeX (TeX Live with `fontspec`, `titlesec`, `fancyhdr`, `lastpage`, `mdframed`, `enumitem`), the fonts IBM Plex Sans, JetBrains Mono and Noto Sans Devanagari, and `pdfinfo` (poppler) for the page count.
 
 ```sh
 python3 docs/phase1/build_report.py
