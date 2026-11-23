@@ -22,7 +22,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import resource
 import shutil
 import signal
 import statistics
@@ -674,7 +673,7 @@ def render_markdown(report: dict) -> str:
         "",
         "All cells report `mean ± stdev` across cold-process repeats. *Warm* excludes item 1 (which triggers lazy `.pte` load + XNNPACK weight packing).",
         "",
-        "| Model | Threads | Pin | Prompt tier | Gating | Med prompt/gen tok | Warm TTFT (ms) | Warm Prefill (tok/s) | Warm Decode (tok/s) | Warm item (s) | All-items wall (s) | Cold batch (s/item) | Peak RSS (MiB) |",
+        "| Model | Threads | Pin | Prompt tier | Gating | Med prompt/gen tok | Warm TTFT (ms) | Warm Prefill (tok/s) | Warm Decode (tok/s) | Warm item (s) | All-items wall (s) | Cold batch (s/item) | Max RSS (MiB)† |",
         "|---|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
 
@@ -696,8 +695,12 @@ def render_markdown(report: dict) -> str:
     for cell in report["cells"]:
         agg = cell["aggregate"]
         tok_str = f"{agg['prompt_tokens_median']} / {agg['generated_tokens_median']}"
-        rss = agg.get("peak_rss_runner_mib_max") or agg.get("peak_rss_time_mib_max")
-        rss_str = f"{rss:.1f}" if rss is not None else "—"
+        if agg.get("peak_rss_time_mib_max") is not None:
+            rss_str = f"{agg['peak_rss_time_mib_max']:.1f}"
+        elif agg.get("peak_rss_runner_mib_max") is not None:
+            rss_str = f"{agg['peak_rss_runner_mib_max']:.1f}‡"
+        else:
+            rss_str = "—"
         lines.append(
             f"| `{cell['model']}` | {cell['threads']} | `{cell['pin_cpus'] or 'none'}` | `{cell['prompt_length']}` | "
             f"`{cell['gating_mode']}` | {tok_str} | {fmt_ms(agg['warm_ttft_ms_mean_std'])} | "
@@ -705,6 +708,12 @@ def render_markdown(report: dict) -> str:
             f"{fmt_s3(agg['warm_item_wall_s_mean_std'])} | {fmt_s3(agg['all_item_wall_s_mean_std'])} | "
             f"{fmt_s3(agg['cold_batch_s_per_item_mean_std'])} | {rss_str} |"
         )
+
+    lines += [
+        "",
+        "† Whole-process maximum RSS from `/usr/bin/time %M`. ‡ `/usr/bin/time` unavailable: largest RSS "
+        "snapshot logged by the ExecuTorch runner, which can miss the true peak.",
+    ]
 
     if report.get("detectors"):
         lines += [
@@ -719,6 +728,19 @@ def render_markdown(report: dict) -> str:
                 lines.append(f"| `{task}` | — | error | — | — |")
             else:
                 lines.append(f"| `{task}` | {d['n']} | {d['wall_s']:.4f} | {d['ms_per_item_incl_startup']:.2f} | {d['peak_rss_mib'] or '—'} |")
+
+    for cell in report["cells"]:
+        prof = (cell.get("perf_run") or {}).get("perf_profile")
+        if prof:
+            lines += [
+                "",
+                f"## KleidiAI CPU share (`perf record -F 99 -g`, extra run `{cell['perf_run']['tag']}`, not in the aggregates)",
+                "",
+                f"- Named `kai_*` symbols: **{prof['kai_total_cpu_pct']:.2f}%** of sampled CPU time "
+                f"(samples: {prof['samples_header']}, lost: {prof['lost_samples']}).",
+            ]
+            for k in prof["kai_kernels"]:
+                lines.append(f"  - `{k['symbol']}`: {k['cpu_pct']:.2f}%")
 
     return "\n".join(lines) + "\n"
 
@@ -776,7 +798,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--warmup-items", type=int, default=1, help="Number of initial explained items treated as cold load/warm-up")
     ap.add_argument("--detector-bench", action="store_true", help="Also run Stage-1 detector fixture timing")
     ap.add_argument("--offline-unshare", action="store_true", help="Wrap runs in `unshare -n` kernel network namespace")
-    ap.add_argument("--perf-profile", action="store_true", help="Run `perf record -F 99 -g` on the first repeat of the first cell")
+    ap.add_argument("--perf-profile", action="store_true", help="Run `perf record -F 99 -g` as one extra run of the first cell (excluded from aggregates)")
     ap.add_argument("--no-sha256", action="store_true", help="Skip SHA-256 hashing of large .pte files")
     ap.add_argument("--dry-run", action="store_true", help="Print host/disk/matrix plan without running inference")
     ap.add_argument("--run-timeout-s", type=float, default=DEFAULT_RUN_TIMEOUT_S,
@@ -840,9 +862,12 @@ def main(argv: list[str] | None = None) -> int:
                 items = load_items(tier, args.items)
                 for gmode in gating_modes:
                     cell_runs = []
-                    for rep in range(1, args.repeats + 1):
-                        do_perf = args.perf_profile and not did_perf
-                        tag = f"{model_name}-t{threads}-{tier}-{gmode}-r{rep}"
+                    perf_run = None
+                    # The perf-profiled run is an extra run, kept out of the aggregates (sampling adds overhead).
+                    reps = ([0] if (args.perf_profile and not did_perf) else []) + list(range(1, args.repeats + 1))
+                    for rep in reps:
+                        do_perf = rep == 0
+                        tag = f"{model_name}-t{threads}-{tier}-{gmode}-" + ("perf" if do_perf else f"r{rep}")
                         print(f"[arm_bench] running {tag} ({len(items)} items)...", flush=True)
                         run_res = run_single(
                             py_exe=args.python,
@@ -861,6 +886,8 @@ def main(argv: list[str] | None = None) -> int:
                         )
                         if do_perf:
                             did_perf = True
+                            perf_run = run_res
+                            continue
                         cell_runs.append(run_res)
                     agg = aggregate_cell(cell_runs, warmup_items=args.warmup_items)
                     cells.append({
@@ -871,6 +898,7 @@ def main(argv: list[str] | None = None) -> int:
                         "gating_mode": gmode,
                         "aggregate": agg,
                         "runs": cell_runs,
+                        "perf_run": perf_run,
                     })
 
     detectors = run_detector_bench(args.python, cand, DEFAULT_FIXTURES_DIR, thread_list[0]) if args.detector_bench else {}

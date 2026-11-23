@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime, timezone
+import html
 import json
 import os
 from pathlib import Path
@@ -125,12 +126,20 @@ def parse_device_txt(text: str) -> dict:
     }
 
 
+def _duration_ms(token: str) -> float:
+    """Parse the app's duration format: "N ms" below one second, "x.xx s" from one second (formatMs)."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(ms|s)\s*", token)
+    if not m:
+        raise ValueError(f"not a duration: {token!r}")
+    return float(m.group(1)) * (1.0 if m.group(2) == "ms" else 1000.0)
+
+
 def parse_stats_xml(xml_text: str) -> dict:
     """Extract Prahari on-device stats card metrics from a uiautomator XML dump."""
-    # Unescape XML newline entities before matching
-    clean = xml_text.replace("&#10;", "\n").replace("&amp;", "&").replace("&quot;", '"')
-    texts = re.findall(r'text="([^"]*)"', clean)
-    descs = re.findall(r'content-desc="([^"]*)"', clean)
+    # Extract attributes from the raw XML first, then unescape each value, so an escaped quote inside a
+    # value cannot end the match early.
+    texts = [html.unescape(v) for v in re.findall(r' text="([^"]*)"', xml_text)]
+    descs = [html.unescape(v) for v in re.findall(r'content-desc="([^"]*)"', xml_text)]
 
     rec: dict = {
         "detector_ms": None,
@@ -144,24 +153,24 @@ def parse_stats_xml(xml_text: str) -> dict:
     }
 
     for d in descs:
-        m_sum = re.search(r"On-device stats,\s*(expanded|collapsed)\.\s*(\d+(?:\.\d+)?)\s*ms\s*[·.]\s*(\d+(?:\.\d+)?)\s*ms", d)
+        m_sum = re.search(r"On-device stats,\s*(expanded|collapsed)\.\s*(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*(\d+(?:\.\d+)?\s*(?:ms|s))", d)
         if m_sum:
             rec["stats_expanded"] = m_sum.group(1) == "expanded"
-            rec["detector_ms"] = float(m_sum.group(2))
-            rec["first_token_ms"] = float(m_sum.group(3))
+            rec["detector_ms"] = _duration_ms(m_sum.group(2))
+            rec["first_token_ms"] = _duration_ms(m_sum.group(3))
 
     for i, t in enumerate(texts):
         s = t.strip()
-        m_pair = re.fullmatch(r"(\d+(?:\.\d+)?)\s*ms\s*·\s*(\d+(?:\.\d+)?)\s*ms", s)
+        m_pair = re.fullmatch(r"(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*(\d+(?:\.\d+)?\s*(?:ms|s))", s)
         if m_pair and rec["detector_ms"] is None:
-            rec["detector_ms"] = float(m_pair.group(1))
-            rec["first_token_ms"] = float(m_pair.group(2))
+            rec["detector_ms"] = _duration_ms(m_pair.group(1))
+            rec["first_token_ms"] = _duration_ms(m_pair.group(2))
         m_tps = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:t/s|tok/s)", s)
         if m_tps:
             rec["decode_tps"] = float(m_tps.group(1))
-        m_tot = re.search(r"Total\s+(\d+(?:\.\d+)?)\s*s\s*·\s*Memory\s+(\d+(?:\.\d+)?)\s*MB", s)
+        m_tot = re.search(r"Total\s+(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*Memory\s+(\d+(?:\.\d+)?)\s*MB", s)
         if m_tot:
-            rec["total_s"] = float(m_tot.group(1))
+            rec["total_s"] = round(_duration_ms(m_tot.group(1)) / 1000.0, 3)
             rec["app_memory_mb"] = float(m_tot.group(2))
             rec["stats_expanded"] = True
         m_be = re.search(r"(Llama[^\n]+ExecuTorch[^\n]+)", s)
@@ -171,13 +180,13 @@ def parse_stats_xml(xml_text: str) -> dict:
         if m_abi:
             rec["cpu_abi"] = m_abi.group(1)
         if s == "Detector" and i > 0 and rec["detector_ms"] is None:
-            m_d = re.fullmatch(r"(\d+(?:\.\d+)?)\s*ms", texts[i - 1].strip())
+            m_d = re.fullmatch(r"\d+(?:\.\d+)?\s*(?:ms|s)", texts[i - 1].strip())
             if m_d:
-                rec["detector_ms"] = float(m_d.group(1))
+                rec["detector_ms"] = _duration_ms(m_d.group(0))
         if s == "First token" and i > 0 and rec["first_token_ms"] is None:
-            m_f = re.fullmatch(r"(\d+(?:\.\d+)?)\s*ms", texts[i - 1].strip())
+            m_f = re.fullmatch(r"\d+(?:\.\d+)?\s*(?:ms|s)", texts[i - 1].strip())
             if m_f:
-                rec["first_token_ms"] = float(m_f.group(1))
+                rec["first_token_ms"] = _duration_ms(m_f.group(0))
 
     return rec
 
@@ -485,6 +494,18 @@ CHECK_BUTTON_DESC = "Check on this phone"
 _STATS_DESC_RE = re.compile(r'content-desc="On-device stats, (?:collapsed|expanded)\. ([^"]*?) · ([^"]*)"')
 
 
+_SAMPLE_CHIP_RE = re.compile(r'<node\b[^>]*content-desc="[^"]*, (?:SMS|Link|Network) sample"[^>]*>')
+
+
+def sample_row_y(xml_text: str) -> int | None:
+    """Vertical centre of the "Try a sample" chip row, from any visible chip's bounds."""
+    m = _SAMPLE_CHIP_RE.search(xml_text)
+    if not m:
+        return None
+    b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', m.group(0))
+    return (int(b.group(2)) + int(b.group(4))) // 2 if b else None
+
+
 def stats_header_state(xml_text: str) -> str:
     """'absent' (header not on screen), 'pending' (Llama still running) or 'done'."""
     m = _STATS_DESC_RE.search(xml_text)
@@ -546,14 +567,24 @@ def cmd_run(args: argparse.Namespace) -> int:
 
             batt_before = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
             xml = dump_ui_xml(serial)
-            if not tap_element(serial, xml, text_contains=sample_label):
-                # Swipe the sample chip row left and retry once
-                adb_out(serial, "shell", "input", "swipe", "900", "1250", "150", "1250", "250")
+            found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
+            for _ in range(3):
+                if found:
+                    break
+                # Scroll the horizontal sample-chip row left along its own y (read from the dump).
+                row_y = sample_row_y(xml)
+                if row_y is None:
+                    break
+                adb_out(serial, "shell", "input", "swipe", "900", str(row_y), "150", str(row_y), "250")
                 time.sleep(0.6)
                 xml = dump_ui_xml(serial)
-                if not tap_element(serial, xml, text_contains=sample_label):
-                    print(f"[adb_bench] WARNING: sample chip {sample_label!r} not found; skipping {check_id}", file=sys.stderr)
-                    continue
+                found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
+            if not found:
+                print(f"[adb_bench] ERROR: sample chip {sample_label!r} not found; skipping {check_id}", file=sys.stderr)
+                rows.append({"check": check_id, "sample_label": sample_label, "status": "no-sample-chip",
+                             "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
+                             "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                continue
             time.sleep(0.5)
             xml = dump_ui_xml(serial)
 

@@ -361,3 +361,20 @@ def test_android_summary_ignores_incomplete_checks():
     assert rep["summary"]["checks_incomplete"] == ["kyc-warm-2"]
     assert rep["summary"]["warm_kyc_ttft_ms_median"] == 510.0
     assert "| `kyc-warm-2` | timeout |" in adb_bench.render_android_md(rep)
+
+
+def test_adb_sample_chip_row_and_duration_formats():
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "home.xml").read_text(encoding="utf-8")
+    assert adb_bench.sample_row_y(home) == 1522
+    # Chip matched by its accessibility label, which every sample chip carries.
+    assert adb_bench.find_bounds_center(home, desc_contains="KYC scam SMS, ") == (263, 1522)
+    # The app prints "x.xx s" from one second (MainActivity.formatMs); an escaped quote must not cut a value.
+    xml = ('<node text="" content-desc="On-device stats, expanded. 1.05 s · 2.31 s" />'
+           '<node text="Total 4.20 s · Memory 1700.0 MB" content-desc="" />'
+           '<node text="He said &quot;hi&quot; 12.0 t/s" content-desc="" />'
+           '<node text="41.0 t/s" content-desc="" />')
+    rec = adb_bench.parse_stats_xml(xml)
+    assert rec["detector_ms"] == 1050.0 and rec["first_token_ms"] == 2310.0
+    assert rec["total_s"] == 4.2 and rec["app_memory_mb"] == 1700.0
+    assert rec["decode_tps"] == 41.0

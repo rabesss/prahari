@@ -38,7 +38,7 @@ sha256sum /var/tmp/prahari-model/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte \
 ss -tlnp | grep ':8888' || echo "Port 8888 is free"
 ```
 
-If port 8888 is in use (e.g., `hindsight-omp` on Arch), stop that service temporarily and restart
+If port 8888 is in use by a local service, stop that service temporarily and restart
 it after the RTL session finishes.
 
 ## 3. Exact 30-Minute Execution Plan

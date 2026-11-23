@@ -39,9 +39,14 @@ echo "PTE:     $PTE"
 echo "TOK:     $TOK"
 echo "Out dir: $OUT_DIR"
 
+ORIG_SCREEN_TIMEOUT=""
 cleanup() {
   echo "=== Cleanup: restoring airplane mode off ==="
   adb -s "$SERIAL" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
+  if [[ -n "$ORIG_SCREEN_TIMEOUT" && "$ORIG_SCREEN_TIMEOUT" != "null" ]]; then
+    adb -s "$SERIAL" shell settings put system screen_off_timeout "$ORIG_SCREEN_TIMEOUT" >/dev/null 2>&1 || true
+  fi
+  adb -s "$SERIAL" shell rm -f /sdcard/prahari_ui.xml >/dev/null 2>&1 || true
   if [[ "$UNINSTALL_ON_EXIT" == "1" ]]; then
     echo "=== Cleanup: uninstalling in.prahari.app ==="
     adb -s "$SERIAL" uninstall in.prahari.app >/dev/null 2>&1 || true
@@ -62,7 +67,8 @@ if [[ "$SOC" != "SM8550" && "${ALLOW_OTHER_SOC:-0}" != "1" ]]; then
   echo "       Reserve a Galaxy S23 (SM-S911B), or set ALLOW_OTHER_SOC=1 and label results as a different device." >&2
   exit 1
 fi
-# Keep screen awake via timeout (avoid `svc power stayon true`, which drops Samsung RDB).
+# Keep screen awake via timeout (avoid `svc power stayon true`, which drops Samsung RDB); restored on exit.
+ORIG_SCREEN_TIMEOUT="$(adb -s "$SERIAL" shell settings get system screen_off_timeout | tr -d '\r')"
 adb -s "$SERIAL" shell settings put system screen_off_timeout 1800000 || true
 
 echo "=== Step 2/5: Install APK, audit INTERNET permission, push & hash model ==="
