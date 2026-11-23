@@ -1,10 +1,9 @@
-# Prahari Android spike
+# Prahari Android app
 
-Prahari is an experimental offline Android port of the BEST candidate. It uses the unchanged
+Prahari is an experimental offline Android port of the BEST candidate. It uses the shipped
 rules and explanation prompt/checks, portable exported detector parameters, Chaquopy 17.2.0
 (Python 3.10, NumPy 1.26.2) and Maven ExecuTorch Android 1.5.1. No Llama model or tokenizer is
-included in the APK or repository. **No device generation has been verified. This is not yet a
-phone go decision.**
+included in the APK or repository. **The detector and Llama have run end to end on an Android 14 x86_64 emulator. A physical Arm phone run remains pending.**
 
 ## Build
 
@@ -18,7 +17,7 @@ record. If the exact model fails to generate on 1.5.1, request an additional 1.6
 Actions, without running Gradle on the owner's PC:
 
 ```sh
-gh workflow run android.yml --ref android/spike -f source_apk=true
+gh workflow run android.yml --ref main -f source_apk=true
 ```
 
 Download `prahari-debug-apk-executorch-1.6` from that run. A successful AAR or APK build is not
@@ -34,7 +33,7 @@ oracle-a1, not on an Android phone:
 | `Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte` | `ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac` |
 | `tokenizer.model` | `82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55` |
 
-The model is approximately 1.18 GB. The source is the [ExecuTorch community model](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET), subject to the Llama 3.2 Community License. Maven Central [lists 1.5.1 as the newest AAR](https://repo.maven.apache.org/maven2/org/pytorch/executorch-android/maven-metadata.xml); [1.6 release notes](https://github.com/pytorch/executorch/releases/tag/v1.6.0) do not establish forward compatibility with 1.5.1. The model has been run using the Python 1.6 runner on Oracle but not this Android AAR. If 1.5.1 fails, first try the 1.6 source AAR. One alternative for 1.5.1 is the [community SpinQuant INT4 EO8 export at revision 911221e](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET/tree/911221e0f49d3354cbd4697a9c09feee25cadec7): an [independent Android test](https://meetprajapati.com/blogs/executorch-android-offline-llama-chat-benchmarks/) reports generation with 1.5.1 on a Pixel 8a. It is a different model, not a verification of Prahari or a Galaxy phone. The app currently expects the QLoRA filename; if trying SpinQuant, verify its matching tokenizer and hashes separately, then copy the model under that expected filename and record the substitution.
+The model is approximately 1.18 GB. The source is the [ExecuTorch community model](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET), subject to the Llama 3.2 Community License. Maven Central [lists 1.5.1 as the newest AAR](https://repo.maven.apache.org/maven2/org/pytorch/executorch-android/maven-metadata.xml); [1.6 release notes](https://github.com/pytorch/executorch/releases/tag/v1.6.0) do not establish forward compatibility with 1.5.1. The same model has run using the Python 1.6 runner on Oracle and the Android 1.5.1 AAR on an x86_64 emulator. If 1.5.1 fails, first try the 1.6 source AAR. One alternative for 1.5.1 is the [community SpinQuant INT4 EO8 export at revision 911221e](https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET/tree/911221e0f49d3354cbd4697a9c09feee25cadec7): an [independent Android test](https://meetprajapati.com/blogs/executorch-android-offline-llama-chat-benchmarks/) reports generation with 1.5.1 on a Pixel 8a. It is a different model, not a verification of Prahari or a Galaxy phone. The app currently expects the QLoRA filename; if trying SpinQuant, verify its matching tokenizer and hashes separately, then copy the model under that expected filename and record the substitution.
 
 The joblib pickles record scikit-learn 1.9.1. Chaquopy's [Android wheel index](https://chaquo.com/pypi-13.1/scikit-learn/) lists scikit-learn through 1.3.2 for Python 3.10 arm64, not 1.9.1; its index also lists NumPy 1.26.2 and SciPy 1.8.1 for Python 3.10 arm64, while joblib 1.6.0 is a pure-Python wheel requiring Python 3.10+. Cross-version loading is unsupported. CI exports all four models from the reference environment and tests portable probabilities and final scores/labels against visible fixtures. No cross-version unpickling occurs on Android.
 
@@ -59,7 +58,7 @@ The joblib pickles record scikit-learn 1.9.1. Chaquopy's [Android wheel index](h
    ```
 
    Match both digests to the table before testing. Allow time and storage for the model transfer.
-5. In Prahari press **Network check**, record the failure and inspect the CI `aapt` and merged-manifest audit. Test the SMS, URL and flow presets; confirm actual generated Llama text, evidence, action, timing, and no crash or empty explanation. Include a flow JSON example and verify its model verdict is retained by the prompt. Test the exact model and tokenizer above; loading alone is insufficient.
+5. In Prahari press **Prove it’s offline**, record the failure and inspect the CI `aapt` and merged-manifest audit. Test the SMS, URL and flow presets; confirm actual generated Llama text, evidence, action, timing, and no crash or empty explanation. Include a flow JSON example and verify its model verdict is retained by the prompt. Test the exact model and tokenizer above; loading alone is insufficient.
 6. Before any long benchmark, measure PSS and sustained inference. After first generation and after several consecutive checks, run `adb shell dumpsys meminfo in.prahari.app` and record TOTAL PSS, process survival, elapsed time, thermal throttling and results. Sample repeatedly during generation to estimate peak PSS; the app's displayed PSS is a post-inference sample, not peak. Stop on memory pressure, a crash, or unacceptable thermal/latency behaviour.
 7. Only if the phone is stable, run a small benchmark: the 28 chosen visible prompts, one repeat, recording each detector time, TTFT, runtime decode tok/s, total and sampled peak PSS. The hidden 28-item evaluation set is not in this repository; use a fixed visible set and label the result as such, not as the original benchmark. No automated phone benchmark is included yet.
 8. If generation fails on 1.5.1, try the separately built 1.6 AAR APK only after its CI build succeeds; repeat the generation, memory and stability checks. Report the exact AAR and APK used.
@@ -68,5 +67,5 @@ The joblib pickles record scikit-learn 1.9.1. Chaquopy's [Android wheel index](h
 
 * The Android 1.5.1 and 1.6 `LlmGenerationConfig.maxNewTokens` field is not passed by the Android `generate` overload to the native runner. The bridge stops after 40 UTF-8 callbacks, which can each contain multiple token fragments; this is **not a guaranteed 40-token cap**. The exact budget needs a fixed upstream Android binding or a custom native bridge before claiming parity. TTFT is measured to the first callback, and decode tok/s comes from native stats.
 * The UI accepts flow descriptions (the candidate's rule path) or a JSON feature record (the trained flow model). Both pass the actual detector verdict and evidence to the explanation; no verdict is recomputed by the bridge.
-* The portable implementation and JNI have not run on-device. Parity fixtures are small and do not prove equivalent behaviour on all inputs or Android NumPy. Model memory plus Python can exceed a mid-range phone's available RAM. Android can kill the app; temperature, storage and cold-start time may be limiting.
+* The portable implementation and JNI have run on an x86_64 emulator; they have not been verified on a physical Arm phone. Parity fixtures are small and do not prove equivalent behaviour on all inputs or Android NumPy. Model memory plus Python can exceed a mid-range phone's available RAM. Android can kill the app; temperature, storage and cold-start time may be limiting.
 * The HTTPS button tries a real connection and reports the exception. A failed connection alone does not prove absence of network capability; review the merged manifest and permissions alongside it.

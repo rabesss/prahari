@@ -4,11 +4,11 @@ Prahari is a prototype offline scam and phishing triage assistant for Arm Bharat
 
 ## Round-3 results
 
-On Oracle's two-vCPU Arm Neoverse-N1 VM, the shipped version (gen51 plus PR #30 rule fixes) achieved conservative F1 of 0.922 on SMS, 0.994 on URL, 0.950 on Indic and 0.850 on NSL-KDD flow replay. These hidden sets were used repeatedly during development. On the separately sealed final holdout, gen51 scored combined F1 0.802 and FPR 0.31 (the later fixes were not re-scored); hard benign look-alikes caused many false alarms. In the shipped version's final evaluation, end-to-end processing took about 3.8 s/item and peak cgroup memory was 2.05 GB (systemd scope `memory.peak`, including page cache; not process RSS). See the [report](docs/phase1/report.md) for the baseline, evaluation limits and explanation audit. No real-phone result has been measured.
+On Oracle's two-vCPU Arm Neoverse-N1 VM, the shipped version (content hash `4ea1d89a…`, gen51 plus later rule and advice changes) achieved conservative F1 of 0.922 on SMS, 0.994 on URL, 0.950 on Indic and 0.850 on NSL-KDD flow replay. These hidden sets were used repeatedly during development. On the separately sealed final holdout, gen51 scored combined F1 0.802 and FPR 0.31 (the later fixes were not re-scored); hard benign look-alikes caused many false alarms. In the PR #30 evaluation (`b9e16a6e…`), end-to-end processing took about 3.8 s/item and peak cgroup memory was 2.05 GB (systemd scope `memory.peak`, including page cache; not process RSS). See the [report](docs/phase1/report.md) for the baseline, evaluation limits and explanation audit. No real-phone result has been measured.
 
 ## Android app
 
-The redesigned app on `android/spike` ran the shipped detector and Llama 3.2 1B end to end on an Android 14 x86_64 emulator. It shows vetted steps before the AI explanation and declares no `INTERNET` permission. Emulator timings are not Arm timings; a physical-phone Llama run remains untested. For setup and pushing the separately obtained model and tokenizer, see [android/README.md on android/spike](https://github.com/rabesss/arm-bharat-ai-soc/blob/android/spike/android/README.md#remote-phone-checklist).
+The app in `android/` ran the shipped detector and Llama 3.2 1B end to end on an Android 14 x86_64 emulator. It shows vetted steps before the AI explanation and declares no `INTERNET` permission. Emulator timings are not Arm timings; a physical-phone Llama run remains untested. For setup and pushing the separately obtained model and tokenizer, see [android/README.md](android/README.md#remote-phone-checklist).
 
 ![KYC scam result on an Android 14 emulator (x86_64)](docs/phase1/img/app-r2-kycscamsms-a.png)
 
