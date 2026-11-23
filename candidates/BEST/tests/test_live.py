@@ -390,7 +390,7 @@ DEMO = ["--ports", "3", "--repeat", "2", "--every", "0.02", "--delay", "0", "--b
 
 
 def run_demo(*extra, host=None):
-    demo = CAND.parents[1] / "bin" / "scan_demo.py"
+    demo = CAND / "bin" / "scan_demo.py"
     cmd = [sys.executable, str(demo)] + (["--host", host] if host else []) + DEMO + list(extra)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 

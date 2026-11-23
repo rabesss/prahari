@@ -57,7 +57,7 @@ at every sample and `/proc/net/snmp` (the kernel's TCP counters for the whole de
 
 ```sh
 # from the repository root
-python bin/scan_demo.py --ports 150 &       # harmless demo traffic, loopback ports only
+python candidates/BEST/bin/scan_demo.py --ports 150 &       # harmless demo traffic, loopback ports only
 candidates/BEST/bin/monitor --seconds 6       # start it in the same second
 ```
 
