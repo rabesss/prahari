@@ -397,10 +397,6 @@
   "प्रहरी · scam & threat check"
  ],
  "new": {
-  "language_toggle": {
-   "en": "English / हिंदी",
-   "hi": "English / हिंदी"
-  },
   "listen": {
    "en": "Listen",
    "hi": "सुनें"
@@ -409,45 +405,9 @@
    "en": "Stop",
    "hi": "रोकें"
   },
-  "no_offline_voice": {
-   "en": "No offline voice installed",
-   "hi": "इस फ़ोन पर ऑफ़लाइन आवाज़ नहीं है"
-  },
-  "share_title": {
-   "en": "Check with Prahari",
-   "hi": "Prahari से जांचें"
-  },
   "shared_banner": {
    "en": "Shared text — review, then tap Check",
    "hi": "शेयर किया गया टेक्स्ट — देख लें, फिर जांचें दबाएं"
-  },
-  "detected_mode": {
-   "en": "Detected: %s",
-   "hi": "पहचाना गया: %s"
-  },
-  "detected_sms": {
-   "en": "Detected: SMS",
-   "hi": "पहचाना गया: SMS"
-  },
-  "detected_link": {
-   "en": "Detected: Link",
-   "hi": "पहचाना गया: लिंक"
-  },
-  "detected_network": {
-   "en": "Detected: Network",
-   "hi": "पहचाना गया: नेटवर्क"
-  },
-  "mode_sms": {
-   "en": "SMS",
-   "hi": "SMS"
-  },
-  "mode_link": {
-   "en": "Link",
-   "hi": "लिंक"
-  },
-  "mode_network": {
-   "en": "Network",
-   "hi": "नेटवर्क"
   },
   "advanced_mode": {
    "en": "Advanced",
@@ -461,14 +421,6 @@
    "en": "Still verify",
    "hi": "फिर भी जांच लें"
   },
-  "history_recent": {
-   "en": "Recent checks",
-   "hi": "हाल की जांचें"
-  },
-  "history_clear": {
-   "en": "Clear history",
-   "hi": "इतिहास मिटाएं"
-  },
   "history_off": {
    "en": "History is off",
    "hi": "इतिहास बंद है"
@@ -477,57 +429,13 @@
    "en": "Saved only on this phone",
    "hi": "सिर्फ़ इसी फ़ोन पर सेव रहता है"
   },
-  "history_save": {
-   "en": "Save",
-   "hi": "सेव करें"
-  },
   "qr_check": {
    "en": "Check a QR code",
    "hi": "QR कोड जांचें"
   },
-  "qr_pick_photo": {
-   "en": "Pick a photo with a QR code",
-   "hi": "QR कोड वाली फ़ोटो चुनें"
-  },
-  "qr_not_found": {
-   "en": "No QR code found",
-   "hi": "कोई QR कोड नहीं मिला"
-  },
-  "first_run_welcome": {
-   "en": "Welcome",
-   "hi": "स्वागत है"
-  },
-  "first_run_intro": {
-   "en": "Prahari checks messages and links on this phone. Nothing is sent anywhere.",
-   "hi": "Prahari आपके मैसेज और लिंक इसी फ़ोन पर जांचता है। कुछ भी कहीं नहीं भेजा जाता।"
-  },
-  "first_run_load_model": {
-   "en": "Load the model to get AI explanations",
-   "hi": "AI से आसान विवरण पाने के लिए मॉडल लोड करें"
-  },
-  "provenance_network_replay": {
-   "en": "Network data is a replay, not live capture",
-   "hi": "यह नेटवर्क डेटा पुराना रीप्ले है, लाइव निगरानी नहीं"
-  },
-  "provenance_ai_replaced": {
-   "en": "AI sentence replaced by a safety step",
-   "hi": "AI के वाक्य की जगह सुरक्षा कदम दिखाया गया है"
-  },
-  "ai_english_badge": {
-   "en": "AI summary (in English — can be wrong, follow the steps above)",
-   "hi": "AI सारांश (अंग्रेज़ी में — गलत हो सकता है, ऊपर दिए कदम मानें)"
-  },
-  "link_result_caveat": {
-   "en": "Scammers copy real websites. Type the address yourself or use the official app.",
-   "hi": "ठग असली वेबसाइटों की नकल करते हैं। पता खुद टाइप करें या आधिकारिक ऐप इस्तेमाल करें।"
-  },
   "ai_english": {
    "en": "AI text is in English",
    "hi": "AI टेक्स्ट अंग्रेज़ी में है"
-  },
-  "check_alert": {
-   "en": "CHECK ALERT",
-   "hi": "अलर्ट जांचें"
   },
   "clear_history": {
    "en": "Clear history",
@@ -569,17 +477,9 @@
    "en": "Hindi voice not installed — reading in English",
    "hi": "हिंदी की आवाज़ नहीं मिली — अंग्रेज़ी में पढ़ रहे हैं"
   },
-  "check_this_alert": {
-   "en": "CHECK THIS ALERT",
-   "hi": "अलर्ट जांचें"
-  },
-  "bank_alert_line": {
-   "en": "Looks like a bank alert. Scammers copy these, so check it in your bank app.",
-   "hi": "यह बैंक का अलर्ट लगता है। ठग ऐसे अलर्ट की नकल करते हैं, इसलिए अपने बैंक ऐप में जांचें।"
-  },
   "model_only_evidence": {
    "en": "The on-device model rated this like known scam messages; no single phrase decided it.",
-   "hi": "फ़ोन के मॉडल ने इसे ठगी वाले मैसेज जैसा पाया। किसी एक वाक्य ने यह तय नहीं किया।"
+   "hi": "ऑन-डिवाइस मॉडल ने इसे ठगी वाले मैसेज जैसा पाया। किसी एक वाक्य ने यह तय नहीं किया।"
   },
   "works_offline": {
    "en": "Works with no internet",

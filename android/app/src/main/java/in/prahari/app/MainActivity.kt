@@ -90,6 +90,19 @@ private val OWN_MOBILE = Regex("(?<![0-9])(?:\\+?91[ -]?)?[6-9][0-9]{4}[ -]?[0-9
 /** True when the text offers its own link or a private Indian mobile number. */
 private fun hasOwnContact(text: String): Boolean = OWN_LINK.containsMatchIn(text) || OWN_MOBILE.containsMatchIn(text)
 
+/**
+ * A bank debit or OTP alert shown as the amber CHECK THIS ALERT banner: the vetted debit or check
+ * step is present, the verdict is not DANGEROUS, and the message offers no contact of its own.
+ * The result screen and History both use this, so they never disagree.
+ */
+private fun isBankAlert(verdict: JSONObject, value: String): Boolean {
+    val level = verdict.optString("level", "clear")
+    if (level != "clear" && level != "warn") return false
+    val actions = verdict.optJSONArray("actions") ?: return false
+    val vetted = (0 until actions.length()).any { val a = actions.optString(it); a == DEBIT_STEP || a == CHECK_STEP }
+    return vetted && !hasOwnContact(value)
+}
+
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
 private const val QR_REQUEST = 41
@@ -386,7 +399,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         if (!Bridge.publish(id, job)) return
         Bridge.app?.let { ctx ->
             try {
-                HistoryStore.add(ctx, mode, level, value)
+                HistoryStore.add(ctx, mode, if (isBankAlert(verdict, value)) "alert" else level, value)
             } catch (t: Throwable) {
                 Log.e(TAG, "history save failed", t)
             }
@@ -570,6 +583,9 @@ class MainActivity : Activity() {
     // Bumped by stopSpeech(); a TTS engine that finishes starting after the user left the result
     // (Back, pause, stop) sees a stale request and stays silent.
     private var speechRequest = 0
+    // Id of the utterance now playing; callbacks for a flushed, older one are ignored.
+    private var currentUtterance = ""
+    private var utteranceSeq = 0
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
     private var backCallback: OnBackInvokedCallback? = null
@@ -1222,6 +1238,12 @@ class MainActivity : Activity() {
         }
         advHead.setOnClickListener {
             advancedOpen = !advancedOpen
+            // Hiding Network must not leave it selected: a message typed next would be checked as
+            // a network event and could come back NO RISK.
+            if (!advancedOpen && selectedMode == 2) {
+                selectedMode = 0
+                refreshSegments()
+            }
             applyAdvanced()
         }
         asButton(advHead, n("advanced_mode"))
@@ -1265,6 +1287,10 @@ class MainActivity : Activity() {
                 minimumHeight = dp(48)
                 setOnClickListener {
                     selectedMode = sample.mode
+                    if (sample.mode == 2 && !advancedOpen) {
+                        advancedOpen = true
+                        applyAdvanced()
+                    }
                     refreshSegments()
                     input.setText(sample.value)
                     input.setSelection(input.text.length)
@@ -1445,7 +1471,6 @@ class MainActivity : Activity() {
             }
             text.length > 100_000 -> {
                 sharedBanner = false
-                inputValue = ""
                 toast("That text is too long to check.")
                 showHome()
             }
@@ -1536,7 +1561,10 @@ class MainActivity : Activity() {
         val what = card()
         val summary = row()
         add(summary, icon(modeIcons[mode], 18, T.ink2), 18, 18)
-        add(summary, txt(value, 14f, T.ink2, 400, 20, raw = true), 0, -2, left = 12, weight = 1f)
+        add(summary, txt(value, 14f, T.ink2, 400, 20, raw = true).apply {
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, 0, -2, left = 12, weight = 1f)
         add(what, summary)
         add(body, what)
         add(body, modeSwitcher(mode, value), -1, -2, top = 12)
@@ -1800,17 +1828,19 @@ class MainActivity : Activity() {
             return
         }
         val script = chosen.second
+        val utterance = "prahari-${++utteranceSeq}"
+        currentUtterance = utterance
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
-                runOnUiThread { if (!isDestroyed) { speaking = false; refreshListen() } }
+                runOnUiThread { if (!isDestroyed && utteranceId == currentUtterance) { speaking = false; refreshListen() } }
             }
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
-                runOnUiThread { if (!isDestroyed) { speaking = false; refreshListen() } }
+                runOnUiThread { if (!isDestroyed && utteranceId == currentUtterance) { speaking = false; refreshListen() } }
             }
         })
-        val code = engine.speak(script, TextToSpeech.QUEUE_FLUSH, Bundle(), "prahari")
+        val code = engine.speak(script, TextToSpeech.QUEUE_FLUSH, Bundle(), utterance)
         if (code == TextToSpeech.ERROR) {
             toast(n("voice_missing"))
             return
@@ -1874,8 +1904,7 @@ class MainActivity : Activity() {
         // A bank debit or OTP alert is not relabelled when the verdict is already DANGEROUS.
         // A copied alert that carries a link or a private mobile number keeps its SUSPICIOUS title:
         // genuine bank alerts point to the bank app or a toll-free line, never to those.
-        val bankAlert = (level == "clear" || level == "warn") &&
-            actions.any { it == DEBIT_STEP || it == CHECK_STEP } && !hasOwnContact(job.value)
+        val bankAlert = isBankAlert(data, job.value)
         val p = if (bankAlert) palette("warn").copy(title = "CHECK THIS ALERT", hindi = "अलर्ट जांचें") else palette(level)
         val calm = clear && !bankAlert
         val fallback = when {
@@ -1994,7 +2023,7 @@ class MainActivity : Activity() {
         add(body, steps, top = 12)
         var whyCard: View? = null
         val shownEvidence = evidence.filter { it.isNotBlank() }
-        if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert) {
+        if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert && selectedMode != 2) {
             val evidenceCard = card()
             add(evidenceCard, heading("Why it's flagged", "संकेत"))
             add(evidenceCard, txt(n("model_only_evidence"), 14f, T.ink, 400, 20, raw = true), top = 8)
@@ -2283,7 +2312,7 @@ class MainActivity : Activity() {
             val id = ++Bridge.netId
             Bridge.net = Bridge.Net(id, "pending", "", 0L, false)
             add(body, txt("Testing HTTPS…", 16f, T.ink2).apply {
-                contentDescription = "Testing whether this app can open a connection"
+                contentDescription = t("Testing whether this app can open a connection")
                 accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             }, top = 16)
             enqueueNet(id)
@@ -2307,7 +2336,7 @@ class MainActivity : Activity() {
         }
         val banner = banner(p, why, t("Tested just now") + " · ${net.elapsed} ms", R.drawable.ic_lock)
         add(body, banner)
-        banner.post { if (!isDestroyed) banner.announceForAccessibility("${t(p.title)}. $why") }
+        banner.post { if (!isDestroyed) banner.announceForAccessibility("${t(p.title)}. ${t(why)}") }
         val tried = card()
         add(tried, heading("What we tried", "हमने क्या आज़माया"))
         fun pairRow(key: String, value: View) {
@@ -2461,6 +2490,7 @@ class MainActivity : Activity() {
             val title = when (entry.level) {
                 "danger" -> t("DANGEROUS")
                 "warn" -> t("SUSPICIOUS")
+                "alert" -> t("CHECK THIS ALERT")
                 else -> t("NO RISK FOUND")
             }
             val whenText = DateUtils.getRelativeTimeSpanString(entry.at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
