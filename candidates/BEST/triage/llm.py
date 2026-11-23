@@ -487,6 +487,9 @@ class Explainer:
         # request it must decline. The real host still appears in the evidence for the reader.
         snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: re.sub(r"(?<!\[)\.(?!\])", "[.]", m.group(0)), snippet)
         ev = compact_evidence(eff_kind, inp, evidence, verdict)
+        # Evidence can quote attacker text (payee name, note, currency). Keep it on one line and
+        # strip anything shaped like the verdict marker, which _prompt_verdict reads from the end.
+        ev = [re.sub(r"(?i)verdict\s*:", "verdict -", re.sub(r"\s+", " ", str(e))) for e in ev]
         what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event", "upi": "UPI payment QR"}.get(eff_kind, "item")
         first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")
@@ -929,7 +932,7 @@ TYPE_ADVICE = {
         REPORT]),
     "a UPI refund or receive-money QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
         "Never scan a QR code or enter your UPI PIN to receive money.",
-        "A UPI QR always sends money from your account; block the sender.",
+        "Paying a UPI QR sends money from your account; block the sender.",
         "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
     "a UPI collect-request QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
         "Decline the request; receiving money never needs a UPI PIN.",
@@ -990,6 +993,13 @@ CHECK_STEP = "Check the payment in your bank app, not through any link or number
 def advice_for(kind, verdict, inp):
     """(replacement sentence, vetted actions) for one checked item."""
     if _is_upi(kind, inp) and verdict in (0, "uncertain"):
+        parsed = upi.parse_upi(inp)
+        if verdict == "uncertain" and parsed and parsed["is_mandate"]:
+            acts = [
+                "Do not approve this AutoPay mandate until you verify its amount, schedule and payee with the merchant.",
+                "You can cancel unknown mandates in your UPI app's AutoPay section.",
+            ]
+            return "Do not approve this mandate until you verify it.", acts
         if verdict == "uncertain":
             acts = [
                 "Do not enter your UPI PIN until you confirm the payee name, UPI ID and amount directly with the merchant.",
@@ -998,7 +1008,7 @@ def advice_for(kind, verdict, inp):
             return "Do not pay until you confirm the payee directly.", acts
         acts = [
             "Confirm the payee name and amount in your UPI app before entering your PIN.",
-            "Remember: scanning a upi://pay QR sends money; receiving money never needs a PIN.",
+            "Remember: paying a UPI QR sends money; receiving money never needs a PIN.",
         ]
         return acts[0], acts
     if verdict in (0, "uncertain") and kind == "sms" and inp is not None:

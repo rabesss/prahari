@@ -29,7 +29,7 @@ _UPI_SCHEME_RE = re.compile(
     r"^(?:upi|upiglobal|tez|gpay|phonepe|paytmmp|bhim|credpay|amazonpay)://",
     re.I,
 )
-_INTENT_UPI_RE = re.compile(r"^intent://[^\s#]*#Intent;[^\s]*scheme=upi\b", re.I)
+_INTENT_UPI_RE = re.compile(r"^intent://[^\s#]*#Intent;(?:[^;\s]*;)*?scheme=upi(?:;|$)", re.I)
 _BARE_QUERY_RE = re.compile(
     r"^(?:[a-z][a-z0-9_]{0,15}=[^&\s]*&)+[a-z][a-z0-9_]{0,15}=[^&\s]*$",
     re.I,
@@ -310,6 +310,9 @@ class UpiFinding:
     field: str = ""     # primary UPI param name ("pa", "pn", "am", "tn", "mc", "url", "action", ...)
 
 
+_EDGE_NOISE_RE = re.compile(r"^(?:\s|" + _HIDDEN_RE.pattern + r")+|(?:\s|" + _HIDDEN_RE.pattern + r")+$")
+
+
 def _clean_invisible(text: str) -> tuple[str, bool]:
     cleaned = _HIDDEN_RE.sub("", text)
     return cleaned, cleaned != text
@@ -361,6 +364,9 @@ def _format_amount(val: str, num: float | None) -> str:
     return f"{int(whole or 0):,}.{frac}"
 
 
+_KNOWN_UPI_ACTIONS = frozenset({"pay", "collect", "mandate", "global"})
+
+
 def _split_uri(s: str) -> tuple[str, str, str, str]:
     """(scheme, host, path, query); never raises on malformed authorities like '[broken'."""
     try:
@@ -377,10 +383,13 @@ def parse_upi(text: str) -> dict | None:
     """Parse a UPI URI or QR payload offline into normalized fields."""
     if not is_upi_payload(text):
         return None
-    cleaned, had_hidden = _clean_invisible(text.strip())
+    # Edge BOMs/zero-width chars are copy-paste noise; only ones inside the payload can hide fields.
+    cleaned, had_hidden = _clean_invisible(_EDGE_NOISE_RE.sub("", text))
+    cleaned = cleaned.strip()
     scheme = "upi"
     action = "pay"
     query = ""
+    unknown_action = False
 
     if _INTENT_UPI_RE.match(cleaned):
         scheme = "intent"
@@ -401,6 +410,8 @@ def parse_upi(text: str) -> dict | None:
             action = path.split("/", 1)[1] or "pay"
         else:
             action = host or path or "pay"
+        if scheme == "upi" and action not in _KNOWN_UPI_ACTIONS:
+            unknown_action = True
     else:
         scheme = "raw"
         action = "pay"
@@ -514,6 +525,7 @@ def parse_upi(text: str) -> dict | None:
         "valid_merchant_mc": valid_merchant_mc,
         "is_merchant_format": is_merchant_format,
         "direction": direction,
+        "unknown_action": unknown_action,
     }
 
 
@@ -600,6 +612,7 @@ def analyze_upi(text: str) -> dict:
             "findings": [],
             "label": "uncertain",
             "score": 0.5,
+            "summary": None,
             "evidence": ["input is not a valid UPI payment payload"],
             "compact_evidence": ["not a valid UPI payment payload"],
             "scam_type": "a UPI payment QR worth checking",
@@ -635,7 +648,7 @@ def analyze_upi(text: str) -> dict:
     valid_mc = parsed["valid_merchant_mc"]
     is_merchant_fmt = parsed["is_merchant_format"]
     is_mobile_vpa = bool(_MOBILE_VPA_RE.fullmatch(vpa_user))
-    note_and_name = " ".join(part for part in (tn, mn, pn) if part).strip()
+    note_and_name = " ; ".join(part for part in (tn, mn, pn) if part).strip()
 
     # 1. Hidden/invisible characters or parameter pollution
     if parsed["had_hidden_chars"]:
@@ -692,6 +705,15 @@ def analyze_upi(text: str) -> dict:
             "promises a refund, cashback, prize or incoming payment, but a UPI payment QR only sends money out of your account",
             "promises a refund or incoming payment on a UPI QR that sends money out of your account",
             "tn" if _RECEIVE_LURE_RE.search(_LEGIT_CREDIT_CARD_RE.sub(" ", tn)) else "pn",
+        )
+
+    if parsed["unknown_action"]:
+        add(
+            "unknown_action",
+            "medium",
+            f"uses an unrecognised UPI action 'upi://{action[:20]}' instead of pay, collect or mandate",
+            f"unrecognised UPI action 'upi://{action[:20]}'",
+            "action",
         )
 
     if action == "collect":
@@ -1157,10 +1179,11 @@ def _scam_type_from(findings: list[UpiFinding], label: int | str) -> str:
         return ""
     codes = {f.code for f in findings}
     if label == 1:
+        if "mandate_autopay" in codes:
+            # Mandate advice (review and cancel unknown mandates) also covers a refund lure on a mandate.
+            return "a UPI AutoPay mandate scam"
         if "receive_money_trick" in codes or "debit_on_receive_lure" in codes:
             return "a UPI refund or receive-money QR scam"
-        if "mandate_autopay" in codes:
-            return "a UPI AutoPay mandate scam"
         if "collect_intent" in codes:
             return "a UPI collect-request QR scam"
         if codes & {"kyc_threat_note", "block_threat_note", "authority_threat_note",

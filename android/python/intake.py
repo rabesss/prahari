@@ -39,7 +39,7 @@ def detect_mode(text):
             pass
     if _BARE.match(t):
         return 1
-    if _BARE_UPI_QUERY.match(t) and re.search(r'(?i)(?:^|&)pa=[^&\s]+@[^&\s]+', t):
+    if _BARE_UPI_QUERY.match(t) and re.search(r'(?i)(?:^|&)pa=[^&\s]+(?:@|%40)[^&\s]+', t):
         return 1
     urls = list(_URL.finditer(t))
     if len(urls) == 1:
