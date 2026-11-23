@@ -579,7 +579,7 @@ class Explainer:
 
 _BENIGN_CLAIM = re.compile(r"\b(?:no risk found|nothing suspicious)\b|"
                            r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
-                           r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real)\b", re.I)
+                           r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real|routine)\b", re.I)
 _MAL_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                         r"\b(?:scam|fraud|fraudulent|phishing|suspicious|malicious|fake|dangerous|unsafe)\b", re.I)
 _CONTRAST = re.compile(r"\b(?:but|however|although|though|yet|except|while)\b", re.I)
@@ -1057,8 +1057,8 @@ BENIGN_FACT = {
 ALL_FACTS = tuple(dict.fromkeys(list(KEY_FACT.values()) + [INJECTION_FACT] + list(BENIGN_FACT.values())))
 
 
-_PAID = re.compile(r"\b(?:debit\w*|credit\w*|paid|payment|refund\w*|transferred|withdrawn|txn|upi|"
-                   r"amount|rs\.?|inr|rupees)\b|₹|भुगतान|डेबिट|क्रेडिट|रिफंड|रुपये|राशि", re.I)
+_PAID = re.compile(r"\b(?:debited|credited|paid|payment|refund\w*|transferred|withdrawn|txn|"
+                   r"rs\.?|inr|rupees)\b|₹|भुगतान|डेबिट|क्रेडिट|रिफंड|रुपये|राशि", re.I)
 
 
 def _benign_reading(kind, phrases):

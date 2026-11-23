@@ -485,3 +485,18 @@ def test_percentage_certainty_is_an_overclaim_but_amounts_are_not():
     c = ctx("Pay Rs 100 now. 100% returns guaranteed.", 1, "sms")
     assert llm.unsupported("This is 100% a scam.", c) == "overclaim"
     assert llm.unsupported("Never trust an offer of 100% returns.", c) is None
+
+
+# --- PR #50 review round 3 (GLM 5.4) -----------------------------------------------------------
+
+@pytest.mark.parametrize("inp", ["We have received your application for KYC. Reference no. 4521.",
+                                 "Your request has been received. Ticket confirmed.",
+                                 "Your UPI registration is complete. Keep this receipt."])
+def test_non_payment_receipts_are_not_money_moving(inp):
+    assert not llm._PAID.search(inp)
+
+
+def test_routine_claim_on_a_dangerous_item_is_dropped():
+    opening = "This message is DANGEROUS: asks for an OTP, PIN or card details"
+    out = llm._consistent(opening + ". This is a routine bank alert.", 1, opening, None)
+    assert "routine" not in out
