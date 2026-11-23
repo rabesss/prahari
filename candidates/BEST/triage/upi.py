@@ -655,7 +655,7 @@ def _has_non_ascii(s: str) -> bool:
 
 
 def _normalize_text(s: str) -> str:
-    return unicodedata.normalize("NFKC", s or "")
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s or "")).strip()
 
 
 def analyze_upi(text: str) -> dict:

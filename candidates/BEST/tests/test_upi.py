@@ -714,3 +714,10 @@ def test_scan_to_receive_receipt_is_not_a_lure():
 def test_group_word_does_not_cover_non_financial_brand():
     assert upi.analyze_upi("upi://pay?pa=foo@okaxis&pn=Amazon%20Life&mc=5411")["label"] == "uncertain"
     assert upi.analyze_upi("upi://pay?pa=GI0000000001@icici&pn=ICICI%20Lombard%20General%20Insurance&mc=6300")["label"] == 0
+
+
+def test_double_space_food_court_is_not_a_court():
+    # CodeRabbit round 3
+    assert upi.analyze_upi("upi://pay?pa=foodcourt.pune@paytm&pn=City%20Food%20%20Court&mc=5812&mode=02&cu=INR")["label"] == 0
+    assert upi.analyze_upi("upi://pay?pa=9876543210@ybl&pn=Delhi%20Court&am=2500&tn=Pay%20fine%20for%20case")["label"] != 0
+    assert upi.analyze_upi("upi://pay?pa=fakeshop@ybl&pn=Amazon%20Securities&mc=5411")["label"] != 0
