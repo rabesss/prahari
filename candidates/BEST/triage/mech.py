@@ -884,7 +884,9 @@ SELF_BLOCK = re.compile(
     r"(?:[^.;!?।\n]{0,25}\b(?:in|via|from|using) (?:the |your )?(?:\w+ )?(?:app|yono|imobile|net ?banking))?", re.I)
 PASSIVE_THREAT = re.compile(r"\b(?:will be|would be|is being|ho jayega|ho jaega|हो जाएगा)\b[^.;!?।\n]{0,20}"
                             r"\b(?:blocked|suspended|frozen|closed|band|बंद)", re.I)
-CONTACT_NUMBER = re.compile(r"\b(?:call|whatsapp|sms|contact|dial|reach)\b[^.;!?।\n]{0,30}\+?\d[\d\s-]{6,}\d", re.I)
+# A phone number: eight or more digits, allowing spaces, dots or dashes between them. A bank's own
+# alert never needs the reader to call a number written in it; an OTP or an amount is shorter.
+CONTACT_NUMBER = re.compile(r"(?<!\d)\+?\d(?:[\s.-]?\d){7,}(?!\d)")
 
 
 def _self_block(text):
@@ -944,7 +946,8 @@ def decide(p_model, a, gate=0.85):
         return 0, p_model, a
     # A warning carried on the service's own app or portal is a notice, not a demand: only a
     # secret request or a payment to an unverified payee survives the official-channel test.
-    if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"}:
+    if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"} and \
+            not ("block_threat" in harm and CONTACT_NUMBER.search(a.get("text", ""))):
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["bill"] or a["notice"] or a["appointment"]) and \
             not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):
