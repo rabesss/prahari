@@ -127,8 +127,9 @@ def verdict(kind, text):
         lab, score, ev = detect.classify_any(kind, text)
     if kind == 'url':
         ev = _promote_link_signals(ev)
-    # A cleared item must not show the threat phrase the detector overruled.
-    if lab == 0:
+    # A cleared item, or a debit alert to confirm, must not show the threat phrase the detector
+    # overruled or set aside.
+    if lab in (0, 'uncertain'):
         ev = llm.benign_evidence(kind, text, ev, lab)
     ms = (time.perf_counter() - t0) * 1000
     actions = llm.actions_for(kind, lab, text)

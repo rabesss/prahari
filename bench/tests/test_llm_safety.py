@@ -418,7 +418,10 @@ def test_benign_evidence_swaps_an_overruled_threat_for_safe_descriptions():
 
 def test_debit_alert_gets_the_not_your_payment_step():
     ok = "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app."
-    assert llm.actions_for("sms", "uncertain", ok)[0] == llm.DEBIT_STEP
+    assert llm.actions_for("sms", "uncertain", ok) == [llm.DEBIT_STEP, llm.CHECK_STEP]
+    assert llm.scam_type("sms", ok, "uncertain") == "a bank debit alert to confirm"
+    assert "block" not in " ".join(llm.benign_evidence("sms", ok, ["threatens to block"], "uncertain")).lower()
+    assert llm.compact_evidence("sms", ok, [], "uncertain") == [llm.DEBIT_LINE]
     assert llm.actions_for("sms", 0, "Your electricity bill of Rs 1,240 is due on 15 Dec.")[0] != llm.DEBIT_STEP
 
 
