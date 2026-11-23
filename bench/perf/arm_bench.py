@@ -773,7 +773,7 @@ def write_items_csv(report: dict, path: Path) -> None:
                         "pin_cpus": cell["pin_cpus"] or "",
                         "prompt_length": cell["prompt_length"],
                         "gating_mode": cell["gating_mode"],
-                        "repeat": rep_idx,
+                        "repeat": run.get("repeat", rep_idx),
                         "id": it.get("id"),
                         "kind": it.get("kind"),
                         "verdict": it.get("verdict"),
@@ -896,11 +896,12 @@ def main(argv: list[str] | None = None) -> int:
                                 perf_record=do_perf,
                                 run_timeout_s=args.run_timeout_s,
                             )
-                        except (RuntimeError, OSError) as exc:
+                        except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
                             # Keep the sweep going and keep the outputs; the cell records what failed.
                             print(f"[arm_bench] ERROR: {tag} failed: {exc}", file=sys.stderr, flush=True)
                             cell_errors.append({"tag": tag, "error": str(exc)[-2000:]})
                             continue
+                        run_res["repeat"] = rep
                         if do_perf:
                             perf_run = run_res
                             continue

@@ -417,14 +417,16 @@ def test_parse_dir_keeps_recorded_timeout_status(tmp_path):
     (cap / "kyc-warm-1-stats.xml").write_text(done_xml, encoding="utf-8")
     (cap / "kyc-warm-2-stats.xml").write_text(done_xml, encoding="utf-8")  # late values, but recorded as timeout
     (cap / "results.json").write_text(json.dumps({"checks": [
-        {"check": "kyc-warm-1", "status": "ok"}, {"check": "kyc-warm-2", "status": "timeout"}]}))
+        {"check": "kyc-warm-1", "status": "ok"}, {"check": "kyc-warm-2", "status": "timeout"},
+        {"check": "port-scan", "status": "no-sample-chip"}]}))
     (cap / "home-stats.xml").write_text((run8 / "home.xml").read_text(encoding="utf-8"), encoding="utf-8")
     out = tmp_path / "out"
     assert adb_bench.main(["parse-dir", str(cap), "--out-dir", str(out)]) == 0
     rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
     status = {c["check"]: c["status"] for c in rep["checks"]}
-    assert status == {"kyc-warm-1": "ok", "kyc-warm-2": "timeout", "home": "incomplete-capture"}
-    assert sorted(rep["summary"]["checks_incomplete"]) == ["home", "kyc-warm-2"]
+    assert status == {"kyc-warm-1": "ok", "kyc-warm-2": "timeout", "home": "incomplete-capture",
+                      "port-scan": "no-sample-chip"}
+    assert sorted(rep["summary"]["checks_incomplete"]) == ["home", "kyc-warm-2", "port-scan"]
     assert "status" in (out / "items.csv").read_text(encoding="utf-8").splitlines()[0]
 
 
@@ -482,3 +484,58 @@ def test_adb_run_loop_with_fake_device(tmp_path, monkeypatch):
     assert state["airplane"] == "0"  # restored afterwards
     # The header subtitle at (549, 211) must never be tapped.
     assert (549, 211) not in state["taps"]
+
+
+def test_adb_run_loop_recovers_from_errors(tmp_path, monkeypatch):
+    """A failure mid-check stops the poller; a failure after the row is recorded does not duplicate it."""
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "sample-row.xml").read_text(encoding="utf-8")
+    stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")
+    state = {"screen": "home", "check": 0, "stops": 0}
+
+    def fake_dump(serial):
+        if state["screen"] == "home":
+            return home
+        if state["check"] == 1:
+            raise RuntimeError("bridge dropped")  # first check dies while waiting for Llama
+        return stats
+
+    def fake_adb(serial, *args, check=True, timeout=120):
+        a = list(args)
+        if a[:3] == ["shell", "input", "tap"]:
+            x, y = int(a[3]), int(a[4])
+            if state["screen"] == "home" and (x, y) == (540, 1726):
+                state["screen"] = "result"
+                state["check"] += 1
+            elif state["screen"] == "result" and y > 2000:
+                raise RuntimeError("tap failed")  # second check: navigation after the row is recorded
+            return ""
+        if a[:3] == ["shell", "input", "keyevent"]:
+            state["screen"] = "home"
+            if state["check"] == 1:
+                raise subprocess.TimeoutExpired("adb", 20)  # the recovery call itself fails once
+            return ""
+        return ""
+
+    class CountingPoller:
+        def __init__(self, *a, **k): pass
+        def start(self): pass
+        def stop(self):
+            state["stops"] += 1
+            return {}
+
+    import subprocess
+    monkeypatch.setattr(adb_bench, "adb_out", fake_adb)
+    monkeypatch.setattr(adb_bench, "dump_ui_xml", fake_dump)
+    monkeypatch.setattr(adb_bench, "MemPoller", CountingPoller)
+    monkeypatch.setattr(adb_bench.subprocess, "check_output", lambda *a, **k: b"png")
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    monkeypatch.setattr(adb_bench, "DEFAULT_SAMPLES", [("a", "Port scan", False), ("b", "Port scan", False)])
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--settle-s", "0"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 2
+    assert [(c["check"], c["status"]) for c in rep["checks"]] == [("a", "error: RuntimeError"), ("b", "ok")]
+    assert rep["checks"][1]["note"].startswith("post-check navigation failed")
+    assert state["stops"] == 2  # stopped by the error handler for "a", normally for "b"
+

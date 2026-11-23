@@ -500,6 +500,13 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
         # Without a recorded status, count a check as complete only if its stats header carries a first-token time.
         rec["status"] = recorded.get(name) or ("ok" if stats_header_state(xml_text) == "done" else "incomplete-capture")
         rows.append(rec)
+    # Checks the live run recorded as failed before any XML was written still belong in the report.
+    seen = {r["check"] for r in rows}
+    for name, status in recorded.items():
+        if name not in seen:
+            rows.append({"check": name, "status": status or "unknown", "airplane_mode": "airplane" in name.lower(),
+                         "detector_ms": None, "first_token_ms": None, "decode_tps": None, "total_s": None,
+                         "app_memory_mb": None, "mem_polled": {}})
     report = summarize_android(dev, rows, mem, source_note=f"Parsed UI XML artifacts from {src}", chronological=False)
     if args.out_dir:
         write_android_outputs(report, args.out_dir.resolve())
@@ -566,6 +573,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     rows = []
     airplane_active = False
 
+    active_poller: dict = {"p": None}
+
     def one_check(check_id: str, sample_label: str, want_airplane: bool) -> None:
         nonlocal airplane_active
         if want_airplane and not args.with_airplane:
@@ -618,6 +627,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                          "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
             return
         poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
+        active_poller["p"] = poller
         poller.start()
         t0 = time.monotonic()
         tap_element(serial, xml, desc_contains=CHECK_BUTTON_DESC)
@@ -637,6 +647,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
         wall_s = round(time.monotonic() - t0, 2)
         polled = poller.stop()
+        active_poller["p"] = None
         status = "ok" if state == "done" else "timeout"
         if status != "ok":
             print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
@@ -687,10 +698,23 @@ def cmd_run(args: argparse.Namespace) -> int:
                 one_check(check_id, sample_label, want_airplane)
             except Exception as exc:  # one adb failure must not lose the rest of the session
                 print(f"[adb_bench] ERROR: {check_id} failed: {exc}", file=sys.stderr)
-                rows.append({"check": check_id, "sample_label": sample_label, "status": f"error: {type(exc).__name__}",
-                             "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
-                             "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
-                adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK", check=False)
+                if active_poller["p"] is not None:  # never leave dumpsys polling running into later checks
+                    try:
+                        active_poller["p"].stop()
+                    except Exception:
+                        pass
+                    active_poller["p"] = None
+                if rows and rows[-1].get("check") == check_id:
+                    # The measurement was recorded; only the navigation afterwards failed.
+                    rows[-1]["note"] = f"post-check navigation failed: {type(exc).__name__}"
+                else:
+                    rows.append({"check": check_id, "sample_label": sample_label, "status": f"error: {type(exc).__name__}",
+                                 "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
+                                 "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                try:
+                    adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK", check=False, timeout=20)
+                except Exception as nav_exc:
+                    print(f"[adb_bench] ERROR: recovery BACK key failed: {nav_exc}", file=sys.stderr)
                 time.sleep(1.0)
 
         try:
