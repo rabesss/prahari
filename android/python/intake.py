@@ -20,6 +20,15 @@ _MESSAGE = re.compile(
     r'[\u0900-\u097F]')
 
 
+_CONTROLS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]')
+
+
+def clean_share(text):
+    """Strip control characters from shared text. Newlines and tabs stay."""
+    cleaned = _CONTROLS.sub('', '' if text is None else str(text))
+    return cleaned.replace('\r\n', '\n').replace('\r', '\n').strip()
+
+
 def detect_mode(text):
     t = (text or '').strip()
     if not t:

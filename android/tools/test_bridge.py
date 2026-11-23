@@ -18,6 +18,10 @@ assert intake.detect_mode('tcp connections to 200 different ports on 10.0.0.5 wi
 assert intake.detect_mode('{"num_failed_logins": 4, "serror_rate": 1}') == 2
 assert intake.detect_mode('') == 0
 assert intake.detect_mode('{not json}') == 0
+assert intake.clean_share('hi\x00there\x7f') == 'hithere'
+assert intake.clean_share('a\r\nb\tc') == 'a\nb\tc'
+assert intake.clean_share('  \x1bkeep  ') == 'keep'
+assert '\n' in intake.clean_share('line\nnext')
 print('share-text mode detection passed')
 
 hi = json.loads((ROOT / 'android/python/strings_hi.json').read_text(encoding='utf-8'))

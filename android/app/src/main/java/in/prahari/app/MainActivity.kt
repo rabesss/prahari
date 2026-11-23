@@ -524,6 +524,7 @@ class MainActivity : Activity() {
     internal var screen = "home"
     internal var selectedMode = 0
     internal var inputValue = ""
+    private var sharedBanner = false
     internal var shownId = Int.MIN_VALUE
     private var visibleJob: Bridge.Job? = null
     private lateinit var input: EditText
@@ -950,11 +951,10 @@ class MainActivity : Activity() {
         window.statusBarColor = T.bg
         window.navigationBarColor = T.bg
         edgeToEdge()
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         savedInstanceState?.let {
             selectedMode = it.getInt("mode", 0).coerceIn(0, KINDS.lastIndex)
             inputValue = it.getString("input") ?: ""
+            sharedBanner = it.getBoolean("shared")
         }
         try {
             if (!Python.isStarted()) Python.start(AndroidPlatform(applicationContext))
@@ -965,7 +965,7 @@ class MainActivity : Activity() {
         }
         loadStrings()
         installBack()
-        // A share intent stays on the activity across rotation. Only the first create auto-checks.
+        // A share intent stays on the activity across rotation. Only the first create fills the box.
         val shared = if (savedInstanceState == null) readShare(intent) else null
         if (shared != null) {
             openShared(shared)
@@ -998,6 +998,7 @@ class MainActivity : Activity() {
         out.putInt("mode", selectedMode)
         out.putString("input", inputValue)
         out.putString("screen", screen)
+        out.putBoolean("shared", sharedBanner)
         val job = if (screen == "result") visibleJob else null
         if (job != null) {
             out.putString("verdict", job.verdict.toString())
@@ -1096,6 +1097,14 @@ class MainActivity : Activity() {
         add(all, body)
         add(body, txt("Check before you tap", 24f, T.ink, 700, 30).apply { isAccessibilityHeading = true }, top = 2)
         add(body, txt(n("works_offline"), 14f, T.ink2, 400, 20, raw = true), top = 2)
+        if (sharedBanner) {
+            val note = col().apply {
+                background = shape(T.warnC, 14f)
+                pad(this, 14, 12, 14, 12)
+            }
+            add(note, txt(n("shared_banner"), 14f, T.onWarnC, 600, 20, raw = true))
+            add(body, note, top = 12)
+        }
         val seg = row().apply { minimumHeight = dp(52); background = shape(T.surface2, 14f); pad(this, 4, 4, 4, 4) }
         val segments = mutableListOf<LinearLayout>()
         val inputCard = col().apply { pad(this, 16, 14, 16, 8) }
@@ -1330,18 +1339,59 @@ class MainActivity : Activity() {
         return text.toString()
     }
 
+    /** Drop control characters. Newlines and tabs stay so a pasted message keeps its lines. */
+    private fun cleanShare(raw: String): String {
+        return try {
+            if (!Python.isStarted()) cleanShareLocal(raw)
+            else Python.getInstance().getModule("intake").callAttr("clean_share", raw).toString()
+        } catch (t: Throwable) {
+            Log.e(TAG, "share clean failed", t)
+            cleanShareLocal(raw)
+        }
+    }
+
+    private fun cleanShareLocal(raw: String): String {
+        val sb = StringBuilder(raw.length)
+        var i = 0
+        while (i < raw.length) {
+            val ch = raw[i]
+            when {
+                ch == '\r' -> {
+                    sb.append('\n')
+                    if (i + 1 < raw.length && raw[i + 1] == '\n') i++
+                }
+                ch == '\n' || ch == '\t' -> sb.append(ch)
+                ch.isISOControl() -> {}
+                else -> sb.append(ch)
+            }
+            i++
+        }
+        return sb.toString().trim()
+    }
+
+    /** Share opens Home with the text filled in. Nothing is checked, and no link is opened, until Check. */
     private fun openShared(raw: String) {
-        val text = raw.trim()
+        stopSpeech()
+        Bridge.cancel()
+        val text = cleanShare(raw)
         when {
             text.isEmpty() -> {
+                sharedBanner = false
                 toast("Nothing to check.")
                 showHome()
             }
             text.length > 100_000 -> {
+                sharedBanner = false
+                inputValue = ""
                 toast("That text is too long to check.")
                 showHome()
             }
-            else -> beginCheck(detectMode(text), text)
+            else -> {
+                sharedBanner = true
+                inputValue = text
+                selectedMode = detectMode(text)
+                showHome()
+            }
         }
     }
 
@@ -1402,6 +1452,7 @@ class MainActivity : Activity() {
         }
         inputValue = value
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
+        sharedBanner = false
         stopSpeech()
         hideKeyboard()
         val id = Bridge.begin()
