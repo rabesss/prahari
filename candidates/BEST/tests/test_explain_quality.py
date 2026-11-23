@@ -72,6 +72,7 @@ def test_key_fact_follows_the_verdict():
     ("Block the sender in your message app.", "tcp connections to 200 ports on 10.0.0.5", 1, "flow", "wrong_channel"),
     ("Check the firewall for open ports.", "Your KYC is expiring, call now.", 1, "sms", "wrong_channel"),
     ("यह संदेश खतरनाक है।", "Share your OTP now.", 1, "sms", "script_mixing"),
+    ("I checked the official SBI app for OTP details.", "Your OTP is 4821.", 0, "sms", "first_person"),
 ])
 def test_validator_drops_unsupported(sent, inp, verdict, kind, reason):
     assert llm.unsupported(sent, ctx(inp, verdict, kind)) == reason

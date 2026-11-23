@@ -1119,6 +1119,7 @@ _V_NETWORK = re.compile(r"\b(?:firewall|ports?|ip address|router|server|traffic)
 _V_MESSAGE = re.compile(r"\b(?:message|sms|text|link|url|click|sender|reply|otp|pin|upi)\b", re.I)
 _V_HEDGE = re.compile(r"\b(?:scam\w*|phishing|fraud\w*|suspicious|malicious|cautious|caution|beware|wary|"
                       r"risky|dangerous|unsafe|harm\w*)\b", re.I)
+_V_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd|me|my|mine|we|we're|we've|our)\b")
 _V_VAGUE = re.compile(r"\s*(?:please\s+)?(?:be|stay|remain)\s+(?:very\s+)?(?:cautious|careful|vigilant|wary|alert)\b", re.I)
 _V_DOMAIN = re.compile(r"(?<![\w@.])(?:https?://)?(?:[a-z0-9-]+(?:\.|\[\.\]))+[a-z]{2,}\b", re.I)
 _V_HELP = ("cybercrime.gov.in", "sancharsaathi.gov.in")
@@ -1148,6 +1149,9 @@ def unsupported(sent, ctx):
     low_inp = inp.lower().replace("[.]", ".")
     if re.search(r"[ऀ-ॿ]", sent):
         return "script_mixing"
+    if _V_FIRST_PERSON.search(sent):
+        # "I checked the official app", "my top priority": the model claiming actions it never took.
+        return "first_person"
     if verdict == 0 and any(not _negated(c, m) for c in _clauses(sent) for m in _V_HEDGE.finditer(c)):
         return "hedge_against_verdict"
     if verdict != 0 and _V_VAGUE.match(sent):
