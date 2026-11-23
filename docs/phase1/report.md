@@ -21,7 +21,7 @@ Round-3 measurements are from Oracle, an Arm Neoverse-N1 VM with two vCPUs [S8].
 - In the shipped version's final evaluation, end-to-end time was about **3.8 s/item** and peak memory was **2.05 GB**. Memory is the systemd scope's `memory.peak` (cgroup memory, which includes page cache), not process RSS. gen51's confirmation runs ranged from 3.8 to 4.8 s/item and 2.05 to 2.34 GB.
 - A blind manual audit of 20 holdout explanations found 5 correct, 8 weak and 7 wrong; 4 made false claims about the input and 16 gave generic or misdirected advice.
 
-**What is not done yet.** Live network capture and a measured physical-phone run remain unverified or planned. A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. The Arm results come from a shared cloud VM, and an independently blocked-egress demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
+**What is not done yet.** Live network capture and a physical-phone Llama run remain unverified. Android generation has been demonstrated on an x86_64 emulator; the Arm measurements are from a shared cloud VM, and an independently blocked-egress Linux demonstration is still needed. These datasets and automated checks do not establish field performance or guarantee safe advice [S2, S7].
 
 \newpage
 
@@ -72,9 +72,19 @@ The message layer combines TF-IDF and a logistic classifier with Indian-context 
 
 **KleidiAI.** KleidiAI micro-kernels are linked into the installed ExecuTorch 1.6.0 XNNPACK backend; dispatch on Neoverse-N1 was not profiled; no speedup claimed. The 17 November symbol inspection found 517 `kai_` symbols in the XNNPACK backend library; its command, additional library counts and limitations are recorded in the evidence ledger [S5]. Symbol presence alone does not establish that a particular inference used those kernels.
 
-## Android deployment (in progress)
+## Android deployment
 
-A draft Android APK reportedly builds in CI at PR #18 head `e74c950`; [CI build and limited parity](https://github.com/rabesss/arm-bharat-ai-soc/actions/runs/44122552734) do not establish on-device model generation. Real-phone execution, exact runtime/model compatibility and measurements remain unverified. Device identity, permissions, latency, throughput and peak memory will be recorded after a real-phone run [S7].
+The `android/spike` app ran the shipped detector and Llama 3.2 1B end to end on an Android 14 x86_64 emulator using an x86_64 build and ExecuTorch Android 1.5.1. It used the same QLoRA `.pte` (SHA-256 `ab7b7ebf…`) as the Linux runner. The pictured KYC check took 273 ms in the detector; the verdict and steps appear before the Llama text. These are emulator observations, not Arm timings: the app labels them “x86 emulator: not Arm timings”. Arm64 phones use an `arm64-v8a` build, but a physical-phone Llama run has not been done [S7].
+
+The result shows the Hindi and English verdict and scam type, numbered scam-specific vetted steps (PR #33), evidence, then a Llama card marked “AI-written and can be wrong. Follow the steps above.” Stats are collapsed by default. For dangerous message or link results, “Call 1930” opens the dialler and “Report online” opens cybercrime.gov.in in the browser. “NO RISK FOUND” includes “Still verify”; it is not a safety guarantee. The PR #31 unsafe-advice filter does not guarantee correct explanations.
+
+The app declares no `INTERNET` permission. “Prove it's offline” attempts HTTPS and displays the Android `SecurityException: Permission denied (missing INTERNET permission?)`; calls and browser visits use separate apps. Model files must be staged first. Mockups used real-app references from Mobbin (iOS) and were laid out in Figma by Claude Opus 5.5; Gemini 4 Neon reviewed the UX and India-specific safety copy, and GPT-6.1 Terra wrote the app code [S7].
+
+![KYC result: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-a.png){width=27%} ![Llama and expanded stats: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-c.png){width=27%}
+
+![No-risk result: Android 14 emulator (x86_64)](img/app-r3-billreminder-a.png){width=27%} ![Permission test: Android 14 emulator (x86_64)](img/app-20-network.png){width=27%}
+
+*Top: KYC result and steps; explanation and expanded stats. Bottom: no-risk result with verification reminder; permission test. Each: Android 14 emulator (x86_64).*
 
 \newpage
 
@@ -140,7 +150,7 @@ Candidate selection repeatedly used feedback from the same hidden evaluation set
 
 ## Explanation, safety and user experience
 
-Prahari separates a detector's verdict from the explanation so that users can inspect the evidence alongside the language model's advice. For a message, the mechanism layer can identify a request for a secret or a fee, a threat, or a benign transaction notice. The UI presents the verdict, score, evidence, Llama explanation, fixed actions and timing. For suspicious communications, the advice directs the user to avoid acting on the message and to use a trusted channel [S2].
+Prahari separates a detector's verdict from the explanation so that users can inspect the evidence alongside the language model's advice. For a message, the mechanism layer can identify a request for a secret or a fee, a threat, or a benign transaction notice. The Android result places fixed actions before evidence and the Llama explanation, with timing in collapsed stats. For suspicious communications, the advice directs the user to avoid acting on the message and to use a trusted channel [S2, S7].
 
 The prompt identifies incoming content as data rather than instructions, neutralises live URLs, and requests a verdict-first explanation grounded in selected evidence. Injection patterns are recognised; refusal retries and a heuristic contradiction filter address some failure modes. These are practical guards, not a proof that untrusted content cannot influence generation or that advice is correct. The model can still make a wrong assertion or give unsafe advice [S2].
 
@@ -148,7 +158,7 @@ A blind manual audit of 20 sealed-holdout explanations found 5 correct, 8 weak a
 
 ### Offline use
 
-Inference runs locally; inputs reach the local app over loopback. Downloading the model requires network access, and the app itself does not block outbound traffic. The controller evaluation used an import-time guard that blocks non-loopback connections; offline claims cover only what was tested. An independently verified egress restriction remains needed for the demo. Inspect the installed Android APK permissions before making claims about it [S2, S7].
+On Linux, inference runs locally and inputs reach the app over loopback; normal startup does not block outbound traffic. The controller evaluation used an import-time guard that blocks non-loopback connections, and an independently verified Linux egress restriction remains needed for the demo. The Android app declares no `INTERNET` permission and its emulator test showed Android blocking its HTTPS request. Downloading and staging model files requires a separate network-capable device or process [S2, S7].
 
 \newpage
 
@@ -158,7 +168,7 @@ Prahari is a triage prototype. It misses some attacks and raises false alarms; o
 
 Phase 2 will turn the prototype into a more representative edge system:
 
-1. Complete the Android app, run it offline on a real Arm phone, and record device identity, permissions, latency, throughput and peak memory.
+1. Run the Android app offline on a real Arm phone, and record device identity, permissions, latency, throughput and peak memory.
 2. Implement permission-aware live capture and a documented feature pipeline, then measure detection and false alarms on representative traffic.
 3. Expand Indic-language coverage with consented, licensed data and independent evaluation, including difficult benign notices and new scam families.
 4. Improve and test grounding, injection resistance, unsafe advice and comprehension with non-expert users; keep uncertainty and human verification visible.
@@ -181,6 +191,6 @@ These are planned activities rather than completed validation [S7].
 
 [S8] Controller-provided round-3 aggregate results, confirmation, sealed-holdout run and blind explanation audit; provenance and holdout hash in `docs/phase1/EVIDENCE.md`. Item texts are withheld until after submission.
 
-[S7] `docs/BRAINSTORM.md` and `candidates/BEST/REPORT.md`, baseline `2fdc142`; Android build status supplied by the controller, 17 November 2026.
+[S7] Android emulator execution and design provenance supplied by the controller, 23 November 2026; screenshots and scope in `docs/phase1/EVIDENCE.md`. Physical-phone testing remains planned.
 
 The [evidence ledger](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/docs/phase1/EVIDENCE.md) records commands, measurements and their limits. The rendered PDF is built locally from this source and attached at submission.
