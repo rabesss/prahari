@@ -86,6 +86,18 @@ private fun errorText(t: Throwable): String {
     return "${t.javaClass.simpleName}: $msg"
 }
 
+/** True when Android refused the socket because this app has no INTERNET permission. */
+private fun internetBlocked(t: Throwable): Boolean {
+    val seen = HashSet<Throwable>()
+    var cur: Throwable? = t
+    while (cur != null && seen.add(cur)) {
+        if (cur is SecurityException) return true
+        if (cur.message?.contains("INTERNET permission", ignoreCase = true) == true) return true
+        cur = cur.cause
+    }
+    return false
+}
+
 private fun containsIndic(value: CharSequence): Boolean {
     for (i in value.indices) if (value[i] in '\u0900'..'\u097F') return true
     return false
@@ -166,6 +178,8 @@ internal object Bridge {
     @Volatile var job: Job? = null
     @Volatile var netId = 0
     @Volatile var net: Net? = null
+    /** 0 verdict still running, 1 verdict back (Llama writing), 2 explanation back. */
+    @Volatile var checkStage = 0
 
     fun still(id: Int) = id == generation
 
@@ -188,6 +202,7 @@ internal object Bridge {
             id = generation
             job = null
             phase = "checking"
+            checkStage = 0
             stopNow = if (generating) module else null
         } finally {
             genLock.unlock()
@@ -333,8 +348,11 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         if (!Bridge.still(id)) return
         val job = Bridge.Job(id, mode, value, started, verdict)
         if (!Bridge.publish(id, job)) return
+        // Step 1 and the safety steps are both done once verdict() returns. Step 2 keeps spinning.
+        Bridge.checkStage = 1
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
+            if (act.screen == "checking") act.advanceChecking(1)
             if (act.screen != "result" || act.shownId != id) act.presentResult(job)
         }
         if (!Bridge.still(id)) return
@@ -355,8 +373,10 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         job.explanation = explanation
         job.totalMs = SystemClock.elapsedRealtime() - started
         job.pssMb = try { Debug.getPss() / 1024.0 } catch (_: Throwable) { Double.NaN }
+        Bridge.checkStage = 2
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
+            if (act.screen == "checking") act.advanceChecking(2)
             if (act.screen != "result" || act.shownId != id) act.presentResult(job)
             else act.applyExplanation(job)
         }
@@ -387,11 +407,10 @@ private fun enqueueNet(id: Int) {
             connection.readTimeout = 4000
             connection.getInputStream().use { it.read() }
             code = "ok"
-        } catch (e: SecurityException) {
-            code = "security"
-            message = errorText(e)
         } catch (e: Exception) {
-            code = "other"
+            // SecurityException, or any failure whose text names the missing INTERNET permission,
+            // is Android blocking the app. Timeouts, DNS and other IO are a different state.
+            code = if (internetBlocked(e)) "blocked" else "other"
             message = errorText(e)
         }
         val elapsed = SystemClock.elapsedRealtime() - start
@@ -495,6 +514,9 @@ class MainActivity : Activity() {
     private var metaText: TextView? = null
     private var modelStatusSlot: LinearLayout? = null
     internal var networkBody: LinearLayout? = null
+    private val checkSlots = mutableListOf<FrameLayout>()
+    private val checkTitles = mutableListOf<TextView>()
+    private val checkSubs = mutableListOf<TextView>()
     private var aboutDialog: Dialog? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
@@ -511,12 +533,12 @@ class MainActivity : Activity() {
     private data class Sample(val label: String, val mode: Int, val value: String)
     private val samples = listOf(
         Sample("KYC scam SMS", 0, "Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked"),
-        Sample("Bill reminder", 0, "Your electricity bill of Rs 1,240 is due on 15 Nov. Pay through the mahadiscom app; no link is attached."),
+        Sample("Bill reminder", 0, "Your electricity bill of Rs 1,240 is due on 15 Dec. Pay through the mahadiscom app; no link is attached."),
         Sample("Lookalike link", 1, "http://amaz0n-refund-help.top/claim?id=8812"),
         Sample("Official link", 1, "https://www.irctc.co.in/nget/train-search"),
         Sample("Port scan", 2, "tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected"),
         Sample("Hinglish electricity", 0, "Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein."),
-        Sample("Bank OTP alert (genuine)", 0, "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app.")
+        Sample("Bank debit alert", 0, "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app.")
     )
 
     private val density get() = resources.displayMetrics.density
@@ -531,14 +553,23 @@ class MainActivity : Activity() {
         text = value
         setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
         setTextColor(color)
-        // Font padding plus a line box in sp keeps Devanagari matras inside the view at 200% text size.
+        // includeFontPadding plus a line box in sp keeps Devanagari matras and descenders
+        // inside a wrapped Hindi step at 100% and 200% font scale. textSize already includes
+        // fontScale, so the line box doubles at 200% instead of clipping the lower stroke.
         includeFontPadding = true
         isFallbackLineSpacing = true
         typeface = Typeface.create(Typeface.DEFAULT, weight, false)
-        if (line > 0) {
-            val designed = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, line.toFloat(), resources.displayMetrics)
-            val room = textSize * if (containsIndic(value)) 1.6f else 1.15f
+        val indic = containsIndic(value)
+        if (line > 0 || indic) {
+            val designed = if (line > 0) {
+                TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, line.toFloat(), resources.displayMetrics)
+            } else 0f
+            val room = textSize * if (indic) 1.8f else 1.15f
             lineHeight = maxOf(designed, room).toInt().coerceAtLeast(1)
+        }
+        if (indic) {
+            val cushion = (textSize * 0.12f).toInt()
+            setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom + cushion)
         }
     }
 
@@ -1137,33 +1168,84 @@ class MainActivity : Activity() {
             else -> "Llama 3.2 is writing an explanation" to "On-device · usually 2–4 s"
         }
         val steps = card()
+        checkSlots.clear()
+        checkTitles.clear()
+        checkSubs.clear()
         listOf(
-            Triple("Checking scam signals", "Rules + detector", true),
-            Triple(llama.first, llama.second, false),
-            Triple("Safety steps", "From the vetted list", false)
+            "Checking scam signals" to "Rules + detector",
+            llama.first to llama.second,
+            "Safety steps" to "From the vetted list"
         ).forEachIndexed { index, item ->
             if (index > 0) divider(steps)
             val line = row().apply { minimumHeight = dp(56) }
-            if (item.third) {
-                add(line, ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
-                    indeterminateTintList = ColorStateList.valueOf(T.brand)
-                    contentDescription = "Checking scam signals"
-                }, 24, 24)
-            } else {
-                add(line, View(this).apply { background = shape(T.white, 12f, 2, T.outline2) }, 24, 24)
-            }
+            val slot = FrameLayout(this)
+            add(line, slot, 24, 24)
             val labels = col()
             // Pending steps stay in ink3, which clears 4.5:1. A 55% fade does not.
-            val color = if (item.third) T.ink else T.ink3
-            add(labels, txt(item.first, 15f, color, 500, 21))
-            add(labels, txt(item.second, 12f, T.ink3, 400, 16))
+            val title = txt(item.first, 15f, T.ink3, 500, 21)
+            val sub = txt(item.second, 12f, T.ink3, 400, 16)
+            add(labels, title)
+            add(labels, sub)
             add(line, labels, 0, -2, left = 12, weight = 1f)
             add(steps, line)
+            checkSlots.add(slot)
+            checkTitles.add(title)
+            checkSubs.add(sub)
         }
         add(body, steps, top = 18)
+        advanceChecking(Bridge.checkStage)
         centeredNote(body, iconText(R.drawable.ic_wifi_off, "No internet used. You can switch on airplane mode.", T.ink3, 12f, 13), 16)
         bottom(root, "Cancel", outlined = true) { goHome() }
         setContentView(root)
+    }
+
+    /** Step 1 and step 3 finish together when verdict() returns. Step 2 spins until explain() returns. */
+    internal fun advanceChecking(stage: Int) {
+        if (screen != "checking" || checkTitles.size < 3) return
+        if (stage <= 0) {
+            paintCheck(0, "run")
+            paintCheck(1, "wait")
+            paintCheck(2, "wait")
+            return
+        }
+        paintCheck(0, "done")
+        paintCheck(2, "done")
+        // A known model failure will not write anything, so that step is finished with the verdict.
+        if (stage >= 2 || modelProblem() != null) {
+            paintCheck(1, "done")
+            return
+        }
+        checkTitles[1].text = "Llama 3.2 is writing an explanation"
+        checkSubs[1].text = "On-device · usually 2–4 s"
+        paintCheck(1, "run")
+    }
+
+    private fun paintCheck(index: Int, state: String) {
+        val slot = checkSlots.getOrNull(index) ?: return
+        val title = checkTitles.getOrNull(index) ?: return
+        slot.removeAllViews()
+        when (state) {
+            "run" -> {
+                val spin = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
+                    indeterminateTintList = ColorStateList.valueOf(T.brand)
+                    contentDescription = title.text
+                }
+                slot.addView(spin, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            }
+            "done" -> {
+                val mark = ImageView(this).apply {
+                    setImageResource(R.drawable.ic_check_circle)
+                    setColorFilter(T.ok)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }
+                slot.addView(mark, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            }
+            else -> {
+                val dot = View(this).apply { background = shape(T.white, 12f, 2, T.outline2) }
+                slot.addView(dot, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            }
+        }
+        title.setTextColor(if (state == "wait") T.ink3 else T.ink)
     }
 
     private data class Palette(
@@ -1231,6 +1313,7 @@ class MainActivity : Activity() {
             "warn" -> "Some warning signs found."
             else -> "No scam signals found."
         }
+        // The one-line "why" is the first evidence line (benign reading when the verdict is clear).
         val first = evidence.firstOrNull()?.let { sentence(it).trimEnd('.', '!', '?') + "." } ?: fallback
         val why = first + if (clear) " That is not a guarantee it is safe." else ""
         val elapsed = if (job.totalMs >= 0) job.totalMs else SystemClock.elapsedRealtime() - job.started
@@ -1244,6 +1327,7 @@ class MainActivity : Activity() {
         b.post { if (!isDestroyed) b.announceForAccessibility("${p.title}. ${p.hindi}. $why") }
         val steps = card()
         add(steps, heading(if (clear) "Before you act" else "Do this now", if (clear) "कार्य करने से पहले" else "अभी यह करें"))
+        val actionsHi = strings(data.optJSONArray("actions_hi"))
         actions.forEachIndexed { i, action ->
             val line = row().apply { gravity = Gravity.TOP }
             val number = txt("${i + 1}", 13f, p.number, 700).apply {
@@ -1254,31 +1338,58 @@ class MainActivity : Activity() {
                 setPadding(dp(6), dp(2), dp(6), dp(2))
             }
             add(line, number, -2, -2)
-            add(line, txt(action, 15f, T.ink, 400, 21), 0, -2, left = 12, weight = 1f)
+            val textCol = col()
+            add(textCol, txt(action, 15f, T.ink, 400, 21))
+            val hi = actionsHi.getOrNull(i).orEmpty()
+            if (hi.isNotBlank()) add(textCol, txt(hi, 13f, T.ink2, 400, 18), top = 2)
+            add(line, textCol, 0, -2, left = 12, weight = 1f)
             add(steps, line, top = if (i == 0) 10 else 12)
         }
         val mode = job.mode
-        if (mode != 2 && level == "danger") {
-            val buttons = row()
-            val call = button("Call 1930", R.drawable.ic_phone, T.danger) { dial() }.apply {
-                contentDescription = "Call 1930. Opens the phone dialler."
-            }
-            val report = button("Report online", R.drawable.ic_external, textColor = T.ink, outlined = true) {
-                launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://cybercrime.gov.in")))
-            }.apply { contentDescription = "Report online. Opens cybercrime.gov.in in the browser." }
-            add(buttons, call, 0, -2, weight = 1f)
-            add(buttons, report, 0, -2, left = 8, weight = 1f)
-            add(steps, buttons, top = 14)
-        } else if (mode != 2 && level == "warn") {
+        val report = data.optJSONObject("report_buttons")
+        if (mode != 2 && level == "warn") {
+            val (en, hi) = buttonCopy(data, "lost_money_1930", "Lost money? Call 1930")
             divider(steps, 12)
-            val lost = iconText(R.drawable.ic_phone, "Lost money or shared details? Call 1930 now.", T.ink2, 13f, 16, flex = true).apply {
+            val lost = row().apply {
+                gravity = Gravity.CENTER_VERTICAL
                 minimumHeight = dp(48)
                 setPadding(0, dp(8), 0, dp(8))
                 setOnClickListener { dial() }
             }
-            asButton(lost, "Lost money or shared details? Call 1930 now.")
+            add(lost, icon(R.drawable.ic_phone, 16, T.ink2), 16, 16)
+            val labels = col()
+            add(labels, txt(en, 13f, T.ink2, 600, 18))
+            if (hi.isNotBlank()) add(labels, txt(hi, 12f, T.ink3, 400, 16), top = 1)
+            add(lost, labels, 0, -2, left = 6, weight = 1f)
+            asButton(lost, reportDescription("lost_money_1930", en, hi))
             add(steps, lost)
-        } else if (clear) {
+        } else if (mode != 2 && report != null) {
+            val primary = report.optJSONObject("primary")
+            val secondary = report.optJSONObject("secondary")
+            if (primary != null && secondary != null) {
+                val buttons = row().apply { gravity = Gravity.TOP }
+                fun place(which: JSONObject, outlined: Boolean, left: Int) {
+                    val id = which.optString("id")
+                    val en = which.optString("en")
+                    val hi = which.optString("hi")
+                    val dial = id == "lost_money_1930"
+                    val view = reportButton(
+                        en, hi,
+                        if (dial) R.drawable.ic_phone else R.drawable.ic_external,
+                        if (dial || level == "danger") T.danger else T.brand,
+                        if (outlined) T.ink else T.white,
+                        if (outlined) T.ink2 else Color.argb(230, 255, 255, 255),
+                        outlined,
+                        reportDescription(id, en, hi)
+                    ) { openReport(id) }
+                    add(buttons, view, 0, -2, left = left, weight = 1f)
+                }
+                place(primary, false, 0)
+                place(secondary, true, 8)
+                add(steps, buttons, top = 14)
+            }
+        }
+        if (clear) {
             divider(steps, 12)
             add(steps, iconText(R.drawable.ic_alert_circle, "Scammers copy real messages. If it asks for money or a code, check in the official app first.", T.ink2, 13f, 16, flex = true).apply {
                 minimumHeight = dp(48)
@@ -1308,8 +1419,12 @@ class MainActivity : Activity() {
         }
         val llama = card(T.surface2, false)
         add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
-        val explainRow = row().apply { gravity = Gravity.TOP }
-        add(explainRow, View(this).apply { setBackgroundColor(T.brand); minimumHeight = dp(48) }, 3, -1)
+        val explainRow = row().apply { gravity = Gravity.TOP; isBaselineAligned = false }
+        val accent = View(this).apply {
+            setBackgroundColor(T.brand)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        add(explainRow, accent, 3, -1)
         val known = modelProblem()
         val placeholder = if (known == null) "Writing an explanation on this phone…"
         else "Explanation unavailable on this phone. The verdict and the steps above are complete.\n$known"
@@ -1321,6 +1436,18 @@ class MainActivity : Activity() {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         add(explainRow, explanationText!!, 0, -2, left = 12, weight = 1f)
+        // The accent matches the explanation text, including after Llama replaces the placeholder.
+        explanationText!!.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val h = v.height
+            if (h > 0 && accent.layoutParams.height != h) {
+                v.post {
+                    if (!isDestroyed && accent.layoutParams.height != h) {
+                        accent.layoutParams.height = h
+                        accent.requestLayout()
+                    }
+                }
+            }
+        }
         add(llama, explainRow, top = 12)
         add(llama, iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true), top = 12)
         add(body, llama, top = 12)
@@ -1435,6 +1562,61 @@ class MainActivity : Activity() {
     }
     private fun dial() = launch(Intent(Intent.ACTION_DIAL, Uri.parse("tel:1930")))
 
+    private fun openReport(id: String) {
+        when (id) {
+            "lost_money_1930" -> dial()
+            "report_chakshu" -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://sancharsaathi.gov.in")))
+            else -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://cybercrime.gov.in")))
+        }
+    }
+
+    private fun buttonCopy(data: JSONObject, id: String, fallback: String): Pair<String, String> {
+        val item = data.optJSONObject("buttons")?.optJSONObject(id)
+        val en = item?.optString("en")?.takeIf { it.isNotBlank() } ?: fallback
+        val hi = item?.optString("hi").orEmpty()
+        return en to hi
+    }
+
+    private fun reportDescription(id: String, en: String, hi: String): String {
+        val where = when (id) {
+            "lost_money_1930" -> "Opens the phone dialler."
+            "report_chakshu" -> "Opens sancharsaathi.gov.in in the browser."
+            else -> "Opens cybercrime.gov.in in the browser."
+        }
+        return listOf(en, hi).filter { it.isNotBlank() }.joinToString(". ") + ". " + where
+    }
+
+    private fun reportButton(
+        en: String, hi: String, iconId: Int, fill: Int, textColor: Int, hiColor: Int,
+        outlined: Boolean, description: String, action: () -> Unit
+    ): LinearLayout = row().apply {
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = dp(48)
+        setPadding(dp(10), dp(8), dp(10), dp(8))
+        background = ripple(shape(if (outlined) T.white else fill, 16f, if (outlined) 1 else 0, T.outline2))
+        add(this, icon(iconId, 20, textColor), 20, 20)
+        val labels = col()
+        val enView = txt(en, 14f, textColor, 600, 18).apply {
+            maxLines = 4
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        add(labels, enView)
+        val hiView = if (hi.isNotBlank()) txt(hi, 12f, hiColor, 400, 16).apply {
+            maxLines = 4
+            ellipsize = TextUtils.TruncateAt.END
+        } else null
+        if (hiView != null) add(labels, hiView, top = 1)
+        add(this, labels, 0, -2, left = 8, weight = 1f)
+        setOnClickListener { action() }
+        asButton(this, description)
+        addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (width <= 0) return@addOnLayoutChangeListener
+            val max = (width - paddingLeft - paddingRight - dp(28)).coerceAtLeast(dp(48))
+            if (enView.maxWidth != max) enView.maxWidth = max
+            if (hiView != null && hiView.maxWidth != max) hiView.maxWidth = max
+        }
+    }
+
     private fun showNetwork(rerun: Boolean) {
         Bridge.enterNetwork(rerun)
         screen = "network"
@@ -1467,18 +1649,16 @@ class MainActivity : Activity() {
         if (isDestroyed || screen != "network") return
         body.removeAllViews()
         val connected = net.code == "ok"
-        val p = Palette(
-            if (connected) T.danger else T.brand,
-            T.white, T.brandC, T.brand, T.brand,
-            if (connected) R.drawable.ic_octagon_x else R.drawable.ic_wifi_off,
-            0x2EFFFFFF,
-            if (connected) "CONNECTED" else "NO INTERNET",
-            if (connected) "कनेक्शन सफल" else "इंटरनेट नहीं"
-        )
-        val why = when (net.code) {
-            "ok" -> "This app reached the internet. The offline claim failed on this build."
-            "security" -> "This app cannot connect. Android blocked the request because Prahari has no internet permission."
-            else -> "This request could not connect. See the exception below."
+        val blocked = net.code == "blocked" || net.code == "security"
+        val p = when {
+            connected -> Palette(T.danger, T.white, T.dangerC, T.onDanger, T.onDanger, R.drawable.ic_octagon_x, 0x2EFFFFFF, "CONNECTED", "कनेक्शन सफल")
+            blocked -> Palette(T.brand, T.white, T.brandC, T.brand, T.brand, R.drawable.ic_wifi_off, 0x2EFFFFFF, "NO INTERNET / blocked by Android", "इंटरनेट नहीं")
+            else -> Palette(T.warnBanner, T.onWarn, T.warnC, T.onWarnC, T.warn, R.drawable.ic_triangle_alert, 0x1F2B1B00, "Could not connect", "कनेक्ट नहीं हो सका")
+        }
+        val why = when {
+            connected -> "This app reached the internet. The offline claim failed on this build."
+            blocked -> "This app cannot connect. Android blocked the request because Prahari has no internet permission."
+            else -> "This alone does not prove the app is offline."
         }
         val banner = banner(p, why, "Tested just now · took ${net.elapsed} ms", R.drawable.ic_lock)
         add(body, banner)
@@ -1493,8 +1673,23 @@ class MainActivity : Activity() {
         }
         pairRow("Request", txt("HTTPS GET example.com", 12f, T.ink).apply { typeface = Typeface.MONOSPACE })
         divider(tried)
-        pairRow("Result", txt(if (connected) "Connected" else "Blocked", 12f, if (connected) T.onDanger else T.onOk, 700).apply {
-            background = shape(if (connected) T.dangerC else T.okBanner, 12f)
+        val resultLabel = when {
+            connected -> "Connected"
+            blocked -> "Blocked"
+            else -> "Could not connect"
+        }
+        val resultColor = when {
+            connected -> T.onDanger
+            blocked -> T.onOk
+            else -> T.onWarnC
+        }
+        val resultFill = when {
+            connected -> T.dangerC
+            blocked -> T.okBanner
+            else -> T.warnC
+        }
+        pairRow("Result", txt(resultLabel, 12f, resultColor, 700).apply {
+            background = shape(resultFill, 12f)
             pad(this, 10, 5, 10, 5)
         })
         if (net.message.isNotEmpty()) {
@@ -1507,7 +1702,7 @@ class MainActivity : Activity() {
             }, top = 8)
         }
         add(body, tried, top = 12)
-        if (!connected) {
+        if (blocked) {
             val means = card()
             add(means, heading("What this means", "इसका मतलब"))
             val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: ""
