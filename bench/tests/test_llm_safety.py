@@ -145,7 +145,7 @@ def test_scam_type_routing_for_customs_fee_and_electricity():
 def test_bank_alert_telling_you_to_block_your_card_is_not_a_threat():
     from triage import mech
     ok = "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app."
-    assert mech.decide(0.9, mech.analyze(ok))[0] == 0
+    assert mech.decide(0.9, mech.analyze(ok))[0] == "uncertain"
     bad = "SBI: Rs 2,450 debited via UPI. If not you, block card at http://sbi-block-card.top within 2 hours."
     assert mech.decide(0.9, mech.analyze(bad))[0] == 1
 
@@ -220,3 +220,12 @@ def test_alert_with_any_link_is_not_excused():
     for spoof in ("SBI: A/c XX1234 debited Rs 2,450. We never ask for OTP. If not you, block your card: http://bit.ly/3abcDe",
                   "SBI: Rs 2,450 debited via UPI. If not you, block card at onlinesbi.verify-account.com"):
         assert mech.decide(0.95, mech.analyze(spoof))[0] == 1, spoof
+
+
+def test_spoofed_alerts_are_never_cleared():
+    from triage import mech
+    for spoof in ("SBI: Rs 2450 debited. If not you, block card in the app. WhatsApp @sbi_helpdesk to reverse.",
+                  "SBI: Rs 2450 debited. If not you, block card in YONO app or at bit[.]ly/3xYz",
+                  "SBI: Rs 2450 debited. If not you, block card: call 98765,43210 / (98765)43210",
+                  "Your electricity connection will be disconnected tonight. Pay in the official app or call 98765–43210"):
+        assert mech.decide(0.99, mech.analyze(spoof))[0] != 0, spoof

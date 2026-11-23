@@ -135,7 +135,9 @@ def test_official_branch_with_block_threat_does_not_crash():
     a = mech.analyze(text)
     assert a['official_channel'] and 'block_threat' in dict(a['harm'])
     assert mech.decide(0.1, a)[0] == 0
-    assert verdict(text) == 0
+    # Since 23 Nov a block or disconnection threat next to an official channel is SUSPICIOUS when the
+    # model leans scam (a spoof can hide its contact), and NO RISK only when the model does not.
+    assert verdict(text) in (0, "uncertain")
 
 
 @pytest.mark.parametrize('text', [
