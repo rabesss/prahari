@@ -454,3 +454,34 @@ def test_upi_id_is_not_an_email_address():
 def test_malware_hedge_on_a_cleared_flow_is_dropped():
     c = ctx("nightly backup traffic to the NAS at 2 am", 0, "flow")
     assert llm.unsupported("This traffic may carry malware to the target machine.", c) == "hedge_against_verdict"
+
+
+# --- PR #50 review round 3 (gpt-6.1-terra, CodeRabbit) -----------------------------------------
+
+class _FakeRaw(llm.Explainer):
+    def __init__(self, reply):
+        self.cfg = {"max_new_tokens": 40}
+        self.model_name = "fake"
+        self.reply = reply
+
+    def _run(self, prompt):
+        return self.reply(prompt), {"generated_tokens": 30}
+
+
+def test_opening_buried_in_dropped_text_is_not_model_text():
+    inp = "Share your OTP now to unblock your account."
+    lab, _, ev = detect.classify_any("sms", inp)
+    ex = _FakeRaw(lambda p: "Please submit your OTP and " + llm._forced_sentence(p) + ".")
+    with pytest.raises(ValueError):
+        ex.generate(ex.prompt("sms", inp, lab, ev))
+
+
+def test_order_received_is_not_money_moving():
+    assert not llm._PAID.search("Your order has been received. Receipt number 12345.")
+    assert llm._PAID.search("Rs 720 debited via UPI.")
+
+
+def test_percentage_certainty_is_an_overclaim_but_amounts_are_not():
+    c = ctx("Pay Rs 100 now. 100% returns guaranteed.", 1, "sms")
+    assert llm.unsupported("This is 100% a scam.", c) == "overclaim"
+    assert llm.unsupported("Never trust an offer of 100% returns.", c) is None

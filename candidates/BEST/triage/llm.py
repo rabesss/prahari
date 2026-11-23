@@ -546,7 +546,7 @@ class Explainer:
         if ctx:
             text, report = validate(text, opening, ctx, vetted=[tail] if tail else [],
                                     generated_tokens=stats.get("generated_tokens"),
-                                    model_opening=bool(opening) and opening in raw)
+                                    model_opening=bool(opening) and raw.lstrip(" \"'\u201c").startswith(opening))
             stats["validator"] = report
             replaced = replaced or report["fact_added"]
         stats["replaced"] = replaced
@@ -1057,7 +1057,7 @@ BENIGN_FACT = {
 ALL_FACTS = tuple(dict.fromkeys(list(KEY_FACT.values()) + [INJECTION_FACT] + list(BENIGN_FACT.values())))
 
 
-_PAID = re.compile(r"\b(?:debit\w*|credit\w*|paid|payment|refund\w*|received|transferred|withdrawn|txn|upi|"
+_PAID = re.compile(r"\b(?:debit\w*|credit\w*|paid|payment|refund\w*|transferred|withdrawn|txn|upi|"
                    r"amount|rs\.?|inr|rupees)\b|₹|भुगतान|डेबिट|क्रेडिट|रिफंड|रुपये|राशि", re.I)
 
 
@@ -1143,7 +1143,8 @@ _V_HEDGE = re.compile(r"\b(?:scam\w*|phishing|fraud\w*|suspicious|malicious|caut
                       r"risky|dangerous|unsafe|harm\w*|malware|virus\w*)\b", re.I)
 _V_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd)\b|\b(?i:me|my|mine|we|we're|we've|our)\b")
 _V_OVERCLAIM = re.compile(r"\b(?:known|confirmed|proven)\s+(?:scam\w*|phishing|fraud\w*|malicious|attack\w*)|"
-                          r"\b(?:definitely|certainly|undoubtedly)\b", re.I)
+                          r"\b(?:definitely|certainly|undoubtedly)\b|\b100 ?%\s*(?:a\s+|an\s+)?(?:scam|fraud|fake|phishing|"
+                          r"malicious|sure|certain|safe|genuine)\b", re.I)
 _V_VAGUE = re.compile(r"\s*(?:please\s+)?(?:be|stay|remain)\s+(?:very\s+)?(?:cautious|careful|vigilant|wary|alert)\b", re.I)
 _V_DOMAIN = re.compile(r"(?<![\w@.])(?:https?://)?(?:[a-z0-9-]+(?:\.|\[\.\]))+[a-z]{2,}\b", re.I)
 _V_HELP = ("cybercrime.gov.in", "sancharsaathi.gov.in", "cert-in.org.in", "sachet.rbi.org.in")
