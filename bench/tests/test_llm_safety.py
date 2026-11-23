@@ -133,3 +133,18 @@ def test_linkless_scam_gets_a_matching_replacement():
 
 def test_no_risk_action_does_not_say_no_action_needed():
     assert "no action needed" not in " ".join(llm.actions_for("sms", 0, "Your bill is due")).lower()
+
+
+def test_scam_type_routing_for_customs_fee_and_electricity():
+    fee = "Your parcel is held at customs. Pay a delivery fee of Rs 200 to receive parcel at http://x.top"
+    assert llm.scam_type("sms", fee, 1) != "a fake police or customs threat"
+    power = "Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein."
+    assert llm.scam_type("sms", power, 1) == "an electricity disconnection scam"
+
+
+def test_bank_alert_telling_you_to_block_your_card_is_not_a_threat():
+    from triage import mech
+    ok = "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app."
+    assert mech.decide(0.9, mech.analyze(ok))[0] == 0
+    bad = "SBI: Rs 2,450 debited via UPI. If not you, block card at http://sbi-block-card.top within 2 hours."
+    assert mech.decide(0.9, mech.analyze(bad))[0] == 1
