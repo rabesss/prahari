@@ -440,3 +440,44 @@ def test_upi_predict_runs_fully_offline(tmp_path):
     assert p.returncode == 0, p.stderr[-800:]
     rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert [(r["id"], r["label"]) for r in rows] == [("q1", 1), ("q2", 0)]
+
+
+# ---- PR #46 review round 1 (gpt-6.1-terra) regressions ------------------------------------------
+
+def test_merchant_cashback_promo_is_not_a_receive_lure():
+    for note in ("Get%20cashback%20on%20purchase", "Scan%20%26%20pay%20to%20get%205%25%20cashback"):
+        res = upi.analyze_upi(f"upi://pay?pa=abc@okaxis&pn=Merchant&mc=5411&tn={note}")
+        assert res["label"] == 0, note
+    # Refund wording, scan-to-receive and non-merchant cashback still count.
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&pn=Merchant&mc=5411&tn=Amazon%20refund")["label"] == 1
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&pn=Merchant&mc=5411&tn=Scan%20to%20get%20cashback")["label"] == 1
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&tn=Get%20cashback")["label"] == 1
+
+
+def test_second_note_cannot_hide_scam():
+    res = upi.analyze_upi("upi://pay?pa=abc@okaxis&tn=groceries&tn=scan+to+receive+cashback")
+    assert res["label"] == 1
+    assert "scan to receive cashback" in res["summary"]["note"]
+
+
+def test_percent_encoded_invisible_chars_do_not_bypass_rules():
+    res = upi.analyze_upi("upi://pay?pa=abc@okaxis&tn=scan%20to%20rece%E2%80%8Bive%20money")
+    codes = {f.code for f in res["findings"]}
+    assert res["label"] == 1 and {"receive_money_trick", "hidden_chars"} <= codes
+
+
+def test_malformed_authority_never_raises():
+    for raw in ("UPI://[broken?pa=a@okaxis", "intent://[x/pay?pa=a@okaxis&pn=A#Intent;scheme=upi;end"):
+        lab, _, _ = upi.classify(raw)
+        assert lab in (0, 1, "uncertain")
+
+
+def test_local_reseller_with_p2p_code_not_flagged():
+    res = upi.analyze_upi("upi://pay?pa=q123456789@ybl&pn=Airtel+Recharge+Shop&mc=0000")
+    assert res["label"] == 0
+
+
+def test_amount_display_keeps_payload_digits():
+    assert upi.analyze_upi("upi://pay?pa=m@okaxis&pn=Shop&am=10.9999")["summary"]["amount"] == "10.9999"
+    assert upi.analyze_upi("upi://pay?pa=m@okaxis&pn=Shop&am=1250.50")["summary"]["amount"] == "1,250.50"
+    assert upi.analyze_upi("upi://pay?pa=m@okaxis&pn=Shop&am=450.00")["summary"]["amount"] == "450"

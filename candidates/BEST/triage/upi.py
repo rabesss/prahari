@@ -169,6 +169,8 @@ _OFFICIAL_DESK_RE = re.compile(
     r"billing\s*desk|care\s*team|fraud\s*team|security\s*team)\b",
     re.I,
 )
+# Plain cashback / money-back promo wording that real merchant QRs carry ("5% cashback on purchase").
+_MERCHANT_PROMO_RE = re.compile(r"\b(?:get\s+)?(?:\d+\s*%\s*)?(?:cash\s*back|cashback|money\s*back)\b|कैशबैक", re.I)
 # Small local shops legitimately name a brand they resell ("Airtel Recharge Shop", "Jio Point").
 _LOCAL_SHOP_RE = re.compile(
     r"\b(?:shop|store|kirana|mart|point|corner|traders|enterprises|agency|"
@@ -209,7 +211,7 @@ _PIN_TO_RECEIVE_RE = re.compile(
     r"|(?:receive|get|claim|credit|refund|cashback|paise\s*pa+ne|paisa\s*pa+ne|पाने|प्राप्त)"
     r"[^.;!?।\n]{0,35}(?:enter|using|with|via|by|dal\w*|daal\w*|डाल\w*)"
     r"[^.;!?।\n]{0,20}(?:upi\s*)?(?:pin|mpin|पिन)"
-    r"|scan[^.;!?।\n]{0,25}(?:to\s+)?(?:receive|get|claim|credit|collect|paise\s*pa+ne|paisa\s*pa+ne|पैसे\s*पाने|प्राप्त\s*करने)"
+    r"|scan(?:(?!\bpay)[^.;!?।\n]){0,25}(?:to\s+)?(?:receive|get|claim|credit|collect|paise\s*pa+ne|paisa\s*pa+ne|पैसे\s*पाने|प्राप्त\s*करने)"
     r"|(?:approve|accept|confirm)[^.;!?।\n]{0,25}(?:to\s+)?(?:receive|get|claim|credit|refund|cashback)"
     r"|पिन\s*(?:डाल|दर्ज)[^।;!?\n]{0,25}(?:पैसे|राशि|रिफंड|कैशबैक|प्राप्त|मिलेंगे)",
     re.I,
@@ -352,9 +354,23 @@ def _parse_amount(val: str) -> float | None:
 def _format_amount(val: str, num: float | None) -> str:
     if num is None:
         return val
-    if num == int(num):
+    s = val.strip().replace(",", "")
+    whole, _, frac = s.partition(".")
+    if not frac.strip("0"):
         return f"{int(num):,}"
-    return f"{num:,.2f}"
+    return f"{int(whole or 0):,}.{frac}"
+
+
+def _split_uri(s: str) -> tuple[str, str, str, str]:
+    """(scheme, host, path, query); never raises on malformed authorities like '[broken'."""
+    try:
+        p = urlparse(s)
+        return p.scheme, p.netloc, p.path, p.query
+    except ValueError:
+        scheme, _, rest = s.partition("://")
+        head, _, query = rest.partition("?")
+        host, _, path = head.partition("/")
+        return scheme, host, path, query
 
 
 def parse_upi(text: str) -> dict | None:
@@ -369,14 +385,13 @@ def parse_upi(text: str) -> dict | None:
     if _INTENT_UPI_RE.match(cleaned):
         scheme = "intent"
         before_frag = cleaned.split("#Intent;", 1)[0]
-        parsed = urlparse(before_frag)
-        action = (parsed.netloc or parsed.path.strip("/") or "pay").lower()
-        query = parsed.query
+        _s, p_host, p_path, query = _split_uri(before_frag)
+        action = (p_host or p_path.strip("/") or "pay").lower()
     elif _UPI_SCHEME_RE.match(cleaned):
-        parsed = urlparse(cleaned)
-        scheme = (parsed.scheme or "upi").lower()
-        host = (parsed.netloc or "").lower()
-        path = parsed.path.strip("/").lower()
+        p_scheme, p_host, p_path, query = _split_uri(cleaned)
+        scheme = (p_scheme or "upi").lower()
+        host = (p_host or "").lower()
+        path = p_path.strip("/").lower()
         # Handle both upi://pay?... and tez://upi/pay?... / phonepe://pay?...
         if host in ("pay", "collect", "mandate", "global"):
             action = host
@@ -386,7 +401,6 @@ def parse_upi(text: str) -> dict | None:
             action = path.split("/", 1)[1] or "pay"
         else:
             action = host or path or "pay"
-        query = parsed.query
     else:
         scheme = "raw"
         action = "pay"
@@ -406,6 +420,10 @@ def parse_upi(text: str) -> dict | None:
             if v2 != v:
                 double_encoded = True
                 v = v2
+        v_clean = _HIDDEN_RE.sub("", v)
+        if v_clean != v:
+            had_hidden = True
+            v = v_clean.strip()
         params_multi.setdefault(k, []).append(v)
         if k not in params or (not params[k] and v):
             params[k] = v
@@ -430,7 +448,8 @@ def parse_upi(text: str) -> dict | None:
     am = params.get("am", "")
     mam = params.get("mam", "")
     cu = params.get("cu", "")
-    tn = params.get("tn", "")
+    # A second tn must not hide a scam note behind an innocent first one: keep every distinct note.
+    tn = " / ".join(duplicates["tn"]) if "tn" in duplicates else params.get("tn", "")
     mc = params.get("mc", "")
     tr = params.get("tr", "")
     tid = params.get("tid", "")
@@ -654,6 +673,8 @@ def analyze_upi(text: str) -> dict:
     # 3. Collect / AutoPay mandate / "scan or enter PIN to receive money" trick
     has_pin_receive = bool(_PIN_TO_RECEIVE_RE.search(note_and_name))
     cleaned_for_lure = _LEGIT_CREDIT_CARD_RE.sub(" ", note_and_name)
+    if valid_mc and not _OFFICIAL_DESK_RE.search(pn):
+        cleaned_for_lure = _MERCHANT_PROMO_RE.sub(" ", cleaned_for_lure)
     has_receive_lure = bool(_RECEIVE_LURE_RE.search(cleaned_for_lure))
 
     if has_pin_receive:
@@ -1025,7 +1046,7 @@ def analyze_upi(text: str) -> dict:
                     "merchant QR metadata paired with P2P code 0000",
                     "mc",
                 )
-            if pn_brands or pn_official_desk:
+            if pn_official_desk or (pn_brands and not pn_local_shop):
                 add(
                     "mc_p2p_for_brand",
                     "medium",
