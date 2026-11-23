@@ -83,6 +83,8 @@ private const val MODEL_FILE = "Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte"
 private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
+private const val CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
+private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
 private const val QR_REQUEST = 41
 
@@ -1816,18 +1818,18 @@ class MainActivity : Activity() {
         val evidence = strings(data.optJSONArray("evidence"))
         val actions = strings(data.optJSONArray("actions"))
         val clear = level == "clear"
-        // A copied bank debit is not "no risk". The detector can clear it; the screen asks for a check.
-        val alert = clear && actions.any { it == DEBIT_STEP }
-        val p = if (alert) palette("warn").copy(title = "CHECK ALERT", hindi = "अलर्ट जांचें") else palette(level)
-        val calm = clear && !alert
+        // A bank debit or OTP alert is not relabelled when the verdict is already DANGEROUS.
+        val bankAlert = (level == "clear" || level == "warn") &&
+            actions.any { it == DEBIT_STEP || it == CHECK_STEP }
+        val p = if (bankAlert) palette("warn").copy(title = "CHECK THIS ALERT", hindi = "अलर्ट जांचें") else palette(level)
+        val calm = clear && !bankAlert
         val fallback = when {
-            alert -> "Some warning signs found."
             level == "danger" -> "Strong scam signals found."
             level == "warn" -> "Some warning signs found."
             else -> "No scam signals found."
         }
-        // The one-line "why" is the first evidence line (benign reading when the verdict is clear).
-        val why = verdictLine(evidence, fallback, calm)
+        // The alert banner replaces the suspicious line. Other results use the first evidence line.
+        val why = if (bankAlert) t(ALERT_LINE) else verdictLine(evidence, fallback, calm)
         val elapsed = if (job.totalMs >= 0) job.totalMs else SystemClock.elapsedRealtime() - job.started
         val root = root("${p.title}. ${p.hindi}")
         add(root, bar("Result", true, lang = true), -1, -2)
