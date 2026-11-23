@@ -105,10 +105,10 @@ class H(BaseHTTPRequestHandler):
 
     def _callguard(self, body):
         """Call Guard transcript check (preview). Off unless PRAHARI_CALL_GUARD=1, so the core flow is untouched."""
-        from triage import callguard
-        if not callguard.is_enabled():
+        if os.environ.get("PRAHARI_CALL_GUARD", "").strip().lower() not in ("1", "true", "yes", "on"):
             self._send(404, b'{"error":"Call Guard is disabled"}', "application/json")
             return
+        from triage import callguard
         transcript = body.get("transcript", "")
         if not isinstance(transcript, str):
             self._send(400, b'{"error":"Invalid request body"}', "application/json")

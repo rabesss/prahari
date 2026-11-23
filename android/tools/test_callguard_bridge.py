@@ -27,6 +27,10 @@ legit = json.loads(cg.verdict_call(
     'the official YONO app or visit your home branch.'))
 assert legit['stop_warning'] is False and legit['level'] == 'clear', legit
 
+cut = json.loads(cg.verdict_call(
+    'Hi, this is Priya from City Dental Clinic confirming your appointment tomorrow.', truncated=True))
+assert cut['level'] == 'warn' and any('first 2 minutes' in e for e in cut['evidence']), cut
+
 empty = json.loads(cg.verdict_call('   '))
 assert empty['level'] == 'warn' and empty['stop_warning'] is False
 

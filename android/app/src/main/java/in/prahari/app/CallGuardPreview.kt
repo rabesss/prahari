@@ -37,7 +37,7 @@ import java.nio.ByteOrder
  */
 internal object CallGuardPreview {
     /** Feature flag: set false to hide Call Guard Preview without affecting SMS/Link/Network. */
-    const val FEATURE_FLAG_ENABLED = true
+    const val FEATURE_FLAG_ENABLED = false
     const val AUDIO_PICK_REQUEST = 42
 
     private const val TAG = "PrahariCallGuard"
@@ -46,6 +46,7 @@ internal object CallGuardPreview {
     private const val WHISPER_TOK = "tokenizer.json"
     private const val MAX_AUDIO_SECONDS = 30
     private const val MAX_DECODE_TOKENS = 128
+    private const val MAX_DECODE_WALL_MS = 20_000L
 
     private const val SOT_TOKEN = 50258L
     private const val EN_TOKEN = 50259L
@@ -63,8 +64,9 @@ internal object CallGuardPreview {
         34949, 40283, 40493, 40549, 47282, 49146, 50359, 50360, 50361
     )
 
-    data class DecodedAudio(val pcm16Mono: ByteArray, val sampleRate: Int, val seconds: Double)
-    data class AsrOutcome(val transcript: String?, val error: String?, val elapsedMs: Long)
+    data class DecodedAudio(val pcm16Mono: ByteArray, val sampleRate: Int, val seconds: Double, val truncated: Boolean)
+    /** [truncated]: only the first [MAX_AUDIO_SECONDS] were checked; the caller must say so and not clear the call. */
+    data class AsrOutcome(val transcript: String?, val error: String?, val elapsedMs: Long, val truncated: Boolean = false)
 
     val sampleCalls = listOf(
         "Digital arrest (CBI/parcel)" to
@@ -163,12 +165,23 @@ internal object CallGuardPreview {
             codec.start()
 
             val out = ByteArrayOutputStream()
-            val maxBytes = sampleRate * 2 * MAX_AUDIO_SECONDS
             val info = MediaCodec.BufferInfo()
             var inputDone = false
             var outputDone = false
 
-            while (!outputDone && out.size() < maxBytes) {
+            var truncated = false
+            val decodeStart = SystemClock.elapsedRealtime()
+            while (!outputDone) {
+                // A stalled codec must not spin forever; what was decoded so far is checked as truncated.
+                if (SystemClock.elapsedRealtime() - decodeStart > MAX_DECODE_WALL_MS) {
+                    truncated = true
+                    break
+                }
+                // Recomputed each pass: the decoder may report a different output rate than the container.
+                if (out.size() >= sampleRate * 2 * MAX_AUDIO_SECONDS) {
+                    truncated = true
+                    break
+                }
                 if (!inputDone) {
                     val inIdx = codec.dequeueInputBuffer(10_000)
                     if (inIdx >= 0) {
@@ -215,7 +228,7 @@ internal object CallGuardPreview {
             }
             val pcm = out.toByteArray()
             val sec = pcm.size.toDouble() / (sampleRate * 2.0)
-            return DecodedAudio(pcm, sampleRate, sec)
+            return DecodedAudio(pcm, sampleRate, sec, truncated)
         } finally {
             try { codec?.stop() } catch (_: Throwable) {}
             try { codec?.release() } catch (_: Throwable) {}
@@ -239,6 +252,7 @@ internal object CallGuardPreview {
     /** Run ExecuTorch Whisper Tiny INT8 on decoded PCM. Closes the Whisper module before returning. */
     fun transcribeUri(context: Context, uri: Uri): AsrOutcome {
         val start = SystemClock.elapsedRealtime()
+        if (!FEATURE_FLAG_ENABLED) return AsrOutcome(null, "Call Guard is disabled", 0L)
         val missing = missingWhisperMessage(context)
         if (missing != null) {
             return AsrOutcome(null, missing, SystemClock.elapsedRealtime() - start)
@@ -300,7 +314,7 @@ internal object CallGuardPreview {
             val arr = JSONArray()
             tokens.forEach { arr.put(it) }
             val text = pyMod.callAttr("decode_whisper_tokens", files.second.path, arr.toString()).toString()
-            AsrOutcome(text, null, SystemClock.elapsedRealtime() - start)
+            AsrOutcome(text, null, SystemClock.elapsedRealtime() - start, audio.truncated)
         } catch (t: Throwable) {
             Log.e(TAG, "offline Whisper transcription failed", t)
             AsrOutcome(null, "${t.javaClass.simpleName}: ${t.message ?: "ASR error"}", SystemClock.elapsedRealtime() - start)

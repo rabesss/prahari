@@ -7,24 +7,32 @@ phone yet.
 ## What it does
 
 1. **Input.** A WhatsApp voice note or other shared audio file (`.wav` natively; `.ogg`, `.opus`, `.m4a`,
-   `.mp3` through a local `ffmpeg`), or a speakerphone recording made with `--record N --consent`.
+   `.mp3` through a local `ffmpeg`, which may only use audio demuxers so a disguised playlist cannot
+   pull in other files), or a speakerphone recording made with `--record N --consent`.
    Android and Linux apps cannot tap live cellular or VoIP call audio, so Call Guard never listens to a
    call by itself. The person has to share or record the audio.
 2. **Speech-to-text on the device.** Arm's INT8 Whisper Tiny export
    (`Arm/whisper-tiny-int8-xnnpack-executorch`, Apache-2.0, 117 MB `.pte`) runs through ExecuTorch with
    XNNPACK. Log-mel features are computed in NumPy, not by `whisper_preprocessor.pte`, which kept peak
-   RSS far lower on aarch64. Greedy decoding, 30 s windows, up to 2 minutes per file, with a repetition
-   guard and a per-window time cap.
+   RSS far lower on aarch64. Greedy decoding, 30 s windows, up to 2 minutes per file (only that much
+   is read from disk), with a repetition guard and a per-window time cap. If the file was longer, or any
+   window stopped before end-of-text, the transcript is marked incomplete. An incomplete transcript can
+   never be cleared: NO RISK becomes SUSPICIOUS with a note naming the part that was not checked.
 3. **Detection.** The transcript goes through the existing SMS detector (`detect.classify_any("sms", …)`)
    and new call-script rules (`triage/callrules.py`): fake CBI, police, customs, TRAI or RBI callers;
    arrest warrants and "digital arrest"; drug parcels linked to Aadhaar; "do not disconnect"; "stay alone
    on video call" or "do not tell your family"; transfers to an "RBI safe" or "verification" account;
-   SIM-disconnection and "press 9" scripts; OTP or remote-app requests. The rules are clause-scoped and
-   check for protective framing, so a genuine bank reminder ("never share your OTP on a call") is not
-   flagged. `callguard.fuse()` combines both and is shared by the desktop and Android code.
+   SIM-disconnection and "press 9" scripts; OTP or remote-app requests. A match governed by a negation
+   ("never transfer to a safe account") is advice, not a demand. A sentence that only describes scams
+   ("real police never…", "fraudsters pose as CBI") is skipped up to a "but". Labels such as "security
+   reminder" hide nothing, so a scammer cannot borrow them. A genuine bank reminder is not flagged. A
+   detector DANGEROUS verdict is never cleared because the call sounds protective, unless the only harm
+   is telling the listener to block their own card in the official app. `callguard.fuse()` combines both and is shared by the desktop and Android code.
 4. **Explanation.** Llama 3.2 1B (the configured `llama32-1b-qlora` `.pte`) writes the warning through
    ExecuTorch. For a scam it starts with "STOP — This call is DANGEROUS: …" and adds one sentence telling
-   the listener to hang up and report it. The existing post-processing removes unsafe advice.
+   the listener to hang up and report it. The wording varies: the model does not always name 1930 or
+   Chakshu, so the vetted action list below always does. Chat-template control tokens are stripped from the transcript
+   before it is quoted in the prompt. The existing post-processing removes unsafe advice.
 5. **Actions and read-aloud.** Vetted steps: hang up; never move money to a "safe account"; tell family;
    report on Sanchar Saathi Chakshu (sancharsaathi.gov.in) or cybercrime.gov.in; call 1930 if money was
    lost. `--speak` reads a short fixed STOP script aloud with `espeak-ng`/`spd-say` on Linux. The spoken
@@ -36,7 +44,7 @@ phone yet.
 # once, with network: download and SHA-256-verify the Whisper .pte and tokenizer (not committed)
 candidates/BEST/bin/callguard --setup-model          # or set PRAHARI_WHISPER_DIR to an existing copy
 # offline from here on
-candidates/BEST/bin/callguard --demo                 # four synthetic calls in demo/call_guard/
+candidates/BEST/bin/callguard --demo                 # four synthetic calls in candidates/BEST/demo/call_guard/
 candidates/BEST/bin/callguard --file voice-note.ogg  # JSON on stdout (native runner logs go to stderr)
 candidates/BEST/bin/callguard --transcript "This is CBI, do not disconnect…" --no-explain
 candidates/BEST/bin/callguard --record 30 --consent  # speakerphone, only with consent
@@ -50,8 +58,8 @@ do not import Call Guard.
 ## Measured on Arm (Oracle A1, 2 vCPU Neoverse-N1, ~11 GB RAM)
 
 Run on 2026-11-23 with `bin/callguard --demo`. The raw output is in
-`candidates/BEST/artifacts/callguard_demo_neoverse_n1.json`. The VM is shared, and load average was
-3.0–3.6 during the run, so the slower rows reflect co-tenant contention.
+`candidates/BEST/artifacts/callguard_demo_neoverse_n1.json`. The first two clips ran slower than the
+last two. The VM is shared (load average 3.0–3.6 during the run), and the cause was not isolated.
 
 | Clip | Audio | ASR (Whisper Tiny INT8) | Real-time factor | Llama prefill / decode | End to end (ASR + rules + Llama) |
 |---|---|---|---|---|---|
@@ -62,12 +70,13 @@ Run on 2026-11-23 with `bin/callguard --demo`. The raw output is in
 
 - Whisper model load: 0.24 s. Rules plus detector: 30–55 ms per call (2.0 s on the first call while the
   detectors load).
-- Peak process RSS (`/usr/bin/time -v`, four clips): **851 MB ASR only**; **2.67 GB ASR + Llama** in
-  one process. The Llama runner reports 2.6 GB RSS after load.
+- Peak process RSS (`/usr/bin/time -v`, four clips): **831 MiB ASR only**; **2,611 MiB ASR + Llama** in
+  one process. The Llama runner reports about 2,609 MiB RSS after load.
 - All four clips got the expected verdict (2 scam → STOP, 2 benign → no risk found).
 - Import order matters. If `executorch.extension.llm.custom_ops` is not imported before the Whisper
   program loads, Whisper decode is about 1.8x slower, and a Llama runner loaded later in the same
-  process drops from about 82 to about 18 prefill tokens/s. `asr.py` now imports it first.
+  process drops from about 82 to about 18 prefill tokens/s. `asr.py` now imports it first. The runs are
+  recorded under `import_order_check` in the artifact.
 
 **Not measured:** Galaxy S23 or any physical phone. That needs a Remote Test Lab session. Android
 numbers must not be quoted from these Linux results.
@@ -80,8 +89,11 @@ numbers must not be quoted from these Linux results.
   torch, executorch, sklearn and tokenizers blocked, as on the phone, in the Android CI job.
 - `android/app/.../CallGuardPreview.kt` has shared-audio intent parsing, offline MediaCodec decoding to
   PCM, and an ExecuTorch `Module` Whisper encoder/decoder loop. Its output feeds the adapter above. It
-  compiles with the app, but no button or share target in `MainActivity` calls it yet, and it has not
-  run on a device. The Whisper `.pte` and `tokenizer.json` must be pushed to the app's files dir with
+  compiles with the app (the Android CI `apk` job builds it), but no button or share target in `MainActivity` calls it yet, its
+  `FEATURE_FLAG_ENABLED` constant is `false`, and it has not run on a device. It returns a `truncated`
+  flag that `callguard_mobile.verdict_call(transcript, truncated=True)` uses to avoid clearing a cut call.
+  Before it is wired up, it still needs a check that the shared URI is a granted content URI and a
+  digest or size check on the pushed `.pte`. The Whisper `.pte` and `tokenizer.json` must be pushed to the app's files dir with
   adb. It is not bundled. The Kotlin path transcribes only the first 30 s of a file.
 - The read-aloud step on Android is meant to reuse the app's existing offline `TextToSpeech` voice.
 
@@ -94,14 +106,26 @@ numbers must not be quoted from these Linux results.
   (compressed, noisy, accented, two speakers) will raise the ASR error rate. Whisper already mishears
   "UPI PIN", "Aadhaar" and "TRAI" on the clean clips. The rules tolerate some of this, but not all.
 - Four demo clips are not an accuracy evaluation. Precision and recall on real calls are unknown.
-- Only 2 minutes per file are transcribed. Longer recordings are cut.
+- Call Guard inherits the core SMS detector's false positives. For example, "credited to your settlement
+  account" reads as a safe-account demand. When the detector's DANGEROUS reading comes only from a question
+  or reported speech ("did the caller ask for your OTP?"), the verdict is SUSPICIOUS instead.
+- The existing post-processing filters unsafe advice on DANGEROUS and SUSPICIOUS verdicts only, not on
+  NO RISK FOUND.
+- A phrase repeated three times ("hello? hello? hello?") trips the decoder's loop guard and ends that
+  30 s window early. The transcript is then marked incomplete, so the call can be SUSPICIOUS at worst.
+- `--lang auto` chooses only between English and Hindi.
+- Whisper is a second neural model in the entry. The rules require Llama for the advisory component, and
+  Llama still writes every explanation. Whether an ASR model is allowed is logged in
+  `research/QUESTIONS.md`.
+- Only 2 minutes per file are transcribed (30 s on the Android path). A longer recording is cut and
+  can at best be SUSPICIOUS, never cleared.
 - The model can still word the advice imperfectly ("report to authorities" rather than naming 1930).
   The vetted action list always names 1930 and Chakshu.
 
 ## Fixture provenance
 
-`demo/call_guard/*.wav` are synthetic. `demo/call_guard/generate.py` reads the `script` field in
+`candidates/BEST/demo/call_guard/*.wav` are synthetic. Its `generate.py` reads the `script` field in
 `manifest.json` aloud with Piper `en_US-libritts_r-medium` (training data LibriTTS-R, CC BY 4.0; the
-Piper maintainers state it was retrained from scratch) and stores 16 kHz mono PCM. No real call audio or
+Piper maintainers state it was retrained from scratch; SHA-256 pinned) and stores 16 kHz mono PCM. No real call audio or
 real person's voice is used. An earlier draft used `en_US-lessac`. That voice was dropped because its
 Blizzard 2013 training corpus is licensed for research use only.

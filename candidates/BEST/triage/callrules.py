@@ -35,9 +35,9 @@ FAKE_AUTHORITY_RE = re.compile(
 
 # Demands that the victim stay connected and not hang up.
 NO_DISCONNECT_RE = re.compile(
-    r"\b(?:do not|don't|dont|must not|cannot|can't|never)\s+"
-    r"(?:disconnect|cut|end|drop|leave|close|hang\s*up)\s+"
-    r"(?:the\s+|this\s+|your\s+)?(?:phone\s+|video\s+)?(?:call|line|phone)?\b"
+    r"\b(?:do not|don't|dont|must not|cannot|can't|never)\s+(?:disconnect|hang\s*up)\b"
+    r"|\b(?:do not|don't|dont|must not|cannot|can't|never)\s+(?:cut|end|drop|leave|close)\s+"
+    r"(?:the\s+|this\s+|your\s+)?(?:phone\s+|video\s+)?(?:call|line|phone)\b"
     r"|\b(?:keep|stay|remain)\s+(?:the\s+|this\s+)?(?:call|line)\s+(?:open|connected|active|on)\b"
     r"|\bstay\s+on\s+(?:the|this)\s+(?:line|call|phone)\b"
     r"|\bif\s+you\s+(?:disconnect|hang\s*up|cut\s+(?:the|this)\s+call)\b"
@@ -53,9 +53,13 @@ VIDEO_ISOLATION_RE = re.compile(
     r"\b(?:stay|remain|keep|come|join|connect)\b[^.!?\n]{0,30}\b(?:on\s+)?(?:video\s*call|skype|whatsapp\s*video|camera\s*on)\b"
     r"|\b(?:video\s*call|camera)\b[^.!?\n]{0,25}\b(?:alone|on|open|active|24\s*hours?)\b"
     r"|\b(?:stay|sit|remain|be)\s+(?:alone\s+)?in\s+(?:a|your|the)\s+room(?:\s+alone)?\b"
-    r"|\b(?:lock|close|shut)\s+(?:the\s+|your\s+)?(?:room\s+)?door\b"
+    r"|\block\s+(?:the\s+|your\s+)?(?:room\s+)?door\b"
+    r"|\b(?:close|shut)\s+(?:the\s+|your\s+)?(?:room\s+)?door\s+and\s+(?:stay|sit|remain)\b"
+    r"|\b(?:never|do not|don't|dont|must not)\s+(?:tell|inform)\s+(?:anyone|anybody|your\s+family|family|"
+    r"friends|police)\s+(?:about|regarding)\s+(?:this|the)\s+(?:call|case|investigation|matter|inquiry)\b"
     r"|\b(?:do not|don't|dont|must not|cannot)\s+(?:tell|inform|call|contact|speak\s+to|talk\s+to)\s+"
     r"(?:anyone|anybody|your\s+family|family|spouse|wife|husband|parents|children|friends|lawyer|advocate|police)\b"
+    r"(?!\s+(?:your\s+|the\s+)?(?:otp|pin|password|cvv|upi|card|account\s+details))"
     r"|\b(?:keep\s+(?:this|it|the\s+call|the\s+case)\s+(?:strictly\s+)?(?:secret|confidential)|"
     r"under\s+(?:virtual|digital|online|camera)\s+(?:custody|surveillance|monitoring))\b"
     r"|\b(?:kamre\s+mein\s+akele|kisi\s+ko\s+(?:mat|na)\s+bata\w*|video\s+call\s+par\s+rah\w*)\b"
@@ -66,13 +70,14 @@ VIDEO_ISOLATION_RE = re.compile(
 
 # "Transfer money to RBI/government/police safe or verification account".
 SAFE_ACCOUNT_VERIFY_RE = re.compile(
-    r"\b(?:r\.?\s*b\.?\s*i\.?|reserve\s+bank|government|govt|supreme\s+court|police|c\.?\s*b\.?\s*i\.?|official|central)?\s*"
+    r"\b(?:r\.?\s*b\.?\s*i\.?|reserve\s+bank|government|govt|supreme\s+court|police|c\.?\s*b\.?\s*i\.?|official|central)\s+"
     r"(?:safe|secure|verification|audit|escrow|monitoring|settlement|custody|temporary)\s+"
     r"(?:verification\s+)?(?:bank\s+)?(?:account|wallet|a/c)\b"
-    r"|\b(?:transfer|send|move|deposit|wire|remit|shift)\b[^.!?\n]{0,50}\b"
+    r"|\b(?:safe|verification|escrow|custody)\s+(?:verification\s+)?(?:bank\s+)?(?:account|wallet|a/c)\b"
+    r"|\b(?:transfer|send|move|deposit|wire|remit|shift)\b(?!\s+(?:the|this|your)\s+(?:call|line))"
+    r"[^.!?\n]{0,30}\b(?:money|funds|amount|savings|balance|rupees|rs|lakhs?|thousand|\d[\d,]*)\b[^.!?\n]{0,40}\b"
     r"(?:to\s+verify|for\s+(?:rbi\s+|police\s+|court\s+|fund\s+|account\s+)?verification|"
-    r"safe\s+account|verification\s+account|rbi\s+account|government\s+account|escrow\s+account|"
-    r"clear\s+your\s+(?:funds|money|account))\b"
+    r"rbi\s+account|government\s+account|clear\s+your\s+(?:funds|money|account))\b"
     r"|\b(?:refunded|returned|credited\s+back)\s+(?:immediately\s+)?after\s+(?:the\s+)?(?:verification|audit|inquiry|investigation)\b"
     r"|\b(?:break|liquidate|close|empty)\s+(?:your\s+)?(?:fixed\s+deposit|fd|savings|bank\s+account)\b"
     r"|(?:आरबीआई|सरकारी|पुलिस|सुरक्षित|सेफ|वेरिफिकेशन|सत्यापन)\s*(?:वेरिफिकेशन\s*)?(?:खाते|अकाउंट|खाता)"
@@ -83,11 +88,11 @@ SAFE_ACCOUNT_VERIFY_RE = re.compile(
 # Contraband parcel (drugs/MDMA/passports/SIMs) allegedly seized by customs or linked to Aadhaar.
 CONTRABAND_PARCEL_RE = re.compile(
     r"\b(?:parcel|package|courier|consignment|shipment)\b[^.!?\n]{0,55}"
-    r"\b(?:drugs?|narcotics?|mdma|cocaine|heroin|contraband|illegal|passport|fake\s+passports?|"
-    r"sim\s+cards?|seized|customs|taiwan|iran|thailand|mumbai\s+airport|delhi\s+airport)\b"
-    r"|\b(?:illegal\s+drugs?|narcotics?\s+parcel|drugs?\s+(?:were\s+)?(?:found|seized)|"
-    r"seized\s+by\s+customs|customs\s+seized)\b"
-    r"|\b(?:parcel|package|courier|illegal\s+sim|bank\s+account|drugs?)\b[^.!?\n]{0,45}"
+    r"\b(?:drugs?|narcotics?|mdma|cocaine|heroin|contraband|illegal|fake\s+passports?)\b"
+    r"|\b(?:illegal\s+drugs?|narcotics?\s+parcel|drugs?\s+(?:were\s+)?(?:found|seized))\b"
+    r"|\b(?:parcel|package|courier|consignment)\b[^.!?\n]{0,45}"
+    r"\blink(?:ed)?\s+to\s+your\s+(?:aadhaa?r|ad[- ]?har|pan)\b"
+    r"|\b(?:illegal\s+sim|drugs?|narcotics?|contraband)\b[^.!?\n]{0,45}"
     r"\b(?:link(?:ed)?\s+to\s+your\s+(?:aadhaa?r|ad[- ]?har|pan|id|mobile|number)|in\s+your\s+name)\b"
     r"|(?:पार्सल|कूरियर)\s*(?:में|से)\s*(?:ड्रग्स|नशीले\s*पदार्थ|अवैध|पासपोर्ट|सिम)"
     r"|(?:ड्रग्स|नशीले\s*पदार्थ)[^।.!?\n]{0,30}(?:पार्सल|कस्टम|आधार|पकड़)",
@@ -97,9 +102,9 @@ CONTRABAND_PARCEL_RE = re.compile(
 # Digital arrest / arrest warrant / immediate police arrest / money-laundering case threat.
 ARREST_WARRANT_RE = re.compile(
     r"\b(?:digital\s+arrest|virtual\s+arrest|arrest\s+warrant|non[- ]?bailable\s+warrant|"
-    r"warrant\s+(?:has\s+been\s+)?issued(?:\s+in\s+your\s+name)?|"
-    r"police\s+(?:will|are\s+coming\s+to)\s+arrest\s+you|"
-    r"you\s+(?:will\s+be|are\s+under)\s+(?:arrest|digital\s+arrest)|"
+    r"warrant\s+(?:is\s+|was\s+|has\s+been\s+)?issued(?:\s+in\s+your\s+name)?|"
+    r"(?:police|officers?|we)\s+(?:will|are\s+coming\s+to)\s+(?:come\s+(?:to\s+)?)?arrest\s+you|"
+    r"you\s+(?:will\s+be|are|are\s+under)\s+(?:arrested|arrest|digital\s+arrest)|"
     r"(?:money\s+laundering|hawala|pmla|terror\s+funding|narcotics)\s+(?:case|investigation|charges?)|"
     r"f\.?\s*i\.?\s*r\.?\s+(?:has\s+been\s+)?(?:registered|filed)\s+against\s+you)\b"
     r"|(?:डिजिटल\s*(?:अरेस्ट|गिरफ्तारी)|गिरफ्तारी\s*(?:वारंट|का\s*वारंट)|वारंट\s*जारी|"
@@ -129,18 +134,42 @@ CALL_SECRET_REMOTE_RE = re.compile(
 )
 
 # Framing that describes a scam as a warning/advisory rather than making a scammer's demand.
-AWARENESS_CLAUSE_RE = re.compile(
-    r"\b(?:never\s+(?:conduct|do|ask|share|transfer|move|stay|pay|give|tell)|"
-    r"do\s+not\s+(?:share|transfer|move|stay\s+on\s+a\s+video\s+call|pay|believe|fall\s+for)|"
-    r"don't\s+(?:share|transfer|move|pay|believe|fall\s+for)|"
-    r"no\s+such\s+thing\s+as(?:\s+a)?\s+digital\s+arrest|"
-    r"routine\s+security\s+reminder|security\s+reminder|fraud\s+awareness|scam\s+alert|"
-    r"(?:real|genuine)\s+(?:police|cbi|customs|rbi|banks?|officials?)\s+(?:never|do\s+not|will\s+not)|"
+# Third-person narrative about scams ("real police never ...", "fraudsters pose as CBI"): the clause
+# describes a scam instead of running one, up to a contrast word ("..., but I am CBI").
+AWARENESS_NARRATIVE_RE = re.compile(
+    r"\b(?:no\s+such\s+thing\s+as(?:\s+a)?\s+digital\s+arrest|"
+    r"(?:real|genuine)\s+(?:police|cbi|customs|rbi|banks?|officials?|ed|trai)"
+    r"(?:\s*,\s*|\s+and\s+|\s+or\s+|,\s*and\s+)?(?:(?:police|cbi|customs|rbi|banks?|officials?|ed|trai)"
+    r"(?:\s*,\s*|\s+and\s+|\s+or\s+|,\s*and\s+)?)*\s*(?:never|do\s+not|don't|will\s+not|won't)|"
     r"(?:fraudsters?|scammers?|fake\s+(?:police|cbi|officers?))\s+(?:are|may|often|try|pose|claim|call|threaten))\b"
-    r"|(?:कभी\s*(?:न|मत|नहीं)\s*(?:बताएं|साझा|ट्रांसफर|भेजें|करें)|"
-    r"डिजिटल\s*अरेस्ट\s*जैसी\s*कोई\s*(?:चीज़|चीज)\s*नहीं|सुरक्षा\s*चेतावनी|ठग\s*(?:नकली|फर्जी))",
+    r"|(?:डिजिटल\s*अरेस्ट\s*जैसी\s*कोई\s*(?:चीज़|चीज)\s*नहीं|ठग\s*(?:नकली|फर्जी))",
     re.I,
 )
+# Labels a genuine reminder uses. They mark the call as protective but never hide a rule match,
+# because a scammer can say them too ("security reminder from CBI: you are under digital arrest").
+AWARENESS_LABEL_RE = re.compile(
+    r"\b(?:routine\s+security\s+reminder|security\s+reminder|fraud\s+awareness|scam\s+alert)\b"
+    r"|सुरक्षा\s*चेतावनी",
+    re.I,
+)
+# Negated advice ("never transfer to a safe account", "do not share your OTP").
+AWARENESS_NEGATED_RE = re.compile(
+    r"\b(?:never\s+(?:conduct|do|ask|share|transfer|move|stay|pay|give)|"
+    r"do\s+not\s+(?:share|transfer|move|stay\s+on\s+a\s+video\s+call|pay|believe|fall\s+for)|"
+    r"don't\s+(?:share|transfer|move|pay|believe|fall\s+for))\b"
+    r"|कभी\s*(?:न|मत|नहीं)\s*(?:बताएं|साझा|ट्रांसफर|भेजें|करें)",
+    re.I,
+)
+REPORTED_RE = re.compile(
+    r"\b(?:if|did|has|have|whether|when)\s+(?:anyone|anybody|someone|the\s+caller|a\s+caller|they|he|she)\s+"
+    r"(?:ever\s+)?(?:ask|asks|asked|tell|tells|told|request\w*|want\w*)\b",
+    re.I,
+)
+CONTRAST_RE = re.compile(r"\b(?:but|however|yet|although|though|lekin|par)\b|लेकिन|पर\s", re.I)
+_STRONG_NEGATOR_RE = re.compile(r"\b(?:never|not|don't|dont|avoid|कभी|मत|नहीं)\b", re.I)
+_WEAK_NEGATOR_RE = re.compile(r"\b(?:no|without|nor|न)\b", re.I)
+_BREAK_RE = re.compile(r"\b(?:and|but|then|so|or|aur|lekin|just|now|immediately|instead|rather|only)\b"
+                       r"|[,:;—-]|और|लेकिन", re.I)
 
 # Routine benign cues on everyday calls/voice notes.
 BENIGN_CALL_RE = re.compile(
@@ -150,6 +179,8 @@ BENIGN_CALL_RE = re.compile(
     r"at\s+your\s+convenience|reception\s+desk|no\s+hurry|no\s+rush)\b",
     re.I,
 )
+
+DIGITAL_ARREST_RE = re.compile(r"\bdigital\s+arrest\b|डिजिटल\s*(?:अरेस्ट|गिरफ्तारी)", re.I)
 
 RULE_SPECS = [
     ("fake_authority_call", FAKE_AUTHORITY_RE,
@@ -193,6 +224,9 @@ def normalize_transcript(text: str) -> str:
         return ""
     s = unicodedata.normalize("NFKC", str(text))
     s = re.sub(r"[\u200b-\u200f\u2060\ufeff\u00ad]", "", s)
+    # Whisper writes "C. B. I." / "R. B. I."; join them so sentence splitting keeps the name whole.
+    s = re.sub(r"\b(?:[A-Za-z]\.\s?){2,}",
+               lambda m: re.sub(r"[.\s]", "", m.group(0)) + " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -201,7 +235,37 @@ def _split_clauses(text: str) -> list[str]:
 
 
 def _clause_is_protective(clause: str) -> bool:
-    return bool(AWARENESS_CLAUSE_RE.search(clause))
+    return bool(AWARENESS_NARRATIVE_RE.search(clause) or AWARENESS_LABEL_RE.search(clause)
+                or AWARENESS_NEGATED_RE.search(clause))
+
+
+def _active_segments(clauses: list[str]) -> list[str]:
+    """Text a call script can be matched in. A narrative clause about scams is skipped up to its
+    first contrast word; everything else stays active."""
+    out = []
+    for c in clauses:
+        m = AWARENESS_NARRATIVE_RE.search(c) or REPORTED_RE.search(c)
+        if m:
+            cut = CONTRAST_RE.search(c, m.end())
+            if cut:
+                out.append(c[cut.end():])
+            continue
+        out.append(c)
+    return [seg.strip() for seg in out if seg.strip()]
+
+
+def _negated(segment: str, start: int) -> bool:
+    """True when the words just before a match negate it ("never transfer money to a safe account",
+    "do not stay ..."): a strong negator up to six words back, "no"/"without" up to two, stopping at
+    "and", "but", "just", a comma and similar breaks ("don't panic, just transfer" is a demand)."""
+    before = segment[max(0, start - 80):start]
+    parts = _BREAK_RE.split(before)
+    words = (parts[-1] if parts else before).split()
+    return bool(_STRONG_NEGATOR_RE.search(" ".join(words[-6:])) or _WEAK_NEGATOR_RE.search(" ".join(words[-2:])))
+
+
+def _rule_hit(rx: re.Pattern, segment: str) -> bool:
+    return any(not _negated(segment, m.start()) for m in rx.finditer(segment))
 
 
 def analyze_call(transcript: str) -> dict:
@@ -226,30 +290,26 @@ def analyze_call(transcript: str) -> dict:
             "protective": False,
             "is_digital_arrest": False,
             "scam_type": "",
+            "active_text": "",
+            "set_aside": False,
         }
 
     clauses = _split_clauses(text)
     protective_clauses = [c for c in clauses if _clause_is_protective(c)]
     benign_cues = bool(BENIGN_CALL_RE.search(text))
 
-    # Match each call-script rule only against non-protective clauses so a genuine
-    # security reminder ("real police never do digital arrest; never transfer to a safe account")
-    # does not trigger scam rules.
+    # Match each rule in the active text. A match governed by a negation ("never transfer to a
+    # safe account") is advice, not a demand, and does not count. Labels such as "security
+    # reminder" hide nothing, so a scammer cannot borrow them to clear a script.
     hits: list[tuple[str, str]] = []
     seen_names: set[str] = set()
-    active_clauses = [c for c in clauses if not _clause_is_protective(c)]
+    active = _active_segments(clauses)
+    joined = " ".join(active)
 
     for name, rx, desc in RULE_SPECS:
-        if any(rx.search(c) for c in active_clauses):
+        if any(_rule_hit(rx, seg) for seg in active) or _rule_hit(rx, joined):
             hits.append((name, desc))
             seen_names.add(name)
-
-    # Whole-text cross-clause check for split phrases when the text is NOT an awareness reminder.
-    if not protective_clauses:
-        for name, rx, desc in RULE_SPECS:
-            if name not in seen_names and rx.search(text):
-                hits.append((name, desc))
-                seen_names.add(name)
 
     # Determine if an explicit "digital arrest" / coercive authority script is present.
     da_hits = seen_names & DIGITAL_ARREST_SIGNALS
@@ -258,8 +318,8 @@ def analyze_call(transcript: str) -> dict:
         "arrest_warrant", "contraband_parcel", "no_disconnect",
         "video_isolation", "safe_account_verify", "telecom_ivr_scam",
     })
-    explicit_digital_arrest = bool(
-        not protective_clauses and re.search(r"\bdigital\s+arrest\b|डिजिटल\s*(?:अरेस्ट|गिरफ्तारी)", text, re.I)
+    explicit_digital_arrest = any(
+        _rule_hit(DIGITAL_ARREST_RE, seg) for seg in active
     )
 
     # Scoring & verdict:
@@ -315,4 +375,7 @@ def analyze_call(transcript: str) -> dict:
         "protective": bool((protective_clauses or benign_cues) and not hits),
         "is_digital_arrest": is_da,
         "scam_type": scam_type,
+        # The text left after narrative and reported-speech clauses are set aside.
+        "active_text": joined,
+        "set_aside": any(AWARENESS_NARRATIVE_RE.search(c) or REPORTED_RE.search(c) for c in clauses),
     }

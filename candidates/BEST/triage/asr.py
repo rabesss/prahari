@@ -1,9 +1,8 @@
 """On-device offline Whisper speech-to-text through ExecuTorch (XNNPACK + KleidiAI INT8).
 
 Uses Arm's Apache-2.0 INT8 Whisper Tiny ExecuTorch export (`Arm/whisper-tiny-int8-xnnpack-executorch`,
-117 MB `.pte`, 8da8w XNNPACK). Log-mel spectrograms are computed in pure NumPy (80 Slaney mel bins,
-16 kHz, 30 s windows) rather than loading `whisper_preprocessor.pte`, which reduces peak RSS on
-aarch64 from ~4.17 GB to ~0.60 GB while keeping identical Whisper features.
+117 MB `.pte`, 8da8w XNNPACK). Log-mel spectrograms are computed in NumPy (80 Slaney mel bins, 16 kHz,
+30 s windows) instead of loading `whisper_preprocessor.pte`, which used far more memory on aarch64.
 
 Model weights are never committed to the repository and never downloaded during inference. Run
 `bin/callguard --setup-model` (or `download_model()`) once with network access, then run offline.
@@ -45,6 +44,8 @@ HOP_LENGTH = 160
 N_MELS = 80
 N_FRAMES = 3000
 MAX_CHUNKS = 4  # Up to 2 minutes of audio per file.
+# Decode one second past the cap so a longer file is detected as truncated without loading it all.
+LOAD_SECONDS = CHUNK_SECONDS * MAX_CHUNKS + 1
 
 DECODER_START_TOKEN_ID = 50258   # <|startoftranscript|>
 EOS_TOKEN_ID = 50257             # <|endoftext|>
@@ -144,13 +145,23 @@ def log_mel_spectrogram(waveform_16k: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(log_spec[np.newaxis, :, :], dtype=np.float32)
 
 
+def _lowpass(w: np.ndarray, cutoff: float, taps: int = 63) -> np.ndarray:
+    """Windowed-sinc low-pass FIR; `cutoff` is a fraction of the input sample rate (0-0.5)."""
+    n = np.arange(taps) - (taps - 1) / 2.0
+    h = 2.0 * cutoff * np.sinc(2.0 * cutoff * n) * np.hamming(taps)
+    h /= h.sum()
+    return np.convolve(w, h.astype(np.float32), mode="same").astype(np.float32)
+
+
 def resample_to_16k(waveform: np.ndarray, sample_rate: int) -> np.ndarray:
-    """Linear resample mono float32 audio to 16 kHz."""
+    """Resample mono float32 audio to 16 kHz (anti-alias low-pass first when downsampling)."""
     w = np.asarray(waveform, dtype=np.float32).reshape(-1)
     if sample_rate <= 0:
         raise AudioDecodeError(f"invalid sample rate: {sample_rate}")
     if sample_rate == SAMPLE_RATE or len(w) == 0:
         return np.ascontiguousarray(w, dtype=np.float32)
+    if sample_rate > SAMPLE_RATE:
+        w = _lowpass(w, 0.45 * SAMPLE_RATE / sample_rate)
     target_len = max(1, int(round(len(w) * SAMPLE_RATE / sample_rate)))
     out = np.interp(
         np.linspace(0.0, len(w) - 1, target_len),
@@ -160,13 +171,16 @@ def resample_to_16k(waveform: np.ndarray, sample_rate: int) -> np.ndarray:
     return np.ascontiguousarray(out, dtype=np.float32)
 
 
-def _read_wav_pcm(path: Path) -> tuple[np.ndarray, int]:
+def _read_wav_pcm(path: Path, max_seconds: float | None = None) -> tuple[np.ndarray, int]:
     try:
         with wave.open(str(path), "rb") as wf:
             sr = wf.getframerate()
             ch = wf.getnchannels()
             sw = wf.getsampwidth()
-            raw = wf.readframes(wf.getnframes())
+            n = wf.getnframes()
+            if max_seconds is not None and sr > 0:
+                n = min(n, int(max_seconds * sr))
+            raw = wf.readframes(n)
     except wave.Error as exc:
         raise AudioDecodeError(f"not a readable PCM WAV file ({path.name}): {exc}") from exc
 
@@ -185,16 +199,23 @@ def _read_wav_pcm(path: Path) -> tuple[np.ndarray, int]:
     return x.astype(np.float32), int(sr)
 
 
-def _decode_with_ffmpeg(path: Path) -> tuple[np.ndarray, int]:
+AUDIO_DEMUXERS = "ogg,matroska,webm,mov,mp4,m4a,mp3,wav,flac,aac,amr,caf,w64"
+
+
+def _decode_with_ffmpeg(path: Path, max_seconds: float | None = None) -> tuple[np.ndarray, int]:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise AudioDecodeError(
             f"cannot decode '{path.suffix or path.name}' without ffmpeg on PATH; "
             "install ffmpeg or convert the voice note to 16 kHz PCM WAV first."
         )
+    # Only audio container demuxers: a "voice note" that is really an ffconcat/playlist file must not
+    # make ffmpeg read other files.
     cmd = [
         ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
-        "-i", str(path), "-f", "s16le", "-acodec", "pcm_s16le",
+        "-format_whitelist", AUDIO_DEMUXERS, "-protocol_whitelist", "file",
+        "-i", str(path.resolve()), *(["-t", str(max_seconds)] if max_seconds else []),
+        "-f", "s16le", "-acodec", "pcm_s16le",
         "-ac", "1", "-ar", str(SAMPLE_RATE), "pipe:1",
     ]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
@@ -205,24 +226,25 @@ def _decode_with_ffmpeg(path: Path) -> tuple[np.ndarray, int]:
     return x, SAMPLE_RATE
 
 
-def load_audio_16k(audio_path: str | Path) -> tuple[np.ndarray, float]:
+def load_audio_16k(audio_path: str | Path, max_seconds: float | None = LOAD_SECONDS) -> tuple[np.ndarray, float]:
     """Load an audio file (WAV natively; WhatsApp .ogg/.opus/.m4a/.mp3/.flac via local ffmpeg).
 
-    Returns (mono_float32_16k, duration_seconds).
+    Only the first `max_seconds` are read, so a long recording cannot exhaust memory.
+    Returns (mono_float32_16k, duration_seconds_loaded).
     """
     path = Path(audio_path)
     if not path.is_file():
         raise AudioDecodeError(f"audio file not found: {path}")
     if path.suffix.lower() == ".wav":
         try:
-            wav, sr = _read_wav_pcm(path)
+            wav, sr = _read_wav_pcm(path, max_seconds)
         except AudioDecodeError:
             if shutil.which("ffmpeg"):
-                wav, sr = _decode_with_ffmpeg(path)
+                wav, sr = _decode_with_ffmpeg(path, max_seconds)
             else:
                 raise
     else:
-        wav, sr = _decode_with_ffmpeg(path)
+        wav, sr = _decode_with_ffmpeg(path, max_seconds)
     wav16 = resample_to_16k(wav, sr)
     return wav16, round(len(wav16) / SAMPLE_RATE, 3)
 
@@ -319,12 +341,18 @@ def find_repeated_suffix_pattern(
 
 def resolve_whisper_dir(explicit_dir: str | Path | None = None) -> tuple[Path, Path]:
     """Locate `(model_pte, tokenizer_json)` without accessing the network."""
-    candidates: list[Path] = []
-    if explicit_dir:
-        candidates.append(Path(explicit_dir))
-    env_dir = os.environ.get("PRAHARI_WHISPER_DIR")
-    if env_dir:
-        candidates.append(Path(env_dir))
+    # A directory the user chose wins over the registry and the defaults; a wrong one is an error,
+    # never a silent fall back to another copy.
+    for chosen in (explicit_dir, os.environ.get("PRAHARI_WHISPER_DIR")):
+        if chosen:
+            d = Path(chosen)
+            if (d / MODEL_FILENAME).is_file() and (d / TOKENIZER_FILENAME).is_file():
+                return d / MODEL_FILENAME, d / TOKENIZER_FILENAME
+            raise ModelMissingError(
+                f"Whisper ExecuTorch model files ({MODEL_FILENAME}, {TOKENIZER_FILENAME}) not found in {d}. "
+                "Run `candidates/BEST/bin/callguard --setup-model --model-dir DIR` (needs network once)."
+            )
+    candidates: list[Path] = [Path(c) for c in (explicit_dir, os.environ.get("PRAHARI_WHISPER_DIR")) if c]
     reg_path = Path(os.environ.get("HC_MODEL_REGISTRY", REPO / "models" / "registry.json"))
     if reg_path.is_file():
         try:
@@ -372,7 +400,8 @@ def download_model(dest_dir: str | Path | None = None, verify: bool = True) -> d
         dst = target / name
         if not dst.is_file() or (verify and sha256_file(dst) != expected_sha):
             tmp = target / (name + ".part")
-            urllib.request.urlretrieve(f"{base_url}/{name}", tmp)
+            with urllib.request.urlopen(f"{base_url}/{name}", timeout=60) as resp, open(tmp, "wb") as fh:
+                shutil.copyfileobj(resp, fh, 1 << 20)
             digest = sha256_file(tmp)
             if verify and digest != expected_sha:
                 tmp.unlink(missing_ok=True)
@@ -523,6 +552,7 @@ class WhisperExecuTorchASR:
             gen_tokens += res["generated_tokens"]
 
         total_ms = mel_ms + enc_ms + dec_ms
+        truncated = len(np.asarray(waveform_16k).reshape(-1)) > CHUNK_SAMPLES * MAX_CHUNKS
         rtfx = round(duration_s / (total_ms / 1000.0), 2) if total_ms > 0 and duration_s > 0 else None
         rss_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0, 1)
         return {
@@ -532,6 +562,10 @@ class WhisperExecuTorchASR:
             "chunks": len(chunks),
             "generated_tokens": gen_tokens,
             "stop_reason": reasons[-1] if reasons else "empty",
+            "stop_reasons": reasons,
+            "truncated": truncated,
+            # Every window ended on end-of-text and nothing was cut: the transcript covers the file.
+            "complete": (not truncated) and bool(reasons) and all(r == "eos" for r in reasons),
             "backend": "executorch",
             "model": MODEL_ID,
             "load_ms": self.load_ms,

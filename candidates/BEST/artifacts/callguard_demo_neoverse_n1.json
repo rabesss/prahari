@@ -4,10 +4,6 @@
  "date": "2026-11-23",
  "asr_model": "Arm/whisper-tiny-int8-xnnpack-executorch (ExecuTorch 1.6, XNNPACK, INT8)",
  "llm_model": "llama32-1b-qlora (ExecuTorch 1.6, XNNPACK)",
- "process_peak_rss_mb_usr_bin_time": {
-  "asr_only_4_clips": 831.4,
-  "asr_plus_llama_4_clips": 2611.2
- },
  "wall_clock_s_4_clips": {
   "asr_only": 20.5,
   "asr_plus_llama": 47.7
@@ -54,7 +50,7 @@
     "gen_wall_ms": 10470.5
    },
    "explanation_status": "success",
-   "audio_file": "demo/call_guard/digital_arrest_cbi.wav",
+   "audio_file": "candidates/BEST/demo/call_guard/digital_arrest_cbi.wav",
    "transcript": "This is Inspector Rajas Sharma from Mumbai cybercrime and C. B. I. An arrest warrant has been issued in your name, because a parcel with illegal drugs was seized by customs. Do not disconnect this call and stay on video call alone. France for 50,000 rupees to the RBI Safe Verification account immediately, or police will arrest you.",
    "asr": {
     "text": "This is Inspector Rajas Sharma from Mumbai cybercrime and C. B. I. An arrest warrant has been issued in your name, because a parcel with illegal drugs was seized by customs. Do not disconnect this call and stay on video call alone. France for 50,000 rupees to the RBI Safe Verification account immediately, or police will arrest you.",
@@ -122,7 +118,7 @@
     "gen_wall_ms": 6812.5
    },
    "explanation_status": "success",
-   "audio_file": "demo/call_guard/trai_customs_parcel.wav",
+   "audio_file": "candidates/BEST/demo/call_guard/trai_customs_parcel.wav",
    "transcript": "Alert from Tri-Telicum Department. Your mobile number will be disconnected within two hours due to an illegal narcotics parcel linked to your at-hard card. Stay on the line and do not tell your family. Press 9 to speak to the cyber officer and verify your bank account.",
    "asr": {
     "text": "Alert from Tri-Telicum Department. Your mobile number will be disconnected within two hours due to an illegal narcotics parcel linked to your at-hard card. Stay on the line and do not tell your family. Press 9 to speak to the cyber officer and verify your bank account.",
@@ -180,7 +176,7 @@
     "gen_wall_ms": 3504.9
    },
    "explanation_status": "success",
-   "audio_file": "demo/call_guard/legit_bank_alert.wav",
+   "audio_file": "candidates/BEST/demo/call_guard/legit_bank_alert.wav",
    "transcript": "Hello, this is a routine security reminder from State Bank of India. Never share your OTP, UPPIN, or password on any phone call. If you did not authorize a card transaction, block your card directly, inside the official Yono app, or visit your home branch.",
    "asr": {
     "text": "Hello, this is a routine security reminder from State Bank of India. Never share your OTP, UPPIN, or password on any phone call. If you did not authorize a card transaction, block your card directly, inside the official Yono app, or visit your home branch.",
@@ -236,7 +232,7 @@
     "gen_wall_ms": 3684.8
    },
    "explanation_status": "success",
-   "audio_file": "demo/call_guard/legit_clinic_courier.wav",
+   "audio_file": "candidates/BEST/demo/call_guard/legit_clinic_courier.wav",
    "transcript": "Hi, this is Priya from City, dental clinic, calling to confirm your appointment to Marwad 11am. Also, your curry, her delivery, arrived at the building reception desk. No fear payment is required. Please call back whenever it is convenient.",
    "asr": {
     "text": "Hi, this is Priya from City, dental clinic, calling to confirm your appointment to Marwad 11am. Also, your curry, her delivery, arrived at the building reception desk. No fear payment is required. Please call back whenever it is convenient.",
@@ -263,5 +259,33 @@
    "expected": "benign",
    "expected_match": true
   }
- ]
+ ],
+ "process_peak_rss_mib_usr_bin_time": {
+  "asr_only_4_clips": 831.4,
+  "asr_plus_llama_4_clips": 2611.2
+ },
+ "note": "The first two clips ran slower than the last two; the host was shared (load average 3.0-3.6) and the cause was not isolated.",
+ "import_order_check": {
+  "clip": "digital_arrest_cbi.wav (17.9 s)",
+  "whisper_total_ms_without_llm_custom_ops_import": [
+   6733.3,
+   6608.9
+  ],
+  "whisper_total_ms_with_llm_custom_ops_imported_first": [
+   3781.3,
+   3748.0
+  ],
+  "llama_prefill_decode_tps_whisper_loaded_first_without_import": [
+   18.7,
+   11.5
+  ],
+  "llama_prefill_decode_tps_llama_loaded_first": [
+   82.2,
+   20.7
+  ],
+  "llama_prefill_decode_tps_whisper_loaded_first_with_import": [
+   79.3,
+   17.0
+  ]
+ }
 }

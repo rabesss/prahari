@@ -20,6 +20,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import resource
 import shutil
 import subprocess
@@ -32,7 +33,8 @@ from . import asr, callrules
 
 CAND = Path(__file__).resolve().parents[1]
 REPO = CAND.parents[1]
-DEMO_DIR = REPO / "demo" / "call_guard"
+# Inside the candidate so its tests and --demo work in a staged copy (bin/eval copies only this dir).
+DEMO_DIR = CAND / "demo" / "call_guard"
 
 VERDICT = {1: "malicious", 0: "benign", "uncertain": "uncertain"}
 
@@ -115,18 +117,34 @@ def classify_call(transcript: str) -> dict:
     }
 
 
-def _protective_reminder(text: str, call_a: dict) -> bool:
-    """A genuine security reminder: protective framing, no call-script harm, and the detector's
-    only harm (if any) is telling the listener to block their own card in the official app."""
+def _protective_reminder(text: str, call_a: dict, det_lab) -> bool:
+    """A genuine security reminder the detector over-flagged: protective framing, no call-script
+    signal, and no harm beyond telling the listener to block their own card in the official app.
+    A detector DANGEROUS verdict is overridden only in that self-block case; "no harm found" can
+    only clear a SUSPICIOUS one."""
     from . import mech
 
     if not call_a.get("protective") or call_a.get("label") != 0:
         return False
     m = mech.analyze(text)
+    if not m["protective"]:
+        return False
     harms = {name for name, _ in m["harm"]}
-    if not harms:
-        return True
-    return harms == {"block_threat"} and m["official_channel"] and m["self_check"]
+    self_block = harms == {"block_threat"} and m["official_channel"] and m["self_check"]
+    if det_lab == 1:
+        return bool(self_block)
+    return not harms or bool(self_block)
+
+
+def _only_reported_harm(text: str, call_a: dict) -> bool:
+    """True when setting aside narrative / reported-speech clauses removes the detector's DANGEROUS
+    reading and no call-script signal remains."""
+    from . import detect
+
+    if call_a.get("label") == 1 or not call_a.get("set_aside"):
+        return False
+    active = call_a.get("active_text") or ""
+    return not active.strip() or detect.classify_any("sms", active)[0] != 1
 
 
 def fuse(text: str, call_a: dict, det_lab, det_score: float, det_ev) -> tuple:
@@ -142,9 +160,14 @@ def fuse(text: str, call_a: dict, det_lab, det_score: float, det_ev) -> tuple:
     if call_lab == 1:
         lab: int | str = 1
         score = max(float(det_score), float(call_a["score"]))
-    elif det_lab in (1, "uncertain") and _protective_reminder(text, call_a):
+    elif det_lab in (1, "uncertain") and _protective_reminder(text, call_a, det_lab):
         lab = 0
         score = min(float(det_score), 0.25)
+    elif det_lab == 1 and _only_reported_harm(text, call_a):
+        # The detector's DANGEROUS reading came only from a question, reported speech or a story
+        # about scams ("did the caller ask for your OTP?"): SUSPICIOUS, never cleared.
+        lab = "uncertain"
+        score = 0.6
     elif det_lab == 1:
         lab = 1
         score = float(det_score)
@@ -162,7 +185,10 @@ def fuse(text: str, call_a: dict, det_lab, det_score: float, det_ev) -> tuple:
         if not evidence:
             evidence = ["no digital-arrest or scam-call demand detected in the transcript"]
     else:
-        evidence = list(dict.fromkeys(call_a["evidence"] + list(det_ev or [])))[:6]
+        # Only risk lines lead a warning: a "reads like a security reminder" line would become the
+        # opening of a STOP explanation.
+        risk_ev = [e for e in call_a["evidence"] if not e.startswith("reads like")]
+        evidence = list(dict.fromkeys(risk_ev + list(det_ev or [])))[:6]
     return lab, score, evidence
 
 
@@ -198,7 +224,11 @@ def build_call_prompt(transcript: str, lab: int | str, evidence: list[str], is_d
     """Build a compact, injection-safe Llama 3.2 prompt that opens with a STOP warning for scams."""
     from . import llm
 
-    snippet = transcript if len(transcript) <= 320 else transcript[:317] + "..."
+    # The transcript is untrusted caller audio: remove chat-template control tokens and the quote
+    # fence so it cannot open a new turn or close the quoted block.
+    clean = re.sub(r"<\|[^|>]{0,40}\|>", " ", transcript).replace('"""', '"')
+    clean = re.sub(r"\s+", " ", clean).strip()
+    snippet = clean if len(clean) <= 320 else clean[:317] + "..."
     top_ev = evidence[0] if evidence else ""
     if lab == 1:
         # Keep the copied opening short: the explainer's 40-token budget must also fit the
@@ -242,6 +272,31 @@ def build_call_prompt(transcript: str, lab: int | str, evidence: list[str], is_d
     return built
 
 
+INCOMPLETE_NOTE = {
+    "truncated": "only the first 2 minutes of the recording were checked",
+    "partial": "speech-to-text stopped early, so part of the call was not checked",
+}
+
+
+def mark_incomplete(res: dict, asr_res: dict) -> dict:
+    """A transcript that does not cover the whole call cannot clear it: NO RISK becomes SUSPICIOUS,
+    and every verdict says which part was not checked."""
+    if asr_res.get("complete", True):
+        return res
+    note = INCOMPLETE_NOTE["truncated" if asr_res.get("truncated") else "partial"]
+    out = dict(res)
+    out["asr_complete"] = False
+    out["evidence"] = list(dict.fromkeys(list(res.get("evidence") or []) + [note]))[:7]
+    if res.get("label") == 0:
+        out.update(
+            label="uncertain", verdict="uncertain", stop_warning=False,
+            score=max(float(res.get("score") or 0.0), 0.5),
+            actions=list(CALL_SUSPICIOUS_ACTIONS),
+            speech_script=build_speech_script("uncertain", False, out["evidence"], CALL_SUSPICIOUS_ACTIONS),
+        )
+    return out
+
+
 def explain_call(transcript: str, result: dict, explainer=None) -> dict:
     """Generate an on-device Llama 3.2 1B explanation via ExecuTorch for a Call Guard result."""
     from . import llm
@@ -282,7 +337,7 @@ def analyze_audio_file(
     asr_res = engine.transcribe_file(audio_path, language=language)
 
     t_det = time.perf_counter()
-    res = classify_call(asr_res["text"])
+    res = mark_incomplete(classify_call(asr_res["text"]), asr_res)
     det_ms = round((time.perf_counter() - t_det) * 1000, 2)
 
     if explain:
@@ -524,7 +579,7 @@ def main(argv=None) -> int:
             Path(a.out).write_text(payload, encoding="utf-8")
         print(payload)
         return 0
-    except (asr.AsrError, ValueError) as exc:
+    except (asr.AsrError, ValueError, OSError, subprocess.SubprocessError) as exc:
         print(f"callguard: {exc}", file=sys.stderr)
         return 2
 

@@ -71,8 +71,10 @@ def _call_actions_hi(actions):
     return [_CALL_HI_STEPS.get(step) or base.get(step, '') for step in (actions or [])]
 
 
-def verdict_call(transcript):
-    """Stage 1 for Call Guard: existing detector + Indian digital-arrest rules (no Llama)."""
+def verdict_call(transcript, truncated=False):
+    """Stage 1 for Call Guard: existing detector + Indian digital-arrest rules (no Llama).
+
+    `truncated`: the audio was cut before transcription; a cut call is never cleared."""
     t0 = time.perf_counter()
     text = callrules.normalize_transcript(transcript)
     call_a = callrules.analyze_call(text)
@@ -91,6 +93,13 @@ def verdict_call(transcript):
         scam = call_a['scam_type'] or llm.scam_type('sms', text, lab)
         actions = callguard.actions_for_call(lab, call_a, text)
         is_da = bool(call_a['is_digital_arrest'])
+
+    if truncated:
+        marked = callguard.mark_incomplete({'label': lab, 'evidence': ev, 'score': score},
+                                           {'complete': False, 'truncated': True})
+        if marked['label'] != lab:
+            actions = list(callguard.CALL_SUSPICIOUS_ACTIONS)
+        lab, ev, score = marked['label'], marked['evidence'], marked['score']
 
     ms = (time.perf_counter() - t0) * 1000.0
     speech_script = callguard.build_speech_script(lab, is_da, ev, actions)
@@ -129,7 +138,11 @@ def explain_call(runner):
         bool(_last_call.get('is_da', False)),
     )
     text, stats = ex.generate(prompt)
-    replaced = mobile.ends_with_replacement(
+    # The Call Guard tails are its own vetted sentences, not the SMS pool.
+    call_tails = (callguard.DIGITAL_ARREST_ACTIONS[0], callguard.CALL_SCAM_ACTIONS[0],
+                  callguard.CALL_SUSPICIOUS_ACTIONS[0])
+    body = (text or '').strip()
+    replaced = any(body.endswith(t) for t in call_tails) or mobile.ends_with_replacement(
         text, 'sms', _last_call.get('lab', 'uncertain'), _last_call.get('text', '')
     )
     return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
