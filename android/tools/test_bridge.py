@@ -181,6 +181,27 @@ for _sample in _samples:
         assert _token.group(0) in _got, (_sample, _got)
 print('every app string has Hindi, including evidence templates')
 
+def device_words(text):
+    """Mirror of MainActivity.onDevice for an x86/x86_64 ABI. arm64 does not call this."""
+    return (text
+            .replace("this phone's", "this emulator's")
+            .replace('this phone', 'this emulator')
+            .replace('इसी फ़ोन', 'इसी एम्युलेटर')
+            .replace('इस फ़ोन', 'इस एम्युलेटर'))
+
+_phone_bits = ('this phone', 'इस फ़ोन', 'इसी फ़ोन')
+_hi_values = list(hi['ui'].values()) + list(hi['evidence'].values())
+_hi_values += [item['hi'] for item in hi['new'].values()]
+_hi_values += [item['hi'] for item in hi['templates']]
+for _value in _hi_values:
+    if any(bit in _value for bit in ('इस फ़ोन', 'इसी फ़ोन')):
+        _shown = device_words(_value)
+        assert 'इस फ़ोन' not in _shown and 'इसी फ़ोन' not in _shown, _value
+for _key in list(hi['ui']) + [item['en'] for item in hi['new'].values()]:
+    if 'this phone' in _key:
+        assert 'this phone' not in device_words(_key), _key
+print('emulator wording drops this phone and इस फ़ोन')
+
 import qrdec
 _HI = """
 111111100101001111111
