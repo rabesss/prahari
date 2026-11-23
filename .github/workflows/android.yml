@@ -10,6 +10,10 @@ on:
         description: Build an additional APK with the source-built 1.6 AAR
         type: boolean
         default: false
+      emulator_abi:
+        description: Also package x86_64 libraries (emulator screenshots only; not Arm evidence)
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -42,7 +46,8 @@ jobs:
         working-directory: android
         env:
           CHAQUOPY_BUILD_PYTHON: ${{ steps.python310.outputs.python-path }}
-        run: gradle --no-daemon :app:assembleDebug
+          ABIS: ${{ inputs.emulator_abi && 'arm64-v8a,x86_64' || 'arm64-v8a' }}
+        run: gradle --no-daemon :app:assembleDebug -PprahariAbis="$ABIS"
       - name: Audit merged manifest and APK permissions
         run: |
           python android/tools/check_manifest.py android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
