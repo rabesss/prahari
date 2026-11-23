@@ -197,6 +197,9 @@ _GROUP_COMPANY_RE = re.compile(
 _AGGREGATOR_HANDLE_RE = re.compile(r"razorpay|rzp|payu|cashfree|ccavenue|billdesk|juspay|pinelabs|easebuzz|instamojo")
 # Agent/registration words that, next to a bank or government name on a personal mobile UPI ID, still need a check.
 _AGENT_WORD_RE = re.compile(r"\b(?:agents?|registered|associates|consultants?|advis[eo]rs?)\b", re.I)
+# "Pay Rs 500 and receive 5% cashback on your purchase" is a purchase promo; "Pay Rs 1 to receive cashback" is not.
+_PROMO_PURCHASE_RE = re.compile(r"\d+\s*%|\bon\s+(?:your\s+|the\s+|this\s+)?(?:purchase|order|bill|shopping|payment)\b", re.I)
+_PROMO_PURPOSE_RE = re.compile(r"\bto\s+(?:receive|claim|get|unlock)\b", re.I)
 _PROMO_BREAKER_RE = re.compile(
     r"\b(?:receive|claim|credited?\s+to)\b|\bpay\s*(?:rs\.?|inr|₹)?\s*\d", re.I)
 # Small local shops legitimately name a brand they resell ("Airtel Recharge Shop", "Jio Point").
@@ -244,7 +247,7 @@ _PIN_TO_RECEIVE_RE = re.compile(
     r"|(?:receive|get|claim|credit|refund|cashback|paise\s*pa+ne|paisa\s*pa+ne|पाने|प्राप्त)"
     r"[^.;!?।\n]{0,35}(?:enter|using|with|via|by|dal\w*|daal\w*|डाल\w*)"
     r"[^.;!?।\n]{0,20}(?:upi\s*)?(?:pin|mpin|पिन)"
-    r"|scan(?:(?!\bpay)[^.;!?।\n]){0,25}(?:to\s+)?(?:receive\b|"
+    r"|scan(?:(?!\bpay)[^.;!?।\n]){0,25}(?:to\s+)?(?:receive\b(?!\s+(?:(?:the|your|a)\s+)?(?:payment\s+)?(?:receipt|confirmation|details|link|sms|alert|bill|invoice))|"
     r"get\s+paid\b|(?:get|claim|credit|collect)\s+(?:(?:your|the|a|an)\s+)?(?:money|payment|amount|refund|cashback|cash|paisa|paise|funds?|prize|reward|gift|bonus|rs\.?|inr|₹)|paise\s*pa+ne|paisa\s*pa+ne|पैसे\s*पाने|प्राप्त\s*करने)"
     r"|(?:approve|accept|confirm)[^.;!?।\n]{0,25}(?:to\s+)?(?:receive|claim|credit|refund|cashback|"
     r"get\s+(?:(?:your|the)\s+)?(?:money|payment|amount|refund|cashback|paisa|paise|rs\.?|₹))"
@@ -262,7 +265,7 @@ _PIN_TO_RECEIVE_RE = re.compile(
 _RECEIVE_LURE_RE = re.compile(
     r"\b(?:refund|cash\s*back|cashback|money\s*back|"
     r"receive\s+(?:the\s+|your\s+)?(?:money|payment|amount|funds?|cash|reward|gift|prize|bonus)(?!\s*(?:receipt|confirmation|details|link|sms|alert))|"
-    r"receive\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*(?![\d,])|payment\s+receive|pay\s+receive|"
+    r"receive\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*(?![\d,])(?!\s*%)|payment\s+receive|pay\s+receive|"
     # "Get Rs 100 off", "get Rs 1299 worth of products", "you get Rs 100 change" are discounts, not credits.
     r"get\s*(?:rs\.?|inr|₹)\s*\d[\d,]*(?![\d,])(?!\s*(?:off|discount|worth|instant|talktime|change|extra\s+off))|"
     r"pay\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*\s*(?:to|and)\s*(?:get|receive|win)\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*(?![\d,])(?!\s*(?:off|discount|worth|instant|talktime))|"
@@ -485,8 +488,9 @@ def parse_upi(text: str) -> dict | None:
                 double_encoded = True
                 v = v2
         v_clean = _HIDDEN_RE.sub("", v)
-        if v_clean != v and _SUSPICIOUS_HIDDEN_RE.search(v):
-            had_hidden = True
+        if v_clean != v:
+            if _SUSPICIOUS_HIDDEN_RE.search(v):
+                had_hidden = True
             v = v_clean.strip()
         params_multi.setdefault(k, []).append(v)
         if k not in params or (not params[k] and v):
@@ -747,7 +751,9 @@ def analyze_upi(text: str) -> dict:
     # 3. Collect / AutoPay mandate / "scan or enter PIN to receive money" trick
     has_pin_receive = bool(_PIN_TO_RECEIVE_RE.search(note_and_name))
     cleaned_for_lure = _LEGIT_CREDIT_CARD_RE.sub(" ", note_and_name)
-    if valid_mc and not _OFFICIAL_DESK_RE.search(pn) and not _PROMO_BREAKER_RE.search(cleaned_for_lure):
+    promo_broken = bool(_PROMO_BREAKER_RE.search(cleaned_for_lure)) and (
+        bool(_PROMO_PURPOSE_RE.search(cleaned_for_lure)) or not _PROMO_PURCHASE_RE.search(cleaned_for_lure))
+    if valid_mc and not _OFFICIAL_DESK_RE.search(pn) and not promo_broken:
         cleaned_for_lure = _MERCHANT_PROMO_RE.sub(" ", cleaned_for_lure)
     has_receive_lure = bool(_RECEIVE_LURE_RE.search(cleaned_for_lure))
 
@@ -924,7 +930,7 @@ def analyze_upi(text: str) -> dict:
                     f"payee name '{pn}' does not match UPI ID {pa}",
                     "pn",
                 )
-            elif valid_mc and not _MERCHANT_VPA_PREFIX_RE.match(vpa_user) and not _GROUP_COMPANY_RE.search(pn) \
+            elif valid_mc and not _MERCHANT_VPA_PREFIX_RE.match(vpa_user) and not (primary_cat == "bank" and _GROUP_COMPANY_RE.search(pn)) \
                     and not _AGGREGATOR_HANDLE_RE.search(vpa_handle):
                 # Any QR can carry a 4-digit mc, so it cannot vouch for the name. Real brand QRs put the
                 # brand in the UPI ID (amazonupi@apl, bsesrajdhani.bbps@hdfcbank); flag for a check.

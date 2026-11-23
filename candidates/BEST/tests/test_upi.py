@@ -690,3 +690,27 @@ def test_receive_trick_wording_fits_collect_requests():
     res = upi.analyze_upi("upi://collect?pa=9876543210@ybl&am=500&tn=Enter%20UPI%20PIN%20to%20receive%20payment")
     desc = [f.description for f in res["findings"] if f.code == "receive_money_trick"][0]
     assert "upi://pay" not in desc and "approving a UPI request" in desc
+
+
+# ---- PR #46 review round 3 (gpt-6.1-terra) regressions ------------------------------------------
+
+def test_encoded_zwj_inside_hindi_note_does_not_evade():
+    uri = "upi://pay?pa=9876543210@ybl&pn=Rahul&am=500&tn=" + quote("पै‍से पाने के लिए स्कैन करें")
+    assert upi.analyze_upi(uri)["label"] == 1
+
+
+def test_purchase_cashback_promo_with_receive_stays_clear():
+    uri = "upi://pay?pa=q123456789@ybl&pn=Sharma%20Store&mc=5411&am=500&tn=" + quote("Pay Rs 500 and receive 5% cashback on your purchase")
+    assert upi.analyze_upi(uri)["label"] == 0
+    assert upi.analyze_upi("upi://pay?pa=person@ybl&pn=Shop&mc=5411&am=1&tn=Pay+Rs+1+to+receive+cashback")["label"] == 1
+    assert upi.analyze_upi("upi://pay?pa=abc@okaxis&pn=Shop&mc=5411&tn=Receive%20cashback")["label"] == 1
+
+
+def test_scan_to_receive_receipt_is_not_a_lure():
+    uri = "upi://pay?pa=q123456789@ybl&pn=Sharma%20Store&mc=5411&am=500&tn=" + quote("Scan to receive payment receipt")
+    assert upi.analyze_upi(uri)["label"] == 0
+
+
+def test_group_word_does_not_cover_non_financial_brand():
+    assert upi.analyze_upi("upi://pay?pa=foo@okaxis&pn=Amazon%20Life&mc=5411")["label"] == "uncertain"
+    assert upi.analyze_upi("upi://pay?pa=GI0000000001@icici&pn=ICICI%20Lombard%20General%20Insurance&mc=6300")["label"] == 0
