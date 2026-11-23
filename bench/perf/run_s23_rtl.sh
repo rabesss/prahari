@@ -70,12 +70,14 @@ adb -s "$SERIAL" shell sha256sum \
   /sdcard/Android/data/in.prahari.app/files/tokenizer.model > "$OUT_DIR/device-sha256.txt"
 
 echo "=== Step 4/5: Run timed checks (cold + 3x warm + benign + debit + link + port + airplane) ==="
+# Exit code 2 means some checks timed out or were skipped; keep going so logs are still captured.
+RUN_RC=0
 "$PY" "$ROOT/bench/perf/adb_bench.py" --serial "$SERIAL" run \
   --out-dir "$OUT_DIR" \
   --with-airplane \
   --mem-poll-ms 500 \
   --settle-s 8 \
-  --check-timeout-s 60
+  --check-timeout-s 60 || RUN_RC=$?
 
 echo "=== Step 5/5: Capture logcat tail and battery/thermal post-check ==="
 adb -s "$SERIAL" logcat -d -t 250 > "$OUT_DIR/logcat-tail.txt" || true
@@ -86,3 +88,7 @@ echo "Summary: $OUT_DIR/summary.md"
 echo "JSON:    $OUT_DIR/results.json"
 echo "CSV:     $OUT_DIR/items.csv"
 echo "Remember to close the Samsung Remote Test Lab reservation in the browser."
+if [[ "$RUN_RC" != "0" ]]; then
+  echo "WARNING: adb_bench run exited $RUN_RC: some checks are incomplete (see the Status column in summary.md)." >&2
+  exit "$RUN_RC"
+fi

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
+import time
 
 import pytest
 
@@ -169,7 +171,7 @@ def test_adb_parsers_and_parse_dir(tmp_path, capsys):
     assert rc == 0
     res = json.loads((out_dir / "results.json").read_text(encoding="utf-8"))
     assert res["schema"] == "prahari-android-bench-v1"
-    assert res["summary"]["warm_kyc_decode_tps_max"] == pytest.approx(43.4)
+    assert res["summary"]["warm_kyc_decode_tps_median"] == pytest.approx(43.4)
     assert (out_dir / "items.csv").is_file()
     assert (out_dir / "summary.md").is_file()
 
@@ -204,8 +206,18 @@ def test_adb_parsers_and_parse_dir(tmp_path, capsys):
     assert "46.7" in md
 
 
-def test_arm_bench_end_to_end_stub_candidate_gating(tmp_path):
-    """Exercise full arm_bench.main pipeline (all vs flagged-only) on a tiny stub candidate."""
+def _fake_executorch(root: Path, ok: bool = True) -> Path:
+    """Minimal `executorch.extension.pybindings.portable_lib` so the threadpool hook can be exercised."""
+    pkg = root / "fake_et" / "executorch" / "extension" / "pybindings"
+    pkg.mkdir(parents=True)
+    for d in (pkg.parents[1], pkg.parents[0], pkg):
+        (d / "__init__.py").write_text("")
+    body = "def _unsafe_reset_threadpool(n):\n    return None\n" if ok else "def _unsafe_reset_threadpool(n):\n    raise RuntimeError('unsupported')\n"
+    (pkg / "portable_lib.py").write_text(body)
+    return root / "fake_et"
+
+
+def _stub_candidate(tmp_path):
     cand = tmp_path / "stub_cand"
     (cand / "triage").mkdir(parents=True)
     (cand / "artifacts").mkdir()
@@ -254,6 +266,13 @@ def test_arm_bench_end_to_end_stub_candidate_gating(tmp_path):
     tok.write_bytes(b"fake-tok")
     reg = tmp_path / "registry.json"
     reg.write_text(json.dumps({"stub-llama": {"family": "llama", "pte": str(pte), "tokenizer": str(tok), "notes": "stub"}}))
+    return cand, reg
+
+
+def test_arm_bench_end_to_end_stub_candidate_gating(tmp_path, monkeypatch):
+    """Exercise full arm_bench.main pipeline (all vs flagged-only) on a tiny stub candidate."""
+    cand, reg = _stub_candidate(tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(_fake_executorch(tmp_path)))
     out_dir = tmp_path / "bench_out"
 
     rc = arm_bench.main([
@@ -289,3 +308,56 @@ def test_adb_helpers_bounds_battery_and_meminfo_fallback():
     assert mem["total_pss_kb"] == 1744842
     assert mem["total_rss_kb"] == 1867396
 
+
+def test_arm_bench_refuses_unconfirmed_thread_count(tmp_path, monkeypatch):
+    """A failed threadpool reset must fail the run, not be reported as an N-thread result."""
+    cand, reg = _stub_candidate(tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(_fake_executorch(tmp_path, ok=False)))
+    with pytest.raises(RuntimeError, match="threadpool reset to 4 was not confirmed"):
+        arm_bench.main([
+            "--candidate", str(cand), "--registry", str(reg), "--python", sys.executable,
+            "--threads", "4", "--prompt-lengths", "short", "--repeats", "1",
+            "--out-dir", str(tmp_path / "out"),
+        ])
+
+
+def test_run_bounded_kills_process_group_on_timeout(tmp_path):
+    marker = tmp_path / "child.pid"
+    script = f"import subprocess, sys, time; p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); open({str(marker)!r}, 'w').write(str(p.pid)); time.sleep(60)"
+    with pytest.raises(RuntimeError, match="timed out"):
+        arm_bench.run_bounded([sys.executable, "-c", script], timeout_s=2)
+    child = int(marker.read_text())
+    for _ in range(50):
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        pytest.fail("grandchild survived the timeout kill")
+
+
+def test_adb_check_button_and_completion_selectors():
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    sample_row = (run8 / "sample-row.xml").read_text(encoding="utf-8")
+    home = (run8 / "home.xml").read_text(encoding="utf-8")
+    # The real button, not the header subtitle "... scam & threat check".
+    assert adb_bench.find_bounds_center(sample_row, desc_contains=adb_bench.CHECK_BUTTON_DESC) == (540, 1726)
+    assert adb_bench.find_bounds_center(home, desc_contains=adb_bench.CHECK_BUTTON_DESC) is None
+    # Result screen before scrolling: header not visible. After Llama finished: done.
+    assert adb_bench.stats_header_state((run8 / "kyc-running.xml").read_text(encoding="utf-8")) == "absent"
+    assert adb_bench.stats_header_state((run8 / "kyc-stats.xml").read_text(encoding="utf-8")) == "done"
+    pending = 'content-desc="On-device stats, collapsed. 6 ms · —"'
+    assert adb_bench.stats_header_state(pending) == "pending"
+
+
+def test_android_summary_ignores_incomplete_checks():
+    ok = {"check": "kyc-warm-1", "status": "ok", "detector_ms": 6.0, "first_token_ms": 510.0,
+          "decode_tps": 43.4, "total_s": 1.2, "app_memory_mb": 1708.0}
+    bad = {"check": "kyc-warm-2", "status": "timeout", "detector_ms": 6.0, "first_token_ms": None,
+           "decode_tps": None, "total_s": None, "app_memory_mb": None}
+    rep = adb_bench.summarize_android({}, [ok, bad])
+    assert rep["summary"]["checks_total"] == 2
+    assert rep["summary"]["checks_incomplete"] == ["kyc-warm-2"]
+    assert rep["summary"]["warm_kyc_ttft_ms_median"] == 510.0
+    assert "| `kyc-warm-2` | timeout |" in adb_bench.render_android_md(rep)

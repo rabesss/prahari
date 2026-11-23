@@ -24,6 +24,7 @@ import platform
 import re
 import resource
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -97,17 +98,47 @@ WORKLOADS: dict[str, list[tuple[str, str, str]]] = {
     ],
 }
 
+THREADPOOL_OK_MARKER = "[arm_bench] threadpool_reset_ok="
+
 SITECUSTOMIZE_SRC = """\
-import os
+import os, sys
 _n = os.environ.get("PRAHARI_BENCH_THREADS")
 if _n:
     try:
         from executorch.extension.pybindings.portable_lib import _unsafe_reset_threadpool
         _unsafe_reset_threadpool(int(_n))
+        print(f"[arm_bench] threadpool_reset_ok={_n}", file=sys.stderr, flush=True)
     except Exception as _exc:
-        import sys
-        print(f"[arm_bench] warning: failed to reset ExecuTorch threadpool to {_n}: {_exc}", file=sys.stderr)
+        print(f"[arm_bench] error: failed to reset ExecuTorch threadpool to {_n}: {_exc}", file=sys.stderr, flush=True)
 """
+
+DEFAULT_RUN_TIMEOUT_S = 1800.0
+
+
+def run_bounded(cmd: list[str], *, timeout_s: float, **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run with a hard timeout that kills the whole child process group."""
+    proc = subprocess.Popen(cmd, start_new_session=True, **kwargs)
+    try:
+        out, err = proc.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+            proc.wait(timeout=10)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+        raise RuntimeError(f"command timed out after {timeout_s:.0f} s and was killed: {cmd[:3]}...")
+    except BaseException:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
+        raise
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
 GATED_RUNNER_SRC = """\
 import json, sys, time
@@ -202,7 +233,7 @@ def collect_host_info(py_exe: str) -> dict:
     lscpu_bin = shutil.which("lscpu")
     if lscpu_bin:
         try:
-            raw = subprocess.check_output([lscpu_bin], text=True, stderr=subprocess.DEVNULL)
+            raw = subprocess.check_output([lscpu_bin], text=True, stderr=subprocess.DEVNULL, timeout=30)
             parsed = parse_lscpu(raw)
             flags = set(parsed.get("Flags", "").split())
             info["cpu"] = {
@@ -230,7 +261,7 @@ def collect_host_info(py_exe: str) -> dict:
         "print(json.dumps(out))\n"
     )
     try:
-        info["runner_packages"] = json.loads(subprocess.check_output([py_exe, "-c", probe], text=True, stderr=subprocess.DEVNULL))
+        info["runner_packages"] = json.loads(subprocess.check_output([py_exe, "-c", probe], text=True, stderr=subprocess.DEVNULL, timeout=120))
     except Exception:
         info["runner_packages"] = {}
     return info
@@ -467,6 +498,7 @@ def run_single(
     tag: str,
     offline_unshare: bool = False,
     perf_record: bool = False,
+    run_timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
 ) -> dict:
     work_dir = Path(tempfile.mkdtemp(prefix="prahari-armbench-"))
     try:
@@ -513,11 +545,17 @@ def run_single(
 
         t0 = time.monotonic()
         with log_path.open("w", encoding="utf-8") as log_fh:
-            proc = subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=log_fh)
+            proc = run_bounded(cmd, timeout_s=run_timeout_s, env=env, stdout=subprocess.DEVNULL, stderr=log_fh)
         batch_wall_s = time.monotonic() - t0
+        log_text = log_path.read_text(errors="replace")
         if proc.returncode != 0:
-            tail = log_path.read_text(errors="replace")[-1500:]
-            raise RuntimeError(f"Run {tag} exited {proc.returncode}:\n{tail}")
+            raise RuntimeError(f"Run {tag} exited {proc.returncode}:\n{log_text[-1500:]}")
+        # Never label a run with a thread count that was not actually applied before model load.
+        if f"{THREADPOOL_OK_MARKER}{threads}" not in log_text:
+            raise RuntimeError(
+                f"Run {tag}: ExecuTorch threadpool reset to {threads} was not confirmed "
+                f"(no `{THREADPOOL_OK_MARKER}{threads}` in {log_path}); refusing to report it as a {threads}-thread result."
+            )
 
         peak_rss_time_mib = None
         if time_path.is_file():
@@ -526,7 +564,7 @@ def run_single(
                 peak_rss_time_mib = round(int(raw_kb) / 1024.0, 1)
 
         out_rows = [json.loads(line) for line in out_jsonl.read_text(encoding="utf-8").splitlines() if line.strip()]
-        et_log = parse_executorch_stderr(log_path.read_text(errors="replace"))
+        et_log = parse_executorch_stderr(log_text)
 
         perf_summary = None
         if perf_record and perf_data.is_file():
@@ -534,6 +572,7 @@ def run_single(
                 ["perf", "report", "--stdio", "--no-children", "-i", str(perf_data)],
                 text=True,
                 stderr=subprocess.DEVNULL,
+                timeout=600,
             )
             (out_dir / f"{tag}.perf-flat.txt").write_text(flat, encoding="utf-8")
             perf_summary = parse_perf_flat(flat)
@@ -580,7 +619,12 @@ def run_detector_bench(py_exe: str, candidate: Path, fixtures_dir: Path, threads
             if Path("/usr/bin/time").is_file():
                 cmd = ["/usr/bin/time", "-f", "%M", "-o", str(tm)] + cmd
             t0 = time.monotonic()
-            proc = subprocess.run(cmd, cwd=candidate, env=env, capture_output=True, text=True)
+            try:
+                proc = run_bounded(cmd, timeout_s=600, cwd=candidate, env=env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            except RuntimeError as exc:
+                results[task] = {"error": str(exc)}
+                continue
             wall_s = time.monotonic() - t0
             if proc.returncode != 0:
                 results[task] = {"error": proc.stderr[-500:]}
@@ -735,6 +779,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--perf-profile", action="store_true", help="Run `perf record -F 99 -g` on the first repeat of the first cell")
     ap.add_argument("--no-sha256", action="store_true", help="Skip SHA-256 hashing of large .pte files")
     ap.add_argument("--dry-run", action="store_true", help="Print host/disk/matrix plan without running inference")
+    ap.add_argument("--run-timeout-s", type=float, default=DEFAULT_RUN_TIMEOUT_S,
+                    help="Hard wall-clock limit per benchmark process; the whole process group is killed on expiry")
     ap.add_argument("--out-dir", type=Path, default=None)
     return ap.parse_args(argv)
 
@@ -811,6 +857,7 @@ def main(argv: list[str] | None = None) -> int:
                             tag=tag,
                             offline_unshare=args.offline_unshare,
                             perf_record=do_perf,
+                            run_timeout_s=args.run_timeout_s,
                         )
                         if do_perf:
                             did_perf = True

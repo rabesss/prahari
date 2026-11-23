@@ -348,13 +348,22 @@ def cmd_stage(args: argparse.Namespace) -> int:
     return 0
 
 
+def _median(vals: list, ndigits: int):
+    vals = [v for v in vals if v is not None]
+    return round(statistics.median(vals), ndigits) if vals else None
+
+
 def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = None, source_note: str = "") -> dict:
+    all_rows = rows
+    # Aggregates use completed checks only; timed-out or skipped checks stay listed under "checks".
+    rows = [r for r in all_rows if r.get("status", "ok") == "ok"]
     det_vals = [r["detector_ms"] for r in rows if r.get("detector_ms") is not None]
     ttft_vals = [r["first_token_ms"] for r in rows if r.get("first_token_ms") is not None]
     dec_vals = [r["decode_tps"] for r in rows if r.get("decode_tps") is not None]
     tot_vals = [r["total_s"] for r in rows if r.get("total_s") is not None]
     mem_vals = [r["app_memory_mb"] for r in rows if r.get("app_memory_mb") is not None]
     warm_kyc = [r for r in rows if "warm" in r.get("check", "").lower()]
+    warm_ttft = [r["first_token_ms"] for r in warm_kyc if r.get("first_token_ms") is not None]
     return {
         "schema": "prahari-android-bench-v1",
         "device_class": "android-arm64",
@@ -362,7 +371,8 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
         "device": device,
         "dumpsys_meminfo": meminfo or {},
         "summary": {
-            "checks_total": len(rows),
+            "checks_total": len(all_rows),
+            "checks_incomplete": [r.get("check") for r in all_rows if r.get("status", "ok") != "ok"],
             "checks_full_stats": sum(1 for r in rows if r.get("decode_tps") is not None and r.get("total_s") is not None),
             "detector_ms_min_max": [min(det_vals), max(det_vals)] if det_vals else None,
             "ttft_ms_median": round(statistics.median(ttft_vals), 1) if ttft_vals else None,
@@ -373,11 +383,11 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
             "total_s_min_max": [min(tot_vals), max(tot_vals)] if tot_vals else None,
             "app_pss_mb_min_max": [min(mem_vals), max(mem_vals)] if mem_vals else None,
             "app_pss_growth_mb": round(mem_vals[-1] - mem_vals[0], 1) if len(mem_vals) >= 2 else 0.0,
-            "warm_kyc_ttft_ms_median": round(statistics.median([r["first_token_ms"] for r in warm_kyc if r.get("first_token_ms") is not None]), 1) if warm_kyc else None,
-            "warm_kyc_decode_tps_max": max((r["decode_tps"] for r in warm_kyc if r.get("decode_tps") is not None), default=None),
-            "warm_kyc_total_s_min": min((r["total_s"] for r in warm_kyc if r.get("total_s") is not None), default=None),
+            "warm_kyc_ttft_ms_median": round(statistics.median(warm_ttft), 1) if warm_ttft else None,
+            "warm_kyc_decode_tps_median": _median([r.get("decode_tps") for r in warm_kyc], 1),
+            "warm_kyc_total_s_median": _median([r.get("total_s") for r in warm_kyc], 2),
         },
-        "checks": rows,
+        "checks": all_rows,
     }
 
 
@@ -400,13 +410,13 @@ def render_android_md(report: dict) -> str:
         )
     lines += [
         "",
-        "| Check | Airplane | Detector (ms) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS (MB) | Peak polled PSS (MiB) |",
-        "|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Check | Status | Airplane | Detector (ms) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Peak polled PSS (MiB) |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for r in report["checks"]:
         polled = r.get("mem_polled", {}).get("peak_pss_mib")
         lines.append(
-            f"| `{r['check']}` | {'yes' if r.get('airplane_mode') else 'no'} | "
+            f"| `{r['check']}` | {r.get('status', 'ok')} | {'yes' if r.get('airplane_mode') else 'no'} | "
             f"{r['detector_ms'] if r['detector_ms'] is not None else '—'} | "
             f"{r['first_token_ms'] if r['first_token_ms'] is not None else '—'} | "
             f"{r['decode_tps'] if r['decode_tps'] is not None else '—'} | "
@@ -465,6 +475,23 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
     return 0
 
 
+# The main action button. Match its accessibility label, not any text containing "Check": the app header
+# subtitle ("... scam & threat check") and "Check for the model files" would otherwise match first.
+CHECK_BUTTON_DESC = "Check on this phone"
+# The stats header's accessibility label is "On-device stats, <state>. <detector> · <first token>". The app
+# fills it twice: once when the verdict appears (first token "—") and again when Llama has finished.
+_STATS_DESC_RE = re.compile(r'content-desc="On-device stats, (?:collapsed|expanded)\. ([^"]*?) · ([^"]*)"')
+
+
+def stats_header_state(xml_text: str) -> str:
+    """'absent' (header not on screen), 'pending' (Llama still running) or 'done'."""
+    m = _STATS_DESC_RE.search(xml_text)
+    if not m:
+        return "absent"
+    first_token = m.group(2).strip()
+    return "pending" if (not first_token or first_token.startswith("—") or first_token == "…") else "done"
+
+
 def _set_airplane(serial: str | None, enabled: bool) -> str:
     mode = "enable" if enabled else "disable"
     adb_out(serial, "shell", "cmd", "connectivity", "airplane-mode", mode, check=False)
@@ -498,10 +525,22 @@ def cmd_run(args: argparse.Namespace) -> int:
         for check_id, sample_label, want_airplane in DEFAULT_SAMPLES:
             if want_airplane and not args.with_airplane:
                 continue
+            observed_airplane = None
             if want_airplane != airplane_active:
-                val = _set_airplane(serial, want_airplane)
+                observed_airplane = _set_airplane(serial, want_airplane)
                 airplane_active = want_airplane
-                print(f"[adb_bench] airplane_mode_on={val}", flush=True)
+                print(f"[adb_bench] airplane_mode_on={observed_airplane}", flush=True)
+            if want_airplane:
+                observed_airplane = observed_airplane or adb_out(
+                    serial, "shell", "settings", "get", "global", "airplane_mode_on", check=False).strip()
+                if observed_airplane != "1":
+                    print(f"[adb_bench] ERROR: airplane mode requested but device reports airplane_mode_on={observed_airplane!r}; "
+                          f"skipping {check_id} rather than recording a false offline result", file=sys.stderr)
+                    rows.append({"check": check_id, "sample_label": sample_label, "status": "airplane-not-confirmed",
+                                 "airplane_mode": False, "airplane_mode_on_observed": observed_airplane,
+                                 "detector_ms": None, "first_token_ms": None, "decode_tps": None,
+                                 "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                    continue
 
             batt_before = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
             xml = dump_ui_xml(serial)
@@ -516,21 +555,36 @@ def cmd_run(args: argparse.Namespace) -> int:
             time.sleep(0.5)
             xml = dump_ui_xml(serial)
 
+            if not find_bounds_center(xml, desc_contains=CHECK_BUTTON_DESC):
+                print(f"[adb_bench] ERROR: {CHECK_BUTTON_DESC!r} button not on screen; skipping {check_id}", file=sys.stderr)
+                rows.append({"check": check_id, "sample_label": sample_label, "status": "no-check-button",
+                             "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
+                             "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                continue
             poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
             poller.start()
             t0 = time.monotonic()
-            tap_element(serial, xml, text_contains="Check")
+            tap_element(serial, xml, desc_contains=CHECK_BUTTON_DESC)
 
-            # Wait until stats summary appears (LLM finished) or timeout
+            # Wait until the stats header reports a first-token time, i.e. Llama has finished. The header sits
+            # below the fold on the result screen, so scroll down whenever it is not in the dump.
             deadline = time.monotonic() + args.check_timeout_s
             stats_xml = ""
+            state = "absent"
             while time.monotonic() < deadline:
                 time.sleep(1.0)
                 stats_xml = dump_ui_xml(serial)
-                if "On-device stats" in stats_xml and ("t/s" in stats_xml or "First token" in stats_xml or " · " in stats_xml):
+                state = stats_header_state(stats_xml)
+                if state == "done":
                     break
+                if state == "absent" and "Check another" in stats_xml:
+                    adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
             wall_s = round(time.monotonic() - t0, 2)
             polled = poller.stop()
+            status = "ok" if state == "done" else "timeout"
+            if status != "ok":
+                print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
+                      f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
 
             # Scroll down and expand stats card if collapsed
             adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
@@ -548,7 +602,10 @@ def cmd_run(args: argparse.Namespace) -> int:
             rec = parse_stats_xml(stats_xml)
             rec["check"] = check_id
             rec["sample_label"] = sample_label
+            rec["status"] = status
             rec["airplane_mode"] = want_airplane
+            if want_airplane:
+                rec["airplane_mode_on_observed"] = observed_airplane
             rec["host_observed_wall_s"] = wall_s
             rec["mem_polled"] = polled
             rec["battery_before"] = batt_before
@@ -572,6 +629,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         write_android_outputs(report, out_dir)
         print(render_android_md(report))
         print(f"[adb_bench] outputs written to {out_dir}")
+        failed = [r["check"] for r in rows if r.get("status", "ok") != "ok"]
+        if failed:
+            print(f"[adb_bench] {len(failed)} check(s) incomplete: {', '.join(failed)}", file=sys.stderr)
+            return 2
         return 0
     finally:
         if airplane_active:

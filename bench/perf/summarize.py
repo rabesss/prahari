@@ -19,7 +19,14 @@ def _row_from_arm_linux(data: dict) -> list[dict]:
         w_dec = (agg.get("warm_decode_tps_mean_std") or [None])[0]
         w_wall = (agg.get("warm_item_wall_s_mean_std") or [None])[0]
         all_wall = (agg.get("all_item_wall_s_mean_std") or [None])[0]
-        rss = agg.get("peak_rss_runner_mib_max") or agg.get("peak_rss_time_mib_max")
+        # Prefer the kernel's max RSS for the whole process (/usr/bin/time %M); the ExecuTorch runner only logs
+        # RSS at a few points, which can miss the true peak.
+        if agg.get("peak_rss_time_mib_max") is not None:
+            mem_str = f"{agg['peak_rss_time_mib_max']:.1f} MiB max RSS (/usr/bin/time, whole process)"
+        elif agg.get("peak_rss_runner_mib_max") is not None:
+            mem_str = f"{agg['peak_rss_runner_mib_max']:.1f} MiB RSS (largest ExecuTorch-logged snapshot, not a true peak)"
+        else:
+            mem_str = "—"
         rows.append({
             "device": f"{dev_label} ({cell['threads']}T)",
             "isa": flags,
@@ -30,7 +37,7 @@ def _row_from_arm_linux(data: dict) -> list[dict]:
             "prefill_tps": w_pre,
             "decode_tps": w_dec,
             "per_check_s": w_wall if w_wall is not None else all_wall,
-            "memory": f"{rss:.1f} MiB RSS" if rss is not None else "—",
+            "memory": mem_str,
         })
     return rows
 
@@ -41,12 +48,19 @@ def _row_from_android(data: dict) -> list[dict]:
     mem = data.get("dumpsys_meminfo", {})
     label = f"{dev.get('manufacturer', '')} {dev.get('model', 'Android')} ({dev.get('soc_model', 'arm64')})".strip()
     flags = ", ".join(dev.get("isa_arm_features") or []) or "n/a"
-    mem_str = "—"
-    if mem.get("total_pss_mib"):
-        mem_str = f"{mem['total_pss_mib']:.1f} MiB PSS / {mem['total_rss_mib']:.1f} MiB RSS"
+    polled = [c.get("mem_polled", {}).get("peak_pss_mib") for c in data.get("checks", [])
+              if c.get("status", "ok") == "ok"]
+    polled = [v for v in polled if v is not None]
+    if polled:
+        mem_str = f"{max(polled):.1f} MiB peak PSS (dumpsys polled during checks)"
+    elif mem.get("total_pss_mib"):
+        mem_str = (f"{mem['total_pss_mib']:.1f} MiB PSS / {mem['total_rss_mib']:.1f} MiB RSS "
+                   f"(single dumpsys snapshot after the run, not a peak)")
     elif summ.get("app_pss_mb_min_max"):
         lo, hi = summ["app_pss_mb_min_max"]
-        mem_str = f"{lo:.1f}–{hi:.1f} MB app PSS"
+        mem_str = f"{lo:.1f}–{hi:.1f} MB app PSS (in-app, after each check)"
+    else:
+        mem_str = "—"
     det = summ.get("detector_ms_min_max")
     det_str = f"{det[0]}–{det[1]}" if det else "—"
     return [{
@@ -57,8 +71,8 @@ def _row_from_android(data: dict) -> list[dict]:
         "detector_ms": det_str,
         "warm_ttft_ms": summ.get("warm_kyc_ttft_ms_median") or summ.get("ttft_ms_median"),
         "prefill_tps": None,
-        "decode_tps": summ.get("warm_kyc_decode_tps_max") or summ.get("decode_tps_median"),
-        "per_check_s": summ.get("warm_kyc_total_s_min") or summ.get("total_s_median"),
+        "decode_tps": summ.get("warm_kyc_decode_tps_median") or summ.get("decode_tps_median"),
+        "per_check_s": summ.get("warm_kyc_total_s_median") or summ.get("total_s_median"),
         "memory": mem_str,
     }]
 
@@ -78,7 +92,10 @@ def summarize_files(paths: list[Path]) -> str:
     lines = [
         "# Consolidated Prahari Arm Performance Summary",
         "",
-        "| Device & Config | ISA Flags | Model | Workload | Detector (ms) | Warm TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Warm Check (s) | Peak Memory |",
+        "Warm columns are means (Arm Linux, items after warm-up) or medians (Android warm KYC checks). "
+        "Memory methods differ by platform and are not directly comparable.",
+        "",
+        "| Device & Config | ISA Flags | Model | Workload | Detector (ms) | Warm TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Warm Check (s) | Memory (method) |",
         "|---|---|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for r in rows:
