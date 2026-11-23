@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# One live window on this Linux host: socket table + kernel counters, then the flow-rule verdict.
+#   bin/monitor [--seconds N] [--explain]     No root, no packet capture. Uses the shared project venv unless HC_PY is set.
+set -euo pipefail
+C="$(cd "$(dirname "$0")/.." && pwd)"
+PY="${HC_PY:-$C/../../.venv/bin/python}"
+PYTHONPATH="$C${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m triage.live "$@"
