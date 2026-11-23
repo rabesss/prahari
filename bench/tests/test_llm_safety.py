@@ -414,3 +414,13 @@ def test_benign_evidence_swaps_an_overruled_threat_for_safe_descriptions():
     otp = "Your OTP for login is 448213. Do not share it with anyone, not even bank staff."
     line = "reads like a normal OTP notification"
     assert llm.benign_evidence("sms", otp, [line], 0) == [line]
+
+
+def test_debit_alert_gets_the_not_your_payment_step():
+    ok = "SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app."
+    assert llm.actions_for("sms", "uncertain", ok)[0] == llm.DEBIT_STEP
+    assert llm.actions_for("sms", 0, "Your electricity bill of Rs 1,240 is due on 15 Dec.")[0] != llm.DEBIT_STEP
+
+
+def test_calling_1930_is_not_a_scam_contact():
+    assert not llm._unsafe_advice("If money was taken, call 1930 at once.", 1)

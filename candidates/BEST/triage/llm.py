@@ -460,7 +460,7 @@ _TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|webs
 _CHANNEL_VERB = {"open", "call", "contact", "visit", "use", "check"}
 _SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|email|e-mail|whatsapp|"
                           r"chat|caller|sender|provided|given|mentioned|listed|requested|sent|above|below|"
-                          r"this number|that number|the number in)\b|\d{4,}|https?://|www\.", re.I)
+                          r"this number|that number|the number in)\b|(?!1930\b)\d{4,}|https?://|www\.", re.I)
 
 
 def _unsafe_advice(sent, verdict):
@@ -635,23 +635,23 @@ TYPE_ADVICE = {
     "a fake KYC or account check": ("Do not open the link; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an account-blocking threat": ("Ignore the threat; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an account-blocking scam": ("Ignore the threat; check your account in the bank app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "OTP or PIN theft": ("Never share your OTP or PIN or CVV with anyone.", [
         "Never share your OTP, UPI PIN or CVV.",
-        "If you shared it, freeze your card in the bank app.",
+        "If you shared it, call your bank to block the card and UPI.",
         REPORT]),
     "an advance-fee scam": ("Do not pay from the message; check any charge in the official app.", [
         "Do not pay a fee from a link or message to receive anything.",
-        "Check any parcel charge in the India Post or courier app.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Check any parcel charge on the courier's official website.",
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a fake lottery or prize scam": ("Ignore it; never pay a fee to receive a prize.", [
         "Never pay a fee or tax to receive a prize.",
         "Never share bank details, PIN or Aadhaar.",
@@ -675,15 +675,15 @@ TYPE_ADVICE = {
     "a remote-access app scam": ("Never install screen-sharing apps a caller asks for.", [
         "Never install AnyDesk, QuickSupport or other screen-sharing apps.",
         "If one is open, switch on airplane mode and uninstall it.",
-        "Freeze your cards in the bank app and call 1930."]),
+        "From another phone, call your bank to freeze cards and UPI."]),
     "sextortion or blackmail": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
         "Save screenshots, block the sender and lock your profiles.",
         "Report it confidentially at cybercrime.gov.in."]),
-    "a fake police or customs threat": ("Never stay on a video call with police; check by calling 1930.", [
+    "a fake police or customs threat": ("Never stay on a video call with police; report it at cybercrime.gov.in.", [
         "Hang up; there is no such thing as a digital arrest.",
         "Never move money to a safe account for anyone.",
-        "Tell your family and report at cybercrime.gov.in or call 1930."]),
+        "Tell your family; report at cybercrime.gov.in, or call 1930 if money was lost."]),
     "a safe-account transfer scam": ("Never move money to a safe account for anyone.", [
         "Never move money to a safe account for anyone.",
         "Hang up and call your bank on the number on your card.",
@@ -691,10 +691,10 @@ TYPE_ADVICE = {
     "an electricity disconnection scam": ("Ignore the number; check your bill in the official app.", [
         "Do not call the number or open the link in the SMS.",
         "Check your bill in your electricity board's official app.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "an investment or trading scam": ("Never send money to a personal account for trading.", [
         "Never send money to a personal account for trading.",
-        "Check the adviser or broker on SEBI's official website.",
+        "Check the adviser on SEBI Check before sending money.",
         REPORT]),
     "a crypto payment scam": ("Never send crypto to someone who contacted you.", [
         "Never send crypto or gift cards to a stranger.",
@@ -703,7 +703,7 @@ TYPE_ADVICE = {
     "an identity-document scam": ("Never send Aadhaar or PAN or passport copies over chat.", [
         "Never send ID documents over WhatsApp or a link.",
         "Use only the official app or office for KYC.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a payment fraud": ("Do not pay; check the request in the official app first.", [
         "Do not pay to an account or link from a message.",
         "Check any bill or request in the official app.",
@@ -727,19 +727,19 @@ TYPE_ADVICE = {
     "an impersonation scam": ("Ignore the message; check with the organisation in its official app.", [
         "Do not reply or use any contact from the message.",
         "Check through the official app or the number you already have.",
-        "Report the SMS on Sanchar Saathi Chakshu."]),
+        "Report the message or call on Sanchar Saathi Chakshu."]),
     "a phishing link on a lookalike domain": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a shortened link that hides its destination": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a phishing link": ("Do not open the link; check the official app instead.", [
         "Do not open the link or log in on that page.",
         "Open the official app or type the address yourself.",
-        "If you entered card details, freeze the card in the bank app."]),
+        "If you entered details, call your bank to block card, UPI and netbanking."]),
     "a port scan": (None, ["Block the source address at the firewall or router.",
                            "Close unused ports and turn off remote admin.",
                            "Check the logs for logins that follow the scan."]),
@@ -752,8 +752,18 @@ TYPE_ADVICE = {
 }
 
 
+DEBIT_STEP = "Not your payment? Block it in your bank app and call 1930."
+
+
 def advice_for(kind, verdict, inp):
     """(replacement sentence, vetted actions) for one checked item."""
+    if verdict in (0, "uncertain") and kind == "sms" and inp is not None:
+        a = mech.analyze(inp)
+        if a["receipt"] or a["otp_note"]:
+            # A debit or OTP alert, real or copied: the step that matters is what to do if the
+            # reader did not make the payment.
+            base = (ACTIONS)[verdict]
+            return base[0], [DEBIT_STEP] + [x for x in base if x != DEBIT_STEP][:2]
     if verdict == 1 and inp is not None:
         tail, acts = TYPE_ADVICE.get(scam_type(kind, inp, verdict), (None, None))
         if acts:
