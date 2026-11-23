@@ -79,6 +79,19 @@ first scoring its false alarms were read but not tuned on.
 | dev_v2 (96) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 | v3_tune (159) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 
-The sealed holdout result is in the PR description (scored once, after review).
+### Sealed holdout (india_final_holdout_v1_1, 184 items; scored once, at 80cc558, after review)
+| Route | main FPR / recall / precision / F1 | this PR FPR / recall / precision / F1 |
+|---|---|---|
+| SMS (155) | 0.402 / 0.926 / 0.643 / 0.759 | 0.322 / 0.926 / 0.692 / 0.792 |
+| Injection (29) | 0.154 / 0.938 / 0.882 / 0.909 | unchanged |
+| Combined (184) | 0.370 / 0.929 / 0.678 / 0.784 | 0.300 / 0.929 / 0.722 / 0.813 |
+
+The gain on the sealed set is real but much smaller than on the dev and validation sets. SMS false
+alarms fell from 35 to 28 of 87 genuine messages, and no scam was lost. The remaining false alarms are
+mostly advisories and notices that carry a link of their own (every sealed link uses the `.example`
+placeholder, which the contact gate counts as a contact and the domain rules call risky). The rest are
+personal chats that warn relatives about scams, and doorstep or self-check messages, which are now
+known residuals. The sealed set was not used to choose any rule, and nothing was tuned after this
+score.
 
 Reproduce: `$HC_PY research/fpfix/score.py candidates/BEST NAME=PATH.jsonl ... [--errors]`.
