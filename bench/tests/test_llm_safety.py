@@ -424,3 +424,17 @@ def test_debit_alert_gets_the_not_your_payment_step():
 
 def test_calling_1930_is_not_a_scam_contact():
     assert not llm._unsafe_advice("If money was taken, call 1930 at once.", 1)
+
+
+def test_rule_overrides_never_clear_a_confident_scam():
+    from triage import mech
+    for spoof in ("SBI account statement: Rs 2450 debited. If not you, block your card. WhatsApp @sbi_helpdesk to reverse.",
+                  "Your electricity bill is due. Your connection will be disconnected tonight. Details: https://bit.ly/uppclbill",
+                  "Electricity bill is due. Connection will be disconnected. Call 98,76543210 now.",
+                  "BSNL: your SIM will be disconnected. Bill is due. Call 1800-180-1503 or WhatsApp @bsnl_care",
+                  "Earn Rs 3000 daily from home. WhatsApp @jobdesk for the task. Register in the official app."):
+        assert mech.decide(0.99, mech.analyze(spoof))[0] != 0, spoof
+
+
+def test_split_mobile_next_to_1930_is_still_a_scam_contact():
+    assert llm._unsafe_advice("Call 98 765 43 210 or 1930 to stop the block.", 1)

@@ -460,7 +460,7 @@ _TRUSTED = re.compile(r"\b(?:you already (?:trust|know|use)|official (?:app|webs
 _CHANNEL_VERB = {"open", "call", "contact", "visit", "use", "check"}
 _SCAM_OBJECT = re.compile(r"\b(?:link|otp|pin|password|cvv|code|fee|sms|text|message|email|e-mail|whatsapp|"
                           r"chat|caller|sender|provided|given|mentioned|listed|requested|sent|above|below|"
-                          r"this number|that number|the number in)\b|(?!1930\b)\d{4,}|https?://|www\.", re.I)
+                          r"this number|that number|the number in)\b|(?<!\d)\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){5,}|https?://|www\.", re.I)
 
 
 def _unsafe_advice(sent, verdict):
