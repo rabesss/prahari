@@ -1755,7 +1755,7 @@ class MainActivity : Activity() {
             Triple(R.drawable.ic_cpu, "Llama 3.2 1B on this phone", "Runs on the phone's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation."),
             Triple(R.drawable.ic_shield_check, "A detector decides the verdict", "Scam signals are checked by the detector. The verdict never depends on the AI text."),
             Triple(R.drawable.ic_list, "Safety steps are fixed", "Steps come from a vetted list (Sanchar Saathi Chakshu, 1930, cybercrime.gov.in), never from the AI."),
-            Triple(R.drawable.ic_alert_circle, "Best effort, not a guarantee", "No checker catches every scam. If in doubt, don't pay and call 1930.")
+            Triple(R.drawable.ic_alert_circle, "Best effort, not a guarantee", "No checker catches every scam. If in doubt, don't pay; report on Sanchar Saathi Chakshu, or call 1930 if money was lost.")
         )
         descriptions.forEachIndexed { i, item ->
             if (i > 0) divider(sheet)

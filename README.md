@@ -1,6 +1,6 @@
 # Prahari
 
-Prahari is a prototype offline scam and phishing triage assistant for Arm Bharat AI-SoC Challenge 2026–27, PS3. Local detectors classify pasted messages and URLs; Llama 3.2 1B generates advice through ExecuTorch. A network text description is scored by rules; a separate trained model scores NSL-KDD feature records as dataset replay. Live traffic capture is not implemented. Results are advisory and can be wrong. Arm measurements are from a cloud VM; Android has also been run on an x86_64 emulator, not a physical phone.
+Prahari is a prototype offline scam and phishing triage assistant for Arm Bharat AI-SoC Challenge 2026–27, PS3. Local detectors classify pasted messages and URLs; Llama 3.2 1B generates advice through ExecuTorch. A network text description is scored by rules; a separate trained model scores NSL-KDD feature records as dataset replay. Live traffic capture is not implemented. Results are advisory and can be wrong. Built with Llama (Llama 3.2 Community License). Arm measurements are from a cloud VM; Android has also been run on an x86_64 emulator, not a physical phone.
 
 ## Round-3 results
 
