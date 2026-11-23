@@ -73,6 +73,7 @@ MECH_SHORT = {
     "sextortion": "threatens to publish private material",
     "investment": "promises guaranteed or doubled returns for a deposit",
     "id_request": "asks you to send identity documents to a chat or link",
+    "notice_contact": "gives its own number, chat or link to act on",
 }
 MECH_TYPE = {
     "secret_request": "OTP or PIN theft",
@@ -167,8 +168,8 @@ def _short_host(name, desc):
 
 # Benign readings, most specific first: a receipt or OTP notice says more than a generic
 # official-channel or protection phrase, and names the concept a reader checks for.
-SAFE_ORDER = ("transaction_receipt", "otp_notification", "bill_notice", "appointment_notice",
-              "notice", "official_channel", "protective", "promo", "personal",
+SAFE_ORDER = ("transaction_receipt", "otp_notification", "bill_notice", "personal", "appointment_notice",
+              "notice", "official_channel", "protective", "promo",
               "consumer_advice", "collect_review", "awareness")
 
 

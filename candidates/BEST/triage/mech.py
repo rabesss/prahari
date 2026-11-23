@@ -24,12 +24,17 @@ NEG = re.compile(
 # the call, not the transfer; "agar payment nahi hua to message jayega" is a threat, not advice.
 NEG_VERB = re.compile(r"(?:\b(?:do not|don't|does not|doesn't|did not|not|never|will not|won't|"
                       r"should not|shouldn't|must not|no need to|not to|avoid|no)\b|"
-                      r"(?:^|[\s,;:])(?:न|मत))\s+(?:\w+\s+){0,4}$", re.I)
+                      r"(?:^|[\s,;:])(?:न|मत))\s+(?:\w+\s+){0,4}$|"
+                      # "you never need to enter your PIN or scan a QR code": the negated auxiliary
+                      # reaches the second verb of the same clause
+                      r"\b(?:never|not|no)\s+(?:need|needed)\s+to\s+(?:\w+\s+){0,9}$", re.I)
 NEG_AFTER = re.compile(r"^\s*(?:is|are|was|were|को|की|का|to)?[^\n]{0,20}?"
                        r"(?:\b(?:not|never|no)\b|नहीं(?![\u0900-\u097F])|(?:na|mat|nahi)\b|"
                        r"(?:न|मत)(?=[\s,;:।]|$))", re.I)
 NEG_INSIDE = re.compile(r"(?:^|[\s,;:])(?:न|मत|नहीं)(?:[\s,;:]|$)|"
-                        r"(?:^|\s)(?:nahi|nahin|mat|na|not|no|never)(?:\s|$)", re.I)
+                        r"(?:^|\s)(?:nahi|nahin|mat|na|not|no|never)(?:\s|$)|"
+                        # "penalty se bachne ke liye ...": the matched harm is what to avoid
+                        r"(?:^|\s)(?:se|से)\s*bach\w*", re.I)
 
 # Credentials and identity material a scammer asks a victim to hand over. Bare "kyc" and
 # generic words like "details" are deliberately absent: routine notices mention them.
@@ -57,7 +62,7 @@ SHARE = (r"(shar(e|ing)|send(ing)?|reply|telling|tell|giv(e|ing)|forward(ing)?|r
          r"bhejein|bhejo|bhej\w*|batao|bataen|bataein|bata do|saza\w*|"
          r"भेजें|भेजो|बताएं|बताओ|साझा|दें|दो|भरो)")
 ENTER = (r"(enter(ing)?|typ(e|ing)|fill(ing)?|provid(e|ing)|submit(ting)?|confirm(ing)?|"
-         r"verif(y|ying)|updat(e|ing)|upload(ing)?|डालें|दर्ज|पुष्टि|स्वीकार|भरें|अपडेट|करें)")
+         r"verif(y|ying)|updat(e|ing)|upload(ing)?|डाल\w*|दर्ज\w*|पुष्टि|स्वीकार|भर\w*|अपडेट|करें|कराएं|कराएँ|करवाएं)")
 DEMAND = (r"(\b(ask|asks|asked|asking|demand|demands|demanded|demanding|want|wants|wanted|"
           r"request|requests|requested|requesting|require|requires|required|requiring)\b|मांग\w*|कहता है|कहती है|कह रह\w*|"
           r"bolta hai|bol rah\w*|keh rah\w*|कहा है|कहते हैं|maang\w*|maang rah\w*)")
@@ -98,7 +103,7 @@ DEST_PERSONAL = (
     r"\b[6-9]\d{9}\b|\+91|"
     r"\b[a-z0-9._%+-]+@[a-z]{2,}\b|"
     r"(इस|नीचे दिए|दिए गए)\s+(लिंक|अकाउंट|खाते|वॉलेट)|"
-    r"(phone|mobile|whatsapp|telegram)\s*(number|par|pe|se)|"
+    r"\b(phone|mobile|whatsapp|telegram)\b\s*(number|par|pe|se)\b|"
     r"crypto|bitcoin|usdt|wallet address")
 # A payee that is *suspicious on its own*: a private account, an unknown wallet, a personal
 # mobile number or a relative's "lawyer". Used to decide a payment demand without relying on
@@ -148,12 +153,16 @@ COLLECT = (r"(collect request|payment request|कलेक्ट अनुरो
            r"upi (mandate|debit|autopay)|mandate required)")
 COLLECT_ACTION = (r"(approve|accept|authori[sz]e|स्वीकार|अनुमोदन|मंजूर)")
 QR = (r"(scan (this|the|our|below) qr|this qr|qr code|scan kar\w*|स्कैन)")
-REMOTE = (r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen shar\w*|remote[- ]access "
+REMOTE = (r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen[- ]shar\w*|remote[- ]access "
           r"(software|app|tool)|remote app|remote support)\b|"
           r"\b(install|download)\b[^.;!?।\n]{0,30}\b(app|application|apk|software|tool)\b|"
           r"grant (contacts|sms|access|permissions)|"
           r"ऐप (लगाकर|इंस्टॉल)|ऐप डाउनलोड|रिमोट (ऐप|सॉफ्टवेयर)|स्क्रीन (साझा|शेयर)")
 THREAT = (
+    # Hindi: "खाता बंद हो जाएगा / ब्लॉक हो रहा है" (the account will be closed or is being blocked)
+    r"\b(account|sim|card|connection|number|service|upi|banking|खाता|सिम|कार्ड|सेवा|नंबर|यूपीआई)\b"
+    r"[^.;!?।\n]{0,50}\b(बंद|ब्लॉक|निलंबित|फ्रीज|काट|डिएक्टिवेट)\s+हो\s*"
+    r"(?:जाएगा|जाएगी|रहा है|रही है|गया है|गई है|सकता है|जा सकता है)|"
     r"\b(block|blocked|suspend|suspended|deactivat\w*|disconnect\w*|cut[- ]?off|freeze|frozen|"
     r"expire\w*|penalty|arrest|warrant|legal action|fir|closure|forfeit\w*|dhamki|blackmail\w*|"
     r"धमकी|डरा\w*)\b"
@@ -289,7 +298,10 @@ BUY_REFUND = (r"(buy|purchase|order|book)\b[^.;!?।\n]{0,50}"
 RISKY_BRANDS = ("sbi", "hdfc", "icici", "axis", "kotak", "pnb", "paytm", "phonepe", "gpay", "bhim",
                 "npci", "amazon", "flipkart", "irctc", "uidai", "aadhaar", "incometax", "epfo", "airtel",
                 "jio", "indiapost", "netflix", "paypal", "google", "apple", "microsoft", "kbc", "rbi",
-                "trai", "mahadiscom", "lic", "bsnl", "vodafone")
+                "trai", "mahadiscom", "lic", "bsnl", "vodafone", "tata", "baroda", "canara", "union",
+                "idbi", "indusind", "bandhan", "yesbank", "bescom", "cesc", "uppcl", "adani", "reliance",
+                "indane", "bharatgas", "iocl", "hpcl", "bpcl", "swiggy", "zomato", "myntra", "mobikwik",
+                "freecharge", "sancharsaathi", "cybercrime", "chakshu", "sebi", "nsdl", "groww", "zerodha")
 RISKY_TLDS = {"top", "xyz", "club", "online", "site", "live", "icu", "buzz", "info", "click", "link",
               "work", "rest", "fit", "tk", "ml", "ga", "cf", "gq", "shop", "vip", "cc", "win", "loan",
               "example"}
@@ -300,13 +312,85 @@ OFFICIAL_DOMAINS = {"sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com
                     "irctc.co.in", "uidai.gov.in", "incometax.gov.in", "epfindia.gov.in",
                     "indiapost.gov.in", "pib.gov.in", "cybercrime.gov.in", "sancharsaathi.gov.in",
                     "airtel.in", "jio.com", "bsnl.co.in", "mahadiscom.in", "google.com", "apple.com",
-                    "microsoft.com", "netflix.com", "paypal.com"}
+                    "microsoft.com", "netflix.com", "paypal.com",
+                    # public sites of other Indian banks, billers and couriers
+                    "bankofbaroda.in", "canarabank.com", "unionbankofindia.co.in", "idbibank.in",
+                    "indusind.com", "yesbank.in", "bandhanbank.com", "federalbank.co.in",
+                    "southindianbank.com", "centralbankofindia.co.in", "punjabandsindbank.co.in",
+                    "indianbank.in", "bankofindia.com", "ucobank.in",
+                    "tatapower.com", "cesc.co.in", "bescom.org", "uppcl.org",
+                    "bluedart.com", "dhl.com", "fedex.com", "delhivery.com", "licindia.in", "licindia.com"}
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "rb.gy", "shorturl.at",
               "tiny.cc", "ow.ly"}
 URL_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+|"
                     r"\b(?:[a-z0-9-]+\.)+(?:com|in|net|org|top|xyz|info|co|ly|me|io|site|online|link|"
                     r"click|live|vip|cc|shop|club|app|biz|pro|icu|buzz|work|rest|fit|tk|ml|ga|cf|gq|"
                     r"dev|net|org|example)(?:/[^\s<>\"']*)?", re.I)
+# A mobile number: ten digits starting 6-9, optionally prefixed by +91 or 0, which may be split by
+# spaces or punctuation ("98,76543210"), or written masked in a sample ("98XXXXXX66"). Reference,
+# consumer and card numbers, amounts, short codes and toll-free lines do not have this shape.
+PHONE = (r"(?:(?<!\w)(?:\+?91[\s-]?|0[\s-]?)?[6-9]\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){8}(?!\w)"
+         r"|(?<!\w)[6-9]\d?[xX×*]{4,6}\d{2,3}(?!\w))")
+# A chat the reader is sent to, as distinct from a chat a warning merely names ("WhatsApp groups
+# ... are scams", "never asks for details on WhatsApp").
+CHAT_CONTACT = (r"\b(whatsapp|telegram)\s+(?:us|me|kar\w*|karein|karo|kijiye|pe|par|on|at)\b|"
+                r"\b(?:on|via|through|by|over)\s+(?:whatsapp|telegram)\b[^.;!?।\n]{0,40}"
+                r"\b(?:call|chat|message|video|contact|send|share|upload|report|submit|apply|"
+                r"register|verify|confirm|talk|speak|join|connect|reach)\b|"
+                r"\b(?:call|contact|chat|message|reach|join)\b[^.;!?।\n]{0,30}\b(?:whatsapp|telegram)\b|"
+                r"(?:व्हाट्सऐप|व्हाट्सएप|टेलीग्राम)\s*(?:पर|कर\w*|से)")
+URGENCY = (r"\b(?:immediately|urgent|urgently|right away|at once|asap|right now|today itself|"
+           r"within \d+[- ]?(?:hours?|hrs?|minutes?|mins?)|turant|abhi|जल्दी|तुरंत|अभी)\b")
+# An alert that tells the reader what to do if they did not make the request or transaction.
+SELF_CHECK = re.compile(
+    r"\bif (?:it |this )?(?:was |is )?(?:not |never )(?:you|done by you|done|initiated|requested|"
+    r"authori[sz]ed|made|attempted)\b|\bif (?:it |this )?(?:was |is )?unauthori[sz]ed\b|"
+    r"\bif (?:you|u) (?:did|do) not\b|\bif you didn'?t\b|in case you did not|"
+    r"agar aapne (?:ye |yeh |यह )?nahi|अगर आपने नहीं|यदि आपने नहीं|"
+    r"\b(?:was|is) (?:not |never )(?:done|initiated|requested|authori[sz]ed|attempted|made)(?: by you)?\b|"
+    r"\bnot (?:done|initiated|requested|attempted|authori[sz]ed) by you\b|"
+    r"\bdid not (?:request|initiate|authori[sz]e|make|attempt) (?:this|it|the)\b", re.I)
+# A delivery code handed over in person to the delivery staff at the door.
+DOORSTEP_HANDOVER = re.compile(
+    r"\b(delivery|courier)\b[^.;!?।\n]{0,80}\b(associate|agent|partner|executive|boy|person|staff|"
+    r"driver|representative)\b[^.;!?।\n]{0,50}\b(at (?:your|the) (?:door|doorstep|address|home)|"
+    r"in person|at the time of delivery|when (?:he|she|they) (?:arrives?|comes?|reaches?)|"
+    r"on delivery|at delivery)\b", re.I)
+# A named app, portal or store ("Axis Mobile app", "bob World app", "Jio Store") is the
+# organisation's own channel when the name is a proper noun or a known brand. Generic wording
+# ("your application", "the approved portal") names no organisation and stays unverified.
+_APP_WORDS = r"(?:[Aa]pp|[Aa]pplication|[Pp]ortal|[Ss]tore|[Ww]ebsite|[Ss]ite)"
+_NOT_A_NAME = ("This|That|The|Our|Your|My|Their|Any|All|Official|New|Approved|Linked|Below|Above|"
+               "Following|Same|Other|Another|Fake|Unknown|Bank|Payment|Net|Online|Digital|Android|"
+               "IPhone|IPad|Phone|Free|Safe|Secure|Trusted|Verified|Instant|Latest|Updated|Original|"
+               "Genuine|Registered|Real|Important|Please|Now|Kindly|Download|Install|Open|Update|Pay|"
+               "Send|Share|Enter|Verify|Click|Today|Immediately|Also|Then|And|Or|For|To|Of|In|On|At|By|"
+               "With|From|Use|Using|Via|Recharge|Bill|KYC|OTP|SIM|UPI|Card|Account")
+NAMED_APP = re.compile(
+    r"\b(?:in|on|via|at|from|through|using|open|visit|se|par|mein)\s+(?:the\s+|your\s+|apne\s+)?"
+    r"(?:[a-z0-9&]+\s+){0,2}(?!(?:" + _NOT_A_NAME + r")\s)(?:[A-Z][\w-]*\s+){1,3}" + _APP_WORDS + r"\b"
+    r"|\b(?:in|on|via|at|from|through|using|open|visit|se|par|mein)\s+(?:the\s+|your\s+|apne\s+)?"
+    r"(?:(?:" + "|".join(RISKY_BRANDS) + r")[\w]*\s+){1,3}(?:app|application|portal|store)\b"
+    r"|(?!(?:" + _NOT_A_NAME + r")\s)(?:[A-Z][\w-]*\s+){1,3}[Aa]pp\s+(?:par|mein|se|in|on)\b")
+# A payment request between acquaintances that says there is no hurry; a scam pressures.
+NO_HURRY = (r"\b(?:no (?:hurry|rush|urgency)|koi jaldi nahi|jab (?:fursat|furusat) (?:mile|ho)|"
+            r"when (?:you )?(?:have|get) (?:the |some )?time|at (?:your )?convenience|"
+            r"apni (?:suvidha|aaram) se|jab bhi (?:aap )?(?:chahein|chaho|chaaho))|"
+            r"जब फ़ुर्सत मिले|जब फुर्सत मिले|कोई जल्दी नहीं|जब चाहें")
+# The sender's own record: an order status in Hinglish, or a transfer the sender has already made.
+OWN_RECORD = (
+    r"\b(?:order|booking|payment|refund|recharge|delivery|ticket)[^.;!?।\n]{0,40}\b(?:ho chuk|pack ho|dispatch ho)\w*|"
+    r"\b(?:just|already|maine|humne|मैंने|हमने)\s+[^.;!?।\n]{0,60}"
+    r"(?:transferred|sent|paid|deposited|bhej\s*di\w*|bhej chuk\w*|de diye|कर दिया|दे दिया|भेज\s*द(?:िया|ी|े)|जमा कर दिया)\b|"
+    r"भेज द(?:िए|िया|ी) ह(?:ैं|ै)|bhej d(?:i|e|ye)\s*h(?:ai|ain)\b")
+# What fraudsters do to other people, as an advisory or report describes it. Such a clause makes
+# no payment request of the reader, so it names no payee.
+REPORTED = re.compile(
+    r"\b(?:fraudster\w*|scammer\w*|gang|cheat\w*|caller|impersonator\w*|miscreant\w*|thug\w*|they|"
+    r"people|customers|consumers|citizens|victims?|users?|लोग|गिरोह|ठग\w*)\b[^.;!?।\n]{0,40}"
+    r"\b(?:is|are|was|were|have|has|had)\s+(?:calling|asking|telling|sending|cheating|duping|running|"
+    r"operating|targeting|using|demanding|threatening|posing|pretending|impersonating|instructing|"
+    r"directing|forcing|making)\b", re.I)
 
 SAFE = [
     ("official_channel", DEST_OFFICIAL),
@@ -327,7 +411,10 @@ SAFE = [
     ("otp_notification",
      r"((your|aapka|आपका)?\s*(otp|code|pin|password|कोड|ओटीपी|पिन)(\s+for[^.;!?।\n]{0,20})?\s{0,3}(is|है)?\s{0,3}[:#-]?\s{0,3}\d{4,8})"
      r"|(code\s{0,3}(is)?\s{0,3}\d{4,8})|(\d{4,8}\s*(is your|aapka)\s*(otp|code))|"
-     r"(\d{4,8}\s*(is|है)\s*(your|aapka|आपका)?\s*(one[- ]?time (password|code)|otp|verification code))"),
+     r"(\d{4,8}\s*(is|है)\s*(your|aapka|आपका)?\s*(one[- ]?time (password|code)|otp|verification code))|"
+     # "One Time Password (OTP) for SBI Internet Banking login is 840219"
+     r"(\b(one[- ]?time (password|code)|otp|password|verification code|login code)\b[^.;!?।\n]{0,50}?"
+     r"\b(?:is|:)\s*\d{4,8}\b)"),
     ("protective",
      r"(never|will not|won't|does not|doesn't|do not|don't)\s+(ask|asks|share|send|reply|call|"
      r"pay|transfer|deposit)\b|"
@@ -354,7 +441,8 @@ SAFE = [
      r"\b(appointment|appointments|scheduled|rescheduled|consultation|follow[- ]?up|check[- ]?up|"
      r"delayed|running late|platform (changed|change)|gate (changed|change)|diversion|"
      r"out for delivery|ready for (pickup|collection)|delivery (attempt|update)|"
-     r"cash on delivery|pay on delivery)\b|"
+     r"cash on delivery|pay on delivery|pay (?:by|via|using) (?:cash|upi)|"
+     r"collection|technician|sample|\blab\b|(?:book|confirm|schedule)\s+(?:hai|hain|ho (?:gaya|gayi|chuka|chuki)))\b|"
      r"(अपॉइंटमेंट|परामर्श|जांच|विलंब)"),
     # Consumer advice: read or ask for published charges before acting. A request that also pays
     # or hands over a secret sets a harmful mechanism first, so this only clears text with no ask.
@@ -372,8 +460,12 @@ SAFE = [
     # Warning or news framing: a regulator, police or awareness notice that names a scam technique.
     # A real demand sets a decisive mechanism first, so this clears only text with no ask.
     ("awareness",
-     r"(warns?|warning|beware|caution|advisory|awareness|alert)[^.;!?।\n]{0,80}"
+     r"(warns?|warning|beware|caution|advisory|awareness)[^.;!?।\n]{0,80}"
      r"(scam|fraud|fake|fraudster|otp|pin|processing fee|payment|loan|kyc|safe account|video call)"
+     # "Alert:" and "Notice:" count only next to a fraud word: a bank's own alert also says "KYC".
+     r"|\b(alert|notice|bulletin)[^.;!?।\n]{0,60}"
+     r"(scam|fraud\w*|fake|phishing|cheat\w*|duping|thug\w*|ठग\w*|धोखाधड़ी|साइबर सुरक्षा)"
+     r"|\b(is|are|was|were)\s+(?:a\s+|an\s+)?(scam|scams|fraud|frauds|fake|fraudulent|phishing)\b"
      r"|(scam|fraud|fake|fraudster)[^.;!?।\n]{0,60}"
      r"(warns?|warning|beware|arrest\w*|bust\w*|detain\w*|advisory)"
      r"|(arrest\w*|bust\w*|detain\w*|convict\w*)[^.;!?।\n]{0,60}(scam|fraud|racket)"
@@ -384,7 +476,9 @@ SAFE = [
     ("bill_notice",
      r"(bill|बिल)[^.;!?।\n]{0,40}(is )?(ready|due|generated|issued|reminder)|"
      r"amount due|due date|(देय तिथि|देय राशि|बिल तैयार)|bill (for|of)\b|"
-     r"(प्रीमियम|बीमा|पॉलिसी|policy|premium)[^।.;!?\n]{0,25}(देय|due|renew)"),
+     r"(प्रीमियम|बीमा|पॉलिसी|policy|premium)[^।.;!?\n]{0,25}(देय|due|renew)|"
+     # a loan EMI or auto-debit reminder
+     r"\b(?:emi|sip|installment|auto-?debit|standing instruction)\b|ऑटो-?डेबिट|अनुस्मारक"),
     ("promo",
      r"\b(sale|discount|% ?off|cashback|deal|coupon|offer|win up to|save up to|free trial)\b|"
      r"(छूट|ऑफर|कैशबैक)"),
@@ -404,7 +498,8 @@ def clean(text):
 def clauses(t):
     """Split on sentence punctuation; keep the text lowercased."""
     out, start = [], 0
-    for m in re.finditer(r"[.!?।;](?=\s|$)|\n", t):
+    for m in re.finditer(r"(?<!\brs)(?<!\bno)(?<!\bref)(?<!\binr)(?<!\bmr)(?<!\bmrs)(?<!\bdr)(?<!\bmt)"
+                        r"(?<!\bapprox)(?<!\bupto)(?<!\bacs)(?<!\bamt)[.!?।;](?=\s|$)|\n", t):
         if m.start() > start:
             out.append((start, t[start:m.start()]))
         start = m.end()
@@ -422,7 +517,7 @@ def _matched(m, clause):
     before, after = clause[:m.start()], clause[m.end():]
     if NEG_INSIDE.search(m.group()):
         return False
-    if NEG_VERB.search(before[-40:]):
+    if NEG_VERB.search(before[-80:]):
         return False
     m_after = NEG_AFTER.match(after.split(',', 1)[0])
     if m_after:
@@ -449,6 +544,31 @@ def _clause_hit(pattern, t):
                 return True
             pos = m.start() + 1
     return False
+
+
+# The text asks the reader to do something: an instruction to the reader, a demand for their
+# details or an immediate payment. Scopes that must respect a negation are clause-scoped.
+DIRECT_RAW = (
+    r"\b(you|your|aap|aapka|आप|आपका)\b[^.;!?।\n]{0,40}"
+    r"\b(must|need to|should|pay|send|transfer|share|click|install|download|call|verify|"
+    r"update|deposit|invest)\b",
+    r"(?:कृपया|ज़रा|जरा)\s+[^.;!?।\n]{0,40}(भेजें|भेजो|बताएं|बताओ|साझा|दें|भरें|करें)",
+    r"\b(pay|send|transfer|share|deposit|invest)\s+(now|today|immediately|at once|"
+    r"right away|turant|abhi)\b",
+    r"\b(citizens|customers|people|all)\s+(must|should|need to)\s+"
+    r"(pay|transfer|share|deposit|invest|click|install|download)\b")
+DIRECT_SCOPED = (
+    r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)\s*,?\s*)*"
+    r"(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
+    r"\b(?:please|kindly|pls)\s+(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
+    DEMAND + r"[^.;!?।\n]{0,40}\b(?:your|aapka|आपका)\b[^.;!?।\n]{0,25}" + CREDS)
+
+
+def _directs(t):
+    """True when the text asks the reader to do something. Also used clause by clause, to bind a
+    contact to the request that names it."""
+    return (any(_any(pattern, t) for pattern in DIRECT_RAW)
+            or any(_clause_hit(pattern, t) for pattern in DIRECT_SCOPED))
 
 
 def _clause_find(pattern, t):
@@ -486,6 +606,8 @@ def host_risk(h):
     tld, label = parts[-1], parts[-2]
     if is_official(h):
         return ""
+    if any(h == s or h.endswith("." + s) for s in SHORTENERS):
+        return f"the domain {h} is a URL shortener that hides its destination"
     brand = next((b for b in RISKY_BRANDS if b in h), None)
     if brand and tld in RISKY_TLDS:
         return f"the domain {h} imitates '{brand}' on .{tld}"
@@ -503,6 +625,7 @@ def host_risk(h):
 def analyze(text):
     """Return a dict of mechanism findings used by the decision layer."""
     t = clean(text).lower()
+    orig = clean(text)
     a = {"text": t, "harm": [], "safe": [], "hosts": [], "risky": [], "official_host": False,
          "secret": False, "secret_share": False, "pay_to_receive": False, "pay_unverified": False,
          "collect": False, "remote": False, "crypto": False, "authority": False, "threat": False,
@@ -519,10 +642,20 @@ def analyze(text):
             a["risky"].append(r)
         elif is_official(h):
             a["official_host"] = True
+    for m in URL_RE.finditer(t):
+        if re.match(r"-\w", t[m.end():m.end() + 2]):
+            # "sanchar-verify.in-verify": letters run on past the domain ending and hide the address
+            a["risky"].append("a link runs on past its domain ending, hiding where it really goes")
 
     for name, pat in SAFE:
         if _any(pat, t):
             a["safe"].append(name)
+    if NAMED_APP.search(orig):
+        a["safe"].append("official_channel")
+    if _any(OWN_RECORD, t) and not _any(r"\b(wapas|return|refund|वापस|by mistake|galti se)\b", t):
+        a["safe"].append("transaction_receipt")
+    if _any(NO_HURRY, t):
+        a["safe"].append("no_hurry")
     a["official_host"] = a["official_host"] and not a["risky"]
     a["official_channel"] = "official_channel" in a["safe"] or a["official_host"]
     a["receipt"] = "transaction_receipt" in a["safe"]
@@ -535,6 +668,7 @@ def analyze(text):
     a["advice"] = "consumer_advice" in a["safe"]
     a["collect_review"] = "collect_review" in a["safe"]
     a["awareness"] = "awareness" in a["safe"]
+    a["no_hurry"] = "no_hurry" in a["safe"]
     # A warning or news report names the criminals and what they do to third parties ("a gang is
     # calling people and asking them to transfer"). When the reader is not addressed and no
     # imperative asks them to act, the harmful wording is a description, not a demand.
@@ -554,19 +688,7 @@ def analyze(text):
                         r"arrest\w*|bust\w*|detain\w*|convict\w*|booked)\b|गिरफ्तार\w*", t)
     third_audience = _any(r"\b(victims?|customers|citizens|people|public)\b|लोग", t)
     a["report"] = bool(report_src and third_actor and report_verb and (report_frame or third_audience))
-    a["reader_direct"] = bool(
-        _any(r"\b(you|your|aap|aapka|आप|आपका)\b[^.;!?।\n]{0,40}"
-             r"\b(must|need to|should|pay|send|transfer|share|click|install|download|call|verify|"
-             r"update|deposit|invest)\b", t)
-        or _clause_hit(r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)\s*,?\s*)*"
-                       r"(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b", t)
-        or _clause_hit(r"\b(?:please|kindly|pls)\s+(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b", t)
-        or _clause_hit(DEMAND + r"[^.;!?।\n]{0,40}\b(?:your|aapka|आपका)\b[^.;!?।\n]{0,25}" + CREDS, t)
-        or _any(r"(?:कृपया|ज़रा|जरा)\s+[^.;!?।\n]{0,40}(भेजें|भेजो|बताएं|बताओ|साझा|दें|भरें|करें)", t)
-        or _any(r"\b(pay|send|transfer|share|deposit|invest)\s+(now|today|immediately|at once|"
-                r"right away|turant|abhi)\b", t)
-        or _any(r"\b(citizens|customers|people|all)\s+(must|should|need to)\s+"
-                r"(pay|transfer|share|deposit|invest|click|install|download)\b", t))
+    a["reader_direct"] = _directs(t)
     a["isolation"] = _any(ISOLATION, t)
     a["secrecy"] = _any(SECRECY, t)
     a["new_contact"] = _any(NEW_CONTACT, t)
@@ -582,7 +704,14 @@ def analyze(text):
     # A secret handed over by sharing/sending/telling is never legitimate, even when the message
     # claims an official app. Entering a code in the bank's own app can be; an official channel
     # explains that case only.
-    share_hit = (_clause_hit(SHARE + sep + CRED, t) or _clause_hit(CRED + sep + SHARE, t))
+    # A delivery code shown in the sender's app and handed over in person to the delivery staff at
+    # the door is how couriers confirm a drop. The scam pattern hands a bank code to a caller, a
+    # chat or a number, so an in-person handover is the only share that is not a request.
+    doorstep = (_any(r"\b(shown|displayed|visible|available)\b[^.;!?।\n]{0,50}\b(app|application)\b", t)
+                and not _any(PHONE, t) and not _clause_hit(PRIVATE_CHANNEL, t))
+    share_hit = any(not (doorstep and DOORSTEP_HANDOVER.search(clause)) and
+                    (_clause_hit(SHARE + sep + CRED, clause) or _clause_hit(CRED + sep + SHARE, clause))
+                    for _, clause in clauses(t))
     # An official channel explains entry only in the same clause; a separate
     # reassurance about the official app cannot clear an unrelated request.
     enter_hit = any(
@@ -602,10 +731,13 @@ def analyze(text):
     direct_share = share_hit
     share_hit = share_hit or (_clause_hit(DEMAND + r"[^.;!?।\n]{0,40}" + CREDS, t) or
                               _clause_hit(CREDS + r"[^.;!?।\n]{0,40}" + DEMAND, t))
-    # "If a caller asks for an OTP, hang up and report it" describes the demand; it does not
-    # ask the reader to hand a secret over. A direct share/send request still fires.
+    # "If a caller asks for an OTP, hang up and report it" and "callers pose as bank staff and ask
+    # for OTP" describe the demand; neither asks the reader to hand a secret over. A direct
+    # share/send request still fires. Only criminals are named here: "our officer asks for the
+    # code" is a demand.
     hypothetical = bool(re.search(
-        r"\b(if|when|a caller|someone|fraudster|scammer)\b[^.;!?।\n]{0,60}"
+        r"\b(if|when|a caller|callers|someone|fraudster|fraudsters|scammer|scammers|"
+        r"cheats|conmen|thugs|miscreants)\b[^.;!?।\n]{0,60}"
         r"\b(asks?|demands?|requests?)\b[^.;!?।\n]{0,50}"
         r"(otp|pin|password|code)\b", t, re.I))
     # Report framing never clears a credential demand: scammers wrap requests in news-style text,
@@ -657,7 +789,7 @@ def analyze(text):
     fee = _clause_hit(FEE, t)
     pay = _clause_hit(PAY, t)
     a["fee"] = fee
-    phone = r"(?:\+91[ -]?)?[6-9]\d{9}\b"
+    phone = PHONE
     phone_destination = any(
         (_clause_hit(r"\b(?:pay|send|transfer)\b", clause) and _any(phone, clause)) or
         _any(r"\b(?:to|on)\s+" + phone, clause)
@@ -665,12 +797,13 @@ def analyze(text):
     )
     # A threat followed by "call <mobile number>" sends the reader to a private number.
     threat_call = _clause_hit(THREAT, t) and _any(r"\b(?:call|contact|whatsapp|dial)\b[^.;!?।\n]{0,20}" + phone, t)
-    a["dest_strong"] = _any(DEST_STRONG, t) or phone_destination or threat_call
+    a["dest_strong"] = _clause_hit(DEST_STRONG, t) or phone_destination or threat_call
     # An unrelated official-channel sentence cannot authorize a payment elsewhere, but a link or
     # number given in the very next sentence ("Use this link: ...") belongs to the payment.
     all_clauses = [clause for _, clause in clauses(t)]
     pay_idx = [i for i, clause in enumerate(all_clauses)
-               if _clause_hit(PAY, clause) or (_clause_hit(DEMAND, clause) and _any(MONEY, clause))]
+               if not REPORTED.search(clause) and
+               (_clause_hit(PAY, clause) or (_clause_hit(DEMAND, clause) and _any(MONEY, clause)))]
     cont_idx = [i + 1 for i in pay_idx if i + 1 < len(all_clauses) and i + 1 not in pay_idx and
                 (hosts(all_clauses[i + 1]) or _clause_hit(r"\blink\b", all_clauses[i + 1]) or
                  (_any(phone, all_clauses[i + 1]) and
@@ -691,6 +824,12 @@ def analyze(text):
     dest_staff = any(_clause_hit(DEST_STAFF, clause) for clause in payment_clauses)
     agent_pay = any(_clause_hit(r"(agent|officer|advisor|representative|staff)[’']?s?\s+"
                                 r"(number|account|upi|vpa)", clause) for clause in payment_clauses)
+    # A bill reminder that takes payment on the biller's own app or site ("pay on the Tata Power
+    # app or tatapower.com") names a destination that is not a private payee, a bare "link" or a
+    # lookalike host: a routine bill payment, not an unverified one.
+    bill_own_site = a["bill"] and not payment_risky and \
+        not any(_clause_hit(r"\blink\b", c) for c in payment_clauses) and \
+        any(_any(r"\bapp\b", c) or any(not host_risk(h) for h in hosts(c)) for c in payment_clauses)
     if _clause_hit(PAY_TO_RECEIVE, t):
         a["pay_to_receive"] = True
         a["harm"].append(("pay_to_receive", "asks for a payment before a refund, prize or delivery is released"))
@@ -698,7 +837,7 @@ def analyze(text):
             (payment_dest_strong or payment_risky or not payment_official) and \
             (payment_personal or payment_risky or dest_staff or agent_pay
              or (fee and payment_links)
-             or (payment_links and _clause_hit(UTILITY, t))):
+             or (payment_links and _clause_hit(UTILITY, t) and not bill_own_site)):
         a["pay_unverified"] = True
         a["harm"].append(("pay_unverified", "asks for a payment to a personal number, account or unverified link"))
     private_negated = _any(
@@ -730,22 +869,25 @@ def analyze(text):
     for remote_clause in remote_parts:
         remote_negated = _any(
             r"(never|do not|don't|does not|doesn'?t|no)\s+(ask|asks|tell|tells|require|requires|request|"
-            r"requests)\b[^.;!?।\n]{0,40}(install|download|remote|screen shar)", remote_clause) or _any(
-            r"(anydesk|teamviewer|remote[- ]access|screen shar\w*)[^\n]{0,50}"
+            r"requests)\b[^.;!?।\n]{0,40}(install|download|remote|screen[- ]shar)", remote_clause) or _any(
+            r"(anydesk|teamviewer|remote[- ]access|screen[- ]shar\w*)[^\n]{0,50}"
             r"(never|do not|don't)\s+(install|download|use|do that|allow|share)", remote_clause) or _any(
             r"(never|do not|don't)\s+(install|download|use)\b[^.;!?।\n]{0,40}"
-            r"(anydesk|teamviewer|remote[- ]access|screen shar)", remote_clause)
+            r"(anydesk|teamviewer|remote[- ]access|screen[- ]shar)", remote_clause)
         apk_install = (_clause_hit(r"\b(install|download)\b", remote_clause) and
                        _clause_hit(r"\b(apk|sideload|unknown sources?)\b", remote_clause))
         if (_clause_hit(REMOTE, remote_clause) or apk_install) and not remote_negated:
             generic_install = _clause_hit(r"\b(install|download)\b", remote_clause) and not _clause_hit(
-                r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen shar\w*|remote[- ]access "
+                r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen[- ]shar\w*|remote[- ]access "
                 r"(software|app|tool)|remote app|remote support)\b", remote_clause)
             if not generic_install or hosts(remote_clause) or _clause_hit(
                 PRIVATE_CHANNEL, remote_clause) or _clause_hit(r"\b(apk|sideload|unknown sources?)\b", remote_clause) or apk_private:
                 a["remote"] = True
                 break
     if install and apk_private:
+        a["remote"] = True
+    # An .apk file the reader is told to install is a side-loaded app in any language.
+    if _any(r"\b[\w-]+\.apk\b", t) and _clause_hit(r"\b(install|download|इंस्टॉल|डाउनलोड|लगाएं|लगाओ)\b", t):
         a["remote"] = True
     if a["remote"]:
         a["harm"].append(("remote_access", "asks you to install an app or share your screen"))
@@ -754,14 +896,21 @@ def analyze(text):
         a["harm"].append(("crypto_transfer", "asks you to move money into crypto"))
     # A warning that names a fake officer and tells the reader not to pay is describing the scam,
     # not making the demand. A scam keeps the payment instruction and omits the negation.
-    fake_warning = (_any(r"\b(fake|fraudster|scammer|fraudulent|claiming to be)\b", t) and
+    fake_warning = (_any(r"\b(fake|fraudster|scammer|fraudulent|claiming to be|frauds?|scams?|beware|"
+                         r"cheats?|duping|duped)\b", t) and
                     _any(r"\b(do not|don't|never)\s+(pay|send|transfer|share)\b|"
                          r"\b(report|hang up|ignore)\b", t))
-    # The negation itself is what must be found, so raw search rather than the negation-aware clause hit.
+    # "No agency ever asks citizens to transfer funds into a safe verification account": the negated
+    # demand describes the scam; it does not make it. The negation itself is what must be found, so
+    # raw search rather than the negation-aware clause hit.
     safe_account_negated = _any(
         r"(never|do not|don't|will not|won't)\s+(ask|tell|request|instruct|advise)?[^.;!?।\n]{0,30}"
         r"(transfer|move|send|deposit)[^.;!?।\n]{0,30}(safe|secure|temporary|audit)\s+(account|wallet)", t) or \
-        _any(r"banks?\s+(never|do not|will not)\s+(ask|tell)[^.;!?।\n]{0,40}(transfer|move|send|deposit)", t)
+        _any(r"banks?\s+(never|do not|will not)\s+(ask|tell)[^.;!?।\n]{0,40}(transfer|move|send|deposit)", t) or \
+        _any(r"\b(no|not|never|does not|do not|will not|won't|ever)\b[^.;!?।\n]{0,90}"
+             r"\b(ask|asks|tell|tells|demand|demands|request|requests|instruct|instructs)\b"
+             r"[^.;!?।\n]{0,60}\b(transfer|move|send|deposit)\b[^.;!?।\n]{0,50}"
+             r"(safe|secure|temporary|audit|verification|government|rbi)\s+(account|wallet)", t)
     if _clause_hit(SAFE_ACCOUNT, t) and not safe_account_negated:
         named_safe = _clause_hit(r"(temporary|safe|secure|audit|verification|government|settlement|"
                                  r"escrow|सेफ|सरकारी|सत्यापन)\s+"
@@ -784,6 +933,27 @@ def analyze(text):
         a["threat"] = True
         a["harm"].append(("block_threat", "threatens to block, cut or freeze an account, SIM or connection"))
     the_job = _clause_hit(JOB, t) or _clause_hit(LOAN, t)
+    # A notice, alert or advisory that hands the reader a contact of its own is the spoofed-advisory
+    # pattern: a mobile number, a chat, or a link that imitates or hides its destination. A genuine
+    # one points at an official app or site, a short code or a toll-free line instead. Words about
+    # the "official app" excuse a plain link in a routine notice; an advisory that also sends the
+    # reader to a site of its own is a spoof whatever it calls that site.
+    advisory = a["awareness"] or a.get("report")
+    foreign = any(not is_official(h) for h in hs)
+    directs = [clause for _, clause in clauses(t) if _directs(clause)]
+    # A chat or a plain link is the sender's own contact only where a clause that asks the reader
+    # to act names it: "over WhatsApp" inside a warning describes the fraud, and a link placed after
+    # the advice ("Advisory: cert-in.org.in") is a citation. A lookalike link or a mobile number is
+    # a contact wherever it stands: a genuine advisory never prints a mobile number.
+    a["own_contact"] = bool(
+        a["risky"] or _any(PHONE, t)
+        or any(_clause_hit(CHAT_CONTACT, clause) or any(not is_official(h) for h in hosts(clause))
+               for clause in directs)
+        or (foreign and a["reader_direct"] and _any(URGENCY, t)))
+    a["self_check"] = bool(SELF_CHECK.search(t))
+    if (a["notice"] or advisory or a["advice"]) and a["own_contact"] and \
+            not (a["official_channel"] and not advisory):
+        a["harm"].append(("notice_contact", "is a notice or advisory that gives its own number, chat or link to act on"))
     if (the_job and (_clause_hit(UPFRONT, t) or _clause_hit(BUY_REFUND, t) or
                      (pay and fee and not a["official_channel"])) and not fake_warning):
         a["job_upfront"] = True
@@ -874,28 +1044,38 @@ def analyze(text):
 DECISIVE = {"secret_request", "pay_to_receive", "collect_request", "qr_payment", "remote_access",
             "crypto_transfer", "safe_account", "authority_threat", "job_upfront", "prize_claim",
             "investment", "id_request",
-            "sextortion", "phish_link", "impersonation", "payment_request_private",
+            "sextortion", "phish_link", "impersonation", "payment_request_private", "notice_contact",
             "gift_card", "extortion"}
 
 
 SELF_BLOCK = re.compile(
-    r"\b(if (?:it |this )?(?:was |is )?not (?:you|done by you)|not done by you|agar aapne nahi kiya)\b"
-    r"[^.;!?।\n]{0,30}\bblock (?:your |the )?(?:card|upi|account)\b"
-    r"(?:[^.;!?।\n]{0,25}\b(?:in|via|from|using) (?:the |your )?(?:\w+ )?(?:app|yono|imobile|net ?banking))?", re.I)
+    r"\b(?:if (?:it |this )?(?:was |is )?(?:not |never )(?:you|done by you|done|initiated by you|"
+    r"requested by you|attempted by you|authori[sz]ed)|if (?:it |this )?(?:was |is )?unauthori[sz]ed|"
+    r"if you did not|if you didn'?t|not done by you|agar aapne nahi kiya|यदि आपने नहीं)\b"
+    r"[^.;!?।\n]{0,30}\b(?:block|freeze|disable|lock|hotlist|turn off)\b[^.;!?।\n]{0,20}"
+    r"\b(?:card|upi|account|access)\b"
+    r"(?:[^.;!?।\n]{0,40}\b(?:in|via|from|using|on|at)\b[^.;!?।\n]{0,40}"
+    r"\b(?:app|yono|imobile|net ?banking|website)\b)?", re.I)
 PASSIVE_THREAT = re.compile(r"\b(?:will be|would be|is being|ho jayega|ho jaega|हो जाएगा)\b[^.;!?।\n]{0,20}"
-                            r"\b(?:blocked|suspended|frozen|closed|band|बंद)", re.I)
-# A phone number: eight or more digits, allowing spaces, dots or dashes between them. A bank's own
-# alert never needs the reader to call a number written in it; an OTP or an amount is shorter.
-CONTACT_NUMBER = re.compile(r"(?<!\d)\+?\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){7,}(?!\d)")
+                                r"\b(?:blocked|suspended|frozen|closed|band|बंद)", re.I)
+# A mobile number: ten digits starting 6-9 (with an optional +91 or 0) that may be split by spaces or
+# punctuation ("98,76543210"), or written masked ("98XXXXXX66"). A bank's own alert never needs the
+# reader to call a mobile; reference numbers, amounts, short codes and toll-free lines do not
+# have this shape.
+CONTACT_NUMBER = re.compile(
+    r"(?<!\w)(?:\+?91[\s-]?|0[\s-]?)?[6-9]\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){8}(?!\w)"
+    r"|(?<!\w)[6-9]\d?[xX×*]{4,6}\d{2,3}(?!\w)")
 
 
 OTHER_CONTACT = re.compile(r"whatsapp|telegram|wa\.me|\bt\.me\b|@\w|\(at\)|\[\.\]|\bupi\b|\bvpa\b", re.I)
 
 
 def _other_contact(a):
-    """A contact besides the official channel: a link, a phone number, a chat handle or a UPI ID."""
+    """A contact besides the official channel: a link to a site that is not the organisation's
+    own, a mobile number, a chat handle or a UPI ID."""
     text = a.get("text", "")
-    return bool(a["hosts"] or CONTACT_NUMBER.search(text) or OTHER_CONTACT.search(text))
+    return bool(any(not is_official(h) for h in a["hosts"]) or CONTACT_NUMBER.search(text)
+                or OTHER_CONTACT.search(text))
 
 
 def _self_block(text):
@@ -924,6 +1104,11 @@ def decide(p_model, a, gate=0.85):
     strong = [h for h in harm if h in DECISIVE]
     if strong:
         return 1, max(p_model, 0.85), a
+    if (a["awareness"] or a.get("report")) and not a["own_contact"] and \
+            set(harm) <= {"block_threat", "job_offer"}:
+        # The threat or offer words describe what fraudsters do to other people; the advisory asks
+        # nothing of the reader and gives no number, chat or link of its own.
+        return 0, min(p_model, 0.40), a
     if a["threat"] and (a["risky"] or a["pay_unverified"] or a["secret"] or a["fee"] or a["remote"]):
         return 1, max(p_model, 0.75), a
     # A block warning that routes the reader to a personal mobile number or an unknown link is the
@@ -934,7 +1119,22 @@ def decide(p_model, a, gate=0.85):
     if (a["pay_unverified"] or a["secret"]) and (a["risky"] or a["dest_strong"]):
         return 1, max(p_model, 0.80), a
     if not harm:
-        if a["protective"] and (a["request_cues"] or p_model >= gate):
+        if a["awareness"] or a.get("report"):
+            # A warning or news report makes no request of the reader. With no contact of its own
+            # (analyze records that as a harm) it is cleared whatever the model says.
+            return 0, min(p_model, 0.40), a
+        if (a["bill"] or a["appointment"]) and not a["own_contact"]:
+            # A bill or appointment reminder that names no mobile number, chat or lookalike link of
+            # its own is a routine notice: the payment goes to the biller's own app or site.
+            return 0, min(p_model, 0.40), a
+        if a["no_hurry"] and not a["own_contact"]:
+            # A payment chat that says there is no hurry and names nowhere to send money is a
+            # favour between acquaintances; a scam pressures and always gives a destination.
+            return 0, min(p_model, 0.40), a
+        if a["protective"] and not ((a["otp_note"] or a["self_check"]) and not a["own_contact"]) and \
+                (a["request_cues"] or p_model >= gate):
+            # An OTP delivered to the reader with "do not share it", or an alert that says what to
+            # do "if you did not request this", is the sender's own protection, not a demand.
             return (1 if p_model >= gate else 0), p_model, a
         if a["receipt"] or a["otp_note"]:
             # A completed transaction or an OTP notification is a record, not a request.
@@ -1024,6 +1224,7 @@ SAFE_DESC = {
     "consumer_advice": "reads like consumer advice to check the published charges first",
     "collect_review": "reads like a pending collect-request notice to review",
     "awareness": "reads like a warning or news report about a scam",
+    "no_hurry": "says there is no hurry",
 }
 
 
@@ -1062,7 +1263,7 @@ def evidence(a):
             out.append(r)
     if not a["harm"]:
         for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "opt_out", "notice",
-                  "promo", "consumer_advice", "collect_review", "awareness"):
+                  "promo", "consumer_advice", "collect_review", "awareness", "no_hurry"):
             if s in a["safe"]:
                 out.append(safe_description(s, a['text']))
     return out[:5]
