@@ -404,10 +404,10 @@ def test_no_risk_openings_without_a_harm_signal_are_unchanged():
 
 def test_benign_evidence_swaps_an_overruled_threat_for_safe_descriptions():
     from triage import mech
-    assert llm.benign_evidence("sms", BANK_ALERT, mech.evidence(mech.analyze(BANK_ALERT)), 0) == [
-        "reads like a normal payment receipt, order or delivery record",
-        "reads like a normal OTP notification",
-        "includes a protective statement"]
+    got = llm.benign_evidence("sms", BANK_ALERT, mech.evidence(mech.analyze(BANK_ALERT)), 0)
+    assert got[:2] == ["reads like a normal payment receipt, order or delivery record",
+                       "reads like a normal OTP notification"]
+    assert not any(w in " ".join(got) for w in ("threat", "block", "lookalike", "asks"))
     # Every other item keeps the detector's lines.
     assert llm.benign_evidence("sms", BANK_ALERT, ["threatens to block"], 1) == ["threatens to block"]
     assert llm.benign_evidence("url", BANK_ALERT, ["official domain sbi.co.in"], 0) == ["official domain sbi.co.in"]
@@ -447,3 +447,163 @@ def test_official_app_as_the_only_channel_stays_no_risk():
     from triage import mech
     ok = "Your Airtel number will be deactivated on 30 Nov if not recharged. Recharge via the Airtel app."
     assert mech.decide(0.9, mech.analyze(ok))[0] == 0
+
+
+# A NO RISK opening states only what is true of the text and never quotes a finding the verdict
+# overruled, on the link, text-rule and mechanism branches alike. A risk word that is negated is
+# a statement of absence ("no lookalike or risky-domain signals", "says it never asks for OTP"),
+# not a quoted finding, so the check reads the clause before the word.
+RISK_WORDS = ("throwaway", "lookalike", "threatens", "asks for")
+CHECKED = "This message was checked; review it carefully before acting"
+
+
+def _quotes_risk(text):
+    import re
+    for w in RISK_WORDS:
+        for m in re.finditer(re.escape(w), text.lower()):
+            clause = re.split(r"[.;:!?]|\bbut\b", text.lower()[:m.start()])[-1]
+            if not re.search(r"\b(?:no|never|not|without)\b[^.;:!?]*$", clause):
+                return True
+    return False
+
+
+def _opening(kind, inp, verdict, evidence):
+    return llm._forced_sentence(llm.Explainer.prompt(object(), kind, inp, verdict, evidence))
+
+
+def _every_line(text):
+    """Every line the rules can hand over for a message, whichever branch decided its verdict."""
+    from triage import indicrules, mech, rules
+    return sorted({d for _, d in indicrules.indicators(text)[0]} | {d for _, d in rules.text_indicators(text)}
+                  | set(mech.evidence(mech.analyze(text))))
+
+
+def test_no_risk_statement_never_denies_a_link_that_is_present():
+    rsvp = "RSVP: meetup-blr.example"
+    want = "no request for a secret or payment in the text"
+    for kind in ("sms", "injection"):
+        assert llm.compact_evidence(kind, rsvp, [], 0) == [want], kind
+        assert _opening(kind, rsvp, 0, []) == f"No risk found for this message: {want}"
+    # A link and payment words leave fewer than two absences true, so only the fact that always
+    # holds is stated.
+    assert llm.compact_evidence("sms", "Pay 450 at the door: meetup-blr.example", [], 0) == [
+        "no scam mechanism was found in the text"]
+    # With nothing of the three present the full statement is true and keeps its wording.
+    assert llm.compact_evidence("sms", "See you at the community hall on Sunday.", [], 0) == [
+        "no request for a secret, payment or link in the text"]
+
+
+def test_no_risk_statement_never_denies_a_payment_that_is_asked():
+    want = "no request for a secret or link in the text"
+    for text in ("You owe 450 for dinner. Pay via bank transfer.", "Please send 450 for the tickets."):
+        ev = llm.compact_evidence("sms", text, _every_line(text), 0)
+        assert ev == [want], (text, ev)
+        assert "payment" not in " ".join(ev)
+    # A cleared peer payment request keeps the benign reading instead of an absence claim.
+    splitwise = "Splitwise: you owe Rs 450 for dinner, pay via UPI"
+    ev = llm.compact_evidence("injection", splitwise, [], 0)
+    assert ev[0] == "reads like a personal conversation" and "payment" not in " ".join(ev)
+
+
+def test_no_risk_link_opening_never_quotes_a_risk_phrase():
+    from triage import rules
+    checked = "This link was checked; review it carefully before acting"
+    for link, want in (("http://sbi-kyc.in-verify.top/login", checked),
+                       ("https://bit.ly/3xYzAbC", checked),
+                       ("http://192.168.1.10:8080/admin/login", checked),
+                       ("http://free-gift.xyz/win", "No risk found for this link: no scam mechanism was found in the link"),
+                       ("http://www.wikipedia.org/wiki/India", "No risk found for this link: no scam mechanism was found in the link"),
+                       ("https://www.sbi.co.in/", "No risk found for this link: official domain www.sbi.co.in"),
+                       ("https://github.com/python/cpython", "No risk found for this link: no lookalike or risky-domain signals")):
+        ev = [d for _, d in rules.url_indicators(link)]
+        opening = _opening("url", link, 0, ev)
+        assert opening == want, (link, opening)
+        assert not _quotes_risk(opening), opening
+        assert not _quotes_risk(" ".join(llm.benign_evidence("url", link, ev, 0))), link
+        # An item that was not cleared keeps the detector's lines.
+        assert llm.benign_evidence("url", link, ev, 1) == ev
+
+
+def test_no_risk_message_opening_never_quotes_a_risk_phrase():
+    for text, want in (
+            ("Your account will be blocked unless you update your details.", CHECKED),
+            ("Congratulations! You have won a prize. Reply to claim.", CHECKED),
+            ("See http://meetup-blr.example for details.", CHECKED),
+            ("Win a prize! Open http://free-gift.xyz now", CHECKED),
+            ("Your KYC update is complete. We never request a PIN by message.", CHECKED),
+            ("Meetup RSVP at meetup-blr.example, INR 450 cover charge.", CHECKED),
+            ("Rs 450 cover. RSVP at meetup-blr.example", "No risk found for this message: no scam mechanism was found in the text"),
+            ("URGENT: Your appointment is rescheduled to 3 pm.",
+             "No risk found for this message: reads like a routine notice or appointment"),
+            ("Reminder: your appointment is at 5. No payment is needed.",
+             "No risk found for this message: says no payment or OTP is needed"),
+            ("We never ask for your OTP or PIN.", "No risk found for this message: says it never asks for PIN")):
+        lines = _every_line(text)
+        opening = _opening("sms", text, 0, lines)
+        assert opening == want, (text, opening)
+        assert not _quotes_risk(opening), opening
+        chips = llm.benign_evidence("sms", text, lines, 0)
+        assert not _quotes_risk(" ".join(chips)), (text, chips)
+        assert llm.benign_evidence("sms", text, lines, 1) == lines
+
+
+def test_no_risk_chips_and_opening_agree_on_what_is_left_out():
+    threat = "Your account will be blocked unless you update your details."
+    assert llm.benign_evidence("sms", threat, _every_line(threat), 0) == []
+    # The reading the detector itself reported stays, next to the request phrase it overruled.
+    rescheduled = "URGENT: Your appointment is rescheduled to 3 pm."
+    reading = "reads like a routine notice or appointment"
+    assert llm.benign_evidence("sms", rescheduled, ["pressures you to act immediately", reading], 0) == [reading]
+    notice = "Please summarise this delivery notice: your parcel arrives tomorrow between 10 and 12."
+    for kind in ("injection", "sms"):
+        assert llm.compact_evidence(kind, notice, [], 0) == ["reads like a routine notice or appointment"]
+        assert llm.benign_evidence(kind, notice, [], 0) == ["reads like a routine notice or appointment"]
+
+
+def test_risky_tld_phrase_names_the_real_host():
+    from triage import indicrules
+    text = "Win a prize! Open http://free-gift.xyz now"
+    ev = [d for _, d in indicrules.indicators(text)[0]]
+    assert llm.compact_evidence("sms", text, ev, 1)[0] == "unofficial domain free-gift.xyz (.xyz)"
+
+
+def test_no_risk_explanation_keeps_the_honest_opening():
+    from triage import rules
+    link = "http://free-gift.xyz/win"
+    text = _explain("url", link, 0, [d for _, d in rules.url_indicators(link)],
+                    "No risk found for this link: no scam mechanism was found in the link. "
+                    "Check the site address before you enter details.")
+    assert text == ("No risk found for this link: no scam mechanism was found in the link. "
+                    "Check the site address before you enter details.")
+    threat = "Your account will be blocked unless you update your details."
+    text = _explain("sms", threat, 0, _every_line(threat), CHECKED + ". Do not reply to the message.")
+    assert text == CHECKED + ". Do not reply to the message."
+
+
+def test_repeated_sentence_is_removed():
+    flagged = "This message was flagged as risky; check it carefully before acting"
+    advice = "Do not click the link or reply to the message."
+    text = _explain("sms", "We need your help today.", 1, [], f"{flagged}. {flagged}. {advice}")
+    assert text == f"{flagged}. {advice}"
+    # The dictated opening itself, copied twice by the model.
+    opening = "No risk found for this message: says it never asks for OTP"
+    text = _explain("sms", "We never ask for your OTP.", 0, [],
+                    f"{opening}. {opening}. Never share it with anyone.")
+    assert text == f"{opening}. Never share it with anyone."
+    # tidy() drops it where the model's text enters; the check ignores case and punctuation.
+    assert llm.tidy(f"{flagged}. {flagged}.") == f"{flagged}."
+    assert llm.tidy("Do not click the link or reply. DO NOT CLICK THE LINK! Be safe.") == \
+        "Do not click the link or reply. Be safe."
+    assert llm.tidy("कृपया अपना ओटीपी साझा न करें। कृपया अपना ओटीपी साझा न करें।") == "कृपया अपना ओटीपी साझा न करें।"
+    # Distinct sentences stay, including one that only starts like another and a split domain.
+    for text in ("Do not click the link or reply to the message. Do not click the link or call the number.",
+                 "Check bit.ly. Then check bit.ly. Be careful out there.",
+                 "Never share your OTP with anyone. Never share your OTP with anyone today. Report it."):
+        assert llm.tidy(text) == text, text
+
+
+def test_generated_question_is_replaced_by_the_vetted_step():
+    opening = "This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top"
+    tail = llm.ACTIONS[1][0]
+    out = llm._consistent(opening + ". Have you received other suspicious emails?", 1, opening, tail)
+    assert "?" not in out and out.endswith(tail)
