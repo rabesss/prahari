@@ -543,6 +543,7 @@ class MainActivity : Activity() {
     private val checkSubs = mutableListOf<TextView>()
     private var aboutDialog: Dialog? = null
     private var speech: TextToSpeech? = null
+    private var announcedJob = Int.MIN_VALUE
     private var speaking = false
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
@@ -674,6 +675,7 @@ class MainActivity : Activity() {
         v.isClickable = true
         v.isFocusable = true
         if (v.minimumHeight < dp(48)) v.minimumHeight = dp(48)
+        if (v.minimumWidth < dp(48)) v.minimumWidth = dp(48)
         v.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         v.accessibilityDelegate = object : View.AccessibilityDelegate() {
             override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
@@ -907,7 +909,7 @@ class MainActivity : Activity() {
             pad(this, 2, 2, 2, 2)
             minimumHeight = dp(48)
         }
-        fun seg(label: String, on: Boolean, hi: Boolean) = row().apply {
+        fun seg(label: String, on: Boolean, hi: Boolean, description: String) = row().apply {
             gravity = Gravity.CENTER
             minimumWidth = dp(48)
             minimumHeight = dp(48)
@@ -920,10 +922,11 @@ class MainActivity : Activity() {
                 rememberLanguage()
                 rebuild()
             }
-            asButton(this, label)
+            asButton(this, description)
+            contentDescription = n("language_name") + ", " + t(description)
         }
-        add(wrap, seg("EN", !L10n.hindi, false), -2, -2)
-        add(wrap, seg("हिंदी", L10n.hindi, true), -2, -2, left = 2)
+        add(wrap, seg("EN", !L10n.hindi, false, "English"), -2, -2)
+        add(wrap, seg("हिंदी", L10n.hindi, true, "Hindi"), -2, -2, left = 2)
         return wrap
     }
 
@@ -1850,11 +1853,13 @@ class MainActivity : Activity() {
         // The alert banner replaces the suspicious line. Other results use the first evidence line.
         val why = if (bankAlert) t(ALERT_LINE) else verdictLine(evidence, fallback, calm)
         val elapsed = if (job.totalMs >= 0) job.totalMs else SystemClock.elapsedRealtime() - job.started
-        val root = root("${p.title}. ${p.hindi}")
+        val root = root(p.title)
         add(root, bar("Result", true, lang = true), -1, -2)
         val body = scrollBody(root)
-        add(body, modeSwitcher(selectedMode, job.value), -1, -2)
+        val modeRow = modeSwitcher(selectedMode, job.value)
+        add(body, modeRow, -1, -2)
         val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble()), modeIcons[selectedMode], calm)
+        b.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         if (job.mode == 2) add(b, txt(n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
         data.optString("scam_type", "").takeIf { it.isNotBlank() }?.let { scam ->
@@ -1864,7 +1869,11 @@ class MainActivity : Activity() {
         val actionsHi = strings(data.optJSONArray("actions_hi"))
         add(b, listenButton(p, speechScript(p, actions, actionsHi, true), speechScript(p, actions, actionsHi, false)), -1, -2, top = 12)
         add(body, b, top = 12)
-        b.post { if (!isDestroyed) b.announceForAccessibility("${t(p.title)}. $why") }
+        if (announcedJob != job.id) {
+            announcedJob = job.id
+            val announcement = "${t(p.title)}. $why"
+            b.post { if (!isDestroyed && announcedJob == job.id) b.announceForAccessibility(announcement) }
+        }
         val steps = card()
         add(steps, heading(if (clear) "Before you act" else "Do this now", if (clear) "कार्य करने से पहले" else "अभी यह करें"))
         actions.forEachIndexed { i, action ->
@@ -1950,11 +1959,13 @@ class MainActivity : Activity() {
             }, top = 8)
         }
         add(body, steps, top = 12)
+        var whyCard: View? = null
         val shownEvidence = evidence.filter { it.isNotBlank() }
         if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert) {
             val evidenceCard = card()
             add(evidenceCard, heading("Why it's flagged", "संकेत"))
             add(evidenceCard, txt(n("model_only_evidence"), 14f, T.ink, 400, 20, raw = true), top = 8)
+            whyCard = evidenceCard
             add(body, evidenceCard, top = 12)
         } else if (shownEvidence.isNotEmpty()) {
             val evidenceCard = card()
@@ -1991,6 +2002,7 @@ class MainActivity : Activity() {
                 chip.isClickable = false
                 add(evidenceCard, chip, -1, -2, top = 8)
             }
+            whyCard = evidenceCard
             add(body, evidenceCard, top = 12)
         }
         val llama = card(T.surface2, false)
@@ -2066,6 +2078,18 @@ class MainActivity : Activity() {
         }, top = 10)
         add(body, checked, top = 12)
         bottom(root, n("check_another")) { goHome(true) }
+        fun after(next: View, prev: View) {
+            if (next.id == View.NO_ID) next.id = View.generateViewId()
+            if (prev.id == View.NO_ID) prev.id = View.generateViewId()
+            next.accessibilityTraversalAfter = prev.id
+        }
+        if (b.id == View.NO_ID) b.id = View.generateViewId()
+        after(steps, b)
+        var cursor: View = steps
+        whyCard?.let { after(it, cursor); cursor = it }
+        explanationText?.let { after(it, cursor); cursor = it }
+        statsHeader?.let { after(it, cursor); cursor = it }
+        after(modeRow, cursor)
         showScreen(root)
         if (job.explanation != null) applyExplanation(job)
     }
