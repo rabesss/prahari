@@ -438,3 +438,9 @@ def test_rule_overrides_never_clear_a_confident_scam():
 
 def test_split_mobile_next_to_1930_is_still_a_scam_contact():
     assert llm._unsafe_advice("Call 98 765 43 210 or 1930 to stop the block.", 1)
+
+
+def test_official_app_as_the_only_channel_stays_no_risk():
+    from triage import mech
+    ok = "Your Airtel number will be deactivated on 30 Nov if not recharged. Recharge via the Airtel app."
+    assert mech.decide(0.9, mech.analyze(ok))[0] == 0
