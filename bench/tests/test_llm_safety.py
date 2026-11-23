@@ -191,3 +191,17 @@ def test_generate_uses_the_scam_specific_replacement():
 def test_move_money_is_compliance():
     assert llm._unsafe_advice("Move all your money to the RBI safe account now.", 1)
     assert not llm._unsafe_advice("Never move money to a safe account for anyone.", 1)
+
+
+def test_spoofed_alert_with_threat_and_number_is_not_excused():
+    from triage import mech
+    spoof = ("SBI: Rs 2450 debited. Never share OTP. Your account will be blocked. "
+             "Call 98765 43210 to reverse the transaction")
+    assert mech.decide(0.9, mech.analyze(spoof))[0] == 1
+    spoof2 = "SBI: Rs 2,450 debited via UPI. If not you, block card: call 98765 43210 now."
+    assert mech.decide(0.9, mech.analyze(spoof2))[0] == 1
+
+
+def test_electricity_scam_asking_for_otp_gets_otp_advice():
+    sms = "Bijli ka bill abhi pay karo warna aaj raat connection cut hoga. Verify ke liye OTP share karo: 98XXX12345"
+    assert llm.scam_type("sms", sms, 1) == "OTP or PIN theft"

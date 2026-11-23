@@ -257,8 +257,8 @@ def scam_type(kind, inp, verdict):
     if mech.indic_context(inp):
         a = mech.analyze(inp)
         found = {n for n, _ in a["harm"]}
-        if found & {"block_threat", "pay_unverified", "secret_request"} and _POWER.search(inp) \
-                and not found & {"sextortion", "safe_account", "remote_access"}:
+        if found & {"block_threat", "pay_unverified"} and _POWER.search(inp) \
+                and not found & {"sextortion", "safe_account", "remote_access", "secret_request"}:
             return "an electricity disconnection scam"
         # The most specific mechanism names the scam: a fake-police call that also asks for a
         # transfer to a safe account is a safe-account scam, and a customs parcel fee is an
@@ -625,9 +625,9 @@ TYPE_ADVICE = {
         "Do not pay to an account or link from a message.",
         "Check any bill or request in the official app.",
         REPORT]),
-    "a QR-code payment scam": ("Never scan a QR code to receive money.", [
-        "Never scan a QR code or enter a UPI PIN to receive money.",
-        "Decline the request in your payment app.",
+    "a QR-code payment scam": ("Never scan a QR code from a message; never pay through it.", [
+        "Never scan a QR code from a message; receiving money needs no scan.",
+        "Check any bill or request in the official app before paying.",
         REPORT]),
     "an extortion threat": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
