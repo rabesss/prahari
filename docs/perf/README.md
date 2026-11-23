@@ -5,7 +5,9 @@ Prahari (Bharat AI-SoC Challenge 2026–27, PS3) across three Arm targets: a phy
 S23** smartphone (`arm64-v8a`), an **Arm Neoverse-V2** Linux server (`aarch64`, 8 vCPUs), and an
 **Oracle A1 Arm Neoverse-N1** Linux VM (`aarch64`, 2 vCPUs). Every number below is traced to a
 recorded log, XML dump, `perf` profile, or committed evaluation record (see
-[`methodology.md`](methodology.md#artifact-provenance) for exact file paths and hashes). No numbers
+[`methodology.md`](methodology.md#5-artifact-provenance) for exact file paths and hashes). The raw S23 and
+Neoverse-V2 logs, UI dumps, screenshots and `perf` reports are committed under [`evidence/`](evidence/README.md);
+the Oracle N1 records are in [`research/evals/ledger.jsonl`](../../research/evals/ledger.jsonl). No numbers
 are interpolated, extrapolated, or drawn from x86 emulation.
 
 All three Arm targets ran the **identical** Llama 3.2 1B Instruct QLoRA INT4 ExecuTorch artefact

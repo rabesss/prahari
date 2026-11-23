@@ -1,0 +1,143 @@
+=== Network interfaces ===
+lo               DOWN           00:00:00:00:00:00 <LOOPBACK> 
+=== HTTPS attempt ===
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Could not resolve host: example.com
+* Closing connection 0
+curl: (6) Could not resolve host: example.com
+curl_exit=6
+=== DNS attempt ===
+dns_exit=2
+=== Raw TCP attempt ===
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+OSError: [Errno 101] Network is unreachable
+tcp_exit=1
+=== Offline inference ===
+[cpuinfo_utils.cpp:81] Reading file /sys/devices/soc0/image_version
+[cpuinfo_utils.cpp:97] Failed to open midr file /sys/devices/soc0/image_version
+[cpuinfo_utils.cpp:185] Number of efficient cores 0
+[threadpool.cpp:66] Resetting threadpool to 2 threads.
+I tokenizers:regex.cpp:40] Registering override fallback regex
+E tokenizers:hf_tokenizer.cpp:167] Error parsing json file: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'I'
+[llm_runner_helper.cpp:72] Loaded TikToken tokenizer
+[llm_runner_helper.cpp:258] Reading metadata from model
+[llm_runner_helper.cpp:137] Metadata: use_kv_cache = 1
+[llm_runner_helper.cpp:137] Metadata: get_max_context_len = 2048
+[llm_runner_helper.cpp:137] Metadata: get_max_seq_len = 2048
+[llm_runner_helper.cpp:137] Metadata: use_sdpa_with_kv_cache = 1
+[llm_runner_helper.cpp:137] Metadata: enable_dynamic_shape = 1
+[llm_runner_helper.cpp:179] eos_id = 128009
+[llm_runner_helper.cpp:179] eos_id = 128001
+[llm_runner_helper.cpp:294] Using method: forward
+[text_llm_runner.cpp:89] RSS after loading model: 2373.781250 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 124, num_prompt_tokens 124, max_context_len 2048
+This[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ message is DANGEROUS: threatens to block the account or service. Please verify your KYC information immediately to avoid account suspension.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 124    Generated Tokens: 28
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.457000 (seconds)		 Rate: 	19.217570 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.851000 (seconds)		 Rate: 	145.710928 (tokens/second)
+[stats.h:207] 		Generated 28 tokens:	0.606000 (seconds)		 Rate: 	46.204620 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.851000 (seconds)
+[stats.h:225] 	Sampling time over 152 tokens:	0.001000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2392.117188 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 128, num_prompt_tokens 128, max_context_len 2048
+
+
+PyTorchObserver {"prefill_token_per_sec":145.711,"decode_token_per_sec":46.2046,"prompt_tokens":124,"generated_tokens":28,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435199493,"inference_end_ms":1795435200950,"model_execution_start_ms":1795435200929,"model_execution_end_ms":1795435200950,"prompt_eval_end_ms":1795435200344,"first_token_ms":1795435200344,"aggregate_sampling_time_ms":1,"aggregate_model_execution_time_ms":1453,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+This[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ message is DANGEROUS: asks for an OTP, PIN or card details. Do not share sensitive information via text message.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 128    Generated Tokens: 27
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.148000 (seconds)		 Rate: 	23.519164 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.563000 (seconds)		 Rate: 	227.353464 (tokens/second)
+[stats.h:207] 		Generated 27 tokens:	0.585000 (seconds)		 Rate: 	46.153846 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.563000 (seconds)
+[stats.h:225] 	Sampling time over 155 tokens:	0.002000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2392.117188 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 122, num_prompt_tokens 122, max_context_len 2048
+
+
+PyTorchObserver {"prefill_token_per_sec":227.353,"decode_token_per_sec":46.1538,"prompt_tokens":128,"generated_tokens":27,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435200964,"inference_end_ms":1795435202112,"model_execution_start_ms":1795435202090,"model_execution_end_ms":1795435202112,"prompt_eval_end_ms":1795435201527,"first_token_ms":1795435201527,"aggregate_sampling_time_ms":2,"aggregate_model_execution_time_ms":1146,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+No[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ risk found for this message: reads like a routine bill reminder with a payment due. Please review your account balance before making the payment.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 122    Generated Tokens: 28
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.161000 (seconds)		 Rate: 	24.117140 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.555000 (seconds)		 Rate: 	219.819820 (tokens/second)
+[stats.h:207] 		Generated 28 tokens:	0.606000 (seconds)		 Rate: 	46.204620 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.555000 (seconds)
+[stats.h:225] 	Sampling time over 150 tokens:	0.001000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2392.117188 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 116, num_prompt_tokens 116, max_context_len 2048
+
+
+PyTorchObserver {"prefill_token_per_sec":219.82,"decode_token_per_sec":46.2046,"prompt_tokens":122,"generated_tokens":28,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435202123,"inference_end_ms":1795435203284,"model_execution_start_ms":1795435203262,"model_execution_end_ms":1795435203284,"prompt_eval_end_ms":1795435202678,"first_token_ms":1795435202678,"aggregate_sampling_time_ms":1,"aggregate_model_execution_time_ms":1159,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+This[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top. Do not click on it, it may harm your computer and personal data.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[text_llm_runner.cpp:264] Max new tokens 40 reached!
+[stats.h:175] 	Prompt Tokens: 116    Generated Tokens: 39
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.359000 (seconds)		 Rate: 	28.697572 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.516000 (seconds)		 Rate: 	224.806202 (tokens/second)
+[stats.h:207] 		Generated 39 tokens:	0.843000 (seconds)		 Rate: 	46.263345 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.516000 (seconds)
+[stats.h:225] 	Sampling time over 155 tokens:	0.003000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2392.117188 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 109, num_prompt_tokens 109, max_context_len 2048
+
+
+PyTorchObserver {"prefill_token_per_sec":224.806,"decode_token_per_sec":46.2633,"prompt_tokens":116,"generated_tokens":39,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435203673,"inference_end_ms":1795435205032,"model_execution_start_ms":1795435205010,"model_execution_end_ms":1795435205031,"prompt_eval_end_ms":1795435204189,"first_token_ms":1795435204189,"aggregate_sampling_time_ms":3,"aggregate_model_execution_time_ms":1354,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+No[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ risk found for this link: official domain www.irctc.co.in. Be cautious of phishing scams and suspicious links.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 109    Generated Tokens: 25
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.056000 (seconds)		 Rate: 	23.674242 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.506000 (seconds)		 Rate: 	215.415020 (tokens/second)
+[stats.h:207] 		Generated 25 tokens:	0.550000 (seconds)		 Rate: 	45.454545 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.506000 (seconds)
+[stats.h:225] 	Sampling time over 134 tokens:	0.003000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2392.117188 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 123, num_prompt_tokens 123, max_context_len 2048
+
+
+PyTorchObserver {"prefill_token_per_sec":215.415,"decode_token_per_sec":45.4545,"prompt_tokens":109,"generated_tokens":25,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435205033,"inference_end_ms":1795435206089,"model_execution_start_ms":1795435206067,"model_execution_end_ms":1795435206089,"prompt_eval_end_ms":1795435205539,"first_token_ms":1795435205539,"aggregate_sampling_time_ms":3,"aggregate_model_execution_time_ms":1050,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+This[text_llm_runner.cpp:228] RSS after prompt prefill: 2392.117188 MiB (0 if unsupported)
+ network event is DANGEROUS: traffic to 200 different ports on 10.0.0.5. Immediately disconnect all affected systems.<|eot_id|>[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2392.117188 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 123    Generated Tokens: 31
+[stats.h:181] 	Model Load Time:		2.012000 (seconds)
+[stats.h:188] 	Total inference time:		1.238000 (seconds)		 Rate: 	25.040388 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.564000 (seconds)		 Rate: 	218.085106 (tokens/second)
+[stats.h:207] 		Generated 31 tokens:	0.674000 (seconds)		 Rate: 	45.994065 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.564000 (seconds)
+[stats.h:225] 	Sampling time over 154 tokens:	0.000000 (seconds)
+
+
+PyTorchObserver {"prefill_token_per_sec":218.085,"decode_token_per_sec":45.9941,"prompt_tokens":123,"generated_tokens":31,"model_load_start_ms":1795435197481,"model_load_end_ms":1795435199493,"inference_start_ms":1795435206092,"inference_end_ms":1795435207330,"model_execution_start_ms":1795435207308,"model_execution_end_ms":1795435207330,"prompt_eval_end_ms":1795435206656,"first_token_ms":1795435206656,"aggregate_sampling_time_ms":0,"aggregate_model_execution_time_ms":1235,"SCALING_FACTOR_UNITS_PER_SECOND":1000}
+explain_exit=0
+{"id": "kyc-sms", "verdict": "malicious", "score": 1.0, "category": "an account-blocking scam", "actions": ["Do not open the link or call the number in it.", "Check your account in the bank app or call the number on your card.", "Report the message or call on Sanchar Saathi Chakshu."], "evidence_used": ["sends you to a lookalike page and asks you to act there", "threatens to block, cut or freeze an account, SIM or connection", "the domain sbi-kyc.in-verify.top imitates 'sbi' on .top"], "explanation": "This message is DANGEROUS: threatens to block the account or service. Ignore the threat; check your account in the bank app.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 124, "generated_tokens": 28, "prefill_tps": 145.711, "decode_tps": 46.2046, "first_token_ms": 2863.1, "gen_wall_ms": 3469.2}, "explanation_status": "success", "latency_ms": 4074.6}
+{"id": "otp-hinglish", "verdict": "malicious", "score": 0.9984, "category": "OTP or PIN theft", "actions": ["Never share your OTP, UPI PIN or CVV.", "If you shared it, call your bank to block the card and UPI.", "Report at cybercrime.gov.in, or call 1930 if money was lost."], "evidence_used": ["asks you to share a PIN, OTP, card or account detail"], "explanation": "This message is DANGEROUS: asks for an OTP, PIN or card details. Do not share sensitive information via text message.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 128, "generated_tokens": 27, "prefill_tps": 227.353, "decode_tps": 46.1538, "first_token_ms": 563.1, "gen_wall_ms": 1148.1}, "explanation_status": "success", "latency_ms": 1161.2}
+{"id": "bill-sms", "verdict": "benign", "score": 0.0669, "category": "", "actions": ["Verify in the official app; never share your OTP or PIN."], "evidence_used": ["points to the official app or channel", "includes a protective statement"], "explanation": "No risk found for this message: reads like a routine bill reminder with a payment due. Please review your account balance before making the payment.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 122, "generated_tokens": 28, "prefill_tps": 219.82, "decode_tps": 46.2046, "first_token_ms": 555.1, "gen_wall_ms": 1161.1}, "explanation_status": "success", "latency_ms": 1171.7}
+{"id": "lookalike-url", "verdict": "malicious", "score": 1.0, "category": "a phishing link on a lookalike domain", "actions": ["Do not open the link or log in on that page.", "Open the official app or type the address yourself.", "If you entered details, call your bank to block card, UPI and netbanking."], "evidence_used": ["the domain ends in .top, common for throwaway scam sites", "the domain amaz0n-refund-help.top is unusually long or hyphenated", "the domain amaz0n-refund-help.top swaps letters for digits to imitate a brand", "the link does not use HTTPS"], "explanation": "This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top. Do not click on it, it may harm your computer and personal data.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 116, "generated_tokens": 39, "prefill_tps": 224.806, "decode_tps": 46.2633, "first_token_ms": 515.5, "gen_wall_ms": 1358.5}, "explanation_status": "success", "latency_ms": 1747.6}
+{"id": "official-url", "verdict": "benign", "score": 0.2656, "category": "", "actions": ["Verify in the official app; never share your OTP or PIN."], "evidence_used": ["the domain irctc.co.in is an official domain"], "explanation": "No risk found for this link: official domain www.irctc.co.in. Be cautious of phishing scams and suspicious links.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 109, "generated_tokens": 25, "prefill_tps": 215.415, "decode_tps": 45.4545, "first_token_ms": 505.8, "gen_wall_ms": 1055.8}, "explanation_status": "success", "latency_ms": 1057.3}
+{"id": "port-scan", "verdict": "malicious", "score": 0.9, "category": "a port scan", "actions": ["Check the firewall logs for the scanning address and block it.", "Close unused ports and turn off remote admin.", "Check the logs for logins that follow the scan."], "evidence_used": ["connections to many ports look like a port scan", "most connections were rejected or reset"], "explanation": "This network event is DANGEROUS: traffic to 200 different ports on 10.0.0.5. Check the firewall logs for the scanning address and block it.", "llm": {"backend": "executorch", "model": "llama32-1b-qlora", "prompt_tokens": 123, "generated_tokens": 31, "prefill_tps": 218.085, "decode_tps": 45.9941, "first_token_ms": 563.9, "gen_wall_ms": 1238.4}, "explanation_status": "success", "latency_ms": 1240.8}

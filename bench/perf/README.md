@@ -22,7 +22,7 @@ never dirties the git tree.
 python3 bench/perf/arm_bench.py --dry-run --threads 1,2,4,8 --prompt-lengths short,default,long
 ```
 
-### Arm Linux full sweep (on Neoverse-N1, Neoverse-V2, Raspberry Pi 5, etc.)
+### Arm Linux full sweep (any `aarch64` Linux; measured on Neoverse-N1 and Neoverse-V2)
 
 ```sh
 export HC_PY="$PWD/.venv/bin/python"
@@ -56,7 +56,7 @@ TOK=/path/to/tokenizer.model \
 ### Parse an existing Android capture directory offline
 
 ```sh
-python3 bench/perf/adb_bench.py parse-dir /var/tmp/prahari-rtl/run8 --out-dir /var/tmp/s23-parsed
+python3 bench/perf/adb_bench.py parse-dir docs/perf/evidence/galaxy-s23-rtl-run8 --out-dir /var/tmp/s23-parsed
 ```
 
 ### Merge Arm Linux + Android JSON outputs into one table

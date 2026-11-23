@@ -1,0 +1,101 @@
+[cpuinfo_utils.cpp:81] Reading file /sys/devices/soc0/image_version
+[cpuinfo_utils.cpp:97] Failed to open midr file /sys/devices/soc0/image_version
+[cpuinfo_utils.cpp:185] Number of efficient cores 0
+[threadpool.cpp:66] Resetting threadpool to 4 threads.
+I tokenizers:regex.cpp:40] Registering override fallback regex
+E tokenizers:hf_tokenizer.cpp:167] Error parsing json file: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'I'
+[llm_runner_helper.cpp:72] Loaded TikToken tokenizer
+[llm_runner_helper.cpp:258] Reading metadata from model
+[llm_runner_helper.cpp:137] Metadata: use_kv_cache = 1
+[llm_runner_helper.cpp:137] Metadata: get_max_context_len = 2048
+[llm_runner_helper.cpp:137] Metadata: get_max_seq_len = 2048
+[llm_runner_helper.cpp:137] Metadata: use_sdpa_with_kv_cache = 1
+[llm_runner_helper.cpp:137] Metadata: enable_dynamic_shape = 1
+[llm_runner_helper.cpp:179] eos_id = 128009
+[llm_runner_helper.cpp:179] eos_id = 128001
+[llm_runner_helper.cpp:294] Using method: forward
+[text_llm_runner.cpp:89] RSS after loading model: 2375.769531 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 124, num_prompt_tokens 124, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 124    Generated Tokens: 28
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.979000 (seconds)		 Rate: 	28.600613 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.609000 (seconds)		 Rate: 	203.612479 (tokens/second)
+[stats.h:207] 		Generated 28 tokens:	0.370000 (seconds)		 Rate: 	75.675676 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.609000 (seconds)
+[stats.h:225] 	Sampling time over 152 tokens:	0.002000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2394.105469 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 128, num_prompt_tokens 128, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 128    Generated Tokens: 27
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.647000 (seconds)		 Rate: 	41.731066 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.292000 (seconds)		 Rate: 	438.356164 (tokens/second)
+[stats.h:207] 		Generated 27 tokens:	0.355000 (seconds)		 Rate: 	76.056338 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.292000 (seconds)
+[stats.h:225] 	Sampling time over 155 tokens:	0.000000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2394.105469 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 122, num_prompt_tokens 122, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 122    Generated Tokens: 28
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.668000 (seconds)		 Rate: 	41.916168 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.298000 (seconds)		 Rate: 	409.395973 (tokens/second)
+[stats.h:207] 		Generated 28 tokens:	0.370000 (seconds)		 Rate: 	75.675676 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.298000 (seconds)
+[stats.h:225] 	Sampling time over 150 tokens:	0.002000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2394.105469 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 116, num_prompt_tokens 116, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[text_llm_runner.cpp:264] Max new tokens 40 reached!
+[stats.h:175] 	Prompt Tokens: 116    Generated Tokens: 39
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.797000 (seconds)		 Rate: 	48.933501 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.286000 (seconds)		 Rate: 	405.594406 (tokens/second)
+[stats.h:207] 		Generated 39 tokens:	0.511000 (seconds)		 Rate: 	76.320939 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.286000 (seconds)
+[stats.h:225] 	Sampling time over 155 tokens:	0.002000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2394.105469 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 109, num_prompt_tokens 109, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 109    Generated Tokens: 25
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.610000 (seconds)		 Rate: 	40.983607 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.285000 (seconds)		 Rate: 	382.456140 (tokens/second)
+[stats.h:207] 		Generated 25 tokens:	0.325000 (seconds)		 Rate: 	76.923077 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.285000 (seconds)
+[stats.h:225] 	Sampling time over 134 tokens:	0.001000 (seconds)
+[text_llm_runner.cpp:89] RSS after loading model: 2394.105469 MiB (0 if unsupported)
+[text_prefiller.cpp:121] Prefill token result numel(): 128256
+[text_llm_runner.cpp:201] Max new tokens resolved: 40, given pos_ 123, num_prompt_tokens 123, max_context_len 2048
+[text_llm_runner.cpp:228] RSS after prompt prefill: 2394.105469 MiB (0 if unsupported)
+[text_token_generator.h:181] 
+Reached to the end of generation
+[text_llm_runner.cpp:258] RSS after finishing text generation: 2394.105469 MiB (0 if unsupported)
+[stats.h:175] 	Prompt Tokens: 123    Generated Tokens: 31
+[stats.h:181] 	Model Load Time:		2.123000 (seconds)
+[stats.h:188] 	Total inference time:		0.697000 (seconds)		 Rate: 	44.476327 (tokens/second)
+[stats.h:197] 		Prompt evaluation:	0.290000 (seconds)		 Rate: 	424.137931 (tokens/second)
+[stats.h:207] 		Generated 31 tokens:	0.407000 (seconds)		 Rate: 	76.167076 (tokens/second)
+[stats.h:219] 	Time to first generated token:	0.290000 (seconds)
+[stats.h:225] 	Sampling time over 154 tokens:	0.001000 (seconds)
