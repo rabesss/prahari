@@ -76,9 +76,9 @@ The message layer combines TF-IDF and a logistic classifier with Indian-context 
 
 The app in `android/` ran the shipped detector and Llama 3.2 1B end to end on an Android 14 x86_64 emulator, using an x86_64 build and ExecuTorch Android 1.5.1. It used the same QLoRA `.pte` (SHA-256 `ab7b7ebf…`) as the Linux runner. The pictured KYC check took 274 ms in the detector. Emulator timings are labelled as x86, not Arm timings; a physical Arm phone run remains pending [S7].
 
-The result places the Hindi and English verdict first, followed by numbered scam-specific vetted steps with Hindi lines reviewed by Gemini 4 Neon. For scam messages and links before loss, “Report on Sanchar Saathi Chakshu” is primary and “Lost money? Call 1930” secondary; 1930 is primary when money is already gone, and cybercrime.gov.in is used for sextortion or extortion. Evidence follows, then the Llama card warns “AI-written and can be wrong. Follow the steps above.” On-device stats are collapsed by default. A genuine-looking bank debit alert is SUSPICIOUS, described as a bank alert that scammers copy, and first advises “Didn't make this payment? Call 1930 and block the card or UPI in your bank app.” A rule override does not clear a message as NO RISK when the model leans scam and the message offers another contact such as a link, number, chat handle or UPI ID.
+The result places the Hindi and English verdict first, followed by numbered scam-specific vetted steps with Hindi lines reviewed for accuracy. For scam messages and links before loss, “Report on Sanchar Saathi Chakshu” is primary and “Lost money? Call 1930” secondary; 1930 is primary when money is already gone, and cybercrime.gov.in is used for sextortion or extortion. Evidence follows, then the Llama card warns “AI-written and can be wrong. Follow the steps above.” On-device stats are collapsed by default. A genuine-looking bank debit alert is SUSPICIOUS, described as a bank alert that scammers copy, and first advises “Didn't make this payment? Call 1930 and block the card or UPI in your bank app.” A rule override does not clear a message as NO RISK when the model leans scam and the message offers another contact such as a link, number, chat handle or UPI ID.
 
-The app declares no `INTERNET` permission. “Prove it's offline” attempts HTTPS and displays the OS refusal only for a real permission error; the screenshot shows Android's `SecurityException`. Calls and browser visits use separate apps. Model files must be staged first. Mockups used Mobbin iOS references and Figma; Gemini 4 Neon reviewed UX and India-specific safety copy, and GPT-6.1 Terra wrote the app code [S7].
+The app declares no `INTERNET` permission. “Prove it's offline” attempts HTTPS and displays the OS refusal only for a real permission error; the screenshot shows Android's `SecurityException`. Calls and browser visits use separate apps. Model files must be staged first. The team designed the app from real-app references (Mobbin) with Figma mockups and built it with AI-assisted design, translation and coding tools; the Hindi lines and India-specific safety copy were reviewed for accuracy [S7].
 
 ![KYC result: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-a.png){width=27%} ![Llama and expanded stats: Android 14 emulator (x86_64)](img/app-r2-kycscamsms-c.png){width=27%}
 
@@ -142,7 +142,7 @@ Training used 4,127 SMS, 40,000 URL, 113,273 flow, 256 categorised Indian and 13
 | [karanverma19 Indian seed](https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset) and [bolewara Hinglish seed](https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset) | Apache-2.0 and CC BY 4.0, respectively | 136 combined seed rows in training; per-source counts are not reported. |
 | Project-generated Indian-context messages | Original project work | Visible messages split within each category: train 256, dev 64; separate generator run for evaluation 320. |
 
-Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored after freeze on the baseline, gen51 and one gen51 review-fix revision, not on the later PR #30–35 changes. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths no longer output `uncertain`, because the conservative metric counts abstention as an error. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
+Candidate selection repeatedly used feedback from the same hidden evaluation sets; they are not pristine holdouts. India v2 was adaptive validation; the separately sealed holdout was scored after freeze on the baseline, gen51 and one gen51 review-fix revision, not on the later PR #30–35 changes. The separate LOCO stress test is described below. The recorded work did not test a real phone, live traffic, or messages collected from Prahari users in a field trial. The SMS, Indic and injection paths output `uncertain` (SUSPICIOUS) only in narrow cases: a bank debit or OTP alert, and a block threat or job offer next to an official channel when the model leans scam and the message also offers another contact; the conservative metric counts these as errors. The owner-approved flow-text demo retains `uncertain` for a benign cue next to an attack signal and for a lone rejected connection.
 
 **Category holdout.** Leaving each of 32 visible categories out of text-model training yielded pooled binary F1 1.0 on project-generated synthetic categories; fixed rules active; uncertain mapped to benign; not a category average or real-world estimate [S4]. The script prints a misleading macro label.
 
@@ -158,7 +158,7 @@ A blind manual audit of 20 sealed-holdout explanations found 5 correct, 8 weak a
 
 ### Offline use
 
-On Linux, inference runs locally and inputs reach the app over loopback; normal startup does not block outbound traffic. The controller evaluation used an import-time guard that blocks non-loopback connections, and an independently verified Linux egress restriction remains needed for the demo. The Android app declares no `INTERNET` permission and its emulator test showed Android blocking its HTTPS request. Downloading and staging model files requires a separate network-capable device or process [S2, S7].
+On Linux, inference runs locally and inputs reach the app over loopback; normal startup does not block outbound traffic. The team's evaluation used an import-time guard that blocks non-loopback connections, and an independently verified Linux egress restriction remains needed for the demo. The Android app declares no `INTERNET` permission and its emulator test showed Android blocking its HTTPS request. Downloading and staging model files requires a separate network-capable device or process [S2, S7].
 
 \newpage
 
@@ -185,12 +185,14 @@ These are planned activities rather than completed validation [S7].
 
 [S4] `research/LOG.md` and `research/REPORT.md`, 10–11 November 2026; `research/stress/loco.py` and `eval/prep_data.py`, baseline `2fdc142`.
 
-[S5] Controller-provided symbol inspection, oracle-a1 project venv, 17 November 2026; command and library counts in `docs/phase1/EVIDENCE.md`.
+[S5] Team-provided symbol inspection, oracle-a1 project venv, 17 November 2026; command and library counts in `docs/phase1/EVIDENCE.md`.
 
 [S6] `candidates/BEST/DATA.md`, baseline `2fdc142`; original source and licence links are listed there.
 
-[S8] Controller-provided round-3 aggregate results, confirmation, sealed-holdout run and blind explanation audit; provenance and holdout hash in `docs/phase1/EVIDENCE.md`. Item texts are withheld until after submission.
+[S8] Team-provided round-3 aggregate results, confirmation, sealed-holdout run and blind explanation audit; provenance and holdout hash in `docs/phase1/EVIDENCE.md`. Item texts are withheld until after submission.
 
-[S7] Android emulator execution and design provenance supplied by the controller, 23 November 2026; screenshots and scope in `docs/phase1/EVIDENCE.md`. Physical-phone testing remains planned.
+[S7] Android emulator execution and design provenance recorded by the team, 23 November 2026; screenshots and scope in `docs/phase1/EVIDENCE.md`. Physical-phone testing remains planned.
 
 The [evidence ledger](https://github.com/rabesss/arm-bharat-ai-soc/blob/main/docs/phase1/EVIDENCE.md) records commands, measurements and their limits. The rendered PDF is built locally from this source and attached at submission.
+
+Built with Llama. Llama 3.2 is licensed under the Llama 3.2 Community License.
