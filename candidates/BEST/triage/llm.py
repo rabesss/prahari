@@ -1066,9 +1066,10 @@ def _benign_reading(kind, phrases):
         return "flow"
     first = (phrases[0] if phrases else "").lower()
     for key, pat in (("otp", r"otp notification"), ("no_fee", r"says no (?:fee|charge|payment)"),
+                     ("bill", r"bill reminder"),
                      ("receipt", r"payment|refund|receipt"),
                      ("delivery", r"order|delivery|tracking"),
-                     ("bill", r"bill reminder"), ("official_domain", r"official domain"),
+                     ("official_domain", r"official domain"),
                      ("protective", r"never asks|says no |protective|not to share"),
                      ("official_channel", r"official app|official channel|mentions .* branch|mentions the branch"),
                      ("personal", r"personal conversation")):
@@ -1278,7 +1279,8 @@ def validate(text, opening, ctx, vetted=(), generated_tokens=None, model_opening
     # Model text is what remains after removing vetted sentences (matched as whole strings, since
     # a vetted sentence may itself contain a semicolon) and an opening _consistent re-inserted.
     rest = " ".join(kept)
-    for v in sorted(vetted, key=len, reverse=True):
+    # The fact is only appended below, so a copy of it here was written by the model.
+    for v in sorted(vetted - {fact}, key=len, reverse=True):
         rest = rest.replace(v, " ")
     if opening and not model_opening:
         rest = rest.replace(opening + ".", " ", 1).replace(opening, " ", 1)

@@ -402,3 +402,25 @@ def test_inserted_opening_is_not_model_text():
         llm.validate(opening + ". " + tail, opening, c, vetted=[tail], model_opening=False)
     text, _ = llm.validate(opening + ". " + tail, opening, c, vetted=[tail], model_opening=True)
     assert text.startswith(opening)
+
+
+# --- PR #50 review round 2 (gpt-6.1-terra) -----------------------------------------------------
+
+def test_bill_reminder_reading_beats_receipt():
+    assert llm._benign_reading("sms", ["reads like a routine bill reminder with a payment due"]) == "bill"
+
+
+def test_model_copy_of_the_fact_counts_as_model_text():
+    fact = llm.KEY_FACT["OTP or PIN theft"]
+    c = ctx("Share your OTP to unblock the account.", 1, "sms", fact)
+    text, report = llm.validate(fact, "This message is DANGEROUS: asks for an OTP, PIN or card details", c)
+    assert text == fact and not report["fact_added"]
+
+
+def test_unsafe_only_output_with_inserted_opening_fails():
+    opening = "This message is DANGEROUS: asks for an OTP, PIN or card details"
+    tail = llm.ACTIONS[1][0]
+    out = llm._consistent("Please submit your OTP.", 1, opening, tail)
+    c = ctx("Share your OTP to unblock the account.", 1, "sms", llm.KEY_FACT["OTP or PIN theft"])
+    with pytest.raises(ValueError):
+        llm.validate(out, opening, c, vetted=[tail], model_opening=False)
