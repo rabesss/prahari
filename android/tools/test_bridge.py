@@ -19,6 +19,15 @@ assert intake.detect_mode('') == 0
 assert intake.detect_mode('{not json}') == 0
 print('share-text mode detection passed')
 
+hi = json.loads((ROOT / 'android/python/strings_hi.json').read_text(encoding='utf-8'))
+assert set(hi) >= {'ui', 'evidence', 'skip', 'new'}
+assert isinstance(hi['ui'], dict) and hi['ui']['Check on this phone']
+assert isinstance(hi['evidence'], dict) and '{host}' in next(k for k in hi['evidence'] if '{' in k)
+assert isinstance(hi['skip'], list) and hi['skip']
+for key, item in hi['new'].items():
+    assert 'en' in item and 'hi' in item, key
+print('hindi string table shape passed')
+
 for blocked in ('joblib', 'sklearn', 'scipy', 'pandas', 'torch', 'executorch'):
     sys.modules[blocked] = None
 import mobile
