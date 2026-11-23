@@ -886,7 +886,16 @@ PASSIVE_THREAT = re.compile(r"\b(?:will be|would be|is being|ho jayega|ho jaega|
                             r"\b(?:blocked|suspended|frozen|closed|band|बंद)", re.I)
 # A phone number: eight or more digits, allowing spaces, dots or dashes between them. A bank's own
 # alert never needs the reader to call a number written in it; an OTP or an amount is shorter.
-CONTACT_NUMBER = re.compile(r"(?<!\d)\+?\d(?:[\s.-]?\d){7,}(?!\d)")
+CONTACT_NUMBER = re.compile(r"(?<!\d)\+?\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){7,}(?!\d)")
+
+
+OTHER_CONTACT = re.compile(r"whatsapp|telegram|wa\.me|\bt\.me\b|@\w|\(at\)|\[\.\]|\bupi\b|\bvpa\b", re.I)
+
+
+def _other_contact(a):
+    """A contact besides the official channel: a link, a phone number, a chat handle or a UPI ID."""
+    text = a.get("text", "")
+    return bool(a["hosts"] or CONTACT_NUMBER.search(text) or OTHER_CONTACT.search(text))
 
 
 def _self_block(text):
@@ -951,13 +960,17 @@ def decide(p_model, a, gate=0.85):
         # A block or disconnection threat that also points to the official app may still carry a
         # scammer's contact in any spelling (split numbers, handles, obfuscated links), so it is
         # never cleared outright: it is SUSPICIOUS and the reader checks in the official app.
-        if "block_threat" in harm and p_model >= 0.5:
+        if p_model >= 0.5 and _other_contact(a):
             return "uncertain", min(p_model, 0.6), a
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["bill"] or a["notice"] or a["appointment"]) and \
             not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):
         # A routine bill or appointment reminder may say service stops after the due date; with
         # no private payee, link or secret request it is a deadline, not a threat.
+        # A spoof can copy a reminder and hide its contact in any spelling, so when the model
+        # leans scam the reader is told to check, not that there is no risk.
+        if p_model >= 0.5 and _other_contact(a):
+            return "uncertain", min(p_model, 0.6), a
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["receipt"] or a["otp_note"]) and _self_block(a.get("text", "")) and \
             not (a["hosts"] or a.get("reader_direct") or a["dest_strong"] or a["risky"] or a["secret"] or

@@ -198,5 +198,7 @@ def classify_any(kind, inp):
         # AI-mention rows all score below 0.85 on the visible set.
         if lab == 1 and (mech.analyze(inp)["harm"] or float(score) >= 0.85):
             return lab, score, ev
+        if lab == "uncertain":
+            return lab, score, ev
         return 0, min(float(score), 0.40), ev
     return predict_text([inp])[0]
