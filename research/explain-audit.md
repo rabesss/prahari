@@ -50,3 +50,44 @@ opening and the Hindi summary repeat the detector's evidence, so they inherit it
 Hindi "wrong" ratings are mostly the same items. Fixing those is detector work (fp-fix-neon), not
 this branch. One digital-arrest message was cleared by the detector (verdict issue flagged by the
 judge).
+
+## Audit 3 (head 98d3254, after review round 1 fixes, docs and the final instruction wording)
+
+| | before | after |
+|---|---|---|
+| EN correct / weak / wrong | 5 / 12 / 3 | 10 / 5 / 5 |
+| EN false input claims | 2 | 4 |
+| EN clarity (mean 0-10) | 7.60 | 7.85 |
+| HI accessibility (mean 0-10) | 4.05 | 6.40 |
+| HI correctness correct / weak / wrong | 0 / 18 / 2 | 7 / 6 / 7 |
+
+The judge marked the detector evidence itself wrong on 6 of 20 items; 3 of the 5 "wrong" English
+items on each side are among them (for example the detector's own line calls the reserved
+`.example` test domain "common for throwaway scam sites", and a bill due is read as a receipt).
+Of the two other "wrong" items after: one added payment advice to a school notice (the detector's
+receipt reading covers orders and notices, and the receipt fact said "If you did not make this
+payment"), and one flow explanation guessed an overload motive for a scan-like pattern. Hindi
+"wrong" ratings again follow the wrong detector evidence, which the summary translates.
+
+## Changes after audit 3 (not re-audited; verified on development data and tests only)
+
+- 122e4d4: the payment fact is used only when the cleared message itself reports money moving
+  (the school-notice pattern above, also seen in audit 2 and in dev).
+- c097716, 7f174fd, 145bb79 (review round 2): bill and no-fee readings before receipts, absence
+  statements are not receipts, an opening re-inserted by the consistency filter is not model
+  text, a model copy of the fact counts as model text, an Aadhaar fact that no longer forbids
+  official KYC sites, proxy-style "and <advice>" clause split, email-address and malware-hedge
+  rules.
+
+## Summary across the three audits
+
+English: correct 11/6/5 before vs 8/11/10 after (audits 1/2/3); the first version was worse,
+audits 2 and 3 after the fact rewording show about twice as many correct explanations and far
+fewer weak ones, with the wrong count flat (5 vs 5) or up by 2 (3 vs 5), mostly from detector
+evidence that both sides repeat. False input claims: 3/4/2 before vs 3/4/4 after. Hindi
+accessibility for a Hindi-only reader: 4.5/3.5/4.05 before vs 6.3/5.45/6.4 after.
+
+Latency: interleaved A/B on the 57 dev items, same process and model, old vs new prompt per item
+in alternating order: +12% mean wall time (paired ratio 1.12; +22 prompt tokens, +2.8 generated
+tokens). A terser instruction measured +0-2% but left the model's sentence out (fact appended)
+on about 40% of dev items, so the longer wording was kept.
