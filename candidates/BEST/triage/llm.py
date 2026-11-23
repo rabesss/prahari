@@ -96,9 +96,10 @@ FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed
               "root": "a root-access attempt"}
 # Replacement sentence for unsafe generated advice, remembered per built prompt (bounded).
 _TAILS = {}
-TYPE_PRIORITY = ["sextortion", "authority_threat", "safe_account", "remote_access", "collect_request",
-                 "secret_request", "crypto_transfer", "investment", "job_upfront", "prize_claim",
-                 "pay_to_receive", "id_request", "block_threat", "pay_unverified"]
+TYPE_PRIORITY = ["sextortion", "safe_account", "remote_access", "collect_request", "pay_to_receive",
+                 "authority_threat", "secret_request", "crypto_transfer", "investment", "job_upfront",
+                 "prize_claim", "id_request", "block_threat", "pay_unverified"]
+_POWER = re.compile(r"electricity|power cut|bijli|बिजली|meter|discom|connection (?:will be )?(?:cut|kat)", re.I)
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
               "at_sign", "no_https", "official_domain"}
 
@@ -249,8 +250,12 @@ def scam_type(kind, inp, verdict):
     if mech.indic_context(inp):
         a = mech.analyze(inp)
         found = {n for n, _ in a["harm"]}
+        if found & {"block_threat", "pay_unverified", "secret_request"} and _POWER.search(inp) \
+                and not found & {"sextortion", "safe_account", "remote_access"}:
+            return "an electricity disconnection scam"
         # The most specific mechanism names the scam: a fake-police call that also asks for a
-        # transfer is a fake police threat, not a generic payment fraud.
+        # transfer to a safe account is a safe-account scam, and a customs parcel fee is an
+        # advance-fee scam, not a police threat.
         for n in TYPE_PRIORITY:
             if n in found:
                 return MECH_TYPE[n]
@@ -549,9 +554,9 @@ TYPE_ADVICE = {
         "Never share your OTP, UPI PIN or CVV.",
         "If you shared it, freeze your card in the bank app.",
         REPORT]),
-    "an advance-fee scam": ("Do not pay; a real parcel or refund never needs a fee.", [
-        "Do not pay any fee to receive a parcel, refund or prize.",
-        "Track parcels only in the India Post or courier app.",
+    "an advance-fee scam": ("Do not pay from the message; check any charge in the official app.", [
+        "Do not pay a fee from a link or message to receive anything.",
+        "Check any parcel charge in the India Post or courier app.",
         "Report the SMS on Sanchar Saathi Chakshu."]),
     "a fake lottery or prize scam": ("Ignore it; a real prize never needs a fee.", [
         "Never pay a fee or tax to receive a prize.",
