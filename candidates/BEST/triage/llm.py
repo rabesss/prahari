@@ -489,7 +489,7 @@ class Explainer:
         ev = compact_evidence(eff_kind, inp, evidence, verdict)
         # Evidence can quote attacker text (payee name, note, currency). Keep it on one line and
         # strip anything shaped like the verdict marker, which _prompt_verdict reads from the end.
-        ev = [re.sub(r'"{2,}', '"', re.sub(r"(?i)verdict\s*:", "verdict -", re.sub(r"\s+", " ", str(e))))[:160] for e in ev]
+        ev = [re.sub(r'"{2,}', '"', re.sub(r"(?i)verdict\s*:", "verdict -", re.sub(r"\s+", " ", re.sub(r"<\|[^|<>]{0,40}\|>", " ", str(e)))))[:160] for e in ev]
         what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event", "upi": "UPI payment QR"}.get(eff_kind, "item")
         first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")

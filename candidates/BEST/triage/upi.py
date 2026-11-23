@@ -145,8 +145,7 @@ _IMPERSONATED_ENTITIES = [
     ("EPFO", "gov", r"\b(?:epfo|pf\s+office)\b", ("epfo",)),
     ("India Post", "gov", r"\b(?:india\s+post|indiapost|speed\s+post)\b", ("indiapost", "ippb", "post")),
     ("Police / Cyber Cell", "gov", r"\b(?:police|cyber\s*(?:cell|crime|police)|cbi|ncb|customs\s+(?:department|dept|office|officer)|"
-     r"(?:high|supreme|district|sessions|family)\s+court|court\s+(?:fine|summons|order|warrant)|customs)\b"
-     r"|(?<!food\s)(?<!tennis\s)(?<!badminton\s)(?<!basketball\s)(?<!food-)\bcourt\b(?!\s*yard)", ()),
+     r"(?:high|supreme|district|sessions|family)\s+court|court\s+(?:fine|summons|order|warrant)|customs)\b", ()),
     ("Amazon", "ecom", r"\b(?:amazon(?:\s+pay|\s+india)?)\b", ("amazon", "amzn", "apl")),
     ("Flipkart", "ecom", r"\b(?:flipkart)\b", ("flipkart", "fkrt", "fk")),
     ("IRCTC", "travel", r"\b(?:irctc)\b", ("irctc",)),
@@ -183,12 +182,17 @@ _OFFICIAL_DESK_WEAK_RE = re.compile(
 # Plain cashback / money-back promo wording that real merchant QRs carry ("5% cashback on purchase").
 _MERCHANT_PROMO_RE = re.compile(r"\b(?:get\s+)?(?:\d+\s*%\s*)?(?:cash\s*back|cashback|money\s*back)\b|कैशबैक", re.I)
 _HARD_FEE_RE = re.compile(
-    r"\b(?:job|task|prize|lottery|parcel|kyc|withdrawal|payout|bonus|refund|work\s*from\s*home|registration)\b", re.I)
+    r"\b(?:job(?!\s*work)|task|prize|lottery|parcel|kyc|withdrawal|payout|bonus|refund|work\s*from\s*home|registration)\b", re.I)
 _URL_SCAM_WORD_RE = re.compile(r"refund|kyc|cashback|claim|prize|reward|help|support|care|verif|secure|login|update|offer")
 # A promo stops being plain promo when it asks for a payment or action to receive the money.
 # Routine on a merchant QR ("Courier charge"), the classic parcel/customs scam on a personal one.
 _PERSONAL_PARCEL_FEE_RE = re.compile(
-    r"\b(?:customs|parcel|courier|package|shipment)\b[^.;!?।\n]{0,30}\b(?:fee|charge|duty|clearance|release)\b", re.I)
+    r"\b(?:parcel|courier|package|shipment)\b[^.;!?।\n]{0,30}\b(?:fee|charge)\b", re.I)
+_BARE_COURT_RE = re.compile(r"\bcourt\b", re.I)
+_COURT_CASE_RE = re.compile(r"\b(?:fine|case|summons|warrant|penalty|challan|notice|bail|hearing)\b", re.I)
+_PERSONAL_CUSTOMS_RE = re.compile(
+    r"\bcustoms\b[^.;!?।\n]{0,30}\b(?:fee|charge|duty|clearance)\b|"
+    r"\b(?:parcel|courier|package|shipment)\b[^.;!?।\n]{0,30}\b(?:duty|clearance|release|customs)\b", re.I)
 # Group companies carry the bank's name legitimately (ICICI Lombard, PNB MetLife, SBI Life, HDFC Ergo).
 _GROUP_COMPANY_RE = re.compile(
     r"\b(?:lombard|prudential|metlife|ergo|life|general\s+insurance|insurance|securities|mutual\s+fund|amc|"
@@ -200,6 +204,10 @@ _AGENT_WORD_RE = re.compile(r"\b(?:agents?|registered|associates|consultants?|ad
 # "Pay Rs 500 and receive 5% cashback on your purchase" is a purchase promo; "Pay Rs 1 to receive cashback" is not.
 _PROMO_PURCHASE_RE = re.compile(r"\d+\s*%|\bon\s+(?:your\s+|the\s+|this\s+)?(?:purchase|order|bill|shopping|payment)\b", re.I)
 _PROMO_PURPOSE_RE = re.compile(r"\bto\s+(?:receive|claim|get|unlock)\b", re.I)
+_INVOICE_RECEIVE_RE = re.compile(
+    r"\b(?:payment|amount|money)?\s*receiv\w*\s+(?:\w+\s+){0,2}(?:towards|for|against)\s+(?:the\s+)?(?:invoice|bill|order)\b", re.I)
+_MERCHANT_RECEIVE_RE = re.compile(
+    r"\b(?:payment|pay)\s+receive\b|\breceive\s*(?:rs\.?|inr|₹)?\s*\d[\d,]*\b|\breceive\s+(?:a\s+)?gift\s+voucher\b", re.I)
 _PROMO_BREAKER_RE = re.compile(
     r"\b(?:receive|claim|credited?\s+to)\b|\bpay\s*(?:rs\.?|inr|₹)?\s*\d", re.I)
 # Small local shops legitimately name a brand they resell ("Airtel Recharge Shop", "Jio Point").
@@ -273,7 +281,7 @@ _RECEIVE_LURE_RE = re.compile(
     r"credit\s+(?:to|in|into)\s+(?:your\s+)?(?:account|bank|upi|a/c)|"
     r"(?:instant|order|tax|itr|gst|ticket|bank|amazon|flipkart|paytm|phonepe)\s+refund|"
     r"claim\s+(?:your\s+)?(?:prize|reward|refund|cashback|winnings?|lottery|gift)|claim\s+your\s+(?:amount|money|voucher|subsidy)|"
-    r"(?<!no\s)claim\s+(?:your\s+)?bonus|"
+    r"(?<!no\s)(?<!no-)claim\s+(?:your\s+)?bonus|"
     r"lottery|lucky\s*draw|jackpot|you\s+won|prize\s*(?:money|claim|win|winner)|winner\s*(?:payout|claim|prize)|"
     r"olx\s*(?:payment|buyer|receive|credit|advance|deal)|army\s*(?:buyer|officer|payment|receive)|"
     r"subsidy\s*(?:credit|receive|claim)|pm\s*kisan\s*(?:claim|receive|credit|payout)|"
@@ -452,6 +460,8 @@ def parse_upi(text: str) -> dict | None:
         before_frag = cleaned.split("#Intent;", 1)[0]
         _s, p_host, p_path, query = _split_uri(before_frag)
         action = (p_host or p_path.strip("/") or "pay").lower()
+        if action == "upi" and p_path.strip("/"):
+            action = p_path.strip("/").split("/")[0].lower()
     elif _UPI_SCHEME_RE.match(cleaned):
         p_scheme, p_host, p_path, query = _split_uri(cleaned)
         scheme = (p_scheme or "upi").lower()
@@ -751,6 +761,10 @@ def analyze_upi(text: str) -> dict:
     # 3. Collect / AutoPay mandate / "scan or enter PIN to receive money" trick
     has_pin_receive = bool(_PIN_TO_RECEIVE_RE.search(note_and_name))
     cleaned_for_lure = _LEGIT_CREDIT_CARD_RE.sub(" ", note_and_name)
+    cleaned_for_lure = _INVOICE_RECEIVE_RE.sub(" ", cleaned_for_lure)
+    if is_merchant_fmt and not re.search(r"\b(?:pay|scan)\b[^.;!?।\n]{0,30}\bto\s+(?:receive|claim|get)\b", cleaned_for_lure, re.I):
+        # Merchants write "Payment receive", "Receive 2500", "Receive gift voucher on bill above 500".
+        cleaned_for_lure = _MERCHANT_RECEIVE_RE.sub(" ", cleaned_for_lure)
     promo_broken = bool(_PROMO_BREAKER_RE.search(cleaned_for_lure)) and (
         bool(_PROMO_PURPOSE_RE.search(cleaned_for_lure)) or not _PROMO_PURCHASE_RE.search(cleaned_for_lure))
     if valid_mc and not _OFFICIAL_DESK_RE.search(pn) and not promo_broken:
@@ -976,7 +990,7 @@ def analyze_upi(text: str) -> dict:
             "mentions KYC or verification in a payment QR",
             "tn" if _KYC_THREAT_RE.search(tn) else "pn",
         )
-    if _BLOCK_DISCONNECT_RE.search(note_and_name):
+    if _BLOCK_DISCONNECT_RE.search(note_and_name) or (not is_merchant_fmt and re.search(r"नंबर\s*(?:बंद|ब्लॉक)", note_and_name)):
         add(
             "block_threat_note",
             "high",
@@ -984,7 +998,17 @@ def analyze_upi(text: str) -> dict:
             "threatens account blocking or disconnection in the payment note",
             "tn",
         )
-    if _AUTHORITY_CUSTOMS_RE.search(note_and_name) or (not is_merchant_fmt and _PERSONAL_PARCEL_FEE_RE.search(note_and_name)):
+    if not is_merchant_fmt and _PERSONAL_PARCEL_FEE_RE.search(note_and_name) and not (
+            _AUTHORITY_CUSTOMS_RE.search(note_and_name) or _PERSONAL_CUSTOMS_RE.search(note_and_name)):
+        add(
+            "parcel_fee_personal",
+            "medium",
+            "asks for a courier or parcel charge to a personal UPI ID rather than a courier company's merchant QR",
+            "courier or parcel charge to a personal UPI ID",
+            "tn",
+        )
+    if (_AUTHORITY_CUSTOMS_RE.search(note_and_name) or (not is_merchant_fmt and _PERSONAL_CUSTOMS_RE.search(note_and_name))
+            or (_BARE_COURT_RE.search(pn) and _COURT_CASE_RE.search(tn))):
         add(
             "authority_threat_note",
             "high",
@@ -1383,6 +1407,7 @@ def prompt_snippet(text: str) -> str:
         return text[:300]
     def clean(v: str, n: int) -> str:
         # Payload fields are attacker text: one line, no fence-closing quotes, bounded length.
+        v = re.sub(r"<\|[^|<>]{0,40}\|>", " ", v)
         return re.sub(r'"{2,}', '"', re.sub(r"\s+", " ", v))[:n]
 
     parts = [f"Intent: {parsed['scheme']}://{clean(parsed['action'], 20)}"]
