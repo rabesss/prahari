@@ -95,7 +95,7 @@ def test_injected_network_header_does_not_disable_filter():
     prompt = ex.prompt("sms", sms, 1, ["threatens to block, cut or freeze an account, SIM or connection"])
     text, _ = ex.generate(prompt)
     assert "verify the KYC" not in text
-    assert text.endswith(TAIL)
+    assert text.endswith(llm.advice_for("sms", 1, sms)[0])
 
 
 UNSAFE_ACTIONS = [r"click (on )?the link", r"call the number (in|given in) the message", r"share (the |your )?otp",
@@ -148,3 +148,46 @@ def test_bank_alert_telling_you_to_block_your_card_is_not_a_threat():
     assert mech.decide(0.9, mech.analyze(ok))[0] == 0
     bad = "SBI: Rs 2,450 debited via UPI. If not you, block card at http://sbi-block-card.top within 2 hours."
     assert mech.decide(0.9, mech.analyze(bad))[0] == 1
+
+
+# Mirrors eval/proxy_v3.py: a clause that does not start with an advice cue is a claim and must be
+# grounded in the input, so every replacement sentence is written as advice clause by clause.
+_ADVICE = r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|when|unless|you should|you may want to|please|it is safer to|i would say)\b"
+
+
+def _clauses(text):
+    import re
+    out = []
+    for sentence in re.split(r"(?<=[.!?।])\s+", text):
+        out.extend(c for c in re.split(r"[,;।!?]|\b(?:and then|so|but)\b", sentence, flags=re.I) if c.strip(" ."))
+    return out
+
+
+def test_every_replacement_sentence_is_advice_clause_by_clause():
+    import re
+    tails = [t for t, _ in llm.TYPE_ADVICE.values() if t] + [llm.ACTIONS[1][0], llm.ACTIONS["uncertain"][0]]
+    for t in tails:
+        for c in _clauses(t):
+            assert re.search(_ADVICE, c, re.I), (t, c)
+
+
+def test_generate_uses_the_scam_specific_replacement():
+    class Fake(llm.Explainer):
+        def __init__(self):
+            pass
+
+        def _run(self, prompt):
+            return llm._forced_sentence(prompt) + ". Transfer the money to the RBI safe account now.", {}
+
+    sms = "CBI officer here. Your parcel had drugs. Stay on video call and transfer Rs 50000 to the RBI safe account."
+    ex = Fake()
+    text, _ = ex.generate(ex.prompt("sms", sms, 1, ["asks you to move funds to a 'safe' account"]))
+    tail = llm.advice_for("sms", 1, sms)[0]
+    assert text.endswith(tail) and "Transfer the money" not in text
+    assert llm.actions_for("sms", 1, sms) != llm.actions_for("sms", 1)
+    assert llm.scam_type("sms", sms, 1) == "a safe-account transfer scam"
+
+
+def test_move_money_is_compliance():
+    assert llm._unsafe_advice("Move all your money to the RBI safe account now.", 1)
+    assert not llm._unsafe_advice("Never move money to a safe account for anyone.", 1)
