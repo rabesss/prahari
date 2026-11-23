@@ -206,6 +206,23 @@ def test_adb_parsers_and_parse_dir(tmp_path, capsys):
     assert "46.7" in md
 
 
+def _running(pid: int) -> bool:
+    """True if pid is alive and not a zombie (kill(pid, 0) also succeeds for an unreaped zombie)."""
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except (FileNotFoundError, IndexError):
+        return False
+    return state not in ("Z", "X")
+
+
+def _wait_gone(pid: int, tries: int = 50) -> bool:
+    for _ in range(tries):
+        if not _running(pid):
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def _fake_executorch(root: Path, ok: bool = True) -> Path:
     """Minimal `executorch.extension.pybindings.portable_lib` so the threadpool hook can be exercised."""
     pkg = root / "fake_et" / "executorch" / "extension" / "pybindings"
@@ -327,13 +344,7 @@ def test_run_bounded_kills_process_group_on_timeout(tmp_path):
     with pytest.raises(RuntimeError, match="timed out"):
         arm_bench.run_bounded([sys.executable, "-c", script], timeout_s=2)
     child = int(marker.read_text())
-    for _ in range(50):
-        try:
-            os.kill(child, 0)
-        except ProcessLookupError:
-            break
-        time.sleep(0.1)
-    else:
+    if not _wait_gone(child):
         pytest.fail("grandchild survived the timeout kill")
 
 
@@ -388,13 +399,7 @@ def test_run_bounded_kills_sigterm_ignoring_descendant(tmp_path):
     with pytest.raises(RuntimeError, match="timed out"):
         arm_bench.run_bounded([sys.executable, "-c", script], timeout_s=2)
     pid = int(marker.read_text())
-    for _ in range(50):
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            break
-        time.sleep(0.1)
-    else:
+    if not _wait_gone(pid):
         os.kill(pid, 9)
         pytest.fail("SIGTERM-ignoring descendant survived the timeout kill")
 

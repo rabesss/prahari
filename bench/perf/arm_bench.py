@@ -128,7 +128,11 @@ def run_bounded(cmd: list[str], *, timeout_s: float, **kwargs) -> subprocess.Com
             except ProcessLookupError:
                 break
             time.sleep(grace)
-        proc.wait()
+        try:
+            proc.communicate(timeout=10)  # reap the leader and close any captured pipes
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
         raise RuntimeError(f"command timed out after {timeout_s:.0f} s and was killed: {cmd[:3]}...")
     except BaseException:
         try:
