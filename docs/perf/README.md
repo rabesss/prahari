@@ -69,7 +69,7 @@ All values extracted verbatim from `*-stats.xml` UI dumps and `meminfo.txt` on p
 | KYC warm 2 | DANGEROUS | 6 | 499 | *(not expanded)* | *(not expanded)* | *(not expanded)* | Collapsed stats card captured |
 | KYC warm 3 | DANGEROUS | 6 | 508 | 42.9 | 1.21 | 1,724.8 | Warm steady-state SMS check |
 | Bank debit alert | SUSPICIOUS | 17 | 615 | 39.8 | 1.50 | 1,737.5 | Pre-PR#41 APK (repeated opening sentence) |
-| Lookalike link | DANGEROUS | 183 | 594 | 39.1 | 3.53 | 1,781.2 | First URL check (cold `url.json` load). One generation pass is bounded at about 1.8 s here, so the 3.53 s total most likely includes a regenerated reply (`Explainer.generate` retries a rejected reply; this pre-PR #41 APK produced an off-topic question on this sample). TTFT and decode on the card are from the last pass. |
+| Lookalike link | DANGEROUS | 183 | 594 | 39.1 | 3.53 | 1,781.2 | First URL check (cold `url.json` load). The total is well above the other checks; a possible cause, not verified from the capture, is a regenerated reply (`Explainer.generate` can retry a rejected reply, and this pre-PR #41 APK produced an off-topic question on this sample). Which pass the card's TTFT and decode figures come from is not recorded. |
 | Port scan | DANGEROUS | 5 | 650 | 38.6 | 1.49 | 1,772.6 | Flow-text rules + Llama explanation |
 | KYC (airplane mode) | DANGEROUS | 8 | 657 | 39.0 | 1.42 | 1,772.6 | Verified `airplane_mode_on=1` before check |
 

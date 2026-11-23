@@ -378,3 +378,41 @@ def test_adb_sample_chip_row_and_duration_formats():
     assert rec["detector_ms"] == 1050.0 and rec["first_token_ms"] == 2310.0
     assert rec["total_s"] == 4.2 and rec["app_memory_mb"] == 1700.0
     assert rec["decode_tps"] == 41.0
+
+
+def test_run_bounded_kills_sigterm_ignoring_descendant(tmp_path):
+    marker = tmp_path / "child.pid"
+    child = "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"
+    script = (f"import subprocess, sys, time; p = subprocess.Popen([sys.executable, '-c', {child!r}]); "
+              f"open({str(marker)!r}, 'w').write(str(p.pid)); time.sleep(60)")
+    with pytest.raises(RuntimeError, match="timed out"):
+        arm_bench.run_bounded([sys.executable, "-c", script], timeout_s=2)
+    pid = int(marker.read_text())
+    for _ in range(50):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(pid, 9)
+        pytest.fail("SIGTERM-ignoring descendant survived the timeout kill")
+
+
+def test_parse_dir_keeps_recorded_timeout_status(tmp_path):
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    cap = tmp_path / "cap"
+    cap.mkdir()
+    done_xml = (run8 / "kyc-warm1-stats.xml").read_text(encoding="utf-8")
+    (cap / "kyc-warm-1-stats.xml").write_text(done_xml, encoding="utf-8")
+    (cap / "kyc-warm-2-stats.xml").write_text(done_xml, encoding="utf-8")  # late values, but recorded as timeout
+    (cap / "results.json").write_text(json.dumps({"checks": [
+        {"check": "kyc-warm-1", "status": "ok"}, {"check": "kyc-warm-2", "status": "timeout"}]}))
+    (cap / "home-stats.xml").write_text((run8 / "home.xml").read_text(encoding="utf-8"), encoding="utf-8")
+    out = tmp_path / "out"
+    assert adb_bench.main(["parse-dir", str(cap), "--out-dir", str(out)]) == 0
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    status = {c["check"]: c["status"] for c in rep["checks"]}
+    assert status == {"kyc-warm-1": "ok", "kyc-warm-2": "timeout", "home": "incomplete-capture"}
+    assert sorted(rep["summary"]["checks_incomplete"]) == ["home", "kyc-warm-2"]
+    assert "status" in (out / "items.csv").read_text(encoding="utf-8").splitlines()[0]

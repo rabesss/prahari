@@ -49,7 +49,7 @@ def _row_from_android(data: dict) -> list[dict]:
     label = f"{dev.get('manufacturer', '')} {dev.get('model', 'Android')} ({dev.get('soc_model', 'arm64')})".strip()
     flags = ", ".join(dev.get("isa_arm_features") or []) or "n/a"
     polled = [c.get("mem_polled", {}).get("peak_pss_mib") for c in data.get("checks", [])
-              if c.get("status", "ok") == "ok"]
+              if c.get("status") == "ok"]
     polled = [v for v in polled if v is not None]
     if polled:
         mem_str = f"{max(polled):.1f} MiB highest sampled PSS (dumpsys polled every few hundred ms during checks)"

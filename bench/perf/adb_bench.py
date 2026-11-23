@@ -366,7 +366,7 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
                       chronological: bool = True) -> dict:
     all_rows = rows
     # Aggregates use completed checks only; timed-out or skipped checks stay listed under "checks".
-    rows = [r for r in all_rows if r.get("status", "ok") == "ok"]
+    rows = [r for r in all_rows if r.get("status") == "ok"]
     det_vals = [r["detector_ms"] for r in rows if r.get("detector_ms") is not None]
     ttft_vals = [r["first_token_ms"] for r in rows if r.get("first_token_ms") is not None]
     dec_vals = [r["decode_tps"] for r in rows if r.get("decode_tps") is not None]
@@ -382,7 +382,7 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
         "dumpsys_meminfo": meminfo or {},
         "summary": {
             "checks_total": len(all_rows),
-            "checks_incomplete": [r.get("check") for r in all_rows if r.get("status", "ok") != "ok"],
+            "checks_incomplete": [r.get("check") for r in all_rows if r.get("status") != "ok"],
             "checks_full_stats": sum(1 for r in rows if r.get("decode_tps") is not None and r.get("total_s") is not None),
             "detector_ms_min_max": [min(det_vals), max(det_vals)] if det_vals else None,
             "ttft_ms_median": round(statistics.median(ttft_vals), 1) if ttft_vals else None,
@@ -427,7 +427,7 @@ def render_android_md(report: dict) -> str:
     for r in report["checks"]:
         polled = r.get("mem_polled", {}).get("peak_pss_mib")
         lines.append(
-            f"| `{r['check']}` | {r.get('status', 'ok')} | {'yes' if r.get('airplane_mode') else 'no'} | "
+            f"| `{r['check']}` | {r.get('status', 'unknown')} | {'yes' if r.get('airplane_mode') else 'no'} | "
             f"{r['detector_ms'] if r['detector_ms'] is not None else '—'} | "
             f"{r['first_token_ms'] if r['first_token_ms'] is not None else '—'} | "
             f"{r['decode_tps'] if r['decode_tps'] is not None else '—'} | "
@@ -443,7 +443,7 @@ def write_android_outputs(report: dict, out_dir: Path) -> None:
     (out_dir / "results.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     (out_dir / "summary.md").write_text(render_android_md(report), encoding="utf-8")
     fields = [
-        "check", "airplane_mode", "detector_ms", "first_token_ms", "decode_tps",
+        "check", "status", "airplane_mode", "detector_ms", "first_token_ms", "decode_tps",
         "total_s", "app_memory_mb", "polled_peak_pss_mib", "polled_peak_rss_mib", "cpu_abi",
     ]
     with (out_dir / "items.csv").open("w", newline="", encoding="utf-8") as fh:
@@ -453,6 +453,7 @@ def write_android_outputs(report: dict, out_dir: Path) -> None:
             mp = r.get("mem_polled") or {}
             w.writerow({
                 "check": r["check"],
+                "status": r.get("status", "unknown"),
                 "airplane_mode": bool(r.get("airplane_mode")),
                 "detector_ms": r.get("detector_ms"),
                 "first_token_ms": r.get("first_token_ms"),
@@ -472,12 +473,24 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
     xml_files = sorted(src.glob("*-stats.xml"))
     if not xml_files:
         raise SystemExit(f"No *-stats.xml files found in {src}")
+    # A live `run` records each check's status in results.json; keep it, so a timed-out check whose XML
+    # happens to hold late values is not promoted to a completed one when the captures are reparsed.
+    recorded: dict[str, str] = {}
+    prior = src / "results.json"
+    if prior.is_file():
+        try:
+            recorded = {c["check"]: c.get("status", "unknown") for c in json.loads(prior.read_text()).get("checks", [])}
+        except (ValueError, KeyError, TypeError):
+            recorded = {}
     rows = []
     for xf in xml_files:
         name = xf.name.removesuffix("-stats.xml")
-        rec = parse_stats_xml(xf.read_text(errors="replace"))
+        xml_text = xf.read_text(errors="replace")
+        rec = parse_stats_xml(xml_text)
         rec["check"] = name
         rec["airplane_mode"] = "airplane" in name.lower()
+        # Without a recorded status, count a check as complete only if its stats header carries a first-token time.
+        rec["status"] = recorded.get(name) or ("ok" if stats_header_state(xml_text) == "done" else "incomplete-capture")
         rows.append(rec)
     report = summarize_android(dev, rows, mem, source_note=f"Parsed UI XML artifacts from {src}", chronological=False)
     if args.out_dir:
@@ -662,7 +675,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         write_android_outputs(report, out_dir)
         print(render_android_md(report))
         print(f"[adb_bench] outputs written to {out_dir}")
-        failed = [r["check"] for r in rows if r.get("status", "ok") != "ok"]
+        failed = [r["check"] for r in rows if r.get("status") != "ok"]
         if failed:
             print(f"[adb_bench] {len(failed)} check(s) incomplete: {', '.join(failed)}", file=sys.stderr)
             return 2

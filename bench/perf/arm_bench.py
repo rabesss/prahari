@@ -120,15 +120,15 @@ def run_bounded(cmd: list[str], *, timeout_s: float, **kwargs) -> subprocess.Com
     try:
         out, err = proc.communicate(timeout=timeout_s)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(proc.pid, signal.SIGTERM)
-            proc.wait(timeout=10)
-        except (ProcessLookupError, subprocess.TimeoutExpired):
+        # SIGTERM the whole group, give it a moment, then SIGKILL the group regardless of whether the leader
+        # has exited: a descendant may ignore SIGTERM and outlive the leader.
+        for sig, grace in ((signal.SIGTERM, 5.0), (signal.SIGKILL, 0.0)):
             try:
-                os.killpg(proc.pid, signal.SIGKILL)
+                os.killpg(proc.pid, sig)
             except ProcessLookupError:
-                pass
-            proc.wait()
+                break
+            time.sleep(grace)
+        proc.wait()
         raise RuntimeError(f"command timed out after {timeout_s:.0f} s and was killed: {cmd[:3]}...")
     except BaseException:
         try:
