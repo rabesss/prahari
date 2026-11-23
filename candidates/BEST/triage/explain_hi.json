@@ -1,298 +1,298 @@
 {
- "_note": "English source strings for the Hindi summary. Keep {placeholders} unchanged. hi values filled from General Translation, then native-checked.",
+ "_note": "Hindi summary strings. Evidence phrases reuse android/python/strings_hi.json where the English matches (Gemini 4 Neon reviewed); the rest, patterns, facts and verdict lines were written for this table. Keep {placeholders} unchanged.",
  "verdict": {
   "1": {
    "message": {
     "en": "This message is DANGEROUS",
-    "hi": ""
+    "hi": "यह संदेश खतरनाक है"
    },
    "link": {
     "en": "This link is DANGEROUS",
-    "hi": ""
+    "hi": "यह लिंक खतरनाक है"
    },
    "network": {
     "en": "This network event is DANGEROUS",
-    "hi": ""
+    "hi": "यह नेटवर्क गतिविधि खतरनाक है"
    }
   },
   "0": {
    "message": {
     "en": "No risk found for this message",
-    "hi": ""
+    "hi": "इस संदेश में कोई खतरा नहीं मिला"
    },
    "link": {
     "en": "No risk found for this link",
-    "hi": ""
+    "hi": "इस लिंक में कोई खतरा नहीं मिला"
    },
    "network": {
     "en": "No risk found for this network event",
-    "hi": ""
+    "hi": "इस नेटवर्क गतिविधि में कोई खतरा नहीं मिला"
    }
   },
   "uncertain": {
    "message": {
     "en": "This message needs a check",
-    "hi": ""
+    "hi": "इस संदेश की जांच ज़रूरी है"
    },
    "link": {
     "en": "This link needs a check",
-    "hi": ""
+    "hi": "इस लिंक की जांच ज़रूरी है"
    },
    "network": {
     "en": "This network event needs a check",
-    "hi": ""
+    "hi": "इस नेटवर्क गतिविधि की जांच ज़रूरी है"
    }
   }
  },
  "fallback_reason": {
   "1": {
    "en": "it shows warning signs of a scam",
-   "hi": ""
+   "hi": "इसमें ठगी के चेतावनी संकेत हैं"
   },
   "0": {
    "en": "no scam warning signs were found",
-   "hi": ""
+   "hi": "ठगी का कोई चेतावनी संकेत नहीं मिला"
   },
   "uncertain": {
    "en": "some signs are unclear",
-   "hi": ""
+   "hi": "कुछ संकेत साफ़ नहीं हैं"
   }
  },
  "label": {
   "en": "Hindi summary from the detector (fixed text, not written by AI)",
-  "hi": ""
+  "hi": "हिंदी सारांश: डिटेक्टर का तय टेक्स्ट, AI का लिखा नहीं"
  },
  "join_and": {
   "en": "{a} and {b}",
-  "hi": ""
+  "hi": "{a} और {b}"
  },
  "phrases": {
-  "a flood of connections": "",
-  "a link runs on past its domain ending, hiding where it really goes": "",
-  "a raw IP address instead of a name": "",
-  "a root-access attempt": "",
-  "an @ sign hides the destination": "",
-  "an instruction aimed at the assistant (prompt injection)": "",
-  "an unusually long or hyphenated domain": "",
-  "asks for a crypto payment": "",
-  "asks for a payment before a refund, prize or delivery is released": "",
-  "asks for a payment or fee": "",
-  "asks for a payment to a personal number, account or unverified link": "",
-  "asks for a payment to an unverified account or link": "",
-  "asks for an OTP, PIN or card details": "",
-  "asks for an OTP, PIN or password": "",
-  "asks for money to a private account or personal number": "",
-  "asks to install a screen-sharing app": "",
-  "asks to install an app or share the screen": "",
-  "asks to move funds to a safe account": "",
-  "asks to verify KYC or personal details": "",
-  "asks you to buy gift vouchers and hand over the codes": "",
-  "asks you to call a personal number": "",
-  "asks you to install an app or share your screen": "",
-  "asks you to move funds to a 'safe' account": "",
-  "asks you to move money into crypto": "",
-  "asks you to scan a QR code and approve a payment": "",
-  "asks you to send identity documents to a chat or link": "",
-  "asks you to share a PIN, OTP, card or account detail": "",
-  "connections repeat at a fixed interval": "",
-  "connections were rejected": "",
-  "demands a PIN, OTP, password or account login and isolates the reader": "",
-  "explicit beacon or command-and-control activity": "",
-  "gives its own number, chat or link to act on": "",
-  "includes a protective statement": "",
-  "includes an opt-out option": "",
-  "is a notice or advisory that gives its own number, chat or link to act on": "",
-  "looks like a bank debit or OTP alert; scammers copy these": "",
-  "looks like a port scan": "",
-  "many failed logins, like password guessing": "",
-  "mentions the branch": "",
-  "no HTTPS": "",
-  "no lookalike or risky-domain signals": "",
-  "no request for a payment or link in the text": "",
-  "no request for a secret or link in the text": "",
-  "no request for a secret or payment in the text": "",
-  "no request for a secret, payment or link in the text": "",
-  "no scam mechanism was found in the link": "",
-  "no scam mechanism was found in the text": "",
-  "offers a fake job, task or easy loan": "",
-  "offers a job or loan that needs an upfront fee": "",
-  "offers a job or loan that needs an upfront fee or deposit": "",
-  "offers an opt-out": "",
-  "offers easy daily income through a personal chat channel": "",
-  "pay a fee to receive a refund, prize or parcel": "",
-  "points to the official app": "",
-  "points to the official app or channel": "",
-  "poses as a bank or KYC verification desk": "",
-  "poses as a relative or colleague and wants money sent to a third party": "",
-  "poses as police, customs or a regulator": "",
-  "poses as police, customs or a regulator and demands action": "",
-  "pressures you to act immediately": "",
-  "promises a prize that needs a fee or details": "",
-  "promises a prize that needs a fee or personal details to claim": "",
-  "promises a prize, refund or easy money": "",
-  "promises guaranteed or doubled returns and asks you to deposit funds": "",
-  "promises guaranteed or doubled returns for a deposit": "",
-  "pushes a UPI collect request": "",
-  "pushes a UPI collect request that asks for your UPI PIN": "",
-  "pushes you to approve a UPI collect or payment request": "",
-  "pushes you to open a link": "",
-  "reads like a normal OTP notification": "",
-  "reads like a normal order or delivery record": "",
-  "reads like a normal payment receipt, order or delivery record": "",
-  "reads like a normal refund receipt": "",
-  "reads like a normal tracking update": "",
-  "reads like a pending collect-request notice to review": "",
-  "reads like a personal conversation": "",
-  "reads like a promotional offer with a discount or cashback": "",
-  "reads like a routine appointment or schedule change": "",
-  "reads like a routine bill reminder": "",
-  "reads like a routine bill reminder with a payment due": "",
-  "reads like a routine notice or appointment": "",
-  "reads like a routine receipt for an order": "",
-  "reads like a warning or news report about a scam": "",
-  "reads like consumer advice to check the published charges first": "",
-  "says it never asks for CODE": "",
-  "says it never asks for CVV": "",
-  "says it never asks for OTP": "",
-  "says it never asks for OTP or PIN": "",
-  "says it never asks for PASSWORD": "",
-  "says it never asks for PIN": "",
-  "says no OTP is needed": "",
-  "says no PIN is needed": "",
-  "says no charge is needed": "",
-  "says no extra charge is needed": "",
-  "says no fee is needed": "",
-  "says no fee or PIN is needed": "",
-  "says no payment is needed": "",
-  "says no payment or OTP is needed": "",
-  "says not to share the code": "",
-  "says there is no hurry": "",
-  "sends you to a lookalike page and asks you to act there": "",
-  "sets a deadline that threatens loss of access": "",
-  "threatens the reader or family to force a payment": "",
-  "threatens to block the account or service": "",
-  "threatens to block, cut or freeze an account, SIM or connection": "",
-  "threatens to publish private material": "",
-  "threatens to publish private material unless you pay": "",
-  "traffic that looks like a routine update or a scheduled backup": ""
+  "a flood of connections": "बहुत ज़्यादा कनेक्शन की बाढ़",
+  "a link runs on past its domain ending, hiding where it really goes": "लिंक डोमेन के आखिरी हिस्से के बाद भी आगे चलता है, जिससे असली वेबसाइट छिप जाती है",
+  "a raw IP address instead of a name": "वेबसाइट के नाम की जगह सीधा IP पता",
+  "a root-access attempt": "सिस्टम के पूरे अधिकार (root) पाने की कोशिश",
+  "an @ sign hides the destination": "@ निशान असली वेबसाइट को छिपाता है",
+  "an instruction aimed at the assistant (prompt injection)": "जांच करने वाले AI को दिया गया छिपा निर्देश (prompt injection)",
+  "an unusually long or hyphenated domain": "डोमेन सामान्य से ज़्यादा लंबा है या उसमें कई डैश (-) हैं",
+  "asks for a crypto payment": "क्रिप्टो में पेमेंट मांगता है",
+  "asks for a payment before a refund, prize or delivery is released": "रिफ़ंड, इनाम या डिलीवरी देने से पहले पैसे मांगता है",
+  "asks for a payment or fee": "पैसे या फ़ीस मांगता है",
+  "asks for a payment to a personal number, account or unverified link": "किसी निजी नंबर, खाते या बिना जांच वाले लिंक पर पैसे भेजने को कहता है",
+  "asks for a payment to an unverified account or link": "बिना जांच वाले खाते या लिंक पर पैसे भेजने को कहता है",
+  "asks for an OTP, PIN or card details": "OTP, PIN या कार्ड की जानकारी मांगता है",
+  "asks for an OTP, PIN or password": "OTP, PIN या पासवर्ड मांगता है",
+  "asks for money to a private account or personal number": "किसी निजी खाते या निजी नंबर पर पैसे मांगता है",
+  "asks to install a screen-sharing app": "स्क्रीन-शेयरिंग ऐप इंस्टॉल करने को कहता है",
+  "asks to install an app or share the screen": "कोई ऐप इंस्टॉल करने या स्क्रीन शेयर करने को कहता है",
+  "asks to move funds to a safe account": "पैसे किसी सेफ़ अकाउंट में भेजने को कहता है",
+  "asks to verify KYC or personal details": "KYC या निजी जानकारी वेरिफ़ाई करने को कहता है",
+  "asks you to buy gift vouchers and hand over the codes": "आपको गिफ़्ट वाउचर खरीदकर उनके कोड देने को कहता है",
+  "asks you to call a personal number": "आपको किसी निजी नंबर पर कॉल करने को कहता है",
+  "asks you to install an app or share your screen": "आपको कोई ऐप इंस्टॉल करने या अपनी स्क्रीन शेयर करने को कहता है",
+  "asks you to move funds to a 'safe' account": "आपको पैसे किसी 'सेफ़' अकाउंट में भेजने को कहता है",
+  "asks you to move money into crypto": "आपको पैसे क्रिप्टो में भेजने को कहता है",
+  "asks you to scan a QR code and approve a payment": "आपको QR कोड स्कैन करके पेमेंट मंज़ूर करने को कहता है",
+  "asks you to send identity documents to a chat or link": "आपको चैट या लिंक पर पहचान के दस्तावेज़ भेजने को कहता है",
+  "asks you to share a PIN, OTP, card or account detail": "आपको PIN, OTP, कार्ड या खाते की जानकारी बताने को कहता है",
+  "connections repeat at a fixed interval": "कनेक्शन एक तय समय के बाद बार-बार हो रहे हैं",
+  "connections were rejected": "कनेक्शन अस्वीकार कर दिए गए",
+  "demands a PIN, OTP, password or account login and isolates the reader": "PIN, OTP, पासवर्ड या अकाउंट लॉगिन मांगता है और दूसरों से बात न करने का दबाव डालता है",
+  "explicit beacon or command-and-control activity": "संदिग्ध बीकन या रिमोट कंट्रोल (command-and-control) गतिविधि के साफ़ संकेत",
+  "gives its own number, chat or link to act on": "कार्रवाई के लिए अपना ही नंबर, चैट या लिंक देता है",
+  "includes a protective statement": "इसमें सुरक्षा की चेतावनी या बचाव की बात शामिल है",
+  "includes an opt-out option": "इसमें मैसेज बंद करने (opt-out) का विकल्प दिया गया है",
+  "is a notice or advisory that gives its own number, chat or link to act on": "सूचना की तरह दिखता है, पर कार्रवाई के लिए अपना ही नंबर, चैट या लिंक देता है",
+  "looks like a bank debit or OTP alert; scammers copy these": "बैंक से पैसे कटने या OTP के अलर्ट जैसा लगता है; ठग इनकी नकल करते हैं",
+  "looks like a port scan": "पोर्ट स्कैन जैसा लगता है",
+  "many failed logins, like password guessing": "कई बार लॉगिन फेल हुए, जैसे कोई पासवर्ड का अंदाज़ा लगा रहा हो",
+  "mentions the branch": "बैंक की शाखा का ज़िक्र करता है",
+  "no HTTPS": "HTTPS नहीं है",
+  "no lookalike or risky-domain signals": "नकली या जोखिम वाले डोमेन का कोई संकेत नहीं",
+  "no request for a payment or link in the text": "मैसेज में पैसे या लिंक की कोई मांग नहीं है",
+  "no request for a secret or link in the text": "मैसेज में OTP-PIN जैसी गुप्त जानकारी या लिंक की कोई मांग नहीं है",
+  "no request for a secret or payment in the text": "मैसेज में OTP-PIN जैसी गुप्त जानकारी या पैसे की कोई मांग नहीं है",
+  "no request for a secret, payment or link in the text": "मैसेज में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है",
+  "no scam mechanism was found in the link": "लिंक में ठगी का कोई तरीका नहीं मिला",
+  "no scam mechanism was found in the text": "मैसेज में ठगी का कोई तरीका नहीं मिला",
+  "offers a fake job, task or easy loan": "नकली नौकरी, टास्क या आसान लोन का लालच देता है",
+  "offers a job or loan that needs an upfront fee": "ऐसी नौकरी या लोन की पेशकश करता है जिसके लिए पहले फ़ीस देनी होती है",
+  "offers a job or loan that needs an upfront fee or deposit": "ऐसी नौकरी या लोन की पेशकश करता है जिसके लिए पहले फ़ीस या डिपॉज़िट देना होता है",
+  "offers an opt-out": "मैसेज बंद करने (opt-out) का विकल्प देता है",
+  "offers easy daily income through a personal chat channel": "निजी चैट चैनल के ज़रिए रोज़ आसान कमाई का लालच देता है",
+  "pay a fee to receive a refund, prize or parcel": "रिफ़ंड, इनाम या पार्सल पाने के लिए फ़ीस देने को कहता है",
+  "points to the official app": "आधिकारिक ऐप का इस्तेमाल करने को कहता है",
+  "points to the official app or channel": "आधिकारिक ऐप या माध्यम की ओर इशारा करता है",
+  "poses as a bank or KYC verification desk": "बैंक या KYC जांच डेस्क बनकर बात करता है",
+  "poses as a relative or colleague and wants money sent to a third party": "रिश्तेदार या सहकर्मी बनकर किसी तीसरे व्यक्ति को पैसे भेजने को कहता है",
+  "poses as police, customs or a regulator": "पुलिस, कस्टम या सरकारी नियामक बनकर बात करता है",
+  "poses as police, customs or a regulator and demands action": "पुलिस, कस्टम या सरकारी नियामक बनकर कार्रवाई करने का दबाव डालता है",
+  "pressures you to act immediately": "आपको तुरंत कदम उठाने का दबाव डालता है",
+  "promises a prize that needs a fee or details": "ऐसे इनाम का वादा करता है जिसके लिए फ़ीस या जानकारी देनी पड़ती है",
+  "promises a prize that needs a fee or personal details to claim": "ऐसे इनाम का वादा करता है जिसे पाने के लिए फ़ीस या निजी जानकारी देनी पड़ती है",
+  "promises a prize, refund or easy money": "इनाम, रिफ़ंड या आसान कमाई का वादा करता है",
+  "promises guaranteed or doubled returns and asks you to deposit funds": "पक्के या दोगुने मुनाफ़े का वादा करके पैसे जमा करने को कहता है",
+  "promises guaranteed or doubled returns for a deposit": "पैसे जमा करने पर पक्के या दोगुने मुनाफ़े का वादा करता है",
+  "pushes a UPI collect request": "UPI कलेक्ट रिक्वेस्ट मंज़ूर करने पर ज़ोर देता है",
+  "pushes a UPI collect request that asks for your UPI PIN": "ऐसी UPI कलेक्ट रिक्वेस्ट भेजता है जिसमें आपका UPI PIN मांगा जाता है",
+  "pushes you to approve a UPI collect or payment request": "आपको UPI कलेक्ट या पेमेंट रिक्वेस्ट मंज़ूर करने का दबाव डालता है",
+  "pushes you to open a link": "आपको लिंक खोलने का दबाव डालता है",
+  "reads like a normal OTP notification": "सामान्य OTP मैसेज जैसा लगता है",
+  "reads like a normal order or delivery record": "सामान्य ऑर्डर या डिलीवरी की जानकारी जैसा है",
+  "reads like a normal payment receipt, order or delivery record": "सामान्य पेमेंट रसीद, ऑर्डर या डिलीवरी की जानकारी जैसा लगता है",
+  "reads like a normal refund receipt": "सामान्य रिफ़ंड की रसीद जैसा है",
+  "reads like a normal tracking update": "सामान्य ट्रैकिंग अपडेट जैसा है",
+  "reads like a pending collect-request notice to review": "देखने के लिए पेंडिंग कलेक्ट-रिक्वेस्ट की सूचना जैसा लगता है",
+  "reads like a personal conversation": "सामान्य निजी बातचीत जैसा लगता है",
+  "reads like a promotional offer with a discount or cashback": "छूट या कैशबैक वाले सामान्य प्रचार ऑफ़र जैसा लगता है",
+  "reads like a routine appointment or schedule change": "सामान्य अपॉइंटमेंट या समय बदलाव की सूचना जैसा लगता है",
+  "reads like a routine bill reminder": "सामान्य बिल रिमाइंडर जैसा लगता है",
+  "reads like a routine bill reminder with a payment due": "बकाया पेमेंट के सामान्य बिल रिमाइंडर जैसा लगता है",
+  "reads like a routine notice or appointment": "सामान्य सूचना या अपॉइंटमेंट जैसा लगता है",
+  "reads like a routine receipt for an order": "किसी ऑर्डर की सामान्य रसीद जैसा लगता है",
+  "reads like a warning or news report about a scam": "किसी ठगी के बारे में चेतावनी या खबर जैसा लगता है",
+  "reads like consumer advice to check the published charges first": "पहले जारी किए गए चार्ज जांचने की ग्राहक सलाह जैसा लगता है",
+  "says it never asks for CODE": "कहता है कि वह कभी कोड नहीं मांगता",
+  "says it never asks for CVV": "कहता है कि वह कभी CVV नहीं मांगता",
+  "says it never asks for OTP": "कहता है कि वह कभी OTP नहीं मांगता",
+  "says it never asks for OTP or PIN": "कहता है कि वह कभी OTP या PIN नहीं मांगता",
+  "says it never asks for PASSWORD": "कहता है कि वह कभी पासवर्ड नहीं मांगता",
+  "says it never asks for PIN": "कहता है कि वह कभी PIN नहीं मांगता",
+  "says no OTP is needed": "कहता है कि कोई OTP नहीं चाहिए",
+  "says no PIN is needed": "कहता है कि कोई PIN नहीं चाहिए",
+  "says no charge is needed": "कहता है कि कोई चार्ज नहीं लगेगा",
+  "says no extra charge is needed": "कहता है कि कोई अतिरिक्त चार्ज नहीं लगेगा",
+  "says no fee is needed": "कहता है कि कोई फ़ीस नहीं लगेगी",
+  "says no fee or PIN is needed": "कहता है कि कोई फ़ीस या PIN नहीं चाहिए",
+  "says no payment is needed": "कहता है कि कोई पेमेंट नहीं करना है",
+  "says no payment or OTP is needed": "कहता है कि कोई पेमेंट या OTP नहीं चाहिए",
+  "says not to share the code": "कोड किसी को न बताने को कहता है",
+  "says there is no hurry": "कहता है कि कोई जल्दी नहीं है",
+  "sends you to a lookalike page and asks you to act there": "आपको असली जैसे दिखने वाले नकली पेज पर भेजकर वहां कार्रवाई करने को कहता है",
+  "sets a deadline that threatens loss of access": "आखिरी समय तय करके खाता या सेवा बंद करने की धमकी देता है",
+  "threatens the reader or family to force a payment": "पैसे ऐंठने के लिए आपको या आपके परिवार को धमकी देता है",
+  "threatens to block the account or service": "खाता या सेवा ब्लॉक करने की धमकी देता है",
+  "threatens to block, cut or freeze an account, SIM or connection": "खाता, SIM या कनेक्शन ब्लॉक, बंद या फ़्रीज़ करने की धमकी देता है",
+  "threatens to publish private material": "निजी चीज़ें या जानकारी सार्वजनिक करने की धमकी देता है",
+  "threatens to publish private material unless you pay": "पैसे न देने पर निजी जानकारी या सामग्री सार्वजनिक करने की धमकी देता है",
+  "traffic that looks like a routine update or a scheduled backup": "ऐसा ट्रैफ़िक जो सामान्य अपडेट या तय समय पर होने वाले बैकअप जैसा है"
  },
  "patterns": [
   {
    "re": "^risky \\.(?P<tld>[a-z0-9-]+) lookalike domain (?P<host>\\S+)$",
    "en": "risky .{tld} lookalike domain {host}",
-   "hi": ""
+   "hi": "जोखिम वाले .{tld} पर बना नकली डोमेन {host}"
   },
   {
    "re": "^lookalike domain (?P<host>\\S+)$",
    "en": "lookalike domain {host}",
-   "hi": ""
+   "hi": "असली जैसा दिखने वाला नकली डोमेन {host}"
   },
   {
    "re": "^URL shortener (?P<host>\\S+)$",
    "en": "URL shortener {host}",
-   "hi": ""
+   "hi": "छोटा किया गया लिंक {host}, जो असली वेबसाइट छिपाता है"
   },
   {
    "re": "^unofficial domain (?P<host>\\S+) \\(\\.(?P<tld>[a-z0-9-]+)\\)$",
    "en": "unofficial domain {host} (.{tld})",
-   "hi": ""
+   "hi": "गैर-आधिकारिक डोमेन {host} (.{tld})"
   },
   {
    "re": "^official domain (?P<host>\\S+)$",
    "en": "official domain {host}",
-   "hi": ""
+   "hi": "आधिकारिक डोमेन {host}"
   },
   {
    "re": "^traffic to (?P<n>\\d+) different ports on (?P<ip>[\\d.]+)$",
    "en": "traffic to {n} different ports on {ip}",
-   "hi": ""
+   "hi": "{ip} के {n} अलग-अलग पोर्ट पर ट्रैफ़िक"
   },
   {
    "re": "^traffic to (?P<n>\\d+) different ports$",
    "en": "traffic to {n} different ports",
-   "hi": ""
+   "hi": "{n} अलग-अलग पोर्ट पर ट्रैफ़िक"
   },
   {
    "re": "^traffic involving (?P<ip>[\\d.]+)$",
    "en": "traffic involving {ip}",
-   "hi": ""
+   "hi": "{ip} से जुड़ा ट्रैफ़िक"
   },
   {
    "re": "^the domain (?P<host>\\S+) imitates '(?P<brand>[^']+)' on \\.(?P<tld>[a-z0-9-]+)$",
    "en": "the domain {host} imitates '{brand}' on .{tld}",
-   "hi": ""
+   "hi": "डोमेन {host}, .{tld} पर '{brand}' की नकल करता है"
   },
   {
    "re": "^the domain (?P<host>\\S+) imitates '(?P<brand>[^']+)' and uses \\.(?P<tld>[a-z0-9-]+), a throwaway registry$",
    "en": "the domain {host} imitates '{brand}' and uses .{tld}, a throwaway registry",
-   "hi": ""
+   "hi": "डोमेन {host}, '{brand}' की नकल करता है और अस्थायी डोमेन .{tld} इस्तेमाल करता है"
   },
   {
    "re": "^the domain (?P<host>\\S+) uses \\.(?P<tld>[a-z0-9-]+), common for throwaway",
    "en": "the domain {host} uses .{tld}, common for throwaway scam sites",
-   "hi": ""
+   "hi": "डोमेन {host} में .{tld} है, जो थोड़े समय के लिए बनी ठगी की साइटों में आम है"
   },
   {
    "re": "^the domain ends in \\.(?P<tld>[a-z0-9-]+), common for throwaway",
    "en": "the domain ends in .{tld}, common for throwaway scam sites",
-   "hi": ""
+   "hi": "डोमेन .{tld} पर खत्म होता है, जो थोड़े समय के लिए बनाई गई ठगी की साइटों में आम है"
   },
   {
    "re": "^mentions (?P<what>.+) and the branch$",
    "en": "mentions {what} and the branch",
-   "hi": ""
+   "hi": "{what} और बैंक की शाखा का ज़िक्र करता है"
   },
   {
    "re": "^an instruction aimed at the assistant \\(prompt injection\\) that (?P<inner>.+)$",
    "en": "an instruction aimed at the assistant (prompt injection) that {inner}",
-   "hi": ""
+   "hi": "जांच करने वाले AI को दिया गया छिपा निर्देश (prompt injection), जो {inner}"
   }
  ],
  "facts": {
-  "Never share an OTP, PIN or password because no bank or officer ever needs it.": "",
-  "Never enter your UPI PIN to receive money because the PIN only sends money out.": "",
-  "Never scan a QR code to receive money because scanning to pay only sends money out.": "",
-  "Never pay a fee from a message to get a refund or prize or parcel.": "",
-  "Never pay an account or link from a message and check bills in the official app.": "",
-  "Never install a screen-sharing app for a caller because it shows them your OTPs and bank app.": "",
-  "Never send crypto to someone who contacted you because it cannot be taken back.": "",
-  "Never move money to a so-called safe account because no bank or officer asks for that.": "",
-  "Never pay a caller who claims to be police or customs because there is no digital arrest.": "",
-  "Do not trust a threat to block your account because banks do not block accounts by SMS.": "",
-  "Never update KYC through a link or number from a message because banks do not ask that way.": "",
-  "Never pay a fee upfront for a job or loan because real ones do not charge first.": "",
-  "Never pay a deposit for a job or task because real jobs pay you instead.": "",
-  "Never pay a fee or share bank details for a prize because real prizes need neither.": "",
-  "Do not pay a blackmailer because paying usually brings more demands.": "",
-  "Do not pay a threat because paying usually brings more demands.": "",
-  "Never trust guaranteed or doubled returns because no real investment can promise them.": "",
-  "Never send Aadhaar or PAN copies over chat because real KYC does not work that way.": "",
-  "Never pay anyone with gift cards because no real company or officer takes them.": "",
-  "Do not trust the name in the message and check through a number you already have.": "",
-  "Never pay a bill through a number or link from a message and check it in the official app.": "",
-  "Do not open it because the address copies a known name but is not the official site.": "",
-  "Do not open it because a short link hides the real website.": "",
-  "Do not log in on this page because fake sites copy real login pages.": "",
-  "Check the address carefully or open the official app instead.": "",
-  "Do not reply or act on it because it uses pressure to take money or details.": "",
-  "Check with the sender through a number you already trust before acting.": "",
-  "Check the payment in your bank app because scammers copy bank alerts.": "",
-  "Check the firewall logs because a port scan looks for open services before an attack.": "",
-  "Check the logins because many failed attempts usually mean password guessing.": "",
-  "Check the traffic because a flood of connections can knock a service offline.": "",
-  "Check the device because regular check-ins to one address can mean malware.": "",
-  "Check the machine because a root attempt means someone wants full control.": "",
-  "Check this traffic with your IT team because it matches attack patterns.": "",
-  "Check whether anyone expected this traffic.": "",
-  "Do not follow it because text that gives orders to an AI checker is built to trick it.": "",
-  "If you did not make this payment check it in your bank app.": "",
-  "Never share this code with anyone who asks for it.": "",
-  "Check bills only in the official app or website.": "",
-  "Check that the address stays the same before you log in.": "",
-  "Never share your OTP or PIN as the message itself advises.": "",
-  "Check anything it mentions in the official app only.": "",
-  "Never share an OTP or PIN even with people you know.": "",
-  "Check with your IT team only if this traffic was not expected.": "",
-  "Never share an OTP or PIN with anyone who asks later.": ""
+  "Never share your OTP or PIN because no bank or officer needs it.": "अपना OTP या PIN कभी किसी को न बताएं; कोई भी बैंक या अधिकारी इसे नहीं मांगता।",
+  "Never enter your UPI PIN to receive money because it only sends money.": "पैसे पाने के लिए कभी UPI PIN न डालें; PIN डालने से पैसे आपके खाते से कटते हैं।",
+  "Never scan a QR code to receive money because scanning only sends money.": "पैसे पाने के लिए कभी QR कोड स्कैन न करें; स्कैन करने पर पैसे आपके खाते से जाते हैं।",
+  "Never pay a fee from a message to get a refund or prize or parcel.": "रिफ़ंड, इनाम या पार्सल पाने के लिए मैसेज से कभी कोई फ़ीस न भरें।",
+  "Never pay an account or link from a message and check bills in the official app.": "मैसेज में दिए खाते या लिंक पर कभी पैसे न भेजें; बिल आधिकारिक ऐप में ही जांचें।",
+  "Never install a screen-sharing app for a caller because it shows them your OTPs.": "कॉल करने वाले के कहने पर स्क्रीन-शेयरिंग ऐप कभी इंस्टॉल न करें; इससे उसे आपके OTP दिख जाते हैं।",
+  "Never send crypto to someone who contacted you because it cannot be taken back.": "जिसने खुद संपर्क किया हो, उसे कभी क्रिप्टो न भेजें; भेजा गया क्रिप्टो वापस नहीं आता।",
+  "Never move money to a safe account because no bank or officer asks that.": "किसी 'सेफ़ अकाउंट' में कभी पैसे न भेजें; कोई भी बैंक या अधिकारी ऐसा नहीं कहता।",
+  "Never pay a caller claiming to be police or customs because digital arrest is fake.": "पुलिस या कस्टम अधिकारी बनकर कॉल करने वाले को कभी पैसे न दें; 'डिजिटल अरेस्ट' जैसा कुछ नहीं होता।",
+  "Ignore the threat because banks do not block accounts by SMS.": "इस धमकी को अनदेखा करें; बैंक SMS भेजकर खाता बंद नहीं करते।",
+  "Never update KYC through a link or number from a message.": "मैसेज में दिए लिंक या नंबर से कभी KYC अपडेट न करें।",
+  "Never pay a fee upfront for a job or loan because real ones do not charge first.": "नौकरी या लोन के लिए पहले कभी फ़ीस न दें; असली नौकरी या लोन में पहले पैसे नहीं लिए जाते।",
+  "Never pay a deposit for a job or task because real jobs pay you instead.": "नौकरी या टास्क के लिए कभी डिपॉज़िट न दें; असली नौकरी में आपको पैसे मिलते हैं, देने नहीं पड़ते।",
+  "Never pay a fee or share bank details to claim a prize.": "इनाम पाने के लिए कभी फ़ीस न दें और बैंक की जानकारी न बताएं।",
+  "Do not pay a blackmailer because paying usually brings more demands.": "ब्लैकमेल करने वाले को पैसे न दें; पैसे देने पर मांगें और बढ़ती हैं।",
+  "Do not pay a threat because paying usually brings more demands.": "धमकी देने वाले को पैसे न दें; पैसे देने पर मांगें और बढ़ती हैं।",
+  "Never trust guaranteed or doubled returns because real investments cannot promise them.": "पक्के या दोगुने मुनाफ़े के वादे पर कभी भरोसा न करें; असली निवेश में ऐसा वादा नहीं किया जा सकता।",
+  "Never send Aadhaar or PAN copies over chat or a link.": "आधार या PAN की कॉपी कभी चैट या लिंक पर न भेजें।",
+  "Never pay anyone with gift cards because no real company or officer takes them.": "किसी को भी गिफ़्ट कार्ड से पैसे न दें; कोई असली कंपनी या अधिकारी गिफ़्ट कार्ड नहीं लेता।",
+  "Do not trust the name in the message and check through a number you already have.": "मैसेज में लिखे नाम पर भरोसा न करें; अपने पास पहले से मौजूद नंबर पर कॉल करके जांचें।",
+  "Never pay a bill through a number or link from a message.": "मैसेज में दिए नंबर या लिंक से कभी बिल न भरें।",
+  "Do not open it because the address only imitates a known name.": "इसे न खोलें; यह पता सिर्फ़ किसी जाने-माने नाम की नकल करता है।",
+  "Do not open it because a short link hides the real website.": "इसे न खोलें; छोटा किया गया लिंक असली वेबसाइट छिपाता है।",
+  "Do not log in on this page because fake sites copy real login pages.": "इस पेज पर लॉग-इन न करें; नकली साइटें असली लॉग-इन पेज की नकल करती हैं।",
+  "Check the address carefully or open the official app instead.": "पता ध्यान से जांचें, या इसकी जगह आधिकारिक ऐप खोलें।",
+  "Do not reply or act on it because it pressures you for money or details.": "इसका जवाब न दें और इस पर कोई कदम न उठाएं; यह पैसे या जानकारी के लिए दबाव डालता है।",
+  "Check with the sender through a number you already trust before acting.": "कोई कदम उठाने से पहले भेजने वाले से ऐसे नंबर पर बात करें जिस पर आपको पहले से भरोसा है।",
+  "Check the payment in your bank app because scammers copy bank alerts.": "पेमेंट अपने बैंक ऐप में जांचें; ठग बैंक के अलर्ट की नकल करते हैं।",
+  "Check the firewall logs because a port scan maps services before an attack.": "फ़ायरवॉल लॉग जांचें; हमले से पहले पोर्ट स्कैन खुली सेवाओं का पता लगाता है।",
+  "Check the logins because many failed attempts usually mean password guessing.": "लॉग-इन जांचें; बार-बार असफल कोशिशों का मतलब अक्सर पासवर्ड का अंदाज़ा लगाना होता है।",
+  "Check the traffic because a flood of connections can knock a service offline.": "ट्रैफ़िक जांचें; कनेक्शन की बाढ़ किसी सेवा को ठप कर सकती है।",
+  "Check the device because regular check-ins to one address can mean malware.": "डिवाइस जांचें; एक ही पते से तय अंतराल पर संपर्क मैलवेयर का संकेत हो सकता है।",
+  "Check the machine because a root attempt means someone wants full control.": "मशीन जांचें; root पाने की कोशिश का मतलब है कि कोई पूरा नियंत्रण चाहता है।",
+  "Check this traffic with your IT team because it matches attack patterns.": "यह ट्रैफ़िक अपनी IT टीम से जंचवाएं; यह हमलों के पैटर्न से मिलता है।",
+  "Check whether anyone expected this traffic.": "पता करें कि क्या किसी को इस ट्रैफ़िक की उम्मीद थी।",
+  "Do not follow it because orders aimed at an AI checker are a trick.": "इसके निर्देश न मानें; जांच करने वाले AI को दिए गए आदेश एक चाल हैं।",
+  "If you did not make this payment check it in your bank app.": "अगर यह पेमेंट आपने नहीं किया है, तो इसे अपने बैंक ऐप में जांचें।",
+  "Never share this code with anyone who asks for it.": "यह कोड मांगने वाले किसी भी व्यक्ति को कभी न बताएं।",
+  "Check bills only in the official app or website.": "बिल सिर्फ़ आधिकारिक ऐप या वेबसाइट में ही जांचें।",
+  "Check that the address stays the same before you log in.": "लॉग-इन करने से पहले देख लें कि पता यही बना रहे।",
+  "Never share your OTP or PIN as the message itself advises.": "जैसा मैसेज खुद कहता है, अपना OTP या PIN कभी किसी को न बताएं।",
+  "Check anything it mentions in the official app only.": "इसमें बताई गई कोई भी बात सिर्फ़ आधिकारिक ऐप में ही जांचें।",
+  "Never share an OTP or PIN even with people you know.": "OTP या PIN कभी किसी को न बताएं, जान-पहचान वालों को भी नहीं।",
+  "Check with your IT team only if this traffic was not expected.": "अगर इस ट्रैफ़िक की उम्मीद नहीं थी, तभी अपनी IT टीम से पूछें।",
+  "Never share an OTP or PIN with anyone who asks later.": "बाद में कोई OTP या PIN मांगे, तो भी उसे कभी न बताएं।"
  }
 }
