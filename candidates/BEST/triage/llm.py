@@ -491,7 +491,7 @@ class Explainer:
         user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
                 f"Start your answer with exactly: \"{opening}.\" "
-                f"Then one sentence, 6-12 words, on why: {fact}")
+                f"Then write one more sentence, 6-12 words, that tells the reader why, using this fact: {fact}")
         if len(_TAILS) > 256:
             _TAILS.clear()
             _CTX.clear()

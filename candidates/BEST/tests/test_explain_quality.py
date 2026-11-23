@@ -171,7 +171,7 @@ def test_prompt_carries_the_fact():
     inp = "Approve our Rs 6,700 collect request and your cover starts instantly."
     lab, _, ev = detect.classify_any("sms", inp)
     p = llm.Explainer.prompt(object(), "sms", inp, lab, ev)
-    assert "on why: " + llm.key_fact("sms", inp, lab, ev) in p
+    assert "using this fact: " + llm.key_fact("sms", inp, lab, ev) in p
 
 
 # --- Hindi summary -----------------------------------------------------------------------------
