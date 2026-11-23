@@ -130,26 +130,37 @@ private fun missingMessage(): String? {
     } else null
 }
 
-/** Load the single process-wide module. Call only from [Bridge.worker]. */
+/**
+ * Load the single process-wide module. A second [LlmModule] is never constructed
+ * while one is alive. Call only from [Bridge.worker].
+ */
 private fun ensureLoaded(): LlmModule {
     Bridge.module?.let { return it }
-    val missing = missingMessage()
-    Bridge.missing = missing
-    if (missing != null) throw IllegalStateException(missing)
-    Bridge.loadError?.let { throw IllegalStateException(it) }
-    val files = modelFiles() ?: throw IllegalStateException(missingMessage() ?: "Model files missing")
-    val created = LlmModule(files.first.path, files.second.path, 0f)
-    try {
-        created.load()
-    } catch (t: Throwable) {
-        try { created.close() } catch (_: Throwable) {}
-        Bridge.loadError = errorText(t)
-        throw IllegalStateException(Bridge.loadError, t)
+    synchronized(Bridge.moduleLock) {
+        Bridge.module?.let { return it }
+        val missing = missingMessage()
+        Bridge.missing = missing
+        if (missing != null) throw IllegalStateException(missing)
+        Bridge.loadError?.let { throw IllegalStateException(it) }
+        val files = modelFiles() ?: throw IllegalStateException(missingMessage() ?: "Model files missing")
+        val created = LlmModule(files.first.path, files.second.path, 0f)
+        try {
+            created.load()
+        } catch (t: Throwable) {
+            try { created.close() } catch (_: Throwable) {}
+            Bridge.loadError = errorText(t)
+            throw IllegalStateException(Bridge.loadError, t)
+        }
+        val raced = Bridge.module
+        if (raced != null) {
+            try { created.close() } catch (_: Throwable) {}
+            return raced
+        }
+        Bridge.module = created
+        Bridge.loadError = null
+        Bridge.missing = null
+        return created
     }
-    Bridge.module = created
-    Bridge.loadError = null
-    Bridge.missing = null
-    return created
 }
 
 /**
@@ -181,6 +192,7 @@ internal object Bridge {
         Thread(runnable, "prahari-net").apply { isDaemon = true }
     }
     val genLock = ReentrantLock()
+    val moduleLock = Any()
     @Volatile var app: Context? = null
     @Volatile var host: MainActivity? = null
     @Volatile var module: LlmModule? = null
@@ -304,8 +316,11 @@ internal object Bridge {
         }
         if (stopNow != null) try { stopNow.stop() } catch (_: Throwable) {}
         worker.execute {
-            val open = module
-            module = null
+            val open: LlmModule?
+            synchronized(moduleLock) {
+                open = module
+                module = null
+            }
             if (open != null) {
                 try { open.stop() } catch (_: Throwable) {}
                 try { open.close() } catch (_: Throwable) {}
@@ -506,6 +521,7 @@ class Runner(private val id: Int) {
                 Bridge.genLock.lock()
                 try { Bridge.generating = false } finally { Bridge.genLock.unlock() }
             }
+            try { module.resetContext() } catch (_: Throwable) {}
         }
         if (!Bridge.still(id)) throw Cancelled()
         callbackError.get()?.let { throw IllegalStateException(it, generationFailure) }
@@ -1295,7 +1311,7 @@ class MainActivity : Activity() {
         add(offline, offlineText, 0, -2, left = 12, weight = 1f)
         add(offline, icon(R.drawable.ic_chevron_right, 20, T.ink3), 20, 20)
         asButton(offline, "Prove it's offline. Try to reach the internet from this app.")
-        add(body, navRow(R.drawable.ic_list, n("recent"), n("history_toggle")) { showHistory() }, top = 16)
+        add(body, historyHomeRow(), top = 16)
         add(body, navRow(R.drawable.ic_link, n("qr_check"), "") { pickQr() }, top = 8)
         add(body, offline, top = 8)
         add(all, View(this), -1, 0, weight = 1f)
@@ -2334,6 +2350,42 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Same SharedPreferences key as the History screen switch. */
+    private fun historyHomeRow(): LinearLayout {
+        val on = HistoryStore.enabled(this)
+        val line = row().apply {
+            background = ripple(shape(T.white, 16f, 1, T.outline2))
+            pad(this, 14, 8, 8, 8)
+            minimumHeight = dp(48)
+        }
+        val bubble = FrameLayout(this).apply {
+            background = shape(T.brandC, 20f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(icon(R.drawable.ic_list, 20, T.brand), FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
+        }
+        add(line, bubble, 40, 40)
+        val text = col().apply {
+            minimumHeight = dp(48)
+            setOnClickListener { showHistory() }
+        }
+        add(text, txt(n("recent"), 15f, T.ink, 600, 20, raw = true))
+        add(text, txt(if (on) n("history_local_only") else n("history_off"), 13f, T.ink2, 400, 18, raw = true))
+        add(line, text, 0, -2, left = 12, weight = 1f)
+        val sw = Switch(this).apply {
+            isChecked = on
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
+            contentDescription = n("history_toggle")
+            setOnCheckedChangeListener { _, checked ->
+                HistoryStore.setEnabled(this@MainActivity, checked)
+                showHome()
+            }
+        }
+        add(line, sw, -2, -2)
+        text.contentDescription = n("recent")
+        return line
+    }
+
     private fun navRow(iconId: Int, title: String, subtitle: String, action: () -> Unit): LinearLayout {
         val line = row().apply {
             background = ripple(shape(T.white, 16f, 1, T.outline2))
@@ -2372,6 +2424,8 @@ class MainActivity : Activity() {
         add(toggle, txt(n("history_toggle"), 15f, T.ink, 600, 20, raw = true), 0, -2, weight = 1f)
         val sw = Switch(this).apply {
             isChecked = enabled
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
             contentDescription = n("history_toggle")
             setOnCheckedChangeListener { _, on ->
                 HistoryStore.setEnabled(this@MainActivity, on)
@@ -2431,7 +2485,12 @@ class MainActivity : Activity() {
         val uri = data?.data ?: return
         Thread({
             val text = try {
-                loadQrBitmap(uri)?.let { decodeQr(it) }
+                val bitmap = loadQrBitmap(uri)
+                try {
+                    bitmap?.let { decodeQr(it) }
+                } finally {
+                    if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+                }
             } catch (t: Throwable) {
                 Log.e(TAG, "qr decode failed", t)
                 null
@@ -2456,8 +2515,8 @@ class MainActivity : Activity() {
                 ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     val big = maxOf(info.size.width, info.size.height)
-                    if (big > 720) {
-                        val scale = 720.0 / big
+                    if (big > 1024) {
+                        val scale = 1024.0 / big
                         decoder.setTargetSize(
                             (info.size.width * scale).toInt().coerceAtLeast(1),
                             (info.size.height * scale).toInt().coerceAtLeast(1)
@@ -2465,7 +2524,19 @@ class MainActivity : Activity() {
                     }
                 }
             } else {
-                contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeStream(stream, null, bounds)
+                    val sample = run {
+                        var value = 1
+                        val big = maxOf(bounds.outWidth, bounds.outHeight)
+                        while (big / value > 1024) value *= 2
+                        value
+                    }
+                    contentResolver.openInputStream(uri)?.use { again ->
+                        BitmapFactory.decodeStream(again, null, BitmapFactory.Options().apply { inSampleSize = sample })
+                    }
+                }
             }
         } catch (t: Throwable) {
             Log.e(TAG, "image read failed", t)
@@ -2473,34 +2544,40 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Local decoder only. Versions above 10 and micro QR come back empty. */
+    /** Local decoder only. Versions above 10 and micro QR come back empty. The bitmap is recycled. */
     private fun decodeQr(bitmap: Bitmap): String? {
-        val big = maxOf(bitmap.width, bitmap.height)
-        val sample = if (big > 720) {
-            val scale = 720f / big
-            Bitmap.createScaledBitmap(
-                bitmap,
-                (bitmap.width * scale).toInt().coerceAtLeast(21),
-                (bitmap.height * scale).toInt().coerceAtLeast(21),
-                true
-            )
-        } else bitmap
-        val w = sample.width
-        val h = sample.height
-        val pixels = IntArray(w * h)
-        sample.getPixels(pixels, 0, w, 0, 0, w, h)
-        if (sample !== bitmap) sample.recycle()
-        val gray = ByteArray(w * h)
-        for (i in pixels.indices) {
-            val color = pixels[i]
-            val y = (Color.red(color) * 30 + Color.green(color) * 59 + Color.blue(color) * 11) / 100
-            gray[i] = y.toByte()
+        var scaled: Bitmap? = null
+        return try {
+            val big = maxOf(bitmap.width, bitmap.height)
+            val sample = if (big > 1024) {
+                val scale = 1024f / big
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * scale).toInt().coerceAtLeast(21),
+                    (bitmap.height * scale).toInt().coerceAtLeast(21),
+                    true
+                ).also { scaled = it }
+            } else bitmap
+            val w = sample.width
+            val h = sample.height
+            val pixels = IntArray(w * h)
+            sample.getPixels(pixels, 0, w, 0, 0, w, h)
+            val gray = ByteArray(w * h)
+            for (i in pixels.indices) {
+                val color = pixels[i]
+                val y = (Color.red(color) * 30 + Color.green(color) * 59 + Color.blue(color) * 11) / 100
+                gray[i] = y.toByte()
+            }
+            if (!Python.isStarted()) null
+            else {
+                val raw = Python.getInstance().getModule("qrdec").callAttr("decode_gray", gray, w, h)
+                val text = raw?.toString().orEmpty()
+                if (text.isBlank() || text == "None") null else text
+            }
+        } finally {
+            scaled?.let { if (!it.isRecycled) it.recycle() }
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
-        if (!Python.isStarted()) return null
-        val raw = Python.getInstance().getModule("qrdec").callAttr("decode_gray", gray, w, h) ?: return null
-        val text = raw.toString()
-        if (text.isBlank() || text == "None") return null
-        return text
     }
 
     private fun showAbout() {

@@ -24,7 +24,7 @@ internal object HistoryStore {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(ON, false)
 
     fun setEnabled(ctx: Context, on: Boolean) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(ON, on).apply()
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(ON, on).commit()
     }
 
     fun add(ctx: Context, mode: Int, level: String, text: String) {
