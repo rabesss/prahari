@@ -17,7 +17,7 @@ To prevent apples-to-oranges comparisons, every measurement is tagged with its e
 
 - **Detector latency (`detector_ms`):**
   - *Android S23:* Wall time of `mobile.verdict(kind, text)` measured with `time.perf_counter()` inside Python (`android/python/mobile.py`). First check per task pays one-time JSON load (`255 ms` for SMS/Indic, `183 ms` for URL); subsequent warm checks take `5–17 ms`.
-  - *Arm Linux (`bin/eval` on N1):* Per-task batch `bin/predict` throughput (`detection.<task>.items_per_s` in `research/evals/ledger.jsonl`, which includes interpreter start and model load) for SMS (`n=1,162`), URL (`n=7,997`), Indic (`n=320`) and NSL-KDD flow (`n=22,544`). Round-3 `ctl-conf51-gen51` runs 1–3: SMS 206–215/s, URL 1,996–2,375/s, Indic 57–64/s, flow 5,342–7,118/s. Earlier per-run records under `research/evals/*/details.json` also report a pooled `performance.detector_ms_per_item` (e.g. 0.407 ms in round-2 `best-confirm`); it varies by detector version and host load.
+  - *Arm Linux (`bin/eval` on N1):* Per-task batch `bin/predict` throughput (`detection.<task>.items_per_s` in `research/evals/ledger.jsonl`, which includes interpreter start and model load) for SMS (`n=1,162`), URL (`n=7,997`), Indic (`n=320`) and NSL-KDD flow (`n=22,544`). Round-3 `ctl-conf51-gen51` runs 1–3: SMS 206–215/s, URL 1,996–2,375/s, Indic 57–64/s, flow 5,342–7,118/s. Earlier per-run records under `research/evals/*/details.json` also report `performance.detector_ms_per_item`, computed from the URL task only (`eval/run_eval.py`; e.g. 0.407 ms = 1 ÷ 2,456 URL/s in round-2 `best-confirm`); it varies by detector version and host load.
   - *Arm Linux (`arm_bench.py`):* Per-item `detect.classify_any()` wall time via `time.perf_counter()`.
 - **Time to First Token (`TTFT` / `first_token_ms`):**
   - *Android S23:* Elapsed time from `LlmModule.generate()` entry (`SystemClock.elapsedRealtime()`) to the first `LlmCallback.onResult()` invocation (`MainActivity.kt:458–467`). Model loading already occurred on app startup (`requestModel()`).
@@ -61,8 +61,8 @@ Additional inference kernels observed in the same profile: ExecuTorch `cpu_flash
 
 - **No KleidiAI on/off A/B on the installed wheel:** Searching the installed ExecuTorch 1.6.0 Python
   sources and `.so` strings found no supported runtime flag to disable KleidiAI without rebuilding
-  ExecuTorch from source; therefore we report measured KleidiAI CPU share (`54.17%`) and cross-generation
-  speed (`N1 → V2`, `2.33–2.57×`), not a fabricated KleidiAI on-vs-off speedup ratio.
+  ExecuTorch from source; therefore we report the measured KleidiAI CPU share (`54.17%`) and no KleidiAI on-vs-off speedup.
+  The N1 → V2 throughput ratio in the README is indicative only (different workloads and conditions).
 - **Oracle Neoverse-N1:** `nm -D --defined-only` confirmed `517` `kai_*` exported symbols in
   `libexecutorch_backend_xnnpack.so` (plus `56` in `libexecutorch_kernels_torchao.so`, `47` in
   `libexecutorch_kernels_optimized.so`, `47` in `libcustom_ops_aot_lib.so`); `perf` was not run on N1.

@@ -62,8 +62,9 @@ if [[ "$ABI" != *arm64-v8a* ]]; then
   exit 1
 fi
 SOC="$(adb -s "$SERIAL" shell getprop ro.soc.model | tr -d '\r')"
-if [[ "$SOC" != "SM8550" && "${ALLOW_OTHER_SOC:-0}" != "1" ]]; then
-  echo "ERROR: SoC is '$SOC', not SM8550 (Galaxy S23). Results would not be comparable with run 8." >&2
+MODEL="$(adb -s "$SERIAL" shell getprop ro.product.model | tr -d '\r')"
+if [[ ( "$SOC" != "SM8550" || "$MODEL" != SM-S911* ) && "${ALLOW_OTHER_SOC:-0}" != "1" ]]; then
+  echo "ERROR: device is '$MODEL' / '$SOC', not a Galaxy S23 (SM-S911*, SM8550). Results would not be comparable with run 8." >&2
   echo "       Reserve a Galaxy S23 (SM-S911B), or set ALLOW_OTHER_SOC=1 and label results as a different device." >&2
   exit 1
 fi

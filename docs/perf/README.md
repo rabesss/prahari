@@ -44,7 +44,7 @@ detectors running ahead of the language model.
 Measured on Arm Neoverse-V2 (`r0p1`, 8 online vCPUs, 3 cold-process repeats × 6 visible demo items,
 median 122.5 prompt / 28 generated tokens, `_unsafe_reset_threadpool(n)` before model load):
 
-| Threads | Model Load (s, repeat 1) | Warm TTFT (ms) *(items 2–6)* | All-6 TTFT (ms) *(mean ± sd)* | Warm Prefill (tok/s) | All-6 Prefill (tok/s) | Warm Decode (tok/s) | All-6 Decode (tok/s) | Warm Item Wall (s) | All-6 Item Wall (s) | Cold Batch (s/item) | Runner Peak RSS (MiB) |
+| Threads | Model Load (s, repeat 1) | Warm TTFT (ms) *(items 2–6)* | All-6 TTFT (ms) *(mean ± sd)* | Warm Prefill (tok/s) | All-6 Prefill (tok/s) | Warm Decode (tok/s) | All-6 Decode (tok/s) | Warm Item Wall (s) | All-6 Item Wall (s) | Cold Batch (s/item) | Runner RSS, largest logged (MiB) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | **1** | 2.367 | 1,060.1 | 1,465.5 ± 33.1 | 112.79 | 109.26 ± 0.07 | 25.69 | 25.69 ± 0.16 | 2.317 | 2.792 ± 0.031 | 3.437 ± 0.052 | 2,403.3 |
 | **2** | 2.021 | 539.6 | 922.0 ± 3.1 | 221.63 | 210.58 ± 0.22 | 46.72 | 46.69 ± 0.12 | 1.265 | 1.728 ± 0.002 | 2.485 ± 0.210 | 2,398.1 |

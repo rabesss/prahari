@@ -14,6 +14,8 @@ def _row_from_arm_linux(data: dict) -> list[dict]:
     rows = []
     for cell in data.get("cells", []):
         agg = cell.get("aggregate", {})
+        if not agg:  # every run in this cell failed; arm_bench lists the errors in results.json
+            continue
         w_ttft = (agg.get("warm_ttft_ms_mean_std") or [None])[0]
         w_pre = (agg.get("warm_prefill_tps_mean_std") or [None])[0]
         w_dec = (agg.get("warm_decode_tps_mean_std") or [None])[0]

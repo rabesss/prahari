@@ -330,12 +330,17 @@ def test_arm_bench_refuses_unconfirmed_thread_count(tmp_path, monkeypatch):
     """A failed threadpool reset must fail the run, not be reported as an N-thread result."""
     cand, reg = _stub_candidate(tmp_path)
     monkeypatch.setenv("PYTHONPATH", str(_fake_executorch(tmp_path, ok=False)))
-    with pytest.raises(RuntimeError, match="threadpool reset to 4 was not confirmed"):
-        arm_bench.main([
-            "--candidate", str(cand), "--registry", str(reg), "--python", sys.executable,
-            "--threads", "4", "--prompt-lengths", "short", "--repeats", "1",
-            "--out-dir", str(tmp_path / "out"),
-        ])
+    rc = arm_bench.main([
+        "--candidate", str(cand), "--registry", str(reg), "--python", sys.executable,
+        "--threads", "4", "--prompt-lengths", "short", "--repeats", "1",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    assert rc == 3
+    rep = json.loads((tmp_path / "out" / "results.json").read_text(encoding="utf-8"))
+    (cell,) = rep["cells"]
+    assert cell["runs"] == [] and cell["aggregate"] == {}
+    assert "threadpool reset to 4 was not confirmed" in cell["errors"][0]["error"]
+    assert "all runs failed" in (tmp_path / "out" / "summary.md").read_text(encoding="utf-8")
 
 
 def test_run_bounded_kills_process_group_on_timeout(tmp_path):
@@ -421,3 +426,59 @@ def test_parse_dir_keeps_recorded_timeout_status(tmp_path):
     assert status == {"kyc-warm-1": "ok", "kyc-warm-2": "timeout", "home": "incomplete-capture"}
     assert sorted(rep["summary"]["checks_incomplete"]) == ["home", "kyc-warm-2"]
     assert "status" in (out / "items.csv").read_text(encoding="utf-8").splitlines()[0]
+
+
+def test_adb_run_loop_with_fake_device(tmp_path, monkeypatch):
+    """Drive cmd_run against replayed run-8 screens: chip tap, Check button, scroll to stats, airplane check."""
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "sample-row.xml").read_text(encoding="utf-8")      # Port scan chip + Check button visible
+    running = (run8 / "kyc-running.xml").read_text(encoding="utf-8")  # result screen, stats below the fold
+    stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")      # stats header with first-token time
+    state = {"screen": "home", "polls": 0, "airplane": "0", "taps": []}
+
+    def fake_dump(serial):
+        if state["screen"] == "home":
+            return home
+        state["polls"] += 1
+        return running if state["polls"] < 3 else stats
+
+    def fake_adb(serial, *args, check=True, timeout=120):
+        a = list(args)
+        if a[:2] == ["shell", "getprop"]:
+            return {"ro.soc.model": "SM8550", "ro.product.model": "SM-S911B"}.get(a[2], "x") + "\n"
+        if a[:3] == ["shell", "input", "tap"]:
+            x, y = int(a[3]), int(a[4])
+            state["taps"].append((x, y))
+            if state["screen"] == "home" and (x, y) == (540, 1726):
+                state["screen"], state["polls"] = "result", 0
+            elif state["screen"] == "result" and y > 2000:
+                state["screen"] = "home"
+            return ""
+        if a[:4] == ["shell", "cmd", "connectivity", "airplane-mode"]:
+            state["airplane"] = "1" if a[4] == "enable" else "0"
+            return ""
+        if a[:4] == ["shell", "settings", "get", "global"]:
+            return state["airplane"] + "\n"
+        return ""
+
+    class NoPoller:
+        def __init__(self, *a, **k): pass
+        def start(self): pass
+        def stop(self): return {"peak_pss_mib": 1800.0, "peak_rss_mib": 1900.0, "samples": 3}
+
+    monkeypatch.setattr(adb_bench, "adb_out", fake_adb)
+    monkeypatch.setattr(adb_bench, "dump_ui_xml", fake_dump)
+    monkeypatch.setattr(adb_bench, "MemPoller", NoPoller)
+    monkeypatch.setattr(adb_bench.subprocess, "check_output", lambda *a, **k: b"png")
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    monkeypatch.setattr(adb_bench, "DEFAULT_SAMPLES", [("port-scan", "Port scan", False), ("kyc-airplane", "Port scan", True)])
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--with-airplane", "--settle-s", "0"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 0, rep["summary"]
+    assert [c["status"] for c in rep["checks"]] == ["ok", "ok"]
+    assert rep["checks"][0]["first_token_ms"] == 664.0 and rep["checks"][0]["decode_tps"] == 42.6
+    assert rep["checks"][1]["airplane_mode_on_observed"] == "1"
+    assert state["airplane"] == "0"  # restored afterwards
+    # The header subtitle at (549, 211) must never be tapped.
+    assert (549, 211) not in state["taps"]

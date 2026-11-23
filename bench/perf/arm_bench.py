@@ -625,7 +625,7 @@ def run_detector_bench(py_exe: str, candidate: Path, fixtures_dir: Path, threads
             try:
                 proc = run_bounded(cmd, timeout_s=600, cwd=candidate, env=env,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            except RuntimeError as exc:
+            except (RuntimeError, OSError) as exc:
                 results[task] = {"error": str(exc)}
                 continue
             wall_s = time.monotonic() - t0
@@ -698,6 +698,10 @@ def render_markdown(report: dict) -> str:
 
     for cell in report["cells"]:
         agg = cell["aggregate"]
+        if not agg:
+            lines.append(f"| `{cell['model']}` | {cell['threads']} | `{cell['pin_cpus'] or 'none'}` | `{cell['prompt_length']}` | "
+                         f"`{cell['gating_mode']}` | all runs failed (see `errors` in results.json) |||||||| ")
+            continue
         tok_str = f"{agg['prompt_tokens_median']} / {agg['generated_tokens_median']}"
         if agg.get("peak_rss_time_mib_max") is not None:
             rss_str = f"{agg['peak_rss_time_mib_max']:.1f}"
@@ -866,30 +870,38 @@ def main(argv: list[str] | None = None) -> int:
                 items = load_items(tier, args.items)
                 for gmode in gating_modes:
                     cell_runs = []
+                    cell_errors: list[dict] = []
                     perf_run = None
                     # The perf-profiled run is an extra run, kept out of the aggregates (sampling adds overhead).
                     reps = ([0] if (args.perf_profile and not did_perf) else []) + list(range(1, args.repeats + 1))
                     for rep in reps:
                         do_perf = rep == 0
-                        tag = f"{model_name}-t{threads}-{tier}-{gmode}-" + ("perf" if do_perf else f"r{rep}")
-                        print(f"[arm_bench] running {tag} ({len(items)} items)...", flush=True)
-                        run_res = run_single(
-                            py_exe=args.python,
-                            candidate=cand,
-                            registry_path=reg_path,
-                            model_name=model_name,
-                            threads=threads,
-                            pin_cpus=args.pin_cpus,
-                            items=items,
-                            gating_mode=gmode,
-                            out_dir=out_dir,
-                            tag=tag,
-                            offline_unshare=args.offline_unshare,
-                            perf_record=do_perf,
-                            run_timeout_s=args.run_timeout_s,
-                        )
                         if do_perf:
                             did_perf = True
+                        tag = f"{model_name}-t{threads}-{tier}-{gmode}-" + ("perf" if do_perf else f"r{rep}")
+                        print(f"[arm_bench] running {tag} ({len(items)} items)...", flush=True)
+                        try:
+                            run_res = run_single(
+                                py_exe=args.python,
+                                candidate=cand,
+                                registry_path=reg_path,
+                                model_name=model_name,
+                                threads=threads,
+                                pin_cpus=args.pin_cpus,
+                                items=items,
+                                gating_mode=gmode,
+                                out_dir=out_dir,
+                                tag=tag,
+                                offline_unshare=args.offline_unshare,
+                                perf_record=do_perf,
+                                run_timeout_s=args.run_timeout_s,
+                            )
+                        except (RuntimeError, OSError) as exc:
+                            # Keep the sweep going and keep the outputs; the cell records what failed.
+                            print(f"[arm_bench] ERROR: {tag} failed: {exc}", file=sys.stderr, flush=True)
+                            cell_errors.append({"tag": tag, "error": str(exc)[-2000:]})
+                            continue
+                        if do_perf:
                             perf_run = run_res
                             continue
                         cell_runs.append(run_res)
@@ -903,6 +915,7 @@ def main(argv: list[str] | None = None) -> int:
                         "aggregate": agg,
                         "runs": cell_runs,
                         "perf_run": perf_run,
+                        "errors": cell_errors,
                     })
 
     detectors = run_detector_bench(args.python, cand, DEFAULT_FIXTURES_DIR, thread_list[0]) if args.detector_bench else {}
@@ -913,6 +926,10 @@ def main(argv: list[str] | None = None) -> int:
     (out_dir / "summary.md").write_text(md, encoding="utf-8")
     print(md)
     print(f"[arm_bench] artifacts written to {out_dir}")
+    failed = [e["tag"] for c in cells for e in c.get("errors", [])]
+    if failed:
+        print(f"[arm_bench] {len(failed)} run(s) failed: {', '.join(failed)}", file=sys.stderr)
+        return 3
     return 0
 
 

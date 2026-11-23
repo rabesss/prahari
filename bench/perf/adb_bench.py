@@ -203,7 +203,7 @@ def parse_battery(text: str) -> dict:
 
 
 class MemPoller:
-    """Background thread sampling `dumpsys meminfo in.prahari.app` for true peak PSS/RSS."""
+    """Background thread sampling `dumpsys meminfo in.prahari.app`; reports the highest sampled PSS/RSS."""
 
     def __init__(self, serial: str | None, interval_s: float = 0.5):
         self.serial = serial
@@ -247,8 +247,16 @@ class MemPoller:
 
 
 def dump_ui_xml(serial: str | None) -> str:
-    adb_out(serial, "shell", "uiautomator", "dump", "/sdcard/prahari_ui.xml", timeout=20)
-    return adb_out(serial, "shell", "cat", "/sdcard/prahari_ui.xml", timeout=20)
+    # Remove the previous dump first so a failed `uiautomator dump` cannot return the last screen.
+    # uiautomator can fail transiently ("could not get idle state") while text is streaming, so retry.
+    for _ in range(3):
+        adb_out(serial, "shell", "rm", "-f", "/sdcard/prahari_ui.xml", check=False, timeout=20)
+        adb_out(serial, "shell", "uiautomator", "dump", "/sdcard/prahari_ui.xml", check=False, timeout=20)
+        out = adb_out(serial, "shell", "cat", "/sdcard/prahari_ui.xml", check=False, timeout=20)
+        if "<hierarchy" in out:
+            return out
+        time.sleep(0.5)
+    raise RuntimeError("uiautomator dump produced no hierarchy after 3 tries")
 
 
 def find_bounds_center(xml_text: str, *, text_contains: str | None = None, desc_contains: str | None = None) -> tuple[int, int] | None:
@@ -557,119 +565,139 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     rows = []
     airplane_active = False
+
+    def one_check(check_id: str, sample_label: str, want_airplane: bool) -> None:
+        nonlocal airplane_active
+        if want_airplane and not args.with_airplane:
+            return
+        observed_airplane = None
+        if want_airplane != airplane_active:
+            observed_airplane = _set_airplane(serial, want_airplane)
+            airplane_active = want_airplane
+            print(f"[adb_bench] airplane_mode_on={observed_airplane}", flush=True)
+        if want_airplane:
+            observed_airplane = observed_airplane or adb_out(
+                serial, "shell", "settings", "get", "global", "airplane_mode_on", check=False).strip()
+            if observed_airplane != "1":
+                print(f"[adb_bench] ERROR: airplane mode requested but device reports airplane_mode_on={observed_airplane!r}; "
+                      f"skipping {check_id} rather than recording a false offline result", file=sys.stderr)
+                rows.append({"check": check_id, "sample_label": sample_label, "status": "airplane-not-confirmed",
+                             "airplane_mode": False, "airplane_mode_on_observed": observed_airplane,
+                             "detector_ms": None, "first_token_ms": None, "decode_tps": None,
+                             "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                return
+
+        batt_before = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
+        xml = dump_ui_xml(serial)
+        found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
+        for _ in range(5):
+            if found:
+                break
+            # Step the horizontal sample-chip row left along its own y (read from the dump). A slow drag
+            # (1.5 s) moves it by about the swipe distance; a fast swipe would fling it past middle chips.
+            row_y = sample_row_y(xml)
+            if row_y is None:
+                break
+            adb_out(serial, "shell", "input", "swipe", "900", str(row_y), "400", str(row_y), "1500")
+            time.sleep(0.6)
+            xml = dump_ui_xml(serial)
+            found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
+        if not found:
+            print(f"[adb_bench] ERROR: sample chip {sample_label!r} not found; skipping {check_id}", file=sys.stderr)
+            rows.append({"check": check_id, "sample_label": sample_label, "status": "no-sample-chip",
+                         "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
+                         "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+            return
+        time.sleep(0.5)
+        xml = dump_ui_xml(serial)
+
+        if not find_bounds_center(xml, desc_contains=CHECK_BUTTON_DESC):
+            print(f"[adb_bench] ERROR: {CHECK_BUTTON_DESC!r} button not on screen; skipping {check_id}", file=sys.stderr)
+            rows.append({"check": check_id, "sample_label": sample_label, "status": "no-check-button",
+                         "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
+                         "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+            return
+        poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
+        poller.start()
+        t0 = time.monotonic()
+        tap_element(serial, xml, desc_contains=CHECK_BUTTON_DESC)
+
+        # Wait until the stats header reports a first-token time, i.e. Llama has finished. The header sits
+        # below the fold on the result screen, so scroll down whenever it is not in the dump.
+        deadline = time.monotonic() + args.check_timeout_s
+        stats_xml = ""
+        state = "absent"
+        while time.monotonic() < deadline:
+            time.sleep(1.0)
+            stats_xml = dump_ui_xml(serial)
+            state = stats_header_state(stats_xml)
+            if state == "done":
+                break
+            if state == "absent" and "Check another" in stats_xml:
+                adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
+        wall_s = round(time.monotonic() - t0, 2)
+        polled = poller.stop()
+        status = "ok" if state == "done" else "timeout"
+        if status != "ok":
+            print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
+                  f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
+
+        # Scroll down and expand stats card if collapsed
+        adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
+        time.sleep(0.5)
+        stats_xml = dump_ui_xml(serial)
+        if "On-device stats, collapsed" in stats_xml:
+            tap_element(serial, stats_xml, desc_contains="On-device stats, collapsed")
+            time.sleep(0.5)
+            stats_xml = dump_ui_xml(serial)
+
+        (out_dir / f"{check_id}-stats.xml").write_text(stats_xml, encoding="utf-8")
+        png_bytes = subprocess.check_output(adb_cmd(serial, "exec-out", "screencap", "-p"), timeout=20)
+        (out_dir / f"{check_id}-stats.png").write_bytes(png_bytes)
+
+        rec = parse_stats_xml(stats_xml)
+        rec["check"] = check_id
+        rec["sample_label"] = sample_label
+        rec["status"] = status
+        rec["airplane_mode"] = want_airplane
+        if want_airplane:
+            rec["airplane_mode_on_observed"] = observed_airplane
+        rec["host_observed_wall_s"] = wall_s
+        rec["mem_polled"] = polled
+        rec["battery_before"] = batt_before
+        rec["battery_after"] = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
+        rows.append(rec)
+        print(
+            f"[adb_bench] {check_id}: det={rec['detector_ms']}ms ttft={rec['first_token_ms']}ms "
+            f"decode={rec['decode_tps']}tok/s total={rec['total_s']}s pss={rec['app_memory_mb']}MB "
+            f"polled_peak_pss={polled.get('peak_pss_mib')}MiB",
+            flush=True,
+        )
+
+        # Return to home screen
+        if not tap_element(serial, stats_xml, text_contains="Check another"):
+            adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1.0)
+
     try:
         for check_id, sample_label, want_airplane in DEFAULT_SAMPLES:
             if want_airplane and not args.with_airplane:
                 continue
-            observed_airplane = None
-            if want_airplane != airplane_active:
-                observed_airplane = _set_airplane(serial, want_airplane)
-                airplane_active = want_airplane
-                print(f"[adb_bench] airplane_mode_on={observed_airplane}", flush=True)
-            if want_airplane:
-                observed_airplane = observed_airplane or adb_out(
-                    serial, "shell", "settings", "get", "global", "airplane_mode_on", check=False).strip()
-                if observed_airplane != "1":
-                    print(f"[adb_bench] ERROR: airplane mode requested but device reports airplane_mode_on={observed_airplane!r}; "
-                          f"skipping {check_id} rather than recording a false offline result", file=sys.stderr)
-                    rows.append({"check": check_id, "sample_label": sample_label, "status": "airplane-not-confirmed",
-                                 "airplane_mode": False, "airplane_mode_on_observed": observed_airplane,
-                                 "detector_ms": None, "first_token_ms": None, "decode_tps": None,
-                                 "total_s": None, "app_memory_mb": None, "mem_polled": {}})
-                    continue
-
-            batt_before = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
-            xml = dump_ui_xml(serial)
-            found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
-            for _ in range(3):
-                if found:
-                    break
-                # Scroll the horizontal sample-chip row left along its own y (read from the dump).
-                row_y = sample_row_y(xml)
-                if row_y is None:
-                    break
-                adb_out(serial, "shell", "input", "swipe", "900", str(row_y), "150", str(row_y), "250")
-                time.sleep(0.6)
-                xml = dump_ui_xml(serial)
-                found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
-            if not found:
-                print(f"[adb_bench] ERROR: sample chip {sample_label!r} not found; skipping {check_id}", file=sys.stderr)
-                rows.append({"check": check_id, "sample_label": sample_label, "status": "no-sample-chip",
+            try:
+                one_check(check_id, sample_label, want_airplane)
+            except Exception as exc:  # one adb failure must not lose the rest of the session
+                print(f"[adb_bench] ERROR: {check_id} failed: {exc}", file=sys.stderr)
+                rows.append({"check": check_id, "sample_label": sample_label, "status": f"error: {type(exc).__name__}",
                              "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
                              "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
-                continue
-            time.sleep(0.5)
-            xml = dump_ui_xml(serial)
-
-            if not find_bounds_center(xml, desc_contains=CHECK_BUTTON_DESC):
-                print(f"[adb_bench] ERROR: {CHECK_BUTTON_DESC!r} button not on screen; skipping {check_id}", file=sys.stderr)
-                rows.append({"check": check_id, "sample_label": sample_label, "status": "no-check-button",
-                             "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
-                             "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
-                continue
-            poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
-            poller.start()
-            t0 = time.monotonic()
-            tap_element(serial, xml, desc_contains=CHECK_BUTTON_DESC)
-
-            # Wait until the stats header reports a first-token time, i.e. Llama has finished. The header sits
-            # below the fold on the result screen, so scroll down whenever it is not in the dump.
-            deadline = time.monotonic() + args.check_timeout_s
-            stats_xml = ""
-            state = "absent"
-            while time.monotonic() < deadline:
+                adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK", check=False)
                 time.sleep(1.0)
-                stats_xml = dump_ui_xml(serial)
-                state = stats_header_state(stats_xml)
-                if state == "done":
-                    break
-                if state == "absent" and "Check another" in stats_xml:
-                    adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
-            wall_s = round(time.monotonic() - t0, 2)
-            polled = poller.stop()
-            status = "ok" if state == "done" else "timeout"
-            if status != "ok":
-                print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
-                      f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
 
-            # Scroll down and expand stats card if collapsed
-            adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
-            time.sleep(0.5)
-            stats_xml = dump_ui_xml(serial)
-            if "On-device stats, collapsed" in stats_xml:
-                tap_element(serial, stats_xml, desc_contains="On-device stats, collapsed")
-                time.sleep(0.5)
-                stats_xml = dump_ui_xml(serial)
-
-            (out_dir / f"{check_id}-stats.xml").write_text(stats_xml, encoding="utf-8")
-            png_bytes = subprocess.check_output(adb_cmd(serial, "exec-out", "screencap", "-p"), timeout=20)
-            (out_dir / f"{check_id}-stats.png").write_bytes(png_bytes)
-
-            rec = parse_stats_xml(stats_xml)
-            rec["check"] = check_id
-            rec["sample_label"] = sample_label
-            rec["status"] = status
-            rec["airplane_mode"] = want_airplane
-            if want_airplane:
-                rec["airplane_mode_on_observed"] = observed_airplane
-            rec["host_observed_wall_s"] = wall_s
-            rec["mem_polled"] = polled
-            rec["battery_before"] = batt_before
-            rec["battery_after"] = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
-            rows.append(rec)
-            print(
-                f"[adb_bench] {check_id}: det={rec['detector_ms']}ms ttft={rec['first_token_ms']}ms "
-                f"decode={rec['decode_tps']}tok/s total={rec['total_s']}s pss={rec['app_memory_mb']}MB "
-                f"polled_peak_pss={polled.get('peak_pss_mib')}MiB",
-                flush=True,
-            )
-
-            # Return to home screen
-            if not tap_element(serial, stats_xml, text_contains="Check another"):
-                adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK")
-            time.sleep(1.0)
-
-        mem_raw = adb_out(serial, "shell", "dumpsys", "meminfo", PKG, check=False)
+        try:
+            mem_raw = adb_out(serial, "shell", "dumpsys", "meminfo", PKG, check=False)
+        except Exception as exc:
+            print(f"[adb_bench] ERROR: final dumpsys meminfo failed: {exc}", file=sys.stderr)
+            mem_raw = ""
         (out_dir / "meminfo.txt").write_text(mem_raw, encoding="utf-8")
         report = summarize_android(dev, rows, parse_meminfo(mem_raw), source_note="Live adb benchmark run")
         write_android_outputs(report, out_dir)

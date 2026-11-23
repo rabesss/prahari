@@ -22,7 +22,7 @@ never dirties the git tree.
 python3 bench/perf/arm_bench.py --dry-run --threads 1,2,4,8 --prompt-lengths short,default,long
 ```
 
-### Arm Linux full sweep (any `aarch64` Linux; measured on Neoverse-N1 and Neoverse-V2)
+### Arm Linux full sweep (any `aarch64` Linux; the committed Neoverse-V2 numbers came from an earlier script, see `docs/perf/evidence/README.md`)
 
 ```sh
 export HC_PY="$PWD/.venv/bin/python"
