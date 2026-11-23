@@ -49,7 +49,7 @@
   - UCI SMS Spam Collection — Almeida, Hidalgo & Yamakami (2011), CC BY 4.0
   - Mendeley SMS Phishing Dataset — Mishra & Soni (2022), CC BY 4.0
   - PhiUSIIL Phishing URL Dataset — Prasad & Chandra (2024), CC BY 4.0
-  - NSL-KDD — Tavallaee et al. (2009), UNB research use (not redistributed; only trained `flow.joblib` parameters are committed)
+  - NSL-KDD — Tavallaee et al. (2009); UNB permits redistribution with citation (raw data not redistributed here; only trained `flow.joblib` parameters are committed). `candidates/BEST/DATA.md` still says "research use", a stricter reading that can be updated.
   - `karanverma19/Indian_Multilingual_Scam_Message_Dataset` — Apache-2.0
   - `bolewara/hinglish-scam-text-dataset` — CC BY 4.0
 - **Runtime & Android dependencies:** Verified and documented upstream licences: ExecuTorch 1.6.0 / `executorch-android:1.5.1` (BSD-3-Clause), PyTorch (BSD-3-Clause), Arm KleidiAI (Apache-2.0), Chaquopy 17.2.0 (MIT), scikit-learn / NumPy / SciPy / pandas / joblib (BSD-3-Clause), Kotlin / Android Gradle Plugin (Apache-2.0). Verified `android/python/qrdec.py` is an original pure-Python ISO/IEC 18004 decoder with zero third-party QR dependency.

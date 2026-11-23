@@ -30,7 +30,7 @@ Genuine bank debit alerts, OTP notifications, bill reminders, and telecom adviso
 
 ### Hybrid Two-Stage Architecture
 
-Prahari separates **verdict + evidence extraction** (Stage 1, sub-10 ms on Arm CPU) from **plain-language explanation** (Stage 2, Llama 3.2 1B via ExecuTorch). The language model never decides the verdict and never chooses critical helpline actions; instead, it explains the detector's typed evidence so a hallucination or prompt injection in an untrusted message cannot flip a dangerous item into "safe" [S2, S8].
+Prahari separates **verdict + evidence extraction** (Stage 1: 0.42 ms/item on Arm Linux; 5–17 ms warm for text checks on Galaxy S23, 183 ms for a URL) from **plain-language explanation** (Stage 2, Llama 3.2 1B via ExecuTorch). The language model never decides the verdict and never chooses critical helpline actions; instead, it explains the detector's typed evidence so a hallucination or prompt injection in an untrusted message cannot flip a dangerous item into "safe" [S2, S8].
 
 ```text
 +-------------------------------+     +------------------------------------------+
@@ -90,7 +90,7 @@ Following blind manual audits and the physical Galaxy S23 run, **PR #41** added 
 |:--|:--|:--|
 | [UCI SMS Spam](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) (Almeida et al., 2011) & [Mendeley SMS Phishing](https://data.mendeley.com/datasets/f45bkkt8pr) (Mishra & Soni, 2022) | CC BY 4.0 each | Combined SMS: train 4,127; dev 607; eval 1,162 (grouped by normalised text to prevent leakage) |
 | [PhiUSIIL Phishing URLs](https://archive.ics.uci.edu/dataset/967) (Prasad & Chandra, 2024) | CC BY 4.0 | Train 40,000; dev 4,000; eval 7,997 (grouped by domain; balanced eval cap) |
-| [NSL-KDD](https://www.unb.ca/cic/datasets/nsl.html) (Tavallaee et al., 2009) | UNB research use (not redistributed) | `KDDTrain+` train 113,273 / dev 12,700; `KDDTest+` eval 22,544 (distribution-shifted replay) |
+| [NSL-KDD](https://www.unb.ca/cic/datasets/nsl.html) (Tavallaee et al., 2009) | Redistribution permitted with citation (UNB); not redistributed here | `KDDTrain+` train 113,273 / dev 12,700; `KDDTest+` eval 22,544 (distribution-shifted replay) |
 | [karanverma19 Indian seed](https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset) & [bolewara Hinglish seed](https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset) | Apache-2.0 & CC BY 4.0 | 136 combined seed rows in training |
 | Project-generated Indian-context sets | Original project work | Visible train 256 / dev 64; eval 320; India v2 adaptive validation 400; India v3 tuning 159 / held-back 81; sealed final holdout 184 (155 SMS + 29 injection) |
 
@@ -237,4 +237,4 @@ The sealed holdout (84 malicious, 100 benign: 155 SMS-route [68 malicious, 87 be
 - **[S10]** **Arm Neoverse-V2 Linux benchmark (23 Nov 2026):** `perf record -F 99 -g` KleidiAI call-stack profile (54.17% `kai_*`), 1/2/4/8-thread scaling (3 repeats × 6 items), and `unshare -n` OS offline proof (raw logs, `perf` reports and per-run JSONL in `docs/phase1/evidence/neoverse-v2/`).
 - **[S11]** Merged `main` improvements through commit `1eb8916` (23 Nov 2026): PR #40 (rootless Linux live connection monitor), PR #41 (blind explanation honesty fixes), PR #42 (India v3 held-back F1 0.889 + post-PR #42 sealed holdout F1 0.784 / SMS FPR 0.402), and PR #43 (Android r2 UX, Hindi toggle, Share sheet, Listen TTS, evidence spans, opt-in history, pure-Python QR decoder).
 
-**Built with Llama.** Llama 3.2 1B Instruct weights are obtained separately by users/evaluators under Meta's [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/) and [Acceptable Use Policy](https://www.llama.com/llama3_2/use-policy/). Third-party dataset licences (CC BY 4.0, Apache-2.0, UNB NSL-KDD research use) and upstream framework licences (ExecuTorch/PyTorch/scikit-learn BSD-3-Clause, Arm KleidiAI Apache-2.0, Chaquopy MIT) apply to their respective components.
+**Built with Llama.** Llama 3.2 1B Instruct weights are obtained separately by users/evaluators under Meta's [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/) and [Acceptable Use Policy](https://www.llama.com/llama3_2/use-policy/). Third-party dataset licences (CC BY 4.0, Apache-2.0, UNB NSL-KDD terms requiring citation) and upstream framework licences (ExecuTorch/PyTorch/scikit-learn BSD-3-Clause, Arm KleidiAI Apache-2.0, Chaquopy MIT) apply to their respective components.
