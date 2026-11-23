@@ -56,7 +56,7 @@ def main():
         ptok += stats.get("prompt_tokens") or 0
         gtok += stats.get("generated_tokens") or 0
         o = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
-             "explanation": text, "actions": actions_for(r["kind"], lab),
+             "explanation": text, "actions": actions_for(r["kind"], lab, r["input"]),
              "evidence_used": ev, "llm": stats}
         item = {"label": r["label"], "required_mentions": r.get("required_mentions", []),
                 "forbidden": r.get("forbidden", []), "input": r["input"]}

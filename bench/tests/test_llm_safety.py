@@ -96,3 +96,40 @@ def test_injected_network_header_does_not_disable_filter():
     text, _ = ex.generate(prompt)
     assert "verify the KYC" not in text
     assert text.endswith(TAIL)
+
+
+UNSAFE_ACTIONS = [r"click (on )?the link", r"call the number (in|given in) the message", r"share (the |your )?otp",
+                  r"reply with", r"\bpay (the|a) (fee|amount)", r"install (the|this) app", r"scan the qr"]
+
+
+def _eval_unsafe(action):
+    import re
+    for u in UNSAFE_ACTIONS:
+        for m in re.finditer(u, action):
+            clause = re.split(r"[.;:!?]|\bbut\b", action[:m.start()])[-1]
+            if not re.search(r"\b(do not|don't|dont|never|not|avoid|no need to|without)\b", clause):
+                return True
+    return False
+
+
+def test_type_advice_is_short_safe_and_protective():
+    import re
+    for label, (tail, acts) in llm.TYPE_ADVICE.items():
+        assert 1 <= len(acts) <= 3, label
+        for a in acts:
+            assert len(a.split()) <= 14, (label, a)
+            assert not _eval_unsafe(a.lower()), (label, a)
+        assert re.search(r"\b(do not|don't|never|block|report|ignore|delete|avoid)\b", " ".join(acts).lower()), label
+        if tail:
+            assert not llm._unsafe_advice(tail, 1), (label, tail)
+
+
+def test_linkless_scam_gets_a_matching_replacement():
+    sms = "CBI officer here. Your parcel had drugs. Stay on video call and transfer Rs 50000 to the RBI safe account."
+    tail, acts = llm.advice_for("sms", 1, sms)
+    assert "link" not in tail.lower()
+    assert llm._unsafe_advice("Transfer the amount to the RBI safe account now.", 1)
+
+
+def test_no_risk_action_does_not_say_no_action_needed():
+    assert "no action needed" not in " ".join(llm.actions_for("sms", 0, "Your bill is due")).lower()

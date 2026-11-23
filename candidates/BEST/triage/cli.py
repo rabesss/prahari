@@ -43,7 +43,7 @@ def cmd_explain(a):
         lab, score, ev = detect.classify_any(kind, inp)
         row = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
                     "category": scam_type(kind, inp, lab),
-                    "actions": actions_for(kind, lab), "evidence_used": ev}
+                    "actions": actions_for(kind, lab, inp), "evidence_used": ev}
         try:
             text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
             if not isinstance(text, str) or not text.strip():

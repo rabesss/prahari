@@ -94,6 +94,11 @@ FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed
               "beacon_explicit": "explicit beacon or command-and-control activity",
               "periodic": "connections repeat at a fixed interval",
               "root": "a root-access attempt"}
+# Replacement sentence for unsafe generated advice, remembered per built prompt (bounded).
+_TAILS = {}
+TYPE_PRIORITY = ["sextortion", "authority_threat", "safe_account", "remote_access", "collect_request",
+                 "secret_request", "crypto_transfer", "investment", "job_upfront", "prize_claim",
+                 "pay_to_receive", "id_request", "block_threat", "pay_unverified"]
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
               "at_sign", "no_https", "official_domain"}
 
@@ -243,8 +248,11 @@ def scam_type(kind, inp, verdict):
         return "suspicious network traffic" if verdict == 1 else "unusual network traffic"
     if mech.indic_context(inp):
         a = mech.analyze(inp)
-        for n, _ in a["harm"]:
-            if n in MECH_TYPE:
+        found = {n for n, _ in a["harm"]}
+        # The most specific mechanism names the scam: a fake-police call that also asks for a
+        # transfer is a fake police threat, not a generic payment fraud.
+        for n in TYPE_PRIORITY:
+            if n in found:
                 return MECH_TYPE[n]
         return "a scam message" if verdict == 1 else "a message worth checking"
     ev = indicrules.indicators(inp)[0]
@@ -302,9 +310,13 @@ class Explainer:
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
                 f"Start your answer with exactly: \"{opening}.\" "
                 "Then write one more sentence of advice, 6-12 words.")
-        return ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
+        if len(_TAILS) > 256:
+            _TAILS.clear()
+        built = ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +
                 "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
+        _TAILS[built] = advice_for(kind, verdict, inp)[0]
+        return built
 
     def generate(self, prompt):
         text, stats = self._run(prompt)
@@ -337,7 +349,8 @@ class Explainer:
         verdict = _prompt_verdict(prompt)
         # The first user header is ours; the untrusted snippet comes after the kind word.
         user = prompt.split("<|start_header_id|>user<|end_header_id|>\n\n", 1)[-1]
-        tail = None if user.startswith(KIND_WORD["flow"]) or verdict == 0 else ACTIONS[verdict][0]
+        tail = (None if user.startswith(KIND_WORD["flow"]) or verdict == 0 else
+                _TAILS.get(prompt) or ACTIONS[verdict][0])
         text = _consistent(text, verdict, _forced_sentence(prompt), tail)
         return text, stats
 
@@ -381,7 +394,7 @@ _NEGATED = re.compile(r"\b(?:not|never|no|n't|without)\b", re.I)
 # the scam's link, code or number.
 _COMPLY = re.compile(r"(?:verify|update|complete|click|tap|open|visit|follow|call|pay|share|send|"
                      r"submit|confirm|login|log|signin|sign|download|install|reply|respond|contact|"
-                     r"link|provide|enter|scan|accept|approve)", re.I)
+                     r"link|provide|enter|scan|accept|approve|transfer|deposit|remit|wire|dial|grant|comply|cooperate)", re.I)
 _NEGATOR = {"not", "never", "don't", "dont", "avoid", "refuse", "without", "nor"}
 _BREAK = {"and", "but", "then", "so", "to", "instead", ",", ";", ":", "-"}
 # A trusted channel only excuses going to that channel (open, call, contact, visit, use, check),
@@ -410,21 +423,6 @@ def _unsafe_advice(sent, verdict):
                 negated = True
                 break
         if not negated and not (trusted and w in _CHANNEL_VERB):
-            return True
-    return False
-    words = re.findall(r"[a-z']+", sent.lower())
-    trusted = bool(_TRUSTED.search(sent)) and not _SCAM_OBJECT.search(sent)
-    for i, w in enumerate(words):
-        if not _COMPLY.fullmatch(w):
-            continue
-        negated = False
-        for prev in reversed(words[max(0, i - 5):i]):
-            if prev in _BREAK:
-                break
-            if prev in _NEGATOR:
-                negated = True
-                break
-        if not negated and not trusted:
             return True
     return False
 
@@ -518,7 +516,7 @@ ACTIONS = {
         "Report it at cybercrime.gov.in or call the national helpline 1930, and use Sanchar Saathi Chakshu to report the sender."],
     "uncertain": ["Do not act on the message until you verify it.",
                   "Contact the organisation using the number or app you already trust, not the one in the message."],
-    0: ["No action needed, but never share OTPs or PINs even with genuine senders."],
+    0: ["Verify in the official app; never share your OTP or PIN."],
 }
 FLOW_ACTIONS = {
     1: ["Block the source address at the firewall or router.",
@@ -529,5 +527,125 @@ FLOW_ACTIONS = {
 }
 
 
-def actions_for(kind, verdict):
-    return (FLOW_ACTIONS if kind == "flow" else ACTIONS)[verdict]
+# Scam-specific advice for DANGEROUS items, keyed by scam_type(). Reviewed for India by Gemini 4 Neon:
+# 1930 is for money already lost, Sanchar Saathi Chakshu for reporting a scam call or SMS before any
+# loss, and a helpline is always looked up on the card or the official app, never by web search.
+# Each entry: (sentence that replaces unsafe generated advice, up to three vetted actions).
+REPORT = "Report at cybercrime.gov.in, or call 1930 if money was lost."
+TYPE_ADVICE = {
+    "a fake KYC or account check": ("Do not open the link; check your account in the bank app.", [
+        "Do not open the link or call the number in it.",
+        "Check your account in the bank app or call the number on your card.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "an account-blocking threat": ("Ignore the threat; check your account in the bank app.", [
+        "Do not open the link or call the number in it.",
+        "Check your account in the bank app or call the number on your card.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "an account-blocking scam": ("Ignore the threat; check your account in the bank app.", [
+        "Do not open the link or call the number in it.",
+        "Check your account in the bank app or call the number on your card.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "OTP or PIN theft": ("Never share an OTP, PIN or CVV with anyone.", [
+        "Never share your OTP, UPI PIN or CVV.",
+        "If you shared it, freeze your card in the bank app.",
+        REPORT]),
+    "an advance-fee scam": ("Do not pay; a real parcel or refund never needs a fee.", [
+        "Do not pay any fee to receive a parcel, refund or prize.",
+        "Track parcels only in the India Post or courier app.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "a fake lottery or prize scam": ("Ignore it; a real prize never needs a fee.", [
+        "Never pay a fee or tax to receive a prize.",
+        "Never share bank details, PIN or Aadhaar.",
+        "Block the sender and report on Sanchar Saathi Chakshu."]),
+    "a fake prize or lottery scam": ("Ignore it; a real prize never needs a fee.", [
+        "Never pay a fee or tax to receive a prize.",
+        "Never share bank details, PIN or Aadhaar.",
+        "Block the sender and report on Sanchar Saathi Chakshu."]),
+    "a fake job or task scam": ("Never pay a deposit for a job or task; block the sender.", [
+        "Never pay a fee or task deposit for a job.",
+        "Leave the WhatsApp or Telegram group and block the sender.",
+        REPORT]),
+    "a fake job or loan scam": ("Never pay upfront for a job or loan; block the sender.", [
+        "Never pay a fee upfront for a job or loan.",
+        "Do not install loan apps sent over chat.",
+        REPORT]),
+    "UPI collect-request fraud": ("Decline it; receiving money never needs your UPI PIN.", [
+        "Decline the request; receiving money never needs a UPI PIN.",
+        "Block the UPI ID in your payment app.",
+        "Call 1930 at once if money was debited."]),
+    "a remote-access app scam": ("Never install screen-sharing apps a caller asks for.", [
+        "Never install AnyDesk, QuickSupport or other screen-sharing apps.",
+        "If one is open, switch on airplane mode and uninstall it.",
+        "Freeze your cards in the bank app and call 1930."]),
+    "sextortion or blackmail": ("Do not pay; save the messages and report them.", [
+        "Do not pay; paying leads to more demands.",
+        "Save screenshots, block the sender and lock your profiles.",
+        "Report it confidentially at cybercrime.gov.in."]),
+    "a fake police or customs threat": ("Hang up; real police never arrest anyone over video.", [
+        "Hang up; there is no such thing as a digital arrest.",
+        "Never move money to a safe account for anyone.",
+        "Tell your family and report at cybercrime.gov.in or call 1930."]),
+    "a safe-account transfer scam": ("Never move money to a safe account for anyone.", [
+        "Never move money to a safe account for anyone.",
+        "Hang up and call your bank on the number on your card.",
+        REPORT]),
+    "an electricity disconnection scam": ("Ignore the number; check your bill in the official app.", [
+        "Do not call the number or open the link in the SMS.",
+        "Check your bill in your electricity board's official app.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "an investment or trading scam": ("Never send money to a personal account for trading.", [
+        "Never send money to a personal account for trading.",
+        "Check the adviser or broker on SEBI's official website.",
+        REPORT]),
+    "a crypto payment scam": ("Never send crypto to someone who contacted you.", [
+        "Never send crypto or gift cards to a stranger.",
+        "Block the sender.",
+        REPORT]),
+    "an identity-document scam": ("Never send Aadhaar, PAN or passport copies over chat.", [
+        "Never send ID documents over WhatsApp or a link.",
+        "Use only the official app or office for KYC.",
+        "Report the SMS on Sanchar Saathi Chakshu."]),
+    "a payment fraud": ("Do not pay; check the request in the official app first.", [
+        "Do not pay to an account or link from a message.",
+        "Check any bill or request in the official app.",
+        REPORT]),
+    "a fake payment request": ("Do not pay; check the request in the official app first.", [
+        "Do not pay to an account or link from a message.",
+        "Check any bill or request in the official app.",
+        REPORT]),
+    "a phishing link on a lookalike domain": ("Do not open the link; use the official app instead.", [
+        "Do not open the link or log in on that page.",
+        "Open the official app or type the address yourself.",
+        "If you entered card details, freeze the card in the bank app."]),
+    "a shortened link that hides its destination": ("Do not open the link; use the official app instead.", [
+        "Do not open the link or log in on that page.",
+        "Open the official app or type the address yourself.",
+        "If you entered card details, freeze the card in the bank app."]),
+    "a phishing link": ("Do not open the link; use the official app instead.", [
+        "Do not open the link or log in on that page.",
+        "Open the official app or type the address yourself.",
+        "If you entered card details, freeze the card in the bank app."]),
+    "a port scan": (None, ["Block the source address at the firewall or router.",
+                           "Close unused ports and turn off remote admin.",
+                           "Check the logs for logins that follow the scan."]),
+    "a brute-force login": (None, ["Block the source address and limit login attempts.",
+                                   "Change exposed passwords and turn on two-factor login.",
+                                   "Check the logs for successful logins."]),
+    "a flood or denial-of-service attempt": (None, ["Block or rate-limit the flooding traffic.",
+                                                    "Turn on SYN-flood protection on the router or firewall.",
+                                                    "Tell your ISP or IT team."]),
+}
+
+
+def advice_for(kind, verdict, inp):
+    """(replacement sentence, vetted actions) for one checked item."""
+    if verdict == 1 and inp is not None:
+        tail, acts = TYPE_ADVICE.get(scam_type(kind, inp, verdict), (None, None))
+        if acts:
+            return tail or (FLOW_ACTIONS if kind == "flow" else ACTIONS)[verdict][0], acts
+    acts = (FLOW_ACTIONS if kind == "flow" else ACTIONS)[verdict]
+    return acts[0], acts
+
+
+def actions_for(kind, verdict, inp=None):
+    return advice_for(kind, verdict, inp)[1]
