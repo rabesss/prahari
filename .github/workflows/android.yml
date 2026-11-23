@@ -1,0 +1,165 @@
+name: Android spike
+on:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+    inputs:
+      source_apk:
+        description: Build an additional APK with the source-built 1.6 AAR
+        type: boolean
+        default: false
+      emulator_abi:
+        description: Also package x86_64 libraries (emulator screenshots only; not Arm evidence)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/setup-python@v5
+        id: python310
+        with: {python-version: '3.10'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.10.2'}
+      - name: Install reference environment and export portable models
+        run: |
+          python -m pip install 'numpy==2.5.4' 'scipy==1.18.1' 'scikit-learn==1.9.1' 'pandas==3.1.1' 'joblib==1.6.0'
+          mkdir -p android/build/generated/python
+          cp -R candidates/BEST/triage android/build/generated/python/triage
+          python android/tools/export_models.py android/build/generated/python/models
+          python android/tools/test_parity.py android/build/generated/python/models
+          python android/tools/test_bridge.py
+      - name: Assemble debug APK
+        working-directory: android
+        env:
+          CHAQUOPY_BUILD_PYTHON: ${{ steps.python310.outputs.python-path }}
+          ABIS: ${{ inputs.emulator_abi && 'arm64-v8a,x86_64' || 'arm64-v8a' }}
+        run: gradle --no-daemon :app:assembleDebug -PprahariAbis="$ABIS"
+      - name: Audit merged manifest and APK permissions
+        run: |
+          python android/tools/check_manifest.py android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions android/app/build/outputs/apk/debug/app-debug.apk | tee /dev/stderr | (! grep -q 'android.permission.INTERNET')
+          stat -c 'APK size: %s bytes' android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prahari-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+  executorch-aar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Checkout ExecuTorch 1.6.0 and its submodules
+        uses: actions/checkout@v4
+        with:
+          repository: pytorch/executorch
+          ref: v1.6.0
+          submodules: recursive
+          path: executorch
+      - name: Cache built 1.6.0 AAR
+        id: aar-cache
+        uses: actions/cache@v4
+        with:
+          path: aar-output/executorch.aar
+          key: executorch-1.6.0-android-arm64-ndk28c-xnnpack-kleidi-v1
+      - name: Build source AAR and record elapsed time
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/aar-output"
+          echo "Start $(date -u +%FT%TZ)" | tee "$GITHUB_WORKSPACE/aar-output/build-time.txt"
+          python -m pip install pyyaml 'cmake<4' ninja typing_extensions sympy packaging jinja2 filelock networkx fsspec
+          python -m pip install --no-deps 'torch==2.15.0'
+          sdkmanager 'ndk;28.2.13676358' 'cmake;3.22.1'
+          export ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ANDROID_SDK="$ANDROID_HOME" BUILD_AAR_DIR="$GITHUB_WORKSPACE/aar-output"
+          cd executorch
+          export PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}"
+          python - <<'PY'
+          p='scripts/build_android_library.sh'
+          s=open(p).read().replace('cmake . -DCMAKE_INSTALL_PREFIX=', 'cmake . -DEXECUTORCH_BUILD_XNNPACK=ON -DEXECUTORCH_XNNPACK_ENABLE_KLEIDI=ON -DCMAKE_INSTALL_PREFIX=')
+          open(p,'w').write(s)
+          PY
+          start=$SECONDS
+          source scripts/build_android_library.sh
+          ANDROID_ABIS=(arm64-v8a)
+          main
+          echo "Build elapsed: $((SECONDS-start)) seconds" | tee -a "$GITHUB_WORKSPACE/aar-output/build-time.txt"
+      - name: Cache note
+        if: steps.aar-cache.outputs.cache-hit == 'true'
+        run: echo 'Cached AAR; no source build time measured in this run.' > aar-output/build-time.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executorch-1.6.0-arm64-aar
+          path: aar-output/
+          if-no-files-found: error
+
+  source-apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.source_apk
+    needs: executorch-aar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/setup-python@v5
+        id: python310
+        with: {python-version: '3.10'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.10.2'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: executorch-1.6.0-arm64-aar
+          path: aar-output
+      - name: Export and verify detectors
+        run: |
+          python -m pip install 'numpy==2.5.4' 'scipy==1.18.1' 'scikit-learn==1.9.1' 'pandas==3.1.1' 'joblib==1.6.0'
+          mkdir -p android/build/generated/python
+          cp -R candidates/BEST/triage android/build/generated/python/triage
+          python android/tools/export_models.py android/build/generated/python/models
+          python android/tools/test_parity.py android/build/generated/python/models
+          python android/tools/test_bridge.py
+      - name: Build 1.6 fallback APK
+        working-directory: android
+        env:
+          CHAQUOPY_BUILD_PYTHON: ${{ steps.python310.outputs.python-path }}
+        run: gradle --no-daemon :app:assembleDebug -PprahariAar="$GITHUB_WORKSPACE/aar-output/executorch.aar"
+      - name: Audit fallback manifest and permissions
+        run: |
+          python android/tools/check_manifest.py android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions android/app/build/outputs/apk/debug/app-debug.apk | tee /dev/stderr | (! grep -q 'android.permission.INTERNET')
+          stat -c 'Fallback APK size: %s bytes' android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prahari-debug-apk-executorch-1.6
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
