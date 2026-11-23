@@ -24,22 +24,26 @@ Breaking the false alarms down by category and by which rule fired showed two ge
   something to act on. That means at least one of: a non-official contact anywhere (link, mobile
   number, chat handle, obfuscated or scheme-less link), a direct request, an un-negated order to
   share, send, pay or install, a payment order, or a threat in any word order.
-- **Warning segments (`request_text`, `_warning_only`).** Clauses are split into segments. A segment
-  counts as a warning when it is one of:
-  - a negation over an OTP, PIN, payment, app or link;
-  - a hypothetical caller;
-  - a self-check about a transaction the reader did not make;
-  - a doorstep handover (a delivery word plus an in-person marker).
+- **Negated warnings (`request_text`, `_warning_only`).** Clauses are split into segments at ", ",
+  dashes, contrast words and connectors that introduce an order. A segment counts as a warning when
+  it negates an OTP, PIN, payment, app or link ("RBI never asks for your OTP", "kabhi AnyDesk install
+  na karein").
 
-  A segment that itself orders the reader (a verb with no negation within two words of it), or
-  threatens them, or makes an exception ("except our executive") is never a warning. Harm is ignored
-  only when all of these hold:
-  - every harmful mechanism is a secret, app, QR, collect or block mechanism (never a payment,
-    transfer, prize, job, investment or authority demand);
+  A segment is never a warning if it orders the reader (a verb with no negation within two words of
+  it), threatens them, makes an exception ("except our executive") or encourages ("don't hesitate to
+  share"). Harm is ignored only when all of these hold:
+  - every harmful mechanism is a secret, app, QR or collect mechanism (never a payment, transfer,
+    prize, job, investment, block or authority demand);
   - each of them sits in warning segments;
   - the message has no contact anywhere;
-  - the remainder has no order, threat or request cue. Quoted fraudster demands stay flagged, as an
-  earlier controller decision requires.
+  - the remainder has no order, threat or request cue.
+
+  Quoted fraudster demands stay flagged, as an earlier controller decision requires.
+
+Tried and dropped during review: also treating hypothetical callers ("if anyone calls…"), self-check
+lead-ins ("if not you, block the card in the app") and doorstep handovers as warnings. Together they
+removed little (v4_tune FPR 0.151 against 0.172 without them, fp_val 0.120 against 0.127). Each round
+of review found new ways to hide a demand behind them. They remain known residual false alarms.
 
 Tried and dropped: treating the reserved `.example` TLD as neutral. Real SMS never contain it, so the
 change only moved synthetic benchmarks, and it broke pinned stress rows.
@@ -71,7 +75,7 @@ first scoring its false alarms were read but not tuned on.
 |---|---|---|
 | v3_test (tuning holdout, 81) | 0.128 / 0.941 / 0.889 | 0.000 / 0.941 / 0.970 |
 | fp_val_v1 (new, 240) | 0.207 / 1.000 / 0.853 | 0.120 / 1.000 / 0.909 |
-| v4_tune (161) | 0.215 / 0.926 / 0.834 | 0.151 / 0.926 / 0.869 |
+| v4_tune (161) | 0.215 / 0.926 / 0.834 | 0.172 / 0.926 / 0.857 |
 | dev_v2 (96) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 | v3_tune (159) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 

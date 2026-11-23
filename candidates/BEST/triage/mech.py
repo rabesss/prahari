@@ -1083,16 +1083,17 @@ def _self_block(text):
     return bool(SELF_BLOCK.search(text)) and not PASSIVE_THREAT.search(text) and not CONTACT_NUMBER.search(text)
 
 
-# A warning segment describes a scam, a condition or a handover instead of asking the reader to do
-# something: a negated mention of a secret, payment, app or link ("RBI never asks for your OTP",
-# "kabhi AnyDesk install na karein"), a hypothetical caller ("if anyone calls asking for an OTP"),
-# a self-check ("if not done by you, call 1800..."), or a doorstep
-# handover ("share the OTP only with the delivery agent"). A negated order with no such object
-# ("do not tell your family", "vakil se sampark na karein") is a scam's isolation cue and stays,
-# and so does a conditional threat ("agar payment nahi hua toh..."). Segments are clauses split at
-# ", ", dashes and contrast words, so a negation reaches only its own segment ("don't panic, just
-# share the OTP" keeps "just share the OTP"). A report that quotes what fraudsters asked for is
-# not a warning segment: by controller decision a quoted credential demand stays flagged.
+# A warning segment states what the sender will never do or what the reader must never do: a negated
+# mention of a secret, payment, app or link ("RBI never asks for your OTP", "kabhi AnyDesk install na
+# karein", "OTP kisi se share mat karein"). A negated order with no such object ("do not tell your
+# family", "vakil se sampark na karein") is a scam's isolation cue and stays, and so does a
+# conditional threat ("agar payment nahi hua toh..."). A segment that orders the reader, threatens
+# them or makes an exception ("except our executive") is never a warning. Segments are clauses split
+# at ", ", dashes, contrast words and connectors before an order, so a negation reaches only its own
+# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Hypothetical callers,
+# self-check lead-ins and doorstep handovers were tried and dropped: they added little and each
+# opened ways to hide a demand (PR #48 review). A report that quotes what fraudsters asked for is not
+# a warning segment: by controller decision a quoted credential demand stays flagged.
 SEG_SPLIT = re.compile(r",\s|:\s|[–—]|\s-\s|\b(?:but|instead|just|however|lekin|balki|bas|sirf)\b|"
                        r"(?:^|\s)(?:लेकिन|बल्कि|बस|सिर्फ़|सिर्फ)(?=\s|$)", re.I)
 _SEG_NEG = re.compile(r"\b(?:never|not|no|no one|nobody|don'?t|doesn'?t|won'?t|cannot|can'?t|kabhi|kabhee|"
@@ -1103,22 +1104,6 @@ _SEG_PROTECTED = re.compile(
     r"paisa|fee|fees|charges?|transfer|kyc|aadhaar|aadhar|details|code)\b|"
     r"ओटीपी|पिन|पासवर्ड|कार्ड|लिंक|ऐप|पैसे|पैसा|भुगतान|शुल्क|यूपीआई|क्यूआर|केवाईसी|आधार|विवरण|कोड", re.I)
 _SEG_CONDITION = re.compile(r"\b(?:if|agar|unless|warna|otherwise|toh|varna)\b|(?:^|\s)(?:तो|वरना|अगर|यदि)(?=\s|$)", re.I)
-_SEG_WARN = re.compile(
-    r"\b(?:if|agar|yadi)\s+(?:any\s*one|some\s*one|somebody|anybody|a caller|any caller|a person|"
-    r"koi|kisi)\b|(?:अगर|यदि)\s+(?:कोई|किसी)|कोई भी"
-
-    r"|\b(?:beware|be careful|be alert|stay alert|saavdhan|savdhan|sawdhan)\b|सावधान|सतर्क", re.I)
-
-
-# A self-check refers to something the reader did not do: "if this was not you", "if you did not
-# make this transaction". "If you have not updated your KYC" is a condition for a threat, not this.
-_SELF_CHECK_SEG = re.compile(
-    r"\bif\s+(?:this|it)?\s*(?:was|is)?\s*(?:not|never)\s+(?:you|done by you|initiated by you|requested by you|"
-    r"authori[sz]ed by you|made by you|done|authori[sz]ed)\b|\bif\s+(?:this\s+(?:was|is)\s+)?unauthori[sz]ed\b|\bif\s+(?:you\s+)?(?:did\s*n[o']t|didn['\u2019]t)\s+(?:make|do|initiate|"
-    r"authori[sz]e|request|recogni[sz]e|attempt|perform)\b|\bnot\s+(?:done|initiated|authori[sz]ed|made)\s+by\s+you\b|"
-    r"agar\s+(?:yeh|ye|ise)?\s*(?:transaction|lenden|payment|bhugtan|transfer)?\s*aapne\s+nahi\s+(?:kiya|kia)|"
-    r"(?:यदि|अगर)\s+(?:यह\s+)?(?:लेनदेन|भुगतान|ट्रांजैक्शन)?\s*आपने\s+नहीं\s+किया", re.I)
-_SEG_SECRET = re.compile(r"\b(?:otp|pin|cvv|password|passcode)\b|ओटीपी|पिन|पासवर्ड", re.I)
 # A short segment with an order in it ("pay now", "turant paise bhejein") is a request of its own.
 _SEG_COMMAND = re.compile(r"\b(?:pay|send|share|transfer|tell|give|click|call|install|download|enter|type|"
                           r"forward|deposit|scan|approve|reply|bhej\w*|kar[oe]\w*|de\s?d[oe]|bata\w*|daal\w*)\b|"
@@ -1127,28 +1112,21 @@ _SEG_COMMAND = re.compile(r"\b(?:pay|send|share|transfer|tell|give|click|call|in
 _RISKY_COMMAND = re.compile(
     r"\b(?:share|sharing|send|sending|tell|telling|give|giving|forward|transfer|move|pay|deposit|install|download|"
     r"approve|accept|authori[sz]e|scan|enter|type|reply|upload|dictate|read|provide|fill|buy|purchase|"
-    r"hand(?:ing)? over|bhej\w*|bata\w*|de\s?d[oe]|de\s+(?:dijiye|dijiyе|dein|dena|do)|dena hoga|daal\w*|"
+    r"hand(?:ing)? over|bhej\w*|bata\w*|de\s?d[oe]|de\s+(?:dijiye|dein|dena|do)|dijiye|dijiyega|dena hoga|dena hai|daal\w*|"
     r"bhar(?:o|ein|en|iye|dein|do)|jama)\b|भेजें|भेजो|भेजिए|भेजिये|भेज दें|बताएं|बताओ|बता दें|बता देना|बताइए|"
     r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा|रिचार्ज|इंस्टॉल", re.I)
 # A verb in its oblique infinitive ("scan karne ki zaroorat nahi", "bhejne se pehle") names an action;
 # it does not order one.
 _INFINITIVE_AFTER = re.compile(r"^\s*(?:kar(?:ne|na)|करने|करना)\b|^(?:ne|na)\b", re.I)
 _NEG_NEAR_BEFORE = re.compile(r"(?:\b(?:never|not|no|don'?t|do not|does not|doesn'?t|won'?t|cannot|can'?t|"
-                              r"no need to|na|mat|nahi|nahin)|n't|(?:^|\s)(?:न|मत|नहीं|ना))\s+(?:\S+\s+){0,2}$", re.I)
+                              r"no need to|na|mat|nahi|nahin)|n't|(?:^|\s)(?:न|मत|नहीं|ना))\s+(?:\S+\s+){0,2}$|"
+                              # "will not ask you to forward it", "never asks customers to share"
+                              r"\b(?:never|not|n't|no)\s+(?:\S+\s+)?(?:ask|asks|request|requests|tell|tells|require|"
+                              r"requires|want|wants)\s+(?:\S+\s+){0,2}to\s+$", re.I)
 _NEG_NEAR_AFTER = re.compile(r"^\s*(?:\S+\s+){0,2}?(?:na|mat|nahi|nahin|not|never)\b|"
                              r"^\s*(?:\S+\s+){0,2}?(?:न|मत|नहीं|ना)(?=[\s,;:।]|$)", re.I)
 _ATTENTION = re.compile(r"ध्यान दें|dhyan d\w+", re.I)
 _LIST_TAIL = re.compile(r"^\s*(?:or|and|nor|ya|aur|या|और|एवं|तथा)(?=\s|$)", re.I)
-
-
-# A doorstep handover names the delivery: "share the OTP only with the delivery agent", "give the
-# PIN only when collecting the parcel". "Only with our executive" without a delivery is a demand.
-_HANDOVER_SEG = re.compile(r"\b(?:at (?:the|your) (?:door|doorstep)|doorstep|in person|at handover|handover|"
-                           r"hand(?:ing|ed)? over|on delivery|at delivery|at the time of delivery|when (?:collecting|"
-                           r"receiving|you (?:receive|collect|get))|after inspecting|milte (?:waqt|samay)|ghar par)\b|"
-                           r"मिलने पर|हाथ में|घर पर|सुपुर्दगी", re.I)
-_DELIVERY_WORD = re.compile(r"\b(?:deliver\w*|courier|parcel|package|packet|order|shipment|postman|rider|"
-                            r"doorstep|handover|bag|box)\b|डिलीवरी|पार्सल|कूरियर|डाक|सामान|ऑर्डर", re.I)
 
 
 # A new order joined by a connector ("and send", "please share", "then dictate") is a segment of its own.
@@ -1158,19 +1136,28 @@ _AND_ORDER = re.compile(r"\s(?:and|aur|और|then|please|kindly|pls|now|so|phir
                         r"reply|upload|dictate|read|provide|buy|hand)\b)", re.I)
 
 
+# A negation that encourages ("don't hesitate to share", "why not share") is an order.
+_AFFIRM = re.compile(r"\b(?:don'?t|do not|never|dont)\s+hesitate\s+to\b|\bwhy not\b|\bno harm in\b|"
+                     r"\bfeel free to\b|\bno problem (?:in|to)\b", re.I)
+
+
 def _ordered(seg, threat=True):
     """The segment itself orders the reader to hand over, pay, send or install, or threatens them:
-    "if anyone calls, share the OTP", "koi bhi OTP humein bhejein". An order counts unless a negation
-    sits within two words of the verb ("never share", "share mat karein", "install na karein") or the
-    verb is an oblique infinitive ("scan karne ki zaroorat nahi"). In a self-check, "block your card in
-    the app" is the reader's own remedy, so threat words do not count there."""
+    "share the OTP with our officer", "koi bhi OTP humein bhejein". An order counts unless a negation
+    sits within two words of the verb ("never share", "share mat karein", "install na karein"), it
+    continues a negated list ("never share your OTP or install AnyDesk"), or the verb is an oblique
+    infinitive ("scan karne ki zaroorat nahi")."""
     if threat and _threatens(seg):
         return True
-    text = _ATTENTION.sub(" ", seg)
+    text = _AFFIRM.sub(" ", _ATTENTION.sub(" ", seg))
+    negated_before = False
     for m in _RISKY_COMMAND.finditer(text):
         before, after = text[:m.start()], text[m.end():]
-        if _INFINITIVE_AFTER.match(after) or re.search(r"[a-z]ne$", m.group(), re.I) or \
-                _NEG_NEAR_BEFORE.search(before) or _NEG_NEAR_AFTER.match(after):
+        if _INFINITIVE_AFTER.match(after) or re.search(r"[a-z]ne$", m.group(), re.I):
+            continue
+        if _NEG_NEAR_BEFORE.search(before) or _NEG_NEAR_AFTER.match(after) or \
+                (negated_before and re.search(r"(?:\b(?:or|nor|ya)|या)\s+(?:\S+\s+)?$", before, re.I)):
+            negated_before = True
             continue
         return True
     return False
@@ -1181,45 +1168,20 @@ def _threatens(seg, imperative=True):
     counted: in a self-check it is the reader's own remedy, while "will be blocked", "band ho jayega",
     a penalty or an FIR still are threats."""
     return bool((imperative and _clause_hit(THREAT, seg)) or _clause_hit(BLOCK_FUTURE, seg)
-                or PASSIVE_THREAT.search(seg) or _clause_hit(_OTHER_THREAT, seg))
+                or PASSIVE_THREAT.search(seg) or _clause_hit(_OTHER_THREAT, seg) or re.search(r"\bFIR\b", seg))
 
 
-_OTHER_THREAT = (r"\b(?:penalty|fine of|jurmana|fir|arrest\w*|legal action|forfeit\w*|seiz\w*|warrant)\b|"
+_OTHER_THREAT = (r"\b(?:penalty|fine of|jurmana|arrest\w*|legal action|forfeit\w*|seiz\w*|warrant)\b|"
                  r"जुर्माना|गिरफ्तार|कानूनी कार्रवाई|एफआईआर")
-
-
-# What a doorstep handover may ask: tell or give the delivery code to the delivery person, nothing
-# else. A bank, UPI or card secret, a payment, an app or a threat in the same segment is a scam.
-_HANDOVER_OTHER = re.compile(r"\b(?:bank|banking|upi|card|account|a/c|net ?banking|cvv|password|pin|aadhaar|aadhar|"
-                             r"kyc|fee|duty|charges?|rs\.?|inr|officer|field|rings?|calls?|phone|"
-                             r"transfer|pay|deposit|install|download|approve|scan|anydesk|teamviewer|safe account|"
-                             r"verify your identity)\b|बैंक|खाता|खाते|कार्ड|यूपीआई|पासवर्ड|फोन|ऐप", re.I)
-
-
-_DELIVERY_NOUN = re.compile(r"\b(?:delivery|courier|parcel|package|packet|shipment|postman|rider|bag|box)\b|"
-                            r"डिलीवरी|पार्सल|कूरियर|डाककर्मी|डाकिया|सामान", re.I)
-
-
-def _handover(seg, clause):
-    return bool(_HANDOVER_SEG.search(seg) and _DELIVERY_NOUN.search(seg)
-                and not _HANDOVER_OTHER.search(seg) and "₹" not in seg and not _threatens(seg))
 
 
 # "Never share your OTP with anyone except our executive" turns the warning into a request.
 _EXCEPT = re.compile(r"\b(?:except|other than|apart from|siwa|sivay|siway|ke alawa|ke alava)\b|सिवाय|के अलावा|को छोड़कर", re.I)
 
 
-def _warning_segment(seg, clause=""):
-    if _EXCEPT.search(seg):
+def _warning_segment(seg):
+    if _EXCEPT.search(seg) or _AFFIRM.search(seg) or _ordered(seg):
         return False
-    if _handover(seg, clause):
-        return True
-    if _SELF_CHECK_SEG.search(seg):
-        return not _ordered(seg, threat=False)
-    if _ordered(seg):
-        return False
-    if _SEG_WARN.search(seg):
-        return True
     return bool(_SEG_NEG.search(seg) and _SEG_PROTECTED.search(seg) and not _SEG_CONDITION.search(seg))
 
 
@@ -1245,19 +1207,12 @@ def _segments(clause):
 
 def request_text(text):
     """The text with warning segments blanked out in place: what the message actually asks of the
-    reader. Everything else keeps its original wording and punctuation. A self-check ("if this was
-    not you") also covers the rest of its clause ("call 1800... or freeze the card in the app")
-    unless that part asks for a secret, orders a payment, transfer or install, or threatens."""
+    reader. Everything else keeps its original wording and punctuation."""
     drop = []
     for off, clause in clauses(text):
-        self_check = False
         for a, b in _segments(clause):
-            seg = clause[a:b]
-            if _warning_segment(seg, clause) or (self_check and not _SEG_SECRET.search(seg)
-                                                 and not _ordered(seg, threat=False)
-                                                 and not _threatens(seg, imperative=False)):
+            if _warning_segment(clause[a:b]):
                 drop.append((off + a, off + b))
-                self_check = self_check or bool(_SELF_CHECK_SEG.search(seg))
     out, last = [], 0
     for a, b in drop:
         out.append(text[last:a])
@@ -1266,10 +1221,10 @@ def request_text(text):
     return " ".join("".join(out).split())
 
 
-# Only these mechanisms can be explained away by warning context: they are what genuine OTP messages,
-# self-check alerts and advisories mention. A payment, transfer, prize, job, investment or authority
+# Only these mechanisms can be explained away by warning context: they are what genuine OTP messages
+# and advisories mention. A payment, transfer, prize, job, investment or authority
 # demand is never cleared by surrounding warnings.
-CLEARABLE = {"secret_request", "remote_access", "qr_payment", "collect_request", "block_threat"}
+CLEARABLE = {"secret_request", "remote_access", "qr_payment", "collect_request"}
 
 
 def _warning_only(a):
