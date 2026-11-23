@@ -4,7 +4,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from . import indicrules, mech, rules, textmodel
+from . import indicrules, mech, rules, textmodel, upi
 
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 _cache = {}
@@ -114,11 +114,24 @@ def predict_text(texts):
     return out
 
 
+def predict_upi(payloads):
+    return upi.predict_upi(payloads)
+
+
 def predict_url(urls):
-    m = _model("url")
-    ps = m.predict_proba([u.lower() for u in urls])[:, 1]
+    upi_idx = [i for i, u in enumerate(urls) if upi.is_upi_payload(u)]
+    if len(upi_idx) == len(urls):
+        return upi.predict_upi(urls)
+    upi_set = set(upi_idx)
+    web_urls = [u.lower() for i, u in enumerate(urls) if i not in upi_set]
+    ps = _model("url").predict_proba(web_urls)[:, 1] if web_urls else []
+    web_iter = iter(ps)
     out = []
-    for u, p in zip(urls, ps):
+    for i, u in enumerate(urls):
+        if i in upi_set:
+            out.append(upi.classify(u))
+            continue
+        p = next(web_iter)
         ev = rules.url_indicators(u)
         lab, s = _decide(float(p), ev)
         out.append((lab, s, [d for _, d in ev]))
@@ -185,6 +198,8 @@ def predict_flow_text(text):
 
 def classify_any(kind, inp):
     """Used by explain: returns (label, score, evidence) for any input kind."""
+    if kind == "upi" or (kind in ("url", "sms") and upi.is_upi_payload(inp)):
+        return upi.classify(inp)
     if kind == "url":
         return predict_url([inp])[0]
     if kind == "flow":

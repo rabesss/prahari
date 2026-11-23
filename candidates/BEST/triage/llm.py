@@ -12,7 +12,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-from . import indicrules, mech, rules
+from . import indicrules, mech, rules, upi
 
 CAND = Path(__file__).resolve().parents[1]
 
@@ -29,7 +29,11 @@ REFUSAL = re.compile(r"\b(i cannot|i can't|i am unable|i'm unable|i won't|i will
                      r"i'm sorry|i am sorry|cannot provide|can't provide)\b", re.I)
 
 VERDICT_WORD = {1: "DANGEROUS", 0: "NO RISK FOUND", "uncertain": "SUSPICIOUS"}
-KIND_WORD = {"sms": "Text message", "injection": "Text message", "url": "Web link", "flow": "Network event"}
+KIND_WORD = {"sms": "Text message", "injection": "Text message", "url": "Web link", "flow": "Network event", "upi": "UPI payment QR"}
+
+
+def _is_upi(kind, inp):
+    return kind == "upi" or (kind in ("url", "sms") and bool(inp) and upi.is_upi_payload(inp))
 
 SHORT = {
     "secret_request": "asks for an OTP, PIN or password",
@@ -270,6 +274,11 @@ def compact_evidence(kind, inp, fallback, verdict=None):
     """
     if _debit_alert(kind, inp, verdict):
         return [DEBIT_LINE]
+    if _is_upi(kind, inp):
+        ev = upi.compact_evidence_for(inp, verdict)
+        if not ev and verdict != 0:
+            ev = [str(e)[:70] for e in fallback[:2]]
+        return ev[:2]
     out = []
     dismissed = False
     if kind == "url":
@@ -387,6 +396,8 @@ def benign_evidence(kind, inp, evidence, verdict):
         return ["Looks like a bank debit or OTP alert", "Scammers copy these alerts; confirm it in your bank app"]
     if verdict != 0 or kind == "flow":
         return lines
+    if _is_upi(kind, inp):
+        return upi.benign_evidence_for(inp)
     if kind == "url":
         risk = {d for n, d in rules.url_indicators(inp) if n != "official_domain"}
         return [line for line in lines if line not in risk]
@@ -402,6 +413,8 @@ def scam_type(kind, inp, verdict):
         return ""
     if _debit_alert(kind, inp, verdict):
         return "a bank debit alert to confirm"
+    if _is_upi(kind, inp):
+        return upi.scam_type_for(inp, verdict)
     if kind == "url":
         names = {n for n, _ in rules.url_indicators(inp)}
         if names & {"brand_lookalike", "digit_swap"}:
@@ -467,12 +480,14 @@ class Explainer:
         self.model_name = self.cfg["model"]
 
     def prompt(self, kind, inp, verdict, evidence):
-        snippet = inp if len(inp) <= 320 else inp[:317] + "..."
+        is_upi = _is_upi(kind, inp)
+        eff_kind = "upi" if is_upi else kind
+        snippet = upi.prompt_snippet(inp) if is_upi else (inp if len(inp) <= 320 else inp[:317] + "...")
         # Neutralise live links in the snippet: the model tends to read a raw malicious URL as a
         # request it must decline. The real host still appears in the evidence for the reader.
-        snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: m.group(0).replace(".", "[.]"), snippet)
-        ev = compact_evidence(kind, inp, evidence, verdict)
-        what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event"}.get(kind, "item")
+        snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: re.sub(r"(?<!\[)\.(?!\])", "[.]", m.group(0)), snippet)
+        ev = compact_evidence(eff_kind, inp, evidence, verdict)
+        what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event", "upi": "UPI payment QR"}.get(eff_kind, "item")
         first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")
         # The strongest evidence phrase is written into the required opening, so the model copies it
@@ -482,7 +497,7 @@ class Explainer:
                    f"This {what} was flagged as risky; check it carefully before acting" if verdict == 1 else
                    f"This {what} needs a check; review it carefully before acting" if verdict == 'uncertain' else
                    f"This {what} was checked; review it carefully before acting")
-        user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
+        user = (f"{KIND_WORD.get(eff_kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
                 f"Start your answer with exactly: \"{opening}.\" "
                 "Then write one more sentence of advice, 6-12 words.")
@@ -491,7 +506,7 @@ class Explainer:
         built = ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +
                 "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
-        _TAILS[built] = advice_for(kind, verdict, inp)[0]
+        _TAILS[built] = advice_for(eff_kind, verdict, inp)[0]
         return built
 
     def generate(self, prompt):
@@ -912,6 +927,26 @@ TYPE_ADVICE = {
         "Never scan a QR code from a message; receiving money needs no scan.",
         "Check any bill or request in the official app before paying.",
         REPORT]),
+    "a UPI refund or receive-money QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
+        "Never scan a QR code or enter your UPI PIN to receive money.",
+        "A UPI QR always sends money from your account; block the sender.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI collect-request QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
+        "Decline the request; receiving money never needs a UPI PIN.",
+        "Block the UPI ID in your payment app.",
+        "Call 1930 at once if money was debited."]),
+    "a UPI AutoPay mandate scam": ("Do not approve this UPI AutoPay mandate; block the sender.", [
+        "Do not approve this UPI AutoPay mandate; receiving money never needs a mandate.",
+        "Check and cancel any unknown mandates in your UPI app's AutoPay section.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI KYC or impersonation QR scam": ("Do not pay through this QR; check the official app instead.", [
+        "Do not pay through this QR code or enter your UPI PIN.",
+        "Check the payee name and UPI ID directly with the official app or merchant.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI QR payment scam": ("Do not pay through this QR; check the official app instead.", [
+        "Do not pay through this QR code or enter your UPI PIN.",
+        "Check the payee name and UPI ID directly with the official app or merchant.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
     "an extortion threat": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
         "Save screenshots and block the sender.",
@@ -954,6 +989,18 @@ CHECK_STEP = "Check the payment in your bank app, not through any link or number
 
 def advice_for(kind, verdict, inp):
     """(replacement sentence, vetted actions) for one checked item."""
+    if _is_upi(kind, inp) and verdict in (0, "uncertain"):
+        if verdict == "uncertain":
+            acts = [
+                "Do not enter your UPI PIN until you confirm the payee name, UPI ID and amount directly with the merchant.",
+                "Receiving money never needs a QR scan or UPI PIN.",
+            ]
+            return "Do not pay until you confirm the payee directly.", acts
+        acts = [
+            "Confirm the payee name and amount in your UPI app before entering your PIN.",
+            "Remember: scanning a upi://pay QR sends money; receiving money never needs a PIN.",
+        ]
+        return acts[0], acts
     if verdict in (0, "uncertain") and kind == "sms" and inp is not None:
         a = mech.analyze(inp)
         if a["receipt"] or a["otp_note"]:
