@@ -589,3 +589,114 @@ def test_reported_and_reassurance_cases_stay_suspicious_or_worse():
     for text in ["Stay on video call alone until we verify, and if anyone asks you about the call, say it is an office call.",
                  "Do not waste time stay on the video call until we verify."]:
         assert callguard.classify_call(text)["verdict"] != "benign", text
+
+
+# Review round 3 (gpt-6.1-terra): a narrative ends at a comma that starts the caller's own demand, and a
+# negation does not reach back past a comma.
+def test_narrative_ends_at_a_comma_before_the_demand():
+    a = callrules.analyze_call("No bank will ever ask for your OTP, as a police officer I need you to transfer "
+                               "your money to the safe account now")
+    assert a["label"] == 1 and "safe_account_verify" in a["signals"]
+    awareness = callrules.analyze_call("Fraudsters pose as CBI, they ask you to transfer money to safe accounts")
+    assert awareness["label"] == 0
+
+
+def test_negation_does_not_cross_a_comma():
+    a = callrules.analyze_call("Do not tell anyone, you are under digital arrest")
+    assert a["label"] == 1 and a["is_digital_arrest"] is True
+
+
+# Review round 3 (CodeRabbit): negation stops at a comma, narrative ends before a bare demand, lowercase
+# agency initials, and negation shared across "or".
+@pytest.mark.parametrize("text", [
+    "Do not share your OTP, you are under digital arrest.",
+    "No bank will ever ask for your OTP, transfer money to the safe account now.",
+    "This is c. b. i. Do not disconnect the call. Transfer money to the safe account.",
+    "Never share your OTP, but install AnyDesk now.",
+    "Do not disconnect and transfer money to the RBI safe account.",
+])
+def test_round3_scripts_stop(text):
+    assert callrules.analyze_call(text)["label"] == 1, text
+
+
+def test_negation_is_shared_across_or():
+    assert callrules.analyze_call("Never share your OTP or install AnyDesk.")["label"] == 0
+    assert callrules.normalize_transcript("This is c. b. i. officer, meeting at 5 p.m. today") == \
+        "This is CBI officer, meeting at 5 p.m. today"
+
+
+# Review round 3 (Grok 4.7, security seat): a short command before the threat, and a policy statement
+# joined by commas to the demand.
+@pytest.mark.parametrize("text", [
+    "Don't call the police, you are under digital arrest",
+    "Do not call the police, you are under digital arrest",
+    "Don't open the door, you are under digital arrest",
+    "Do not contact your lawyer, you are under digital arrest",
+    "Don't leave the room, you are under digital arrest",
+    "Do not disconnect, you are under digital arrest",
+    "This is Inspector Sharma from CBI. Don't call the police, you are under digital arrest.",
+    "This is CBI. Don't call the police, you are under digital arrest.",
+    "Don't call the police you are under digital arrest",
+    "Sir, no bank will ever ask you for the OTP, a warrant has been issued, please do not disconnect the call and "
+    "transfer two lakh rupees to the RBI safe account.",
+    "Sir, the police will never call you from a normal number, a warrant has been issued, do not disconnect, and "
+    "transfer fifty thousand to the RBI safe account.",
+])
+def test_round3_security_cases_stop(text):
+    res = callguard.classify_call(text)
+    assert res["stop_warning"] is True, (text, res["call_signals"])
+
+
+# Review round 3 (GLM 5.4): negation on the word that governs "to share", awareness that describes the
+# scam in the second person, and a caller's own demand after a reassurance or "a person claiming to be".
+@pytest.mark.parametrize("text", [
+    "Thank you for calling HDFC Bank. Your card has been blocked as requested. We advise you not to share your "
+    "OTP with anyone. Is there anything else I can help you with?",
+    "You are requested not to share your OTP, PIN or password with anyone, including bank staff.",
+    "We will not ask you to share your OTP or PIN with anyone.",
+    "Banks never ask you to share your OTP or PIN with anyone.",
+    "SBI never asks you to share your OTP with anyone.",
+    "Bank staff never ask you to read out your OTP on a call.",
+    "It is not safe to share your OTP with anyone.",
+    "Under no circumstances should you share your OTP with anyone.",
+    "You are requested not to transfer money to a safe account.",
+    "We would never tell you to download AnyDesk or any screen sharing app.",
+    "Sir, your KYC is complete. You do not need to share any OTP for this. Have a nice day.",
+    "Scammers may claim that your account is blocked and ask you to share your OTP to unlock it. Never share your OTP with anyone.",
+    "Scammers may call you saying your Aadhaar is linked to a criminal case and ask you to transfer money to a safe account. Please do not do it.",
+    "Fraudsters may tell you that your account will be blocked and ask you to share your OTP or PIN to unlock it. We never ask for it.",
+    "Fraudsters may claim that your Aadhaar is misused and ask you to share your OTP. Never share your OTP.",
+])
+def test_round3_genuine_advice_and_awareness_no_stop(text):
+    res = callguard.classify_call(text)
+    assert res["stop_warning"] is False, (text, res["call_signals"])
+
+
+@pytest.mark.parametrize("text", [
+    "You do not need to stay on the line. We will call you back.",
+    "You don't have to keep the line open, we will message you.",
+    "You don't need to keep the camera on during the call.",
+])
+def test_round3_genuine_lines_are_not_even_suspicious_from_rules(text):
+    assert callrules.analyze_call(text)["label"] == 0, text
+
+
+@pytest.mark.parametrize("text", [
+    "Sir, this is HDFC Bank fraud department. We will never ask you for your PIN, just tell me the OTP you just "
+    "received so we can reverse the transaction.",
+    "No officer will ask you for cash, you have to deposit the fine in the RBI safe account.",
+    "This is Inspector Rao from Mumbai police and a person claiming to be your brother has been caught in a fraud "
+    "case and you have to pay the bail amount to the police safe account and do not disconnect the call.",
+    "Someone is pretending to be you and has filed a false case against you and you will be arrested today unless "
+    "you transfer the money to the RBI safe account and do not disconnect the call.",
+    "sir a person claiming to be your brother has been caught in a fraud case you have to pay the bail amount to "
+    "the police safe account do not disconnect",
+])
+def test_round3_caller_demand_after_reassurance_or_claiming_stops(text):
+    res = callguard.classify_call(text)
+    assert res["stop_warning"] is True, (text, res["call_signals"])
+
+
+def test_many_reported_triggers_do_not_recurse():
+    a = callrules.analyze_call("If anyone asks, " * 1500 + "say nothing.")
+    assert a["label"] in (0, "uncertain", 1)

@@ -41,5 +41,11 @@
    79.3,
    17.0
   ]
+ },
+ "source_revision": "commit e665f44 (feat/call-guard); later commits change only call-script rules, tests and docs, not ASR, Llama or I/O",
+ "commands": {
+  "asr_only": "PRAHARI_WHISPER_DIR=<dir with whisper_tiny_vivo_executorch_optimized.pte + tokenizer.json> HC_PY=<repo>/.venv/bin/python /usr/bin/time -v candidates/BEST/bin/callguard --demo --no-explain --out callguard_demo_asr_only_neoverse_n1.json",
+  "asr_plus_llama": "PRAHARI_WHISPER_DIR=<same> HC_PY=<repo>/.venv/bin/python /usr/bin/time -v candidates/BEST/bin/callguard --demo --out callguard_demo_neoverse_n1.json (Llama from models/registry.json, config.json model llama32-1b-qlora)",
+  "import_order_check": "ad-hoc scripts on the same host: Whisper alone with and without importing executorch.extension.llm.custom_ops first; Llama loaded before vs after Whisper"
  }
 }

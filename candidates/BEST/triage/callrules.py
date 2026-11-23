@@ -183,11 +183,24 @@ close lock inform contact call speak talk go come visit click follow accept trus
 """.split())
 _WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 # A new first/second-person subject starts the caller's own speech again.
-NEW_SUBJECT_RE = re.compile(r"\b(?:this\s+is|i\s+am|i'm|we\s+are|you\s+are|you're|your\s+(?:name|aadhaa?r|account|number|parcel))\b",
-                            re.I)
-_NARRATIVE_END_RE = re.compile(CONTRAST_RE.pattern + "|" + NEW_SUBJECT_RE.pattern, re.I)
+NEW_SUBJECT_RE = re.compile(r"\b(?:this\s+is|i\s+am|i'm|we\s+are|you\s+are|you're|"
+                            r"(?:i|we)\s+(?:need|want|order|request|ask)\s+you|"
+                            r"you\s+(?:have\s+to|will\s+be|must|need\s+to|should)|unless\s+you)\b", re.I)
+# Words that take a "to"-infinitive: "never ask you to share", "you do not need to share",
+# "requested not to share", "it is not safe to share".
+_CONTROL_WORDS = frozenset({"ask", "asks", "asked", "tell", "tells", "told", "advise", "advises", "advised",
+                            "request", "requests", "requested", "need", "needs", "want", "wants", "require",
+                            "requires", "required", "expect", "have", "has", "safe", "wise", "advisable",
+                            "necessary", "force", "make", "urge", "allowed"})
+_PRONOUNS = frozenset({"you", "anyone", "anybody", "customers", "people", "him", "her", "them"})
+# A narrative also ends at a comma, unless the next words carry on describing the scammers.
+_NARRATIVE_COMMA_RE = re.compile(r"[,;:—]\s*(?!(?:they|them|he|she|it|such|these|those|who|which|and|or|then|so|"
+                                 r"even|including|like|or\s+ask)\b)", re.I)
+_NARRATIVE_END_RE = re.compile(_NARRATIVE_COMMA_RE.pattern + "|" + CONTRAST_RE.pattern + "|" + NEW_SUBJECT_RE.pattern, re.I)
 _REPORTED_END_RE = re.compile(r"[,;:—]|" + CONTRAST_RE.pattern + "|" + NEW_SUBJECT_RE.pattern, re.I)
-_REPORTED_CONTENT_END_RE = re.compile(r"[,;:—]|" + CONTRAST_RE.pattern, re.I)
+_CALLER_DEMAND_RE = re.compile(r"\b(?:you\s+(?:have\s+to|will\s+be|must|need\s+to|should)|unless\s+you|"
+                               r"(?:i|we)\s+(?:need|want|order|request)\s+you)\b", re.I)
+_REPORTED_CONTENT_END_RE = re.compile(r"[,;:—]|" + CONTRAST_RE.pattern + "|" + _CALLER_DEMAND_RE.pattern, re.I)
 
 # Routine benign cues on everyday calls/voice notes.
 BENIGN_CALL_RE = re.compile(
@@ -243,8 +256,10 @@ def normalize_transcript(text: str) -> str:
     s = unicodedata.normalize("NFKC", str(text))
     s = re.sub(r"[\u200b-\u200f\u2060\ufeff\u00ad]", "", s)
     # Whisper writes "C. B. I." / "R. B. I."; join them so sentence splitting keeps the name whole.
-    # Uppercase only, so a sentence ending in "5 p.m." keeps its full stop.
+    # Uppercase runs, plus the agency names in any case, so a sentence ending in "5 p.m." keeps its stop.
     s = re.sub(r"\b(?:[A-Z]\.\s?){2,}", lambda m: re.sub(r"[.\s]", "", m.group(0)) + " ", s)
+    s = re.sub(r"\b(c\.\s?b\.\s?i|r\.\s?b\.\s?i|n\.\s?c\.\s?b|t\.\s?r\.\s?a\.\s?i|d\.\s?r\.\s?i|f\.\s?i\.\s?r)\.?(?=\s|$)",
+               lambda m: re.sub(r"[.\s]", "", m.group(1)).upper() + " ", s, flags=re.I)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -259,12 +274,18 @@ def _clause_is_protective(clause: str) -> bool:
 
 def _active_segments(clauses: list[str]) -> list[str]:
     """Text a call script can be matched in. Text before a scam narrative or reported question stays
-    active. A narrative ("real police never ...") is set aside up to a contrast word or a new
-    first/second-person subject ("this is CBI", "you are under ..."); a reported question or condition
-    ("did the caller ask you to ...", "if anyone asks ...") also ends at a comma."""
+    active. A narrative ("real police never ...", "no bank will ever ask") is set aside up to a contrast
+    word, a comma that starts new speech, or a new first/second-person subject ("this is CBI", "you are
+    under ...", "you have to pay"); a reported question or condition ("did the caller ask you to ...",
+    "if anyone asks ...") also ends at a comma. A first-person promise ("we will never ask you for your
+    PIN") is the caller speaking, not a narrative."""
     out = []
-    for c in clauses:
+    work = list(clauses)
+    while work:
+        c = work.pop(0)
         n = AWARENESS_NARRATIVE_RE.search(c)
+        if n and re.match(r"(?:will|would|shall)\b", n.group(0), re.I) and re.search(r"\b(?:we|i)\s*$", c[:n.start()], re.I):
+            n = None
         r = REPORTED_RE.search(c)
         m = min((x for x in (n, r) if x), key=lambda x: x.start(), default=None)
         if m is None:
@@ -276,8 +297,10 @@ def _active_segments(clauses: list[str]) -> list[str]:
             end_rx = _REPORTED_CONTENT_END_RE
         cut = end_rx.search(c, m.end())
         if cut:
-            rest = c[cut.end():] if CONTRAST_RE.match(c, cut.start()) or cut.group(0) in ",;:—" else c[cut.start():]
-            out.extend(_active_segments([rest]))
+            rest = (c[cut.end():] if CONTRAST_RE.match(c, cut.start()) or cut.group(0).strip()[:1] in ",;:—"
+                    else c[cut.start():])
+            if rest.strip():
+                work.insert(0, rest)
     return [seg.strip() for seg in out if seg.strip()]
 
 
@@ -285,7 +308,13 @@ def _negated(segment: str, start: int) -> bool:
     """True when a negator sits directly before the verb that governs this match: the match's own
     first word, or the nearest governed verb in the six words before it ("never transfer money to a
     safe account"). With no governed verb in reach, only the two words right before the match count."""
-    before = _WORD_RE.findall(segment[max(0, start - 160):start].lower())
+    # A negation never reaches back past a comma ("do not tell anyone, you are under digital arrest").
+    before_text = re.split(r"[,;:—]", segment[max(0, start - 160):start])[-1]
+    # Nor past a new subject ("don't call the police you are under digital arrest").
+    subj = list(NEW_SUBJECT_RE.finditer(before_text))
+    if subj:
+        before_text = before_text[subj[-1].start():]
+    before = _WORD_RE.findall(before_text.lower())
     first = _WORD_RE.findall(segment[start:start + 30].lower())[:1]
     words = before + first
     idx = None
@@ -295,10 +324,31 @@ def _negated(segment: str, start: int) -> bool:
             break
     if idx is None:
         return any(w in _NEGATORS for w in before[-2:])
-    j = idx - 1
-    while j >= 0 and words[j] in _NEG_FILLERS:
-        j -= 1
-    return j >= 0 and words[j] in _NEGATORS
+    if re.search(r"\bunder\s+no\s+circumstances?\b", before_text, re.I):
+        return True
+    while True:
+        j = idx - 1
+        while j >= 0 and words[j] in _NEG_FILLERS:
+            j -= 1
+        # "... not to share", "never ask you to share", "do not need to share", "not safe to share":
+        # the negation sits on the word that governs the infinitive.
+        if j >= 0 and words[j] == "to":
+            k = j - 1
+            if k >= 0 and words[k] in _NEGATORS:
+                return True
+            while k >= 0 and words[k] in _PRONOUNS:
+                k -= 1
+            if k >= 0 and words[k] in _CONTROL_WORDS:
+                idx = k
+                continue
+        # "never share your OTP or install AnyDesk": the negation carries over "or" / "nor" to the
+        # previous governed verb (not over "and": "do not disconnect and transfer" is a demand).
+        if j >= 0 and words[j] in ("or", "nor"):
+            prev = next((k for k in range(j - 1, -1, -1) if words[k] in _GOVERNED_VERBS), None)
+            if prev is not None:
+                idx = prev
+                continue
+        return j >= 0 and words[j] in _NEGATORS
 
 
 def _rule_hit(rx: re.Pattern, segment: str) -> bool:

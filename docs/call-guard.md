@@ -93,7 +93,8 @@ numbers must not be quoted from these Linux results.
   PCM, and an ExecuTorch `Module` Whisper encoder/decoder loop. Its output feeds the adapter above. It
   compiles with the app (the Android CI `apk` job builds it), but no button or share target in `MainActivity` calls it yet, its
   `FEATURE_FLAG_ENABLED` constant is `false`, and it has not run on a device. It returns a `truncated`
-  flag that `callguard_mobile.verdict_call(transcript, truncated=True)` uses to avoid clearing a cut call.
+  flag (audio cut at 30 s) and a `partial` flag (decoding stopped before end-of-text), which
+  `callguard_mobile.verdict_call(transcript, truncated=..., partial=...)` uses so a cut call is never cleared.
   Before it is wired up, it still needs a check that the shared URI is a granted content URI and a
   digest or size check on the pushed `.pte`. The Whisper `.pte` and `tokenizer.json` must be pushed to the app's files dir with
   adb. It is not bundled. The Kotlin path transcribes only the first 30 s of a file.
