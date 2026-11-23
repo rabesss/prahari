@@ -212,9 +212,9 @@ An optional audio path for scam calls. A shared voice note or consented recordin
 device by ExecuTorch Whisper Tiny INT8 (Arm export, Apache-2.0). The existing SMS detector plus new
 Indian digital-arrest call-script rules classify the transcript, and Llama 3.2 1B through ExecuTorch writes
 a STOP warning, with vetted 1930 and Chakshu steps. On the Oracle Neoverse-N1 VM, the four synthetic
-demo calls were all classified as expected. ASR took 2.9–5.5 s for 11–18 s clips (2.1–4.5x real time),
-end to end with Llama took 6.6–16.5 s per call on a shared host, and peak RSS was 831 MiB without
-Llama and 2,611 MiB with it (`artifacts/callguard_demo_neoverse_n1.json`). Limits: apps cannot tap live
+demo calls were all classified as expected. ASR took 3.2–5.0 s for 11–18 s clips (2.7–4.8x real time),
+end to end with Llama took 6.8–13.3 s per call on a shared host, and peak RSS was 832 MiB without
+Llama and 2,611 MiB with it (`artifacts/callguard_demo_neoverse_n1*.json`). Limits: apps cannot tap live
 call audio; Hindi transcription with Whisper Tiny is unreliable; the clips are synthetic US-voice TTS,
 so real-call accuracy is unmeasured; the Android hook is unwired and untested on a phone. Full
 write-up: `docs/call-guard.md`.

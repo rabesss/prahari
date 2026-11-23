@@ -71,10 +71,11 @@ def _call_actions_hi(actions):
     return [_CALL_HI_STEPS.get(step) or base.get(step, '') for step in (actions or [])]
 
 
-def verdict_call(transcript, truncated=False):
+def verdict_call(transcript, truncated=False, partial=False, checked_seconds=30):
     """Stage 1 for Call Guard: existing detector + Indian digital-arrest rules (no Llama).
 
-    `truncated`: the audio was cut before transcription; a cut call is never cleared."""
+    `truncated`: the audio was cut at `checked_seconds`; `partial`: decoding stopped before
+    end-of-text. Either way the call is never cleared."""
     t0 = time.perf_counter()
     text = callrules.normalize_transcript(transcript)
     call_a = callrules.analyze_call(text)
@@ -94,9 +95,10 @@ def verdict_call(transcript, truncated=False):
         actions = callguard.actions_for_call(lab, call_a, text)
         is_da = bool(call_a['is_digital_arrest'])
 
-    if truncated:
+    if truncated or partial:
         marked = callguard.mark_incomplete({'label': lab, 'evidence': ev, 'score': score},
-                                           {'complete': False, 'truncated': True})
+                                           {'complete': False, 'truncated': bool(truncated),
+                                            'checked_seconds': checked_seconds})
         if marked['label'] != lab:
             actions = list(callguard.CALL_SUSPICIOUS_ACTIONS)
         lab, ev, score = marked['label'], marked['evidence'], marked['score']

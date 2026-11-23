@@ -1,0 +1,45 @@
+{
+ "files": {
+  "callguard_demo_neoverse_n1.json": "raw --out of `bin/callguard --demo` (ASR + rules + Llama), unedited",
+  "callguard_demo_asr_only_neoverse_n1.json": "raw --out of `bin/callguard --demo --no-explain`, unedited"
+ },
+ "date": "2026-11-23",
+ "host": "Oracle Cloud A1 VM, 2 vCPU Arm Neoverse-N1, ~11 GB RAM, Ubuntu 24.04; shared host (load average 1.7 at start, 3.7 at end of the runs)",
+ "asr_model": "Arm/whisper-tiny-int8-xnnpack-executorch (ExecuTorch 1.6, XNNPACK, INT8)",
+ "llm_model": "llama32-1b-qlora (ExecuTorch 1.6, XNNPACK)",
+ "usr_bin_time_v": {
+  "asr_only": {
+   "max_rss_kbytes": 851716,
+   "max_rss_mib": 831.8,
+   "wall_s": 20.98
+  },
+  "asr_plus_llama": {
+   "max_rss_kbytes": 2673956,
+   "max_rss_mib": 2611.3,
+   "wall_s": 44.05
+  }
+ },
+ "import_order_check": {
+  "clip": "digital_arrest_cbi.wav (17.9 s); separate runs on the same host the same day",
+  "whisper_total_ms_without_llm_custom_ops_import": [
+   6733.3,
+   6608.9
+  ],
+  "whisper_total_ms_with_llm_custom_ops_imported_first": [
+   3781.3,
+   3748.0
+  ],
+  "llama_prefill_decode_tps_whisper_loaded_first_without_import": [
+   18.7,
+   11.5
+  ],
+  "llama_prefill_decode_tps_llama_loaded_first": [
+   82.2,
+   20.7
+  ],
+  "llama_prefill_decode_tps_whisper_loaded_first_with_import": [
+   79.3,
+   17.0
+  ]
+ }
+}

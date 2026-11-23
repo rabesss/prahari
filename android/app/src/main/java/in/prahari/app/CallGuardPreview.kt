@@ -66,7 +66,9 @@ internal object CallGuardPreview {
 
     data class DecodedAudio(val pcm16Mono: ByteArray, val sampleRate: Int, val seconds: Double, val truncated: Boolean)
     /** [truncated]: only the first [MAX_AUDIO_SECONDS] were checked; the caller must say so and not clear the call. */
-    data class AsrOutcome(val transcript: String?, val error: String?, val elapsedMs: Long, val truncated: Boolean = false)
+    data class AsrOutcome(val transcript: String?, val error: String?, val elapsedMs: Long, val truncated: Boolean = false,
+                          /** Decoding hit the token cap before end-of-text; pass as `partial` to verdict_call. */
+                          val partial: Boolean = false)
 
     val sampleCalls = listOf(
         "Digital arrest (CBI/parcel)" to
@@ -276,6 +278,7 @@ internal object CallGuardPreview {
             val tokens = ArrayList<Int>(MAX_DECODE_TOKENS + 4)
             tokens.add(SOT_TOKEN.toInt())
             var freeCount = 0
+            var sawEos = false
 
             for (step in 0 until (MAX_DECODE_TOKENS + prefix.size)) {
                 val tokTensor = Tensor.fromBlob(longArrayOf(tokens.last().toLong()), longArrayOf(1L, 1L))
@@ -306,7 +309,10 @@ internal object CallGuardPreview {
                         }
                     }
                     freeCount++
-                    if (bestIdx == EOS_TOKEN) break
+                    if (bestIdx == EOS_TOKEN) {
+                        sawEos = true
+                        break
+                    }
                     bestIdx
                 }
                 tokens.add(nextToken)
@@ -314,7 +320,7 @@ internal object CallGuardPreview {
             val arr = JSONArray()
             tokens.forEach { arr.put(it) }
             val text = pyMod.callAttr("decode_whisper_tokens", files.second.path, arr.toString()).toString()
-            AsrOutcome(text, null, SystemClock.elapsedRealtime() - start, audio.truncated)
+            AsrOutcome(text, null, SystemClock.elapsedRealtime() - start, audio.truncated, partial = !sawEos)
         } catch (t: Throwable) {
             Log.e(TAG, "offline Whisper transcription failed", t)
             AsrOutcome(null, "${t.javaClass.simpleName}: ${t.message ?: "ASR error"}", SystemClock.elapsedRealtime() - start)

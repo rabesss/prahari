@@ -25,7 +25,7 @@ phone yet.
    SIM-disconnection and "press 9" scripts; OTP or remote-app requests. A match governed by a negation
    ("never transfer to a safe account") is advice, not a demand. A sentence that only describes scams
    ("real police never…", "fraudsters pose as CBI") is skipped up to a "but". Labels such as "security
-   reminder" hide nothing, so a scammer cannot borrow them. A genuine bank reminder is not flagged. A
+   reminder" hide nothing, so a scammer cannot borrow them. The genuine bank reminders in the tests are not flagged. A
    detector DANGEROUS verdict is never cleared because the call sounds protective, unless the only harm
    is telling the listener to block their own card in the official app. `callguard.fuse()` combines both and is shared by the desktop and Android code.
 4. **Explanation.** Llama 3.2 1B (the configured `llama32-1b-qlora` `.pte`) writes the warning through
@@ -57,26 +57,28 @@ do not import Call Guard.
 
 ## Measured on Arm (Oracle A1, 2 vCPU Neoverse-N1, ~11 GB RAM)
 
-Run on 2026-11-23 with `bin/callguard --demo`. The raw output is in
-`candidates/BEST/artifacts/callguard_demo_neoverse_n1.json`. The first two clips ran slower than the
-last two. The VM is shared (load average 3.0–3.6 during the run), and the cause was not isolated.
+Run on 2026-11-23 with `bin/callguard --demo` on the final code. The unedited `--out` files are
+`candidates/BEST/artifacts/callguard_demo_neoverse_n1.json` (with Llama) and
+`callguard_demo_asr_only_neoverse_n1.json`. `/usr/bin/time` figures and the import-order runs are in
+`callguard_demo_neoverse_n1.meta.json`. The VM is shared: load average rose from 1.7 to 3.7 during
+the runs, so per-clip times vary, and the slow rows were not investigated further.
 
 | Clip | Audio | ASR (Whisper Tiny INT8) | Real-time factor | Llama prefill / decode | End to end (ASR + rules + Llama) |
 |---|---|---|---|---|---|
-| digital arrest (CBI) | 17.9 s | 4.02 s | 4.5x | 41 / 11 tok/s | 16.5 s |
-| TRAI + customs parcel | 11.6 s | 5.49 s | 2.1x | 43 / 12 tok/s | 12.3 s |
-| SBI security reminder | 13.5 s | 3.32 s | 4.1x | 85 / 21 tok/s | 6.9 s |
-| clinic + courier | 11.4 s | 2.93 s | 3.9x | 76 / 20 tok/s | 6.6 s |
+| digital arrest (CBI) | 17.9 s | 3.73 s | 4.8x | 57 / 21 tok/s | 13.3 s |
+| TRAI + customs parcel | 11.6 s | 3.16 s | 3.7x | 87 / 20 tok/s | 6.8 s |
+| SBI security reminder | 13.5 s | 5.03 s | 2.7x | 44 / 11 tok/s | 11.8 s |
+| clinic + courier | 11.4 s | 3.36 s | 3.4x | 86 / 21 tok/s | 6.8 s |
 
-- Whisper model load: 0.24 s. Rules plus detector: 30–55 ms per call (2.0 s on the first call while the
-  detectors load).
-- Peak process RSS (`/usr/bin/time -v`, four clips): **831 MiB ASR only**; **2,611 MiB ASR + Llama** in
+- Whisper model load: 0.24 s. Rules plus detector: 29–84 ms per call (2.0 s on the first call while the
+  detectors load). Every transcript was complete (each window ended on end-of-text).
+- Peak process RSS (`/usr/bin/time -v`, four clips): **832 MiB ASR only**; **2,611 MiB ASR + Llama** in
   one process. The Llama runner reports about 2,609 MiB RSS after load.
 - All four clips got the expected verdict (2 scam → STOP, 2 benign → no risk found).
 - Import order matters. If `executorch.extension.llm.custom_ops` is not imported before the Whisper
   program loads, Whisper decode is about 1.8x slower, and a Llama runner loaded later in the same
-  process drops from about 82 to about 18 prefill tokens/s. `asr.py` now imports it first. The runs are
-  recorded under `import_order_check` in the artifact.
+  process drops from about 82 to about 18 prefill tokens/s. `asr.py` now imports it first. Those runs are
+  recorded under `import_order_check` in the `.meta.json` file.
 
 **Not measured:** Galaxy S23 or any physical phone. That needs a Remote Test Lab session. Android
 numbers must not be quoted from these Linux results.
@@ -117,7 +119,7 @@ numbers must not be quoted from these Linux results.
 - Whisper is a second neural model in the entry. The rules require Llama for the advisory component, and
   Llama still writes every explanation. Whether an ASR model is allowed is logged in
   `research/QUESTIONS.md`.
-- Only 2 minutes per file are transcribed (30 s on the Android path). A longer recording is cut and
+- Only 2 minutes per file are transcribed (30 s on the Android path, and its notes say so). A longer recording is cut and
   can at best be SUSPICIOUS, never cleared.
 - The model can still word the advice imperfectly ("report to authorities" rather than naming 1930).
   The vetted action list always names 1930 and Chakshu.

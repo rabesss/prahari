@@ -102,7 +102,7 @@ CONTRABAND_PARCEL_RE = re.compile(
 # Digital arrest / arrest warrant / immediate police arrest / money-laundering case threat.
 ARREST_WARRANT_RE = re.compile(
     r"\b(?:digital\s+arrest|virtual\s+arrest|arrest\s+warrant|non[- ]?bailable\s+warrant|"
-    r"warrant\s+(?:is\s+|was\s+|has\s+been\s+)?issued(?:\s+in\s+your\s+name)?|"
+    r"warrant\s+(?:is\s+|was\s+|has\s+been\s+|will\s+be\s+)?issued(?:\s+in\s+your\s+name)?|"
     r"(?:police|officers?|we)\s+(?:will|are\s+coming\s+to)\s+(?:come\s+(?:to\s+)?)?arrest\s+you|"
     r"you\s+(?:will\s+be|are|are\s+under)\s+(?:arrested|arrest|digital\s+arrest)|"
     r"(?:money\s+laundering|hawala|pmla|terror\s+funding|narcotics)\s+(?:case|investigation|charges?)|"
@@ -124,11 +124,11 @@ TELECOM_IVR_RE = re.compile(
 
 # Caller demands reading out OTP/PIN/CVV/account verification or installing remote screen-share app.
 CALL_SECRET_REMOTE_RE = re.compile(
-    r"\b(?:share|tell|read\s+out|dictate|give|provide|enter|confirm)\b[^.!?\n]{0,35}"
+    r"\b(?:share|tell|read\s+out|dictate|give|provide|enter|confirm)\b[^.!?\n,;]{0,35}"
     r"\b(?:otp|one[- ]?time\s+password|upi\s+pin|mpin|cvv|atm\s+pin|bank\s+password|verification\s+code)\b"
     r"|\b(?:verify\s+your\s+bank\s+account|confirm\s+your\s+bank\s+balance)\b"
     r"|\b(?:install|download|open)\b[^.!?\n]{0,30}\b(?:anydesk|teamviewer|quicksupport|rustdesk|screen[- ]?shar\w*)\b"
-    r"|(?:ओटीपी|पिन|सीवीवी|पासवर्ड)[^।.!?\n]{0,25}(?:बता\w*|भेज\w*|दीजिए|दो)"
+    r"|(?:ओटीपी|पिन|सीवीवी|पासवर्ड)(?:(?!कभी|मत|नहीं|न\s)[^।.!?\n]){0,25}(?:बता\w*|भेज\w*|दीजिए|दो)"
     r"|(?:एनीडेस्क|टीमव्यूअर|स्क्रीन\s*शेयर)",
     re.I,
 )
@@ -141,7 +141,9 @@ AWARENESS_NARRATIVE_RE = re.compile(
     r"(?:real|genuine)\s+(?:police|cbi|customs|rbi|banks?|officials?|ed|trai)"
     r"(?:\s*,\s*|\s+and\s+|\s+or\s+|,\s*and\s+)?(?:(?:police|cbi|customs|rbi|banks?|officials?|ed|trai)"
     r"(?:\s*,\s*|\s+and\s+|\s+or\s+|,\s*and\s+)?)*\s*(?:never|do\s+not|don't|will\s+not|won't)|"
-    r"(?:fraudsters?|scammers?|fake\s+(?:police|cbi|officers?))\s+(?:are|may|often|try|pose|claim|call|threaten))\b"
+    r"(?:fraudsters?|scammers?|fake\s+(?:police|cbi|officers?))\s+(?:are|may|often|try|pose|claim|call|threaten)|"
+    r"(?:no|never)\s+(?:\w+\s+){0,3}(?:will|would|shall|can)\s+(?:ever\s+)?(?:ask|call|request|demand)|"
+    r"(?:will|would|shall)\s+never\s+(?:ever\s+)?(?:ask|call|request|demand))\b"
     r"|(?:डिजिटल\s*अरेस्ट\s*जैसी\s*कोई\s*(?:चीज़|चीज)\s*नहीं|ठग\s*(?:नकली|फर्जी))",
     re.I,
 )
@@ -162,14 +164,30 @@ AWARENESS_NEGATED_RE = re.compile(
 )
 REPORTED_RE = re.compile(
     r"\b(?:if|did|has|have|whether|when)\s+(?:anyone|anybody|someone|the\s+caller|a\s+caller|they|he|she)\s+"
-    r"(?:ever\s+)?(?:ask|asks|asked|tell|tells|told|request\w*|want\w*)\b",
+    r"(?:ever\s+)?(?:ask|asks|asked|tell|tells|told|request\w*|want\w*)\b"
+    r"|\b(?:anyone|anybody|someone|somebody|people|callers?)\s+(?:who|that)\s+(?:claims?|says?|tells?|pretends?|poses?|"
+    r"threatens?|asks?|calls?)\b"
+    r"|\b(?:claiming|pretending|posing)\s+to\s+be\b|\beven\s+(?:with|to|if)\s+(?:someone|anyone|somebody)\b",
     re.I,
 )
-CONTRAST_RE = re.compile(r"\b(?:but|however|yet|although|though|lekin|par)\b|लेकिन|पर\s", re.I)
-_STRONG_NEGATOR_RE = re.compile(r"\b(?:never|not|don't|dont|avoid|कभी|मत|नहीं)\b", re.I)
-_WEAK_NEGATOR_RE = re.compile(r"\b(?:no|without|nor|न)\b", re.I)
-_BREAK_RE = re.compile(r"\b(?:and|but|then|so|or|aur|lekin|just|now|immediately|instead|rather|only)\b"
-                       r"|[,:;—-]|और|लेकिन", re.I)
+CONTRAST_RE = re.compile(r"\b(?:but|however|yet|although|though|lekin|magar)\b|लेकिन|मगर", re.I)
+# Negation is verb-adjacent: "never transfer", "do not share", "don't stay", "never ever pay". A
+# negator elsewhere ("this is not a joke, CBI ...", "do not worry, ...") governs nothing in the script.
+_NEGATORS = frozenset({"never", "not", "don't", "dont", "avoid", "no", "nor", "without",
+                       "कभी", "मत", "न", "नहीं"})
+_NEG_FILLERS = frozenset({"ever", "even", "also", "please", "kindly"})
+_GOVERNED_VERBS = frozenset("""
+transfer send move deposit wire remit shift pay share tell give provide enter read dictate confirm
+stay remain keep join sit install download open conduct do ask believe disconnect hang cut end leave
+close lock inform contact call speak talk go come visit click follow accept trust fall
+""".split())
+_WORD_RE = re.compile(r"[\w']+", re.UNICODE)
+# A new first/second-person subject starts the caller's own speech again.
+NEW_SUBJECT_RE = re.compile(r"\b(?:this\s+is|i\s+am|i'm|we\s+are|you\s+are|you're|your\s+(?:name|aadhaa?r|account|number|parcel))\b",
+                            re.I)
+_NARRATIVE_END_RE = re.compile(CONTRAST_RE.pattern + "|" + NEW_SUBJECT_RE.pattern, re.I)
+_REPORTED_END_RE = re.compile(r"[,;:—]|" + CONTRAST_RE.pattern + "|" + NEW_SUBJECT_RE.pattern, re.I)
+_REPORTED_CONTENT_END_RE = re.compile(r"[,;:—]|" + CONTRAST_RE.pattern, re.I)
 
 # Routine benign cues on everyday calls/voice notes.
 BENIGN_CALL_RE = re.compile(
@@ -225,8 +243,8 @@ def normalize_transcript(text: str) -> str:
     s = unicodedata.normalize("NFKC", str(text))
     s = re.sub(r"[\u200b-\u200f\u2060\ufeff\u00ad]", "", s)
     # Whisper writes "C. B. I." / "R. B. I."; join them so sentence splitting keeps the name whole.
-    s = re.sub(r"\b(?:[A-Za-z]\.\s?){2,}",
-               lambda m: re.sub(r"[.\s]", "", m.group(0)) + " ", s)
+    # Uppercase only, so a sentence ending in "5 p.m." keeps its full stop.
+    s = re.sub(r"\b(?:[A-Z]\.\s?){2,}", lambda m: re.sub(r"[.\s]", "", m.group(0)) + " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -240,28 +258,47 @@ def _clause_is_protective(clause: str) -> bool:
 
 
 def _active_segments(clauses: list[str]) -> list[str]:
-    """Text a call script can be matched in. A narrative clause about scams is skipped up to its
-    first contrast word; everything else stays active."""
+    """Text a call script can be matched in. Text before a scam narrative or reported question stays
+    active. A narrative ("real police never ...") is set aside up to a contrast word or a new
+    first/second-person subject ("this is CBI", "you are under ..."); a reported question or condition
+    ("did the caller ask you to ...", "if anyone asks ...") also ends at a comma."""
     out = []
     for c in clauses:
-        m = AWARENESS_NARRATIVE_RE.search(c) or REPORTED_RE.search(c)
-        if m:
-            cut = CONTRAST_RE.search(c, m.end())
-            if cut:
-                out.append(c[cut.end():])
+        n = AWARENESS_NARRATIVE_RE.search(c)
+        r = REPORTED_RE.search(c)
+        m = min((x for x in (n, r) if x), key=lambda x: x.start(), default=None)
+        if m is None:
+            out.append(c)
             continue
-        out.append(c)
+        out.append(c[:m.start()])
+        end_rx = _NARRATIVE_END_RE if m is n else _REPORTED_END_RE
+        if m is r and re.search(r"(?:claims?|says?|tells?|threatens?|asks?|be)$", m.group(0), re.I):
+            end_rx = _REPORTED_CONTENT_END_RE
+        cut = end_rx.search(c, m.end())
+        if cut:
+            rest = c[cut.end():] if CONTRAST_RE.match(c, cut.start()) or cut.group(0) in ",;:—" else c[cut.start():]
+            out.extend(_active_segments([rest]))
     return [seg.strip() for seg in out if seg.strip()]
 
 
 def _negated(segment: str, start: int) -> bool:
-    """True when the words just before a match negate it ("never transfer money to a safe account",
-    "do not stay ..."): a strong negator up to six words back, "no"/"without" up to two, stopping at
-    "and", "but", "just", a comma and similar breaks ("don't panic, just transfer" is a demand)."""
-    before = segment[max(0, start - 80):start]
-    parts = _BREAK_RE.split(before)
-    words = (parts[-1] if parts else before).split()
-    return bool(_STRONG_NEGATOR_RE.search(" ".join(words[-6:])) or _WEAK_NEGATOR_RE.search(" ".join(words[-2:])))
+    """True when a negator sits directly before the verb that governs this match: the match's own
+    first word, or the nearest governed verb in the six words before it ("never transfer money to a
+    safe account"). With no governed verb in reach, only the two words right before the match count."""
+    before = _WORD_RE.findall(segment[max(0, start - 160):start].lower())
+    first = _WORD_RE.findall(segment[start:start + 30].lower())[:1]
+    words = before + first
+    idx = None
+    for i in range(len(words) - 1, max(-1, len(words) - 8), -1):
+        if words[i] in _GOVERNED_VERBS:
+            idx = i
+            break
+    if idx is None:
+        return any(w in _NEGATORS for w in before[-2:])
+    j = idx - 1
+    while j >= 0 and words[j] in _NEG_FILLERS:
+        j -= 1
+    return j >= 0 and words[j] in _NEGATORS
 
 
 def _rule_hit(rx: re.Pattern, segment: str) -> bool:
@@ -304,10 +341,10 @@ def analyze_call(transcript: str) -> dict:
     hits: list[tuple[str, str]] = []
     seen_names: set[str] = set()
     active = _active_segments(clauses)
-    joined = " ".join(active)
+    joined = " ".join(active)  # reported as active_text; rules match per segment so windows stop at sentence ends
 
     for name, rx, desc in RULE_SPECS:
-        if any(_rule_hit(rx, seg) for seg in active) or _rule_hit(rx, joined):
+        if any(_rule_hit(rx, seg) for seg in active):
             hits.append((name, desc))
             seen_names.add(name)
 

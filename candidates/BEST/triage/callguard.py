@@ -226,7 +226,7 @@ def build_call_prompt(transcript: str, lab: int | str, evidence: list[str], is_d
 
     # The transcript is untrusted caller audio: remove chat-template control tokens and the quote
     # fence so it cannot open a new turn or close the quoted block.
-    clean = re.sub(r"<\|[^|>]{0,40}\|>", " ", transcript).replace('"""', '"')
+    clean = re.sub(r'"{2,}', '"', re.sub(r"<\|[^|>]{0,40}\|>", " ", transcript))
     clean = re.sub(r"\s+", " ", clean).strip()
     snippet = clean if len(clean) <= 320 else clean[:317] + "..."
     top_ev = evidence[0] if evidence else ""
@@ -273,7 +273,7 @@ def build_call_prompt(transcript: str, lab: int | str, evidence: list[str], is_d
 
 
 INCOMPLETE_NOTE = {
-    "truncated": "only the first 2 minutes of the recording were checked",
+    "truncated": "only the first {checked} of the recording were checked",
     "partial": "speech-to-text stopped early, so part of the call was not checked",
 }
 
@@ -283,7 +283,9 @@ def mark_incomplete(res: dict, asr_res: dict) -> dict:
     and every verdict says which part was not checked."""
     if asr_res.get("complete", True):
         return res
-    note = INCOMPLETE_NOTE["truncated" if asr_res.get("truncated") else "partial"]
+    secs = int(asr_res.get("checked_seconds") or asr.CHUNK_SECONDS * asr.MAX_CHUNKS)
+    checked = f"{secs // 60} minutes" if secs % 60 == 0 and secs >= 120 else f"{secs} seconds"
+    note = INCOMPLETE_NOTE["truncated" if asr_res.get("truncated") else "partial"].format(checked=checked)
     out = dict(res)
     out["asr_complete"] = False
     out["evidence"] = list(dict.fromkeys(list(res.get("evidence") or []) + [note]))[:7]
