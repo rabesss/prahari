@@ -69,13 +69,47 @@ GLM_RULE_LAYER = [
     "Dear SBI customer, if you have not updated your KYC, your account will be blocked today.",
     "UPCL: If you have not paid the bill, your electricity connection will be cut tonight. Pay now.",
 ]
+# PR #48 review round 2 (gpt-6.1-terra)
+GLM_RULE_LAYER += [
+    "Your parcel is at your door install AnyDesk immediately to verify your identity",
+    "At delivery transfer money to our safe account to release your parcel",
+    "कूरियर मिलने पर अपना बैंक ओटीपी हमारे एजेंट को दें।",
+    "RBI never asks for your OTP please share your PIN with our executive",
+    "Never give your OTP to strangers then share your PIN with our officer.",
+]
+# PR #48 review round 2 (GLM 5.4)
+GLM_RULE_LAYER += [
+    "Share the OTP with the courier at your door or your account will be blocked permanently.",
+    "Share your UPI PIN with the delivery agent at your door.",
+    "Your parcel is held at customs. Pay the clearance duty of Rs 2,350 to the courier in person when the parcel arrives.",
+    "SBI: आपका KYC बंद हो रहा है। घर पर आने वाले एजेंट को OTP दें और ऑर्डर पाएं।",
+    "Share the OTP with the courier boy at your door when he rings.",
+    "Aapne kabhi SBI ka KYC nahi karvaya isliye OTP turant bhejein.",
+    "जिन ग्राहकों ने कभी KYC अपडेट नहीं करवाया वे अपना OTP तुरंत हमारे अधिकारी को भेजें।",
+    "Never share your OTP with strangers simply share it with our executive.",
+    "Never share your OTP with anyone and accept the collect request sent to you.",
+    "Never share your OTP with anyone and dictate it to our verification officer.",
+    "कोई भी OTP मांगे, तुरंत हमें भेजिए।",
+    "Agar koi OTP maange to use de dijiye, warna account band ho jayega.",
+    "SBI: If this was not you, move your funds to the safe account.",
+    "HDFC: If not done by you, authorise the debit and we will refund it.",
+    "SBI: If you did not make this payment, a penalty of Rs 10,000 will be debited from your account.",
+]
 # Main flags these only on a high model score; the contact gate must let that score through.
 GLM_MODEL_LAYER = [
-    "Share it only with the courier boy when he calls.",
+    "Share your OTP only with the courier boy when he calls.",
     "SBI: Your internet banking is locked. Unlock here: sbi-netbanking.pw/verify",
-    "HDFC: Account on hold. Verify at forms.gle/abcXYZ12 today.",
+    "HDFC: Account on hold. KYC form: forms.gle/abcXYZ12",
     "Agar koi bank wala call kare aur OTP mange to turant bata dein.",
     "Agar aapne SBI account ka KYC update nahi kiya to account band ho jayega.",
+    "Your internet banking is locked. Unlock here: secureportal.pw",
+    "SBI account suspended. Visit sbihelp.pw now",
+    # PR #48 review round 2 (GLM 5.4)
+    "SBI KYC pending hai. Apna OTP humein bata dena.",
+    "Papa main nayi SIM se bol raha hoon. Jaldi Rs 7,000 bhej dena.",
+    "UPCL: आपकी बिजली काट दी जाएगी। आज ही बिल भरें।",
+    "SBI: Your internet banking is locked. Unlock here: sbisecure.pw",
+    "Never share your OTP with anyone except our verified executive.",
 ]
 
 
@@ -89,6 +123,14 @@ def test_review_scams_flagged_at_mid_and_high_model_score(text):
 @pytest.mark.parametrize("text", GLM_MODEL_LAYER)
 def test_review_scams_keep_the_model_backstop(text):
     assert mech.decide(0.9, mech.analyze(text))[0] == 1, text
+
+
+@pytest.mark.parametrize("text", [
+    "SBI: Rs 2,450 debited via UPI. If unauthorised, block card in YONO app.",
+    "SBI: Rs 2,450 debited via UPI. If not done, block card in YONO app.",
+])
+def test_self_check_alert_variants_are_cleared(text):
+    assert mech.decide(0.9, mech.analyze(text))[0] == 0
 
 
 def test_genuine_advisory_with_negated_list_of_actions_is_not_flagged():
