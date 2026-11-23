@@ -38,6 +38,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.InputMethodManager
@@ -655,10 +656,6 @@ class MainActivity : Activity() {
     private fun iconText(id: Int, text: String, color: Int, size: Float = 14f, iconSize: Int = 18, flex: Boolean = false): LinearLayout = row().apply {
         add(this, icon(id, iconSize, color), iconSize, iconSize)
         val label = txt(text, size, color, 600)
-        if (flex) {
-            label.maxLines = 8
-            label.ellipsize = TextUtils.TruncateAt.END
-        }
         add(this, label, if (flex) 0 else -2, -2, left = 6, weight = if (flex) 1f else 0f)
     }
     private fun cap(label: TextView, limit: View, slackDp: Int) {
@@ -699,8 +696,6 @@ class MainActivity : Activity() {
         val label = txt(text, 16f, textColor, 600).apply {
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
-            maxLines = 3
-            ellipsize = TextUtils.TruncateAt.END
         }
         if (id != null) add(this, icon(id, 20, textColor), 20, 20)
         add(this, label, -2, -2, left = if (id != null) 10 else 0)
@@ -734,16 +729,102 @@ class MainActivity : Activity() {
     }
     private fun root(pane: String): LinearLayout = col().apply {
         setBackgroundColor(T.bg)
-        fitsSystemWindows = true
+        fitsSystemWindows = false
         isFocusableInTouchMode = true
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         accessibilityPaneTitle = t(pane)
+    }
+
+    /** Draw under the system bars and pad them ourselves. API 35 does not keep the footer clear of the nav bar on its own. */
+    private fun edgeToEdge() {
+        if (Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            )
+    }
+
+    /**
+     * Top inset on [root]. Bottom inset plus 8 dp on the scroll content, or on [bottomBar]
+     * when the last control sits outside the scroll. The last card then clears the nav bar.
+     */
+    private fun pinInsets(root: View, scroll: View, bottomBar: View?) {
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val top: Int
+            val left: Int
+            val right: Int
+            val bottom: Int
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                val ime = insets.getInsets(WindowInsets.Type.ime())
+                top = bars.top
+                left = bars.left
+                right = bars.right
+                bottom = maxOf(bars.bottom, ime.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                top = insets.systemWindowInsetTop
+                @Suppress("DEPRECATION")
+                left = insets.systemWindowInsetLeft
+                @Suppress("DEPRECATION")
+                right = insets.systemWindowInsetRight
+                @Suppress("DEPRECATION")
+                bottom = insets.systemWindowInsetBottom
+            }
+            root.setPadding(left, top, right, 0)
+            val clear = bottom + dp(8)
+            if (bottomBar != null) {
+                if (bottomBar.paddingBottom != clear) {
+                    bottomBar.setPadding(bottomBar.paddingLeft, bottomBar.paddingTop, bottomBar.paddingRight, clear)
+                }
+            } else if (scroll.paddingBottom != clear) {
+                scroll.setPadding(scroll.paddingLeft, scroll.paddingTop, scroll.paddingRight, clear)
+            }
+            if (Build.VERSION.SDK_INT >= 30) WindowInsets.CONSUMED else {
+                @Suppress("DEPRECATION")
+                insets.consumeSystemWindowInsets()
+            }
+        }
+        root.requestApplyInsets()
+    }
+
+    /** Side-by-side controls become a vertical stack when their text no longer fits. */
+    private fun stackWhenTight(row: LinearLayout, gapDp: Int = 8) {
+        row.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (row.width <= 0 || row.orientation == LinearLayout.VERTICAL) return@addOnLayoutChangeListener
+            val children = (0 until row.childCount).map { row.getChildAt(it) }.filter { it.visibility != View.GONE }
+            if (children.size < 2) return@addOnLayoutChangeListener
+            var needed = row.paddingLeft + row.paddingRight
+            for (child in children) {
+                child.measure(
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                needed += child.measuredWidth
+            }
+            needed += dp(gapDp) * (children.size - 1)
+            if (needed <= row.width) return@addOnLayoutChangeListener
+            row.orientation = LinearLayout.VERTICAL
+            children.forEachIndexed { index, child ->
+                val lp = (child.layoutParams as? LinearLayout.LayoutParams) ?: return@forEachIndexed
+                lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                lp.weight = 0f
+                lp.leftMargin = 0
+                lp.topMargin = if (index == 0) 0 else dp(gapDp)
+                child.layoutParams = lp
+            }
+        }
     }
     private fun bar(title: String, offline: Boolean, lang: Boolean = false): LinearLayout = row().apply {
         minimumHeight = dp(56)
         pad(this, 4, 0, 8, 0)
         add(this, iconButton(R.drawable.ic_arrow_left, "Back") { goHome() }, 48, 48)
-        add(this, txt(title, 20f, T.ink, 600).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }, 0, -2, left = 4, weight = 1f)
+        add(this, txt(title, 20f, T.ink, 600), 0, -2, left = 4, weight = 1f)
         if (lang) add(this, langToggle {
             val job = visibleJob
             if (job != null && screen == "result") presentResult(job) else showHome()
@@ -757,6 +838,9 @@ class MainActivity : Activity() {
             add(this, chip, -2, -2)
         }
     }
+    private var screenScroll: ScrollView? = null
+    private var screenBottom: View? = null
+
     private fun bottom(parent: LinearLayout, text: String, outlined: Boolean = false, id: Int? = null, action: () -> Unit) {
         val box = col().apply { setBackgroundColor(T.white) }
         divider(box)
@@ -765,18 +849,26 @@ class MainActivity : Activity() {
         actionButton.minimumHeight = dp(52)
         add(wrap, actionButton, -1, -2)
         add(box, wrap)
+        screenBottom = box
         add(parent, box)
     }
     private fun scrollBody(parent: LinearLayout): LinearLayout {
         val body = col().apply { pad(this, 16, 0, 16, 16) }
         val scroll = ScrollView(this).apply {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            isFillViewport = false
+            isFillViewport = true
             clipToPadding = false
-            addView(body)
+            addView(body, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
+        screenScroll = scroll
+        screenBottom = null
         add(parent, scroll, -1, 0, weight = 1f)
         return body
+    }
+    private fun showScreen(root: LinearLayout) {
+        val scroll = screenScroll
+        if (scroll != null) pinInsets(root, scroll, screenBottom)
+        setContentView(root)
     }
     private fun centeredNote(parent: LinearLayout, child: LinearLayout, top: Int) {
         val label = child.getChildAt(1) as TextView
@@ -814,7 +906,7 @@ class MainActivity : Activity() {
         fun seg(label: String, on: Boolean, hi: Boolean) = row().apply {
             gravity = Gravity.CENTER
             minimumWidth = dp(48)
-            minimumHeight = dp(44)
+            minimumHeight = dp(48)
             setPadding(dp(8), dp(4), dp(8), dp(4))
             background = if (on) shape(T.white, 12f, 1, T.outline) else null
             add(this, txt(label, 12f, if (on) T.brand else T.ink2, 700, raw = true), -2, -2)
@@ -857,6 +949,7 @@ class MainActivity : Activity() {
         Bridge.host = this
         window.statusBarColor = T.bg
         window.navigationBarColor = T.bg
+        edgeToEdge()
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         savedInstanceState?.let {
@@ -984,10 +1077,11 @@ class MainActivity : Activity() {
         val root = root("Prahari")
         val scroller = ScrollView(this).apply {
             isFillViewport = true
+            clipToPadding = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         val all = col()
-        scroller.addView(all)
+        scroller.addView(all, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         add(root, scroller, -1, 0, weight = 1f)
         val brand = row().apply { minimumHeight = dp(60); pad(this, 16, 4, 8, 4) }
         add(brand, logo(), 36, 36)
@@ -999,7 +1093,7 @@ class MainActivity : Activity() {
         add(brand, iconButton(R.drawable.ic_info, "About Prahari") { showAbout() }, 48, 48)
         add(all, brand, -1, -2)
         val body = col().apply { pad(this, 16, 0, 16, 8) }
-        add(all, body, -1, 0, weight = 1f)
+        add(all, body)
         add(body, txt("Check before you tap", 24f, T.ink, 700, 30).apply { isAccessibilityHeading = true }, top = 2)
         add(body, txt(n("works_offline"), 14f, T.ink2, 400, 20, raw = true), top = 2)
         val seg = row().apply { minimumHeight = dp(52); background = shape(T.surface2, 14f); pad(this, 4, 4, 4, 4) }
@@ -1052,8 +1146,6 @@ class MainActivity : Activity() {
             val faceLabel = face.getChildAt(1) as TextView
             faceLabel.gravity = Gravity.CENTER
             faceLabel.textAlignment = View.TEXT_ALIGNMENT_CENTER
-            faceLabel.maxLines = 2
-            faceLabel.ellipsize = TextUtils.TruncateAt.END
             add(segment, face, -2, -2)
             cap(faceLabel, segment, 24)
             segment.setOnClickListener { selectedMode = i; refreshSegments() }
@@ -1061,6 +1153,7 @@ class MainActivity : Activity() {
             segments.add(segment)
             add(seg, segment, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
         }
+        stackWhenTight(seg, 4)
         add(body, seg, -1, -2, top = 16)
         fun focusBorder() {
             inputCard.background = shape(T.white, 16f, if (input.hasFocus()) 2 else 1, if (input.hasFocus()) T.brand else T.outline2)
@@ -1137,7 +1230,6 @@ class MainActivity : Activity() {
             override fun afterTextChanged(s: Editable?) {}
         })
         refreshInput()
-        add(body, View(this), -1, 0, weight = 1f)
         val offline = row().apply {
             background = ripple(shape(T.white, 16f, 1, T.outline2))
             pad(this, 14, 12, 12, 12)
@@ -1159,7 +1251,9 @@ class MainActivity : Activity() {
         add(body, navRow(R.drawable.ic_list, n("recent"), n("history_toggle")) { showHistory() }, top = 16)
         add(body, navRow(R.drawable.ic_link, n("qr_check"), "") { pickQr() }, top = 8)
         add(body, offline, top = 8)
-        centeredNote(body, iconText(R.drawable.ic_lock, "Nothing you paste leaves this phone", T.ink3, 12f, 13), 12)
+        add(all, View(this), -1, 0, weight = 1f)
+        centeredNote(all, iconText(R.drawable.ic_lock, "Nothing you paste leaves this phone", T.ink3, 12f, 13), 12)
+        pinInsets(root, scroller, null)
         setContentView(root)
     }
 
@@ -1279,9 +1373,8 @@ class MainActivity : Activity() {
             val color = if (on) T.brand else T.ink2
             add(chip, icon(modeIcons[i], 16, color), 16, 16)
             val label = txt(modeNames[i], 13f, color, 700).apply {
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
                 gravity = Gravity.CENTER
+                textAlignment = View.TEXT_ALIGNMENT_CENTER
             }
             add(chip, label, 0, -2, left = 4, weight = 1f)
             chip.setOnClickListener { if (i != selected) beginCheck(i, value) }
@@ -1289,6 +1382,7 @@ class MainActivity : Activity() {
             asButton(chip, if (on) "$modeLabel, ${t("selected")}" else "${t("Change to")} $modeLabel")
             add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
         }
+        stackWhenTight(seg, 4)
         return seg
     }
 
@@ -1328,7 +1422,7 @@ class MainActivity : Activity() {
         val what = card()
         val summary = row()
         add(summary, icon(modeIcons[mode], 18, T.ink2), 18, 18)
-        add(summary, txt(value, 14f, T.ink2, 400, 20, raw = true).apply { maxLines = 3; ellipsize = TextUtils.TruncateAt.END }, 0, -2, left = 12, weight = 1f)
+        add(summary, txt(value, 14f, T.ink2, 400, 20, raw = true), 0, -2, left = 12, weight = 1f)
         add(what, summary)
         add(body, what)
         add(body, modeSwitcher(mode, value), -1, -2, top = 12)
@@ -1388,7 +1482,7 @@ class MainActivity : Activity() {
         advanceChecking(Bridge.checkStage)
         centeredNote(body, iconText(R.drawable.ic_wifi_off, "No internet used. You can switch on airplane mode.", T.ink3, 12f, 13), 16)
         bottom(root, "Cancel", outlined = true) { goHome() }
-        setContentView(root)
+        showScreen(root)
     }
 
     /** Step 1 and step 3 finish together when verdict() returns. Step 2 spins until explain() returns. */
@@ -1733,6 +1827,7 @@ class MainActivity : Activity() {
                 }
                 place(primary, false, 0)
                 place(secondary, true, 8)
+                stackWhenTight(buttons, 8)
                 add(steps, buttons, top = 14)
             }
         }
@@ -1859,7 +1954,7 @@ class MainActivity : Activity() {
         }, top = 10)
         add(body, checked, top = 12)
         bottom(root, n("check_another")) { goHome(true) }
-        setContentView(root)
+        showScreen(root)
         if (job.explanation != null) applyExplanation(job)
     }
 
@@ -1887,10 +1982,11 @@ class MainActivity : Activity() {
         )
         listOf("Detector", "First token", "Decode speed").forEachIndexed { i, label ->
             val tile = col().apply { background = shape(T.surface2, 12f); pad(this, 10, 10, 10, 10) }
-            add(tile, txt(values[i], 17f, T.ink, 700).apply { maxLines = 2 })
-            add(tile, txt(label, 11f, T.ink2, 500).apply { maxLines = 2 }, top = 4)
+            add(tile, txt(values[i], 17f, T.ink, 700))
+            add(tile, txt(label, 11f, T.ink2, 500), top = 4)
             add(tiles, tile, 0, -2, left = if (i == 0) 0 else 8, weight = 1f)
         }
+        stackWhenTight(tiles, 8)
         add(details, tiles, top = 4)
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "—"
         val foot = t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
@@ -1979,13 +2075,11 @@ class MainActivity : Activity() {
         add(this, icon(iconId, 20, textColor), 20, 20)
         val labels = col()
         val enView = txt(en, 14f, textColor, 600, 18).apply {
-            maxLines = 4
-            ellipsize = TextUtils.TruncateAt.END
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
         }
         add(labels, enView)
         val hiView = if (hi.isNotBlank()) txt(hi, 12f, hiColor, 400, 16).apply {
-            maxLines = 4
-            ellipsize = TextUtils.TruncateAt.END
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
         } else null
         if (hiView != null) add(labels, hiView, top = 1)
         add(this, labels, 0, -2, left = 8, weight = 1f)
@@ -2008,7 +2102,7 @@ class MainActivity : Activity() {
         val body = scrollBody(root)
         networkBody = body
         bottom(root, "Run again", true, R.drawable.ic_refresh) { showNetwork(true) }
-        setContentView(root)
+        showScreen(root)
         val existing = Bridge.net
         if (!rerun && existing != null && existing.id == Bridge.netId && existing.done) {
             renderNetwork(body, existing)
@@ -2172,7 +2266,7 @@ class MainActivity : Activity() {
             HistoryStore.clear(this)
             showHistory()
         }
-        setContentView(root)
+        showScreen(root)
     }
 
     private fun pickQr() {
@@ -2334,9 +2428,23 @@ class MainActivity : Activity() {
         column.addView(sheet)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            fitsSystemWindows = true
+            clipToPadding = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        val sheetBottom = sheet.paddingBottom
+        scroll.setOnApplyWindowInsetsListener { _, insets ->
+            val nav = if (Build.VERSION.SDK_INT >= 30) {
+                insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            } else {
+                @Suppress("DEPRECATION")
+                insets.systemWindowInsetBottom
+            }
+            val clear = sheetBottom + nav + dp(8)
+            if (sheet.paddingBottom != clear) {
+                sheet.setPadding(sheet.paddingLeft, sheet.paddingTop, sheet.paddingRight, clear)
+            }
+            insets
         }
         dialog.setContentView(scroll)
         dialog.window?.apply {
@@ -2349,6 +2457,7 @@ class MainActivity : Activity() {
         }
         dialog.show()
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        scroll.requestApplyInsets()
     }
 
     override fun onDestroy() {
