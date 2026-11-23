@@ -1,0 +1,298 @@
+{
+ "_note": "English source strings for the Hindi summary. Keep {placeholders} unchanged. hi values filled from General Translation, then native-checked.",
+ "verdict": {
+  "1": {
+   "message": {
+    "en": "This message is DANGEROUS",
+    "hi": ""
+   },
+   "link": {
+    "en": "This link is DANGEROUS",
+    "hi": ""
+   },
+   "network": {
+    "en": "This network event is DANGEROUS",
+    "hi": ""
+   }
+  },
+  "0": {
+   "message": {
+    "en": "No risk found for this message",
+    "hi": ""
+   },
+   "link": {
+    "en": "No risk found for this link",
+    "hi": ""
+   },
+   "network": {
+    "en": "No risk found for this network event",
+    "hi": ""
+   }
+  },
+  "uncertain": {
+   "message": {
+    "en": "This message needs a check",
+    "hi": ""
+   },
+   "link": {
+    "en": "This link needs a check",
+    "hi": ""
+   },
+   "network": {
+    "en": "This network event needs a check",
+    "hi": ""
+   }
+  }
+ },
+ "fallback_reason": {
+  "1": {
+   "en": "it shows warning signs of a scam",
+   "hi": ""
+  },
+  "0": {
+   "en": "no scam warning signs were found",
+   "hi": ""
+  },
+  "uncertain": {
+   "en": "some signs are unclear",
+   "hi": ""
+  }
+ },
+ "label": {
+  "en": "Hindi summary from the detector (fixed text, not written by AI)",
+  "hi": ""
+ },
+ "join_and": {
+  "en": "{a} and {b}",
+  "hi": ""
+ },
+ "phrases": {
+  "a flood of connections": "",
+  "a link runs on past its domain ending, hiding where it really goes": "",
+  "a raw IP address instead of a name": "",
+  "a root-access attempt": "",
+  "an @ sign hides the destination": "",
+  "an instruction aimed at the assistant (prompt injection)": "",
+  "an unusually long or hyphenated domain": "",
+  "asks for a crypto payment": "",
+  "asks for a payment before a refund, prize or delivery is released": "",
+  "asks for a payment or fee": "",
+  "asks for a payment to a personal number, account or unverified link": "",
+  "asks for a payment to an unverified account or link": "",
+  "asks for an OTP, PIN or card details": "",
+  "asks for an OTP, PIN or password": "",
+  "asks for money to a private account or personal number": "",
+  "asks to install a screen-sharing app": "",
+  "asks to install an app or share the screen": "",
+  "asks to move funds to a safe account": "",
+  "asks to verify KYC or personal details": "",
+  "asks you to buy gift vouchers and hand over the codes": "",
+  "asks you to call a personal number": "",
+  "asks you to install an app or share your screen": "",
+  "asks you to move funds to a 'safe' account": "",
+  "asks you to move money into crypto": "",
+  "asks you to scan a QR code and approve a payment": "",
+  "asks you to send identity documents to a chat or link": "",
+  "asks you to share a PIN, OTP, card or account detail": "",
+  "connections repeat at a fixed interval": "",
+  "connections were rejected": "",
+  "demands a PIN, OTP, password or account login and isolates the reader": "",
+  "explicit beacon or command-and-control activity": "",
+  "gives its own number, chat or link to act on": "",
+  "includes a protective statement": "",
+  "includes an opt-out option": "",
+  "is a notice or advisory that gives its own number, chat or link to act on": "",
+  "looks like a bank debit or OTP alert; scammers copy these": "",
+  "looks like a port scan": "",
+  "many failed logins, like password guessing": "",
+  "mentions the branch": "",
+  "no HTTPS": "",
+  "no lookalike or risky-domain signals": "",
+  "no request for a payment or link in the text": "",
+  "no request for a secret or link in the text": "",
+  "no request for a secret or payment in the text": "",
+  "no request for a secret, payment or link in the text": "",
+  "no scam mechanism was found in the link": "",
+  "no scam mechanism was found in the text": "",
+  "offers a fake job, task or easy loan": "",
+  "offers a job or loan that needs an upfront fee": "",
+  "offers a job or loan that needs an upfront fee or deposit": "",
+  "offers an opt-out": "",
+  "offers easy daily income through a personal chat channel": "",
+  "pay a fee to receive a refund, prize or parcel": "",
+  "points to the official app": "",
+  "points to the official app or channel": "",
+  "poses as a bank or KYC verification desk": "",
+  "poses as a relative or colleague and wants money sent to a third party": "",
+  "poses as police, customs or a regulator": "",
+  "poses as police, customs or a regulator and demands action": "",
+  "pressures you to act immediately": "",
+  "promises a prize that needs a fee or details": "",
+  "promises a prize that needs a fee or personal details to claim": "",
+  "promises a prize, refund or easy money": "",
+  "promises guaranteed or doubled returns and asks you to deposit funds": "",
+  "promises guaranteed or doubled returns for a deposit": "",
+  "pushes a UPI collect request": "",
+  "pushes a UPI collect request that asks for your UPI PIN": "",
+  "pushes you to approve a UPI collect or payment request": "",
+  "pushes you to open a link": "",
+  "reads like a normal OTP notification": "",
+  "reads like a normal order or delivery record": "",
+  "reads like a normal payment receipt, order or delivery record": "",
+  "reads like a normal refund receipt": "",
+  "reads like a normal tracking update": "",
+  "reads like a pending collect-request notice to review": "",
+  "reads like a personal conversation": "",
+  "reads like a promotional offer with a discount or cashback": "",
+  "reads like a routine appointment or schedule change": "",
+  "reads like a routine bill reminder": "",
+  "reads like a routine bill reminder with a payment due": "",
+  "reads like a routine notice or appointment": "",
+  "reads like a routine receipt for an order": "",
+  "reads like a warning or news report about a scam": "",
+  "reads like consumer advice to check the published charges first": "",
+  "says it never asks for CODE": "",
+  "says it never asks for CVV": "",
+  "says it never asks for OTP": "",
+  "says it never asks for OTP or PIN": "",
+  "says it never asks for PASSWORD": "",
+  "says it never asks for PIN": "",
+  "says no OTP is needed": "",
+  "says no PIN is needed": "",
+  "says no charge is needed": "",
+  "says no extra charge is needed": "",
+  "says no fee is needed": "",
+  "says no fee or PIN is needed": "",
+  "says no payment is needed": "",
+  "says no payment or OTP is needed": "",
+  "says not to share the code": "",
+  "says there is no hurry": "",
+  "sends you to a lookalike page and asks you to act there": "",
+  "sets a deadline that threatens loss of access": "",
+  "threatens the reader or family to force a payment": "",
+  "threatens to block the account or service": "",
+  "threatens to block, cut or freeze an account, SIM or connection": "",
+  "threatens to publish private material": "",
+  "threatens to publish private material unless you pay": "",
+  "traffic that looks like a routine update or a scheduled backup": ""
+ },
+ "patterns": [
+  {
+   "re": "^risky \\.(?P<tld>[a-z0-9-]+) lookalike domain (?P<host>\\S+)$",
+   "en": "risky .{tld} lookalike domain {host}",
+   "hi": ""
+  },
+  {
+   "re": "^lookalike domain (?P<host>\\S+)$",
+   "en": "lookalike domain {host}",
+   "hi": ""
+  },
+  {
+   "re": "^URL shortener (?P<host>\\S+)$",
+   "en": "URL shortener {host}",
+   "hi": ""
+  },
+  {
+   "re": "^unofficial domain (?P<host>\\S+) \\(\\.(?P<tld>[a-z0-9-]+)\\)$",
+   "en": "unofficial domain {host} (.{tld})",
+   "hi": ""
+  },
+  {
+   "re": "^official domain (?P<host>\\S+)$",
+   "en": "official domain {host}",
+   "hi": ""
+  },
+  {
+   "re": "^traffic to (?P<n>\\d+) different ports on (?P<ip>[\\d.]+)$",
+   "en": "traffic to {n} different ports on {ip}",
+   "hi": ""
+  },
+  {
+   "re": "^traffic to (?P<n>\\d+) different ports$",
+   "en": "traffic to {n} different ports",
+   "hi": ""
+  },
+  {
+   "re": "^traffic involving (?P<ip>[\\d.]+)$",
+   "en": "traffic involving {ip}",
+   "hi": ""
+  },
+  {
+   "re": "^the domain (?P<host>\\S+) imitates '(?P<brand>[^']+)' on \\.(?P<tld>[a-z0-9-]+)$",
+   "en": "the domain {host} imitates '{brand}' on .{tld}",
+   "hi": ""
+  },
+  {
+   "re": "^the domain (?P<host>\\S+) imitates '(?P<brand>[^']+)' and uses \\.(?P<tld>[a-z0-9-]+), a throwaway registry$",
+   "en": "the domain {host} imitates '{brand}' and uses .{tld}, a throwaway registry",
+   "hi": ""
+  },
+  {
+   "re": "^the domain (?P<host>\\S+) uses \\.(?P<tld>[a-z0-9-]+), common for throwaway",
+   "en": "the domain {host} uses .{tld}, common for throwaway scam sites",
+   "hi": ""
+  },
+  {
+   "re": "^the domain ends in \\.(?P<tld>[a-z0-9-]+), common for throwaway",
+   "en": "the domain ends in .{tld}, common for throwaway scam sites",
+   "hi": ""
+  },
+  {
+   "re": "^mentions (?P<what>.+) and the branch$",
+   "en": "mentions {what} and the branch",
+   "hi": ""
+  },
+  {
+   "re": "^an instruction aimed at the assistant \\(prompt injection\\) that (?P<inner>.+)$",
+   "en": "an instruction aimed at the assistant (prompt injection) that {inner}",
+   "hi": ""
+  }
+ ],
+ "facts": {
+  "Never share an OTP, PIN or password because no bank or officer ever needs it.": "",
+  "Never enter your UPI PIN to receive money because the PIN only sends money out.": "",
+  "Never scan a QR code to receive money because scanning to pay only sends money out.": "",
+  "Never pay a fee from a message to get a refund or prize or parcel.": "",
+  "Never pay an account or link from a message and check bills in the official app.": "",
+  "Never install a screen-sharing app for a caller because it shows them your OTPs and bank app.": "",
+  "Never send crypto to someone who contacted you because it cannot be taken back.": "",
+  "Never move money to a so-called safe account because no bank or officer asks for that.": "",
+  "Never pay a caller who claims to be police or customs because there is no digital arrest.": "",
+  "Do not trust a threat to block your account because banks do not block accounts by SMS.": "",
+  "Never update KYC through a link or number from a message because banks do not ask that way.": "",
+  "Never pay a fee upfront for a job or loan because real ones do not charge first.": "",
+  "Never pay a deposit for a job or task because real jobs pay you instead.": "",
+  "Never pay a fee or share bank details for a prize because real prizes need neither.": "",
+  "Do not pay a blackmailer because paying usually brings more demands.": "",
+  "Do not pay a threat because paying usually brings more demands.": "",
+  "Never trust guaranteed or doubled returns because no real investment can promise them.": "",
+  "Never send Aadhaar or PAN copies over chat because real KYC does not work that way.": "",
+  "Never pay anyone with gift cards because no real company or officer takes them.": "",
+  "Do not trust the name in the message and check through a number you already have.": "",
+  "Never pay a bill through a number or link from a message and check it in the official app.": "",
+  "Do not open it because the address copies a known name but is not the official site.": "",
+  "Do not open it because a short link hides the real website.": "",
+  "Do not log in on this page because fake sites copy real login pages.": "",
+  "Check the address carefully or open the official app instead.": "",
+  "Do not reply or act on it because it uses pressure to take money or details.": "",
+  "Check with the sender through a number you already trust before acting.": "",
+  "Check the payment in your bank app because scammers copy bank alerts.": "",
+  "Check the firewall logs because a port scan looks for open services before an attack.": "",
+  "Check the logins because many failed attempts usually mean password guessing.": "",
+  "Check the traffic because a flood of connections can knock a service offline.": "",
+  "Check the device because regular check-ins to one address can mean malware.": "",
+  "Check the machine because a root attempt means someone wants full control.": "",
+  "Check this traffic with your IT team because it matches attack patterns.": "",
+  "Check whether anyone expected this traffic.": "",
+  "Do not follow it because text that gives orders to an AI checker is built to trick it.": "",
+  "If you did not make this payment check it in your bank app.": "",
+  "Never share this code with anyone who asks for it.": "",
+  "Check bills only in the official app or website.": "",
+  "Check that the address stays the same before you log in.": "",
+  "Never share your OTP or PIN as the message itself advises.": "",
+  "Check anything it mentions in the official app only.": "",
+  "Never share an OTP or PIN even with people you know.": "",
+  "Check with your IT team only if this traffic was not expected.": "",
+  "Never share an OTP or PIN with anyone who asks later.": ""
+ }
+}

@@ -19,7 +19,7 @@ from triage import mech
 textmodel = types.ModuleType('triage.textmodel')
 textmodel.prob = lambda bundle, texts: np.array([portable.probability('indic', t) for t in texts])
 sys.modules['triage.textmodel'] = textmodel
-from triage import detect, llm
+from triage import detect, explain_hi, llm
 detect.textmodel = textmodel
 
 class Linear:
@@ -246,12 +246,19 @@ def verdict(kind, text):
     ms = (time.perf_counter() - t0) * 1000
     actions = llm.actions_for(kind, lab, text)
     scam = llm.scam_type(kind, text, lab)
+    try:
+        summary_hi = explain_hi.summary_hi(kind, text, lab, ev)
+    except Exception:
+        summary_hi = ''  # the Hindi summary is an aid; the verdict never depends on it
     _last.clear(); _last.update(kind=kind, text=text, lab=lab, ev=ev)
     out = {'verdict': VERDICT[lab], 'level': {1: 'danger', 'uncertain': 'warn', 0: 'clear'}[lab],
            'score': score, 'scam_type': scam, 'evidence': ev,
            'evidence_quotes': [quote_span(line, text) for line in ev],
            'actions': actions, 'actions_hi': _actions_hi(actions),
            'buttons': _HINDI['buttons'], 'detector_ms': ms}
+    if summary_hi:
+        out['summary_hi'] = summary_hi
+        out['summary_hi_label'] = explain_hi.label_hi()
     report = _report_buttons(kind, lab, scam, actions)
     if report:
         out['report_buttons'] = report
@@ -279,6 +286,8 @@ def _replacement_pool(kind, lab, text):
             add(acts[0])
     for tail, _acts in llm.TYPE_ADVICE.values():
         add(tail)
+    for fact in llm.ALL_FACTS:
+        add(fact)
     return pool
 
 
@@ -294,7 +303,10 @@ def explain(runner):
     """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
     ex = BridgeExplainer(runner)
     text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
-    replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
+    # The explainer reports replacement explicitly; suffix matching is the fallback for old stats.
+    replaced = stats.get('replaced')
+    if replaced is None:
+        replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
     return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 

@@ -33,6 +33,7 @@ def cmd_predict(a):
 
 
 def cmd_explain(a):
+    from .explain_hi import summary_hi
     from .llm import Explainer, actions_for, scam_type
     rows = read_jsonl(a.inp)
     ex = Explainer()
@@ -44,6 +45,10 @@ def cmd_explain(a):
         row = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
                     "category": scam_type(kind, inp, lab),
                     "actions": actions_for(kind, lab, inp), "evidence_used": ev}
+        # Fixed-text Hindi summary from the detector result (not model text; see explain_hi.py).
+        hi = summary_hi(kind, inp, lab, ev)
+        if hi:
+            row["summary_hi"] = hi
         try:
             text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
             if not isinstance(text, str) or not text.strip():
