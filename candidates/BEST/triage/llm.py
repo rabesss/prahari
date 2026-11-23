@@ -361,9 +361,11 @@ class Explainer:
         verdict = _prompt_verdict(prompt)
         # The first user header is ours; the untrusted snippet comes after the kind word.
         user = prompt.split("<|start_header_id|>user<|end_header_id|>\n\n", 1)[-1]
-        tail = (None if user.startswith(KIND_WORD["flow"]) or verdict == 0 else
-                _TAILS.get(prompt) or ACTIONS[verdict][0])
-        text = _consistent(text, verdict, _forced_sentence(prompt), tail)
+        flow = user.startswith(KIND_WORD["flow"])
+        # A network event gets no compliance check; its tail only replaces disruptive advice.
+        tail = (None if verdict == 0 else
+                _TAILS.get(prompt) or (FLOW_ACTIONS if flow else ACTIONS)[verdict][0])
+        text = _consistent(text, verdict, _forced_sentence(prompt), tail, flow=flow)
         return text, stats
 
     def _run(self, prompt):
@@ -439,6 +441,44 @@ def _unsafe_advice(sent, verdict):
     return False
 
 
+# Operational advice that takes systems down: a generated "Immediately disconnect all affected
+# systems" for a port scan is unvetted and disruptive. On a DANGEROUS or SUSPICIOUS network event
+# a sentence that carries one of these, not governed by its own negation, is replaced by the vetted
+# flow action. Ordinary advice (block the source address, check the logs, change passwords, update
+# firmware, contact your IT team) uses none of them.
+_DISRUPTIVE = re.compile(
+    r"\bdisconnect\w*|\bshut(?:s|ting)?\w*[^.;,!?]{0,30}\bdown\b|\bshutdown\b|"
+    r"\bpower(?:s|ing)?[\s-]*(?:off|down)\b|\bunplug\w*|"
+    r"\bwip(?:e|ing)\w*|\beras(?:e|es|ed|ing)\b|\bformat(?:s|ted|ting)?\b|\bre-?install\w*|"
+    r"\bfactory[\s-]*(?:reset\w*|settings|defaults)\b|\breset\w*[^.;,!?]{0,30}\bfactory\b|"
+    r"\bdelet\w*|\bdisabl\w*|\btak\w*[^.;,!?]{0,40}\boffline\b|\bisolat\w*|\bpay(?:ing|ments?)?\b|"
+    r"\bransom\b", re.I)
+
+
+def _disruptive_flow_advice(sent, verdict):
+    """True when a network-event sentence gives an operational instruction that is not negated,
+    such as "disconnect all affected systems", "wipe the drive" or "pay the ransom".
+
+    The negation test is the one _unsafe_advice uses: each verb needs a negator of its own in a
+    short window that an "and", "but" or "then" breaks.
+    """
+    if verdict == 0:
+        return False
+    low = re.sub(r"n['\u2019]t\b", " not", sent.lower())  # "shouldn't power off" is a negation too
+    for m in _DISRUPTIVE.finditer(low):
+        before = re.findall(r"[a-z']+|[,;:-]", low[:m.start()])
+        negated = False
+        for prev in reversed(before[-5:]):
+            if prev in _BREAK:
+                break
+            if prev in _NEGATOR:
+                negated = True
+                break
+        if not negated:
+            return True
+    return False
+
+
 def _forced_sentence(prompt):
     """The required opening sentence, e.g. 'This link is DANGEROUS: URL shortener bit.ly'."""
     tail = prompt.rsplit('Start your answer with exactly: "', 1)
@@ -451,7 +491,7 @@ def _prompt_verdict(prompt):
     return 1 if tail.startswith("DANGEROUS") else 0 if tail.startswith("NO RISK FOUND") else "uncertain"
 
 
-def _consistent(text, verdict, opening=None, safe_tail=None):
+def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """Drop a sentence that asserts the opposite of the detector's verdict or urges compliance.
 
     The model occasionally adds "this looks legitimate" to a scam explanation, or advice such as
@@ -461,17 +501,22 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
     Compliance is only checked when safe_tail is given (messages and links, not network events);
     a removed compliance sentence is replaced by safe_tail, a vetted action, so the reader still
     gets advice and the explanation keeps its length.
+
+    A network event (flow) gets no compliance check: contacting the IT team or updating firmware
+    is ordinary advice there. Its safe_tail, the vetted flow action, replaces a sentence that
+    gives a disruptive operational instruction instead (_disruptive_flow_advice).
     """
     if not text:
         return text
     sents = re.split(r"(?<=[.!?;])\s+", text)
     dropped = []
+    check = _disruptive_flow_advice if flow else _unsafe_advice
 
-    def comply(i, sent):
+    def unsafe(i, sent):
         if not safe_tail:
             return False
         rest = sent[len(opening):] if (i == 0 and opening and sent.startswith(opening)) else sent
-        if _unsafe_advice(rest, verdict):
+        if check(rest, verdict):
             dropped.append(sent)
             return True
         return False
@@ -485,13 +530,13 @@ def _consistent(text, verdict, opening=None, safe_tail=None):
         return out
 
     if verdict == "uncertain":
-        kept = [s for i, s in enumerate(sents) if not comply(i, s)]
+        kept = [s for i, s in enumerate(sents) if not unsafe(i, s)]
         return with_tail(kept) or text
     keep = []
     for i, sent in enumerate(sents):
         if re.search(r"\bas an ai\b|\bi cannot help\b|\bi can't help\b", sent, re.I):
             continue
-        if comply(i, sent):
+        if unsafe(i, sent):
             continue
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)
@@ -534,7 +579,7 @@ FLOW_ACTIONS = {
     1: ["Block the source address at the firewall or router.",
         "Check the target machine's logs and change any exposed passwords.",
         "Keep the device and router firmware updated."],
-    "uncertain": ["Confirm the activity with your IT team and review the logs."],
+    "uncertain": ["Check with your IT team and review the logs."],
     0: ["Confirm the activity with your IT team if unexpected."],
 }
 

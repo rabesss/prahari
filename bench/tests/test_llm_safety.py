@@ -165,7 +165,8 @@ def _clauses(text):
 
 def test_every_replacement_sentence_is_advice_clause_by_clause():
     import re
-    tails = [t for t, _ in llm.TYPE_ADVICE.values() if t] + [llm.ACTIONS[1][0], llm.ACTIONS["uncertain"][0]]
+    tails = ([t for t, _ in llm.TYPE_ADVICE.values() if t] + [llm.ACTIONS[1][0], llm.ACTIONS["uncertain"][0],
+             llm.FLOW_ACTIONS[1][0], llm.FLOW_ACTIONS["uncertain"][0]])
     for t in tails:
         for c in _clauses(t):
             assert re.search(_ADVICE, c, re.I), (t, c)
@@ -229,3 +230,108 @@ def test_spoofed_alerts_are_never_cleared():
                   "SBI: Rs 2450 debited. If not you, block card: call 98765,43210 / (98765)43210",
                   "Your electricity connection will be disconnected tonight. Pay in the official app or call 98765–43210"):
         assert mech.decide(0.99, mech.analyze(spoof))[0] != 0, spoof
+
+# Network events: a disruptive operational instruction from the model is replaced by the vetted
+# flow action; ordinary advice is kept.
+PORT_SCAN = "tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected"
+SCAN_OPEN = "This network event is DANGEROUS: traffic to 200 different ports on 10.0.0.5"
+
+
+def _fake(text):
+    class Fake(llm.Explainer):
+        def __init__(self):
+            pass
+
+        def _run(self, prompt):
+            return text, {}
+
+    return Fake()
+
+
+def _explain(kind, inp, verdict, evidence, generated):
+    ex = _fake(generated)
+    return ex.generate(ex.prompt(kind, inp, verdict, evidence))[0]
+
+
+def _flow_evidence(text):
+    from triage import rules
+    return [d for _, d in rules.flow_text_indicators(text)]
+
+
+def test_disruptive_flow_advice_is_replaced_by_the_vetted_flow_sentence():
+    text = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN),
+                    SCAN_OPEN + ". Immediately disconnect all affected systems.")
+    assert text == SCAN_OPEN + ". " + llm.advice_for("flow", 1, PORT_SCAN)[0]
+    assert "disconnect" not in text.lower()
+
+
+def test_observed_brute_force_disconnect_advice_is_replaced():
+    brute = "1,200 failed login attempts from 198.51.100.7 on ssh in 3 minutes"
+    opening = "This network event is DANGEROUS: many failed logins, like password guessing"
+    text = _explain("flow", brute, 1, _flow_evidence(brute), opening +
+                    ". Immediately disconnect users from the network to prevent further attempts.")
+    assert text == opening + ". " + llm.FLOW_ACTIONS[1][0]
+
+
+def test_ordinary_flow_advice_is_kept():
+    for advice in ("Block the source address and check the logs.",
+                   "Contact your IT team and update the router firmware.",
+                   "Change the exposed passwords and review the logs.",
+                   "Close unused ports and turn off remote admin.",
+                   "Do not disconnect the server; block the source address instead.",
+                   "Be cautious of suspicious activity immediately."):
+        text = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN), SCAN_OPEN + ". " + advice)
+        assert text == SCAN_OPEN + ". " + advice, advice
+
+
+def test_vetted_flow_actions_are_never_treated_as_disruptive():
+    flow_types = ("a port scan", "a brute-force login", "a flood or denial-of-service attempt")
+    vetted = (sum(llm.FLOW_ACTIONS.values(), [])
+              + sum((llm.TYPE_ADVICE[t][1] for t in flow_types), []))
+    for action in vetted:
+        assert not llm._disruptive_flow_advice(action, 1), action
+
+
+def test_flow_opening_is_never_replaced():
+    assert _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN), SCAN_OPEN + ".") == SCAN_OPEN + "."
+    glued = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN),
+                     SCAN_OPEN + " and disconnect all affected systems immediately.")
+    assert glued == SCAN_OPEN + ". " + llm.FLOW_ACTIONS[1][0]
+
+
+def test_suspicious_flow_replaces_disruptive_advice_too():
+    scan = "normal port scan of 200 different ports"
+    opening = "This network event needs a check: traffic to 200 different ports"
+    text = _explain("flow", scan, "uncertain", _flow_evidence(scan), opening + ". Shut down the server now.")
+    assert text == opening + ". " + llm.FLOW_ACTIONS["uncertain"][0]
+
+
+def test_benign_flow_advice_is_untouched():
+    backup = "scheduled backup to the nas every night at 2 am over ssh, completed successfully"
+    text = ("No risk found for this network event: traffic that looks like a routine update or a scheduled backup. "
+            "Disconnect the server if you are worried.")
+    assert _explain("flow", backup, 0, _flow_evidence(backup), text) == text
+
+
+def test_disruptive_flow_advice_needs_an_unnegated_instruction():
+    for bad in ("Immediately disconnect all affected systems.", "Shut down the server now.",
+                "You must shut everything down now.", "Wiping the disk removes it.",
+                "Take the server offline.", "Isolate the network from the affected machine.",
+                "Wipe the drive and reinstall the operating system.", "Reset the router to factory settings.",
+                "Delete the logs.", "Disable the firewall.", "Unplug the router.", "Format the hard drive.",
+                "Erase the disk and take all of the affected systems offline.",
+                "Pay the ransom to restore the files.", "Block the source address and disconnect the server."):
+        assert llm._disruptive_flow_advice(bad, 1), bad
+    for ok in ("Block the source address and check the logs.", "Change the passwords and update the firmware.",
+               "Contact your IT team.", "Do not disconnect the server.",
+               "Never wipe the disk or shut down the server.", "You shouldn't power off the machine.",
+               "Avoid paying the ransom.", "The connections were rejected."):
+        assert not llm._disruptive_flow_advice(ok, 1), ok
+    assert not llm._disruptive_flow_advice("Immediately disconnect all affected systems.", 0)
+
+
+def test_disruptive_check_is_not_applied_to_messages():
+    from triage import mech
+    sms = "Dear customer your SBI KYC expired, update now at sbi-kyc.in-verify.top or account will be blocked"
+    text = OPEN + ". Immediately disconnect all affected systems."
+    assert _explain("sms", sms, 1, mech.evidence(mech.analyze(sms)), text) == text
