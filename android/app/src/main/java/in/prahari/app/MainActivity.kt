@@ -525,6 +525,7 @@ class MainActivity : Activity() {
     internal var selectedMode = 0
     internal var inputValue = ""
     private var sharedBanner = false
+    private var advancedOpen = false
     internal var shownId = Int.MIN_VALUE
     private var visibleJob: Bridge.Job? = null
     private lateinit var input: EditText
@@ -955,6 +956,7 @@ class MainActivity : Activity() {
             selectedMode = it.getInt("mode", 0).coerceIn(0, KINDS.lastIndex)
             inputValue = it.getString("input") ?: ""
             sharedBanner = it.getBoolean("shared")
+            advancedOpen = it.getBoolean("advanced")
         }
         try {
             if (!Python.isStarted()) Python.start(AndroidPlatform(applicationContext))
@@ -999,6 +1001,7 @@ class MainActivity : Activity() {
         out.putString("input", inputValue)
         out.putString("screen", screen)
         out.putBoolean("shared", sharedBanner)
+        out.putBoolean("advanced", advancedOpen)
         val job = if (screen == "result") visibleJob else null
         if (job != null) {
             out.putString("verdict", job.verdict.toString())
@@ -1145,7 +1148,7 @@ class MainActivity : Activity() {
             label.text = t(labels[selectedMode])
             input.hint = t(hints[selectedMode])
         }
-        for (i in KINDS.indices) {
+        fun modeChip(i: Int): LinearLayout {
             val segment = col().apply {
                 gravity = Gravity.CENTER
                 minimumHeight = dp(48)
@@ -1160,10 +1163,40 @@ class MainActivity : Activity() {
             segment.setOnClickListener { selectedMode = i; refreshSegments() }
             asButton(segment, modeNames[i])
             segments.add(segment)
-            add(seg, segment, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
+            return segment
         }
+        add(seg, modeChip(0), 0, -2, weight = 1f)
+        add(seg, modeChip(1), 0, -2, left = 4, weight = 1f)
         stackWhenTight(seg, 4)
         add(body, seg, -1, -2, top = 16)
+        if (selectedMode == 2) advancedOpen = true
+        val advanced = col().apply {
+            background = shape(T.surface2, 14f)
+            pad(this, 4, 4, 4, 4)
+        }
+        val advHead = row().apply {
+            minimumHeight = dp(48)
+            setPadding(dp(10), dp(4), dp(8), dp(4))
+        }
+        add(advHead, txt(n("advanced_mode"), 15f, T.ink, 700, raw = true), 0, -2, weight = 1f)
+        val chevron = icon(R.drawable.ic_chevron_down, 20, T.ink2)
+        add(advHead, chevron, 20, 20)
+        val netWrap = col()
+        add(netWrap, modeChip(2), -1, -2)
+        add(advanced, advHead)
+        add(advanced, netWrap)
+        fun applyAdvanced() {
+            netWrap.visibility = if (advancedOpen) View.VISIBLE else View.GONE
+            chevron.rotation = if (advancedOpen) 180f else 0f
+            advHead.contentDescription = n("advanced_mode") + ", " + t(if (advancedOpen) "Expanded" else "Collapsed")
+        }
+        advHead.setOnClickListener {
+            advancedOpen = !advancedOpen
+            applyAdvanced()
+        }
+        asButton(advHead, n("advanced_mode"))
+        applyAdvanced()
+        add(body, advanced, -1, -2, top = 8)
         fun focusBorder() {
             inputCard.background = shape(T.white, 16f, if (input.hasFocus()) 2 else 1, if (input.hasFocus()) T.brand else T.outline2)
         }
