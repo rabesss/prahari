@@ -42,7 +42,7 @@ def triage(kind, inp, explain):
     lab, score, ev = detect.classify_any(kind, inp)
     from triage.llm import Explainer, actions_for, scam_type
     res = {"verdict": VERDICT[lab], "score": round(score, 4), "evidence": ev,
-           "category": scam_type(kind, inp, lab), "actions": actions_for(kind, lab)}
+           "category": scam_type(kind, inp, lab), "actions": actions_for(kind, lab, inp)}
     if explain:
         try:
             with _ex_lock:

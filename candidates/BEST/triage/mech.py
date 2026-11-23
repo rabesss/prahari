@@ -878,6 +878,22 @@ DECISIVE = {"secret_request", "pay_to_receive", "collect_request", "qr_payment",
             "gift_card", "extortion"}
 
 
+SELF_BLOCK = re.compile(
+    r"\b(if (?:it |this )?(?:was |is )?not (?:you|done by you)|not done by you|agar aapne nahi kiya)\b"
+    r"[^.;!?।\n]{0,30}\bblock (?:your |the )?(?:card|upi|account)\b"
+    r"(?:[^.;!?।\n]{0,25}\b(?:in|via|from|using) (?:the |your )?(?:\w+ )?(?:app|yono|imobile|net ?banking))?", re.I)
+PASSIVE_THREAT = re.compile(r"\b(?:will be|would be|is being|ho jayega|ho jaega|हो जाएगा)\b[^.;!?।\n]{0,20}"
+                            r"\b(?:blocked|suspended|frozen|closed|band|बंद)", re.I)
+# A phone number: eight or more digits, allowing spaces, dots or dashes between them. A bank's own
+# alert never needs the reader to call a number written in it; an OTP or an amount is shorter.
+CONTACT_NUMBER = re.compile(r"(?<!\d)\+?\d(?:[\s.,/()\u2013\u2014-]{0,2}\d){7,}(?!\d)")
+
+
+def _self_block(text):
+    """A bank alert's own 'if not you, block your card in the app', with no threat or contact number."""
+    return bool(SELF_BLOCK.search(text)) and not PASSIVE_THREAT.search(text) and not CONTACT_NUMBER.search(text)
+
+
 def decide(p_model, a, gate=0.85):
     """Turn the mechanism analysis plus the text-model probability into a label and score.
 
@@ -930,13 +946,30 @@ def decide(p_model, a, gate=0.85):
         return 0, p_model, a
     # A warning carried on the service's own app or portal is a notice, not a demand: only a
     # secret request or a payment to an unverified payee survives the official-channel test.
-    if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"}:
+    if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"} and \
+            not ("block_threat" in harm and CONTACT_NUMBER.search(a.get("text", ""))):
+        # A block or disconnection threat that also points to the official app may still carry a
+        # scammer's contact in any spelling (split numbers, handles, obfuscated links), so it is
+        # never cleared outright: it is SUSPICIOUS and the reader checks in the official app.
+        if p_model >= 0.5:
+            return "uncertain", min(p_model, 0.6), a
         return 0, min(p_model, 0.45), a
     if set(harm) == {"block_threat"} and (a["bill"] or a["notice"] or a["appointment"]) and \
             not (a["dest_strong"] or a["risky"] or a["secret"] or a["pay_unverified"]):
         # A routine bill or appointment reminder may say service stops after the due date; with
         # no private payee, link or secret request it is a deadline, not a threat.
+        # A spoof can copy a reminder and hide its contact in any spelling, so when the model
+        # leans scam the reader is told to check, not that there is no risk.
+        if p_model >= 0.5:
+            return "uncertain", min(p_model, 0.6), a
         return 0, min(p_model, 0.45), a
+    if set(harm) == {"block_threat"} and (a["receipt"] or a["otp_note"]) and _self_block(a.get("text", "")) and \
+            not (a["hosts"] or a.get("reader_direct") or a["dest_strong"] or a["risky"] or a["secret"] or
+                 a["pay_unverified"]):
+        # A bank debit or OTP alert that says "if not you, block your card in the app" may be the
+        # bank's own protective advice, but a spoof can copy it, so it is never cleared outright:
+        # it is SUSPICIOUS, and the reader checks the payment in the bank app.
+        return ("uncertain", min(p_model, 0.6), a) if p_model >= 0.5 else (0, min(p_model, 0.45), a)
     # The proxy scores abstention as a miss on both sides, so a binary call at the posterior
     # midpoint is never worse than "uncertain" and is right more often than always-benign.
     return (1 if p_model >= 0.5 else 0), p_model, a
