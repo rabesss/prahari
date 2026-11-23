@@ -9,6 +9,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 from pathlib import Path
 
 from . import indicrules, mech, rules
@@ -109,6 +110,25 @@ TYPE_PRIORITY = ["sextortion", "extortion", "safe_account", "remote_access", "co
 _POWER = re.compile(r"electricity|power cut|bijli|बिजली|meter|discom|connection (?:will be )?(?:cut|kat)", re.I)
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
               "at_sign", "no_https", "official_domain"}
+# A NO RISK verdict never quotes a finding it overruled. A link sign that hides the destination,
+# imitates a name or replaces it with a raw address is a mechanism: when the verdict dismisses
+# one and no benign reading exists, nothing is claimed. A weak sign alone (a risky TLD, no HTTPS,
+# a long name) leaves the neutral phrase true.
+HIDDEN_LINK = {"brand_lookalike", "digit_swap", "ip_host", "shortener", "at_sign", "punycode",
+               "homoglyph", "hidden_chars"}
+WEAK_LINK = {"risky_tld", "no_https", "complex_host"}
+PROTECTIVE_NAMES = frozenset(n for n, _, _ in indicrules.PROTECTIVE) | {"official_domain"}
+# Words whose presence makes an absence claim false: a secret, a payment and a link are the three
+# things "no request for ..." names. The patterns are the detector's own, widened by everyday
+# words and link forms it does not look for in a message. A false "present" only falls back to a
+# phrase that is true either way.
+SECRET_WORDS = re.compile(r"\b(?:code|secret\w*|credential\w*|otp|cvv|password|passcode)\b|" + mech.CRED,
+                          re.I)
+PAYMENT_WORDS = re.compile(
+    r"\b(?:pay|owe[sd]?|upi|imps|neft|rtgs|bill|बिल|invoice|due|wallet|crypto|bitcoin|usdt|qr|voucher|"
+    r"gift card|donat\w*|invest\w*|premium)\b|" + mech.MONEY + "|" + mech.PAY, re.I)
+LINK_WORDS = re.compile(r"https?://|www\.|\[\.\]|\(\.\)|\b\d{1,3}(?:\.\d{1,3}){3}\b|"
+                        r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}", re.I)
 
 
 def load_config():
@@ -171,11 +191,81 @@ def _harm_evidence(a, inp):
     return out or _safe_evidence(a, inp)
 
 
+def _findings(inp, a, ev=None):
+    """(mechanisms, signs): every risk phrase the rules can report against a message.
+
+    A mechanism hides or imitates something, or asks or threatens the reader. A sign is a weak
+    property of a link, such as a risky TLD or no HTTPS. A name the lists do not know counts as a
+    mechanism, the safer reading.
+    """
+    mechanisms = {d for _, d in a["harm"]}
+    signs = set()
+    for r in a["risky"]:
+        (mechanisms if re.search(r"imitat|lookalike", r) else signs).add(r)
+    for n, d in (indicrules.indicators(inp)[0] if ev is None else ev):
+        if n not in PROTECTIVE_NAMES:
+            (signs if n in WEAK_LINK else mechanisms).add(d)
+    for n, d in rules.text_indicators(inp):
+        if n != "official_domain":
+            (signs if n in WEAK_LINK else mechanisms).add(d)
+    return mechanisms, signs
+
+
+def _cleared_message(kind, inp, fallback, a, ev=None):
+    """(evidence, dismissed) for a message the detector cleared.
+
+    The benign reading replaces every finding the verdict overruled. A mechanism the rules did
+    find is dismissed and is never reworded as a claim that nothing was asked: with no benign
+    reading the evidence stays empty and the prompt keeps its neutral opening.
+
+    A message decided on the mechanism layer (Indian context) is read through that layer's
+    benign descriptions. An English message is read through the protection phrases of its text
+    rules and the benign lines the detector itself reported; a reading the verdict never used is
+    not borrowed from the other layer.
+    """
+    safe = _safe_evidence(a, inp)
+    if kind == "injection" and rules.injection_indicators(inp):
+        return (safe, False) if safe else ([], True)
+    if ev is None:
+        ev = indicrules.indicators(inp)[0]
+    mechanisms, _ = _findings(inp, a, ev)
+    if mech.indic_context(inp):
+        return (safe, False) if safe else ([], bool(mechanisms))
+    protective = []
+    for n, d in ev:
+        if n in PROTECTIVE_NAMES:
+            s = SHORT.get(n) or d[:70]
+            if s not in protective:
+                protective.append(s)
+    if protective:
+        return protective, False
+    own = [str(line)[:70] for line in fallback if str(line) in safe]
+    return (own, False) if own else ([], bool(mechanisms))
+
+
+def _no_risk_statement(kind, inp):
+    """The closing statement for a cleared item that has nothing to quote.
+
+    For a message it names as absent only what the text does not contain, so a link or a payment
+    demand is never denied. When fewer than two of the three can be named it states the one fact
+    that always holds, as it does for a link, which asks for nothing by itself.
+    """
+    what = "link" if kind == "url" else "text"
+    if kind != "url":
+        absent = [name for name, present in (("secret", SECRET_WORDS), ("payment", PAYMENT_WORDS),
+                                              ("link", LINK_WORDS)) if not present.search(inp)]
+        if len(absent) >= 2:
+            return f"no request for a {', '.join(absent[:-1])} or {absent[-1]} in the {what}"
+    return f"no scam mechanism was found in the {what}"
+
+
 def compact_evidence(kind, inp, fallback, verdict=None):
     """Short evidence phrases, ordered most concrete first, from the same rules the detector used.
 
-    A NO RISK verdict that overruled a harm signal is reported by its benign reading, never by
-    the dismissed harm phrase.
+    A NO RISK verdict never quotes a finding it overruled. It quotes the benign reading when the
+    rules found one (an official domain, a protective statement, a receipt or a notice). With a
+    dismissed mechanism it claims nothing, so the prompt keeps its neutral opening. With no
+    mechanism found it states only what is true of the text.
     """
     if _debit_alert(kind, inp, verdict):
         return [DEBIT_LINE]
@@ -185,25 +275,33 @@ def compact_evidence(kind, inp, fallback, verdict=None):
         ev = rules.url_indicators(inp)
         host = rules.host_of(inp)
         names = [n for n, _ in ev]
-        if any(n in ("brand_lookalike", "digit_swap") for n in names):
-            tld = host.rsplit(".", 1)[-1] if "." in host else ""
-            out.append(f"risky .{tld} lookalike domain {host}" if tld else f"lookalike domain {host}")
-        elif "ip_host" in names:
-            out.append("a raw IP address instead of a name")
-        elif "shortener" in names:
-            out.append(f"URL shortener {host}")
-        elif "risky_tld" in names:
-            out.append(f"unofficial domain {host} (.{host.rsplit('.', 1)[-1]})")
-        if "no_https" in names:
-            out.append("no HTTPS")
-        if "official_domain" in names:
-            out.append(f"official domain {host}")
-        if "at_sign" in names:
-            out.append("an @ sign hides the destination")
-        if not out and "complex_host" in names:
-            out.append("an unusually long or hyphenated domain")
-        if not out and verdict == 0:
-            out.append("no lookalike or risky-domain signals")
+        if verdict == 0:
+            # A cleared link is read by its benign side; a rule the verdict overruled is not repeated.
+            # With no official domain and only a weak sign, the closing statement below holds.
+            if "official_domain" in names:
+                out.append(f"official domain {host}")
+            elif not names:
+                out.append("no lookalike or risky-domain signals")
+            elif set(names) & HIDDEN_LINK:
+                dismissed = True
+        else:
+            if any(n in ("brand_lookalike", "digit_swap") for n in names):
+                tld = host.rsplit(".", 1)[-1] if "." in host else ""
+                out.append(f"risky .{tld} lookalike domain {host}" if tld else f"lookalike domain {host}")
+            elif "ip_host" in names:
+                out.append("a raw IP address instead of a name")
+            elif "shortener" in names:
+                out.append(f"URL shortener {host}")
+            elif "risky_tld" in names:
+                out.append(f"unofficial domain {host} (.{host.rsplit('.', 1)[-1]})")
+            if "no_https" in names:
+                out.append("no HTTPS")
+            if "official_domain" in names:
+                out.append(f"official domain {host}")
+            if "at_sign" in names:
+                out.append("an @ sign hides the destination")
+            if not out and "complex_host" in names:
+                out.append("an unusually long or hyphenated domain")
     elif kind == "flow":
         ip = re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", inp)
         ports = re.search(r"\b(\d{2,}) (?:different|distinct) ports", inp)
@@ -218,45 +316,45 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             out.append(f"traffic involving {ip.group(0)}")
         if not out and verdict == 0:
             out.append("traffic that looks like a routine update or a scheduled backup")
-    elif kind == "injection":
+    elif kind == "injection" or mech.indic_context(inp):
         a = mech.analyze(inp)
-        harm = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:1]
-        if rules.injection_indicators(inp):
-            # One phrase carries both the injection and the mechanism, so a copied opening can
-            # satisfy either concept the reader is asked about.
-            out.append("an instruction aimed at the assistant (prompt injection)"
-                       + (f" that {harm[0]}" if harm else ""))
-        elif verdict == 0 and a["harm"]:
-            # Same analysis as messages below: a NO RISK opening never repeats the dismissed threat.
-            dismissed, out = True, _safe_evidence(a, inp)
-        else:
-            out = harm
-    elif mech.indic_context(inp):
-        a = mech.analyze(inp)
-        if verdict == 0 and a["harm"]:
-            # The verdict overruled the harm signal: a bank alert's own "if not you, block your
-            # card" is protective advice, not a threat. Name the benign reading instead.
-            dismissed, out = True, _safe_evidence(a, inp)
+        if verdict == 0:
+            # A NO RISK opening never repeats a dismissed finding, a threat included: a bank
+            # alert's own "if not you, block your card" is protective advice, not a threat.
+            out, dismissed = _cleared_message(kind, inp, fallback, a)
+        elif kind == "injection":
+            harm = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:1]
+            if rules.injection_indicators(inp):
+                # One phrase carries both the injection and the mechanism, so a copied opening can
+                # satisfy either concept the reader is asked about.
+                out.append("an instruction aimed at the assistant (prompt injection)"
+                           + (f" that {harm[0]}" if harm else ""))
+            else:
+                out = harm
         else:
             out = _harm_evidence(a, inp)
     else:
         ev = indicrules.indicators(inp)[0]
-        risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
-        rest = [(n, d) for n, d in ev if n not in HOST_NAMES or n == "official_domain"]
-        for n, d in risky:
-            s = _short_host(n, d)
-            if s not in out:
-                out.append(s)
-        for n, d in rest:
-            s = SHORT.get(n) or d[:70]
-            if s not in out:
-                out.append(s)
-    # The detector's own lines repeat the dismissed harm phrase, so they are no fallback for it.
-    # With no benign reading to show, the prompt keeps its neutral opening.
-    if not out and not dismissed:
+        if verdict == 0:
+            out, dismissed = _cleared_message(kind, inp, fallback, mech.analyze(inp), ev)
+        else:
+            risky = [(n, d) for n, d in ev if n in HOST_NAMES and n != "official_domain"]
+            rest = [(n, d) for n, d in ev if n not in HOST_NAMES or n == "official_domain"]
+            # The text rules name a risky TLD without its host, so each host comes from the text.
+            hosts = [h for h in indicrules._hosts(inp) if indicrules.host_risk(h)]
+            for (n, d), h in zip(risky, hosts + [""] * len(risky)):
+                s = _short_host(n, f"({h})" if h else d)
+                if s not in out:
+                    out.append(s)
+            for n, d in rest:
+                s = SHORT.get(n) or d[:70]
+                if s not in out:
+                    out.append(s)
+    # The detector's own lines repeat a dismissed finding, so they are no fallback for a cleared item.
+    if not out and verdict != 0:
         out = [str(e)[:70] for e in fallback[:2]]
     if not out and verdict == 0 and not dismissed:
-        out = ["no request for a secret, payment or link in the text"]
+        out = [_no_risk_statement(kind, inp)]
     return out[:2]
 
 
@@ -274,21 +372,27 @@ def _debit_alert(kind, inp, verdict):
 def benign_evidence(kind, inp, evidence, verdict):
     """The evidence lines a UI should show for a checked item.
 
-    The detector lists a harm phrase first even when it overruled that signal, so a NO RISK result
-    can sit above "threatens to block the account or service". For such a message the benign
-    reading replaces the dismissed phrase; with no benign reading the phrase is left out. Every
-    other item keeps the detector's lines.
+    The detector lists a risk phrase first even when it overruled that signal, so a NO RISK result
+    can sit above "threatens to block the account or service" or "the domain ends in .top, common
+    for throwaway scam sites". For a cleared item every such phrase is left out, in a message and
+    in a link alike, and the list follows the opening: an Indian-context message shows the
+    mechanism layer's benign reading in place of the dismissed phrase, an English message keeps
+    only the benign lines the detector itself reported, and with none the list is empty. Every
+    other item keeps the detector's lines. A cleared network event keeps its lines too: at NO RISK
+    the flow rules only describe what was observed, such as connections that repeat.
     """
     lines = list(evidence or [])
     if _debit_alert(kind, inp, verdict):
         return ["Looks like a bank debit or OTP alert", "Scammers copy these alerts; confirm it in your bank app"]
-    if verdict != 0 or kind not in ("sms", "injection") or not mech.indic_context(inp):
+    if verdict != 0 or kind == "flow":
         return lines
+    if kind == "url":
+        risk = {d for n, d in rules.url_indicators(inp) if n != "official_domain"}
+        return [line for line in lines if line not in risk]
     a = mech.analyze(inp)
-    if not a["harm"]:
-        return lines
-    harm = {d for _, d in a["harm"]}
-    return _safe_evidence(a, inp)[:5] + [line for line in lines if line not in harm]
+    mechanisms, signs = _findings(inp, a)
+    kept = [line for line in lines if line not in mechanisms and line not in signs]
+    return kept if kept or not mech.indic_context(inp) else _safe_evidence(a, inp)[:5]
 
 
 def scam_type(kind, inp, verdict):
@@ -550,6 +654,67 @@ def _prompt_verdict(prompt):
     return 1 if tail.startswith("DANGEROUS") else 0 if tail.startswith("NO RISK FOUND") else "uncertain"
 
 
+# Between sentences: ending punctuation, then whitespace, then an opening quote or bracket.
+_SENTENCE_GAP = re.compile(r"[.!?।][\"'”’)\]]*\s+([\"'“(\[]*)")
+_ABBREVIATION = re.compile(r"rs|no|nos|dr|mr|mrs|ms|prof|st|mt|ph|tel|mob|ext|adv|"
+                           r"a\.m|p\.m|e\.g|i\.e|u\.s", re.I)
+
+
+def _words(text):
+    """(start, end, word) for each word, combining marks kept on their letter.
+
+    A Devanagari matra is not a word character, so a bare \\w+ would cut "कृपया" into three pieces
+    and hide every sentence end.
+    """
+    out = []
+    for m in re.finditer(r"\w+", text):
+        if out and all(unicodedata.category(c)[0] == "M" for c in text[out[-1][1]:m.start()]):
+            out[-1][1] = m.end()
+        else:
+            out.append([m.start(), m.end()])
+    for w in out:
+        while w[1] < len(text) and unicodedata.category(text[w[1]])[0] == "M":
+            w[1] += 1
+    return [(a, b, text[a:b]) for a, b in out]
+
+
+def _sentence_starts(text, words):
+    """Offsets where a sentence starts: the text, and each opening quote before a word that follows
+    a sentence end. A period after an abbreviation ("Rs. 450", "Dr. Mehta") does not end a sentence.
+    """
+    starts = [0]
+    for prev, word in zip(words, words[1:]):
+        gap = _SENTENCE_GAP.fullmatch(text[prev[1]:word[0]])
+        if not gap:
+            continue
+        first = word[2][0]
+        if (first.isupper() or first.isdigit() or "\u0900" <= first <= "\u097F") \
+                and not _ABBREVIATION.fullmatch(prev[2]):
+            starts.append(word[0] - len(gap.group(1)))
+    return starts
+
+
+def _dedupe(text):
+    """Drop a sentence that repeats an earlier one, ignoring case, punctuation and spacing.
+
+    A repeat is also a later sentence whose words are the start of an earlier one, such as a copy
+    the token budget cut short. Sentences under four words are left alone, so a split word such
+    as "sbi.co.in" is never mistaken for a repeat.
+    """
+    words = _words(text)
+    starts = _sentence_starts(text, words) + [len(text)] if words else []
+    seen, kept, dropped = set(), [], False
+    for a, b in zip(starts, starts[1:]):
+        key = tuple(w[2].lower() for w in words if a <= w[0] < b)
+        if len(key) >= 4:
+            if any(earlier[:len(key)] == key for earlier in seen):
+                dropped = True
+                continue
+            seen.add(key)
+        kept.append(text[a:b])
+    return " ".join(part.strip() for part in kept) if dropped else text
+
+
 def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """Drop a sentence that asserts the opposite of the detector's verdict or urges compliance.
 
@@ -564,10 +729,13 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     A network event (flow) gets no compliance check: contacting the IT team or updating firmware
     is ordinary advice there. Its safe_tail, the vetted flow action, replaces a sentence that
     gives a disruptive operational instruction instead (_disruptive_flow_advice).
+
+    A sentence that repeats an earlier one is dropped first, so a model that copies the required
+    opening twice leaves one copy.
     """
     if not text:
         return text
-    sents = re.split(r"(?<=[.!?;])\s+", text)
+    sents = re.split(r"(?<=[.!?;])\s+", _dedupe(text))
     dropped = []
     check = _disruptive_flow_advice if flow else _unsafe_advice
 
@@ -580,6 +748,15 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
             return True
         return False
 
+    def question(i, sent):
+        # A generated question ("Have you received any other suspicious emails?") is never
+        # advice; on a risky item it is replaced by the vetted step like unsafe advice.
+        if i == 0 or not sent.rstrip().endswith("?"):
+            return False
+        if safe_tail:
+            dropped.append(sent)
+        return True
+
     def with_tail(kept):
         if dropped and opening and not any(k.startswith(opening) for k in kept):
             kept = [opening + "."] + kept
@@ -589,13 +766,13 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
         return out
 
     if verdict == "uncertain":
-        kept = [s for i, s in enumerate(sents) if not unsafe(i, s)]
+        kept = [s for i, s in enumerate(sents) if not unsafe(i, s) and not question(i, s)]
         return with_tail(kept) or text
     keep = []
     for i, sent in enumerate(sents):
         if re.search(r"\bas an ai\b|\bi cannot help\b|\bi can't help\b", sent, re.I):
             continue
-        if unsafe(i, sent):
+        if unsafe(i, sent) or question(i, sent):
             continue
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)
@@ -614,16 +791,17 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
 
 
 def tidy(text):
-    """End on a complete sentence when the token budget cut the model off."""
+    """End on a complete sentence when the token budget cut the model off, and drop a repeated one."""
     if not text:
         return text
-    if text[-1] in ".!?":
-        return text
-    ends = [m.end() for m in re.finditer(r"[.!?](?=\s|$)", text)]
-    if ends and len(text[:ends[-1]].split()) >= 15:
-        return text[:ends[-1]].strip()
-    text = re.sub(r"\s*\([^()]*$", "", text)  # drop an unmatched trailing parenthesis
-    return text.rstrip(" ,;:-") + "."
+    if text[-1] not in ".!?।":
+        ends = [m.end() for m in re.finditer(r"[.!?।](?=\s|$)", text)]
+        if ends and len(text[:ends[-1]].split()) >= 15:
+            text = text[:ends[-1]].strip()
+        else:
+            text = re.sub(r"\s*\([^()]*$", "", text)  # drop an unmatched trailing parenthesis
+            text = text.rstrip(" ,;:-") + "."
+    return _dedupe(text)
 
 
 ACTIONS = {
