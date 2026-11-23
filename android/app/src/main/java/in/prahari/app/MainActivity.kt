@@ -1931,15 +1931,22 @@ class MainActivity : Activity() {
             }, top = 8)
         }
         add(body, steps, top = 12)
-        if (evidence.isNotEmpty()) {
+        val shownEvidence = evidence.filter { it.isNotBlank() }
+        if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert) {
+            val evidenceCard = card()
+            add(evidenceCard, heading("Why it's flagged", "संकेत"))
+            add(evidenceCard, txt(n("model_only_evidence"), 14f, T.ink, 400, 20, raw = true), top = 8)
+            add(body, evidenceCard, top = 12)
+        } else if (shownEvidence.isNotEmpty()) {
             val evidenceCard = card()
             val header = row()
             add(header, heading(if (clear) "What we saw" else "Why it's flagged", "संकेत"), 0, -2, weight = 1f)
-            val countWord = t(if (evidence.size == 1) "signal" else "signals")
-            add(header, txt("${evidence.size} $countWord", 11f, T.ink3, 600, raw = true), -2, -2)
+            val countWord = t(if (shownEvidence.size == 1) "signal" else "signals")
+            add(header, txt("${shownEvidence.size} $countWord", 11f, T.ink3, 600, raw = true), -2, -2)
             add(evidenceCard, header)
             val quotes = strings(data.optJSONArray("evidence_quotes"))
             evidence.forEachIndexed { index, item ->
+                if (item.isBlank()) return@forEachIndexed
                 val chip = row().apply { gravity = Gravity.TOP; background = shape(p.chip, 12f); pad(this, 10, 8, 12, 8) }
                 add(chip, icon(if (calm) R.drawable.ic_check_circle else R.drawable.ic_alert_circle, 16, p.chipText), 16, 16)
                 val column = col()
