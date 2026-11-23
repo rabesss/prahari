@@ -37,20 +37,44 @@ class BridgeExplainer(llm.Explainer):
         text = llm.tidy(re.sub(r'<\|[^|]*\|>', '', data['text']).strip())
         return text, data['stats']
 
-def check(kind, text, runner):
+VERDICT = {0: 'NO RISK FOUND — still verify', 1: 'DANGEROUS', 'uncertain': 'SUSPICIOUS'}
+_last = {}
+
+
+def _flow_json(text):
+    f = json.loads(text); p = portable.flow_probability(f); ev = []
+    if f.get('num_failed_logins', 0) > 0: ev.append(f"{int(f['num_failed_logins'])} failed login attempts on the connection"); p = max(p, .9)
+    if f.get('wrong_fragment', 0) > 0: ev.append('malformed packet fragments, typical of a teardrop or ping-of-death flood'); p = max(p, .9)
+    if f.get('land', 0) > 0: ev.append('source and destination are the same host and port'); p = max(p, .9)
+    if f.get('serror_rate', 0) > .5: ev.append('most connections were half-open (SYN errors)')
+    if f.get('dst_host_diff_srv_rate', 0) > .5: ev.append('the host contacted many different services')
+    if f.get('root_shell', 0) > 0: ev.append('a root shell was obtained')
+    return (1 if p >= .1 else 0), p, ev
+
+
+def verdict(kind, text):
+    """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds."""
     t0 = time.perf_counter()
     if kind == 'flow' and text.strip().startswith('{'):
-        f = json.loads(text); p = portable.flow_probability(f); ev = []
-        if f.get('num_failed_logins', 0) > 0: ev.append('failed login attempts recorded on the connection'); p = max(p, .9)
-        if f.get('wrong_fragment', 0) > 0: ev.append('malformed packet fragments, typical of a teardrop or pod flood'); p = max(p, .9)
-        if f.get('land', 0) > 0: ev.append('source and destination are the same host and port'); p = max(p, .9)
-        if f.get('serror_rate', 0) > .5: ev.append('most connections were half-open (SYN errors)')
-        if f.get('num_failed_logins', 0) > 0: ev.append(f"{int(f['num_failed_logins'])} failed logins")
-        if f.get('dst_host_diff_srv_rate', 0) > .5: ev.append('the host contacted many different services')
-        if f.get('root_shell', 0) > 0: ev.append('a root shell was obtained')
-        lab, score = (1 if p >= .1 else 0), p
-    else: lab, score, ev = detect.classify_any(kind, text)
-    detector_ms = (time.perf_counter()-t0)*1000
+        lab, score, ev = _flow_json(text)
+    else:
+        lab, score, ev = detect.classify_any(kind, text)
+    ms = (time.perf_counter() - t0) * 1000
+    _last.clear(); _last.update(kind=kind, text=text, lab=lab, ev=ev)
+    return json.dumps({'verdict': VERDICT[lab], 'level': {1: 'danger', 'uncertain': 'warn', 0: 'clear'}[lab],
+                       'score': score, 'scam_type': llm.scam_type(kind, text, lab), 'evidence': ev,
+                       'actions': llm.actions_for(kind, lab, text), 'detector_ms': ms}, ensure_ascii=False)
+
+
+def explain(runner):
+    """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
     ex = BridgeExplainer(runner)
-    explanation, stats = ex.generate(ex.prompt(kind, text, lab, ev))
-    return json.dumps({'verdict': {0:'NO RISK FOUND — still verify',1:'DANGEROUS','uncertain':'SUSPICIOUS'}[lab], 'score':score, 'evidence':ev, 'explanation':explanation, 'actions':llm.actions_for(kind, lab), 'detector_ms':detector_ms, 'llm':stats}, ensure_ascii=False)
+    text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
+    return json.dumps({'explanation': text, 'llm': stats}, ensure_ascii=False)
+
+
+def check(kind, text, runner):
+    """Both stages in one call (tests and the command line)."""
+    out = json.loads(verdict(kind, text))
+    out.update(json.loads(explain(runner)))
+    return json.dumps(out, ensure_ascii=False)
