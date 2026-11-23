@@ -748,6 +748,15 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
             return True
         return False
 
+    def question(i, sent):
+        # A generated question ("Have you received any other suspicious emails?") is never
+        # advice; on a risky item it is replaced by the vetted step like unsafe advice.
+        if i == 0 or not sent.rstrip().endswith("?"):
+            return False
+        if safe_tail:
+            dropped.append(sent)
+        return True
+
     def with_tail(kept):
         if dropped and opening and not any(k.startswith(opening) for k in kept):
             kept = [opening + "."] + kept
@@ -757,13 +766,13 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
         return out
 
     if verdict == "uncertain":
-        kept = [s for i, s in enumerate(sents) if not unsafe(i, s)]
+        kept = [s for i, s in enumerate(sents) if not unsafe(i, s) and not question(i, s)]
         return with_tail(kept) or text
     keep = []
     for i, sent in enumerate(sents):
         if re.search(r"\bas an ai\b|\bi cannot help\b|\bi can't help\b", sent, re.I):
             continue
-        if unsafe(i, sent):
+        if unsafe(i, sent) or question(i, sent):
             continue
         probe = re.sub(r"\b(it|that|this|there)'s\b", r"\1 is", sent, flags=re.I)
         probe = re.sub(r"\b(is|are|was|were)n't\b", r"\1 not", probe, flags=re.I)

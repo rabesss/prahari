@@ -600,3 +600,10 @@ def test_repeated_sentence_is_removed():
                  "Check bit.ly. Then check bit.ly. Be careful out there.",
                  "Never share your OTP with anyone. Never share your OTP with anyone today. Report it."):
         assert llm.tidy(text) == text, text
+
+
+def test_generated_question_is_replaced_by_the_vetted_step():
+    opening = "This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top"
+    tail = llm.ACTIONS[1][0]
+    out = llm._consistent(opening + ". Have you received other suspicious emails?", 1, opening, tail)
+    assert "?" not in out and out.endswith(tail)
