@@ -88,6 +88,12 @@ private object T {
 private const val MODEL_FILE = "Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte"
 private const val TOKENIZER_FILE = "tokenizer.model"
 private val KINDS = arrayOf("sms", "url", "flow")
+/**
+ * An app file (.apk) check. Not in [KINDS]: the home screen's SMS / Link / Network choice stays
+ * 0..2, and only a job's own mode is ever [APK_MODE]. See ApkInspector and apk_check.py.
+ */
+internal const val APK_MODE = 3
+private fun kindName(mode: Int) = if (mode == APK_MODE) "apk" else KINDS.getOrElse(mode) { "?" }
 private const val DEBIT_STEP = "Didn't make this payment? Call 1930 and block the card or UPI in your bank app."
 private const val CHECK_STEP = "Check the payment in your bank app, not through any link or number in the message."
 // Hosts in any script (internationalised domains such as a Devanagari .भारत name count too).
@@ -272,6 +278,9 @@ internal object Bridge {
     @Volatile var generating = false
     @Volatile var phase = "idle"
     @Volatile var job: Job? = null
+    /** Mode and text of the check in flight, for a rotation before its verdict is published. */
+    @Volatile var pendingMode = 0
+    @Volatile var pendingValue = ""
     @Volatile var netId = 0
     @Volatile var net: Net? = null
     /** 0 verdict still running, 1 verdict back (Llama writing), 2 explanation back. */
@@ -436,25 +445,33 @@ private fun requestModel(force: Boolean) {
     }
 }
 
-private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String) {
+private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String, payload: String = "") {
     Bridge.worker.execute {
         try {
-            runCheck(id, mode, value, started, source, sender)
+            runCheck(id, mode, value, started, source, sender, payload)
         } catch (t: Throwable) {
             Log.e(TAG, "check escaped", t)
         }
     }
 }
 
-private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String) {
+/**
+ * [payload] is the app file's facts JSON for [APK_MODE] (read by [readApk]) and empty for text checks.
+ */
+private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String, payload: String = "") {
     try {
         if (!Bridge.still(id)) return
         if (Bridge.pythonError != null || !Python.isStarted()) {
             throw IllegalStateException(Bridge.pythonError ?: "Python is not running")
         }
-        val bridge = Python.getInstance().getModule("mobile")
+        val apk = mode == APK_MODE
+        // apk_check has the same verdict / explain / vetted_explanation calls as mobile.
+        val bridge = Python.getInstance().getModule(if (apk) "apk_check" else "mobile")
         val callStart = SystemClock.elapsedRealtimeNanos()
-        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value, source, sender).toString())
+        val verdict = JSONObject(
+            if (apk) bridge.callAttr("verdict", payload).toString()
+            else bridge.callAttr("verdict", KINDS[mode], value, source, sender).toString()
+        )
         val verdictCallMs = (SystemClock.elapsedRealtimeNanos() - callStart) / 1e6
         val level = verdict.optString("level")
         if (level != "danger" && level != "warn" && level != "clear") {
@@ -517,13 +534,43 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: S
         val detail = errorText(t)
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
-            act.inputValue = value
-            act.senderValue = sender
-            act.selectedMode = mode
+            if (mode in KINDS.indices) {
+                act.inputValue = value
+                act.senderValue = sender
+                act.selectedMode = mode
+            }
             act.showHome()
             act.failureToast(detail)
         }
     }
+}
+
+/**
+ * Read an app file on its own thread, under check [id], then queue the verdict on the model worker.
+ * A content provider that stalls holds only this thread: Cancel or a newer check moves on, and
+ * the model worker stays free for the next check.
+ */
+private fun readApk(id: Int, uri: Uri, started: Long) {
+    Thread({
+        fun failed(key: String) {
+            if (!Bridge.still(id)) return
+            Bridge.fail(id)
+            Bridge.ui { act -> if (Bridge.still(id)) act.apkFailed(key) }
+        }
+        try {
+            val ctx = Bridge.app ?: throw IllegalStateException("App context is not ready")
+            val facts = ApkInspector.read(ctx, uri) { Bridge.still(id) }
+            if (!Bridge.still(id)) return@Thread
+            Bridge.pendingValue = facts.display
+            enqueueCheck(id, APK_MODE, facts.display, started, "", "", facts.json.toString())
+        } catch (e: ApkInspector.Unreadable) {
+            failed(e.key)
+        } catch (_: ApkInspector.Stopped) {
+        } catch (t: Throwable) {
+            Log.e(TAG, "app file read failed", t)
+            failed("apk_fail")
+        }
+    }, "prahari-apk").apply { isDaemon = true }.start()
 }
 
 private fun putNum(rec: JSONObject, key: String, value: Double?) {
@@ -556,7 +603,7 @@ private fun logPerf(job: Bridge.Job, gating: String) {
             .put("session", Bridge.perfSession)
             .put("seq", Bridge.perfSeq.incrementAndGet())
             .put("id", job.id)
-            .put("kind", KINDS.getOrElse(job.mode) { "?" })
+            .put("kind", kindName(job.mode))
             .put("level", job.verdict.optString("level"))
             .put("gating", gating)
             .put("llama_skipped", ex?.optBoolean("llama_skipped") == true)
@@ -763,8 +810,8 @@ class MainActivity : Activity() {
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
-    private val modeNames = arrayOf("SMS", "Link", "Network")
-    private val modeIcons = intArrayOf(R.drawable.ic_message, R.drawable.ic_link, R.drawable.ic_activity)
+    private val modeNames = arrayOf("SMS", "Link", "Network", "App file")
+    private val modeIcons = intArrayOf(R.drawable.ic_message, R.drawable.ic_link, R.drawable.ic_activity, R.drawable.ic_package)
     private val labels = arrayOf("Message you received", "Link you want to open", "Network event or flow JSON")
     private val hints = arrayOf(
         "Paste or type the SMS or WhatsApp message",
@@ -1213,6 +1260,12 @@ class MainActivity : Activity() {
         loadStrings()
         if (savedInstanceState == null) applyGatingExtra(intent)
         installBack()
+        // An app file share is read at once: reading its details runs nothing from it. Only the
+        // first create handles it, so a rotation does not read it again.
+        if (savedInstanceState == null && takeApkShare(intent)) {
+            requestModel(false)
+            return
+        }
         // A share intent stays on the activity across rotation. Only the first create fills the box.
         val shared = if (savedInstanceState == null) readShare(intent) else null
         if (shared != null) {
@@ -1224,7 +1277,8 @@ class MainActivity : Activity() {
         when (Bridge.phase) {
             "checking" -> {
                 val job = Bridge.job
-                showChecking(job?.mode ?: selectedMode, job?.value ?: inputValue)
+                if (job != null) showChecking(job.mode, job.value)
+                else showChecking(Bridge.pendingMode, Bridge.pendingValue)
             }
             "result" -> {
                 val job = Bridge.job
@@ -1603,6 +1657,7 @@ class MainActivity : Activity() {
         asButton(offline, "Prove it's offline. Try to reach the internet from this app.")
         add(body, historyHomeRow(), top = 16)
         add(body, navRow(R.drawable.ic_link, n("qr_check"), "") { pickQr() }, top = 8)
+        add(body, navRow(R.drawable.ic_package, n("apk_check"), n("apk_check_sub")) { pickApk() }, top = 8)
         add(body, offline, top = 8)
         add(all, View(this), -1, 0, weight = 1f)
         centeredNote(all, iconText(R.drawable.ic_lock, "Nothing you paste leaves this phone", T.ink3, 12f, 13), 12)
@@ -1665,6 +1720,7 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyGatingExtra(intent)
+        if (takeApkShare(intent)) return
         val shared = readShare(intent) ?: return
         // getReferrer() still names the app that first launched this singleTop activity, so a
         // later share gets no medium hint rather than a stale one.
@@ -1829,14 +1885,68 @@ class MainActivity : Activity() {
         hideKeyboard()
         val id = Bridge.begin()
         val started = SystemClock.elapsedRealtime()
+        Bridge.pendingMode = selectedMode
+        Bridge.pendingValue = value
         showChecking(selectedMode, value)
         enqueueCheck(id, selectedMode, value, started, source, senderValue)
     }
 
+    /** An app file share: start the check, or say why the file cannot be read. */
+    private fun takeApkShare(source: Intent?): Boolean {
+        if (!ApkInspector.isShare(source)) return false
+        val uri = ApkInspector.sharedUri(source!!)
+        if (uri == null) {
+            stopSpeech()
+            Bridge.cancel()
+            showHome()
+            toast(n("apk_fail"))
+        } else {
+            beginApkCheck(uri)
+        }
+        return true
+    }
+
+    private fun pickApk() {
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(ApkInspector.pickIntent(), ApkInspector.PICK_REQUEST)
+        } catch (t: Throwable) {
+            Log.e(TAG, "file picker failed", t)
+            toast(n("apk_fail"))
+        }
+    }
+
+    /**
+     * The file is read on its own thread under this check's id ([readApk]), so a newer check or
+     * Cancel stops it and the copy never outlives the check. Home's text and mode are left alone.
+     */
+    private fun beginApkCheck(uri: Uri) {
+        sharedBanner = false
+        checkSource = ""
+        stopSpeech()
+        hideKeyboard()
+        val id = Bridge.begin()
+        val started = SystemClock.elapsedRealtime()
+        val shown = n("apk_reading")
+        Bridge.pendingMode = APK_MODE
+        Bridge.pendingValue = shown
+        showChecking(APK_MODE, shown)
+        readApk(id, uri, started)
+    }
+
+    /** The app file could not be read: back to Home with the reason. */
+    internal fun apkFailed(key: String) {
+        showHome()
+        toast(n(key))
+    }
+
     private fun showChecking(mode: Int, value: String) {
         screen = "checking"
-        selectedMode = mode
-        inputValue = value
+        // An app file check keeps Home's own mode and text.
+        if (mode in KINDS.indices) {
+            selectedMode = mode
+            inputValue = value
+        }
         visibleJob = null
         networkBody = null
         val root = root("Checking")
@@ -1851,7 +1961,7 @@ class MainActivity : Activity() {
         }, 0, -2, left = 12, weight = 1f)
         add(what, summary)
         add(body, what)
-        add(body, modeSwitcher(mode, value), -1, -2, top = 12)
+        if (mode in KINDS.indices) add(body, modeSwitcher(mode, value), -1, -2, top = 12)
         val ring = FrameLayout(this)
         val progress = ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
             indeterminateTintList = ColorStateList.valueOf(T.brand)
@@ -1972,12 +2082,13 @@ class MainActivity : Activity() {
     private fun sentence(s: String): String = s.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
     private fun strings(a: JSONArray?): List<String> = if (a == null) emptyList() else (0 until a.length()).map { a.optString(it) }
 
-    private fun verdictLine(evidence: List<String>, fallback: String, clear: Boolean): String {
+    /** [firstHi]: the result's own Hindi for the first evidence line (app file results), or "". */
+    private fun verdictLine(evidence: List<String>, fallback: String, clear: Boolean, firstHi: String = ""): String {
         val raw = evidence.firstOrNull()
         val line = when {
             raw == null -> t(fallback)
             L10n.hindi -> {
-                val translated = t(raw)
+                val translated = firstHi.ifBlank { t(raw) }
                 if (translated != raw) {
                     val body = translated.trim()
                     if (body.endsWith("।") || body.endsWith(".") || body.endsWith("!") || body.endsWith("?")) body
@@ -2222,9 +2333,12 @@ class MainActivity : Activity() {
         if (job.id >= 0 && !Bridge.mark(job.id, "result")) return
         shownId = job.id
         visibleJob = job
-        selectedMode = job.mode.coerceIn(0, KINDS.lastIndex)
-        inputValue = job.value
-        senderValue = job.sender
+        val apk = job.mode == APK_MODE
+        if (!apk) {
+            selectedMode = job.mode.coerceIn(0, KINDS.lastIndex)
+            inputValue = job.value
+            senderValue = job.sender
+        }
         screen = "result"
         networkBody = null
         val data = job.verdict
@@ -2248,20 +2362,23 @@ class MainActivity : Activity() {
             else -> "No scam signals found."
         }
         // The alert banner replaces the suspicious line. Other results use the first evidence line.
-        val why = if (bankAlert) t(ALERT_LINE) else verdictLine(evidence, fallback, calm)
+        val firstHi = strings(data.optJSONArray("evidence_hi")).firstOrNull().orEmpty()
+        val why = if (bankAlert) t(ALERT_LINE) else verdictLine(evidence, fallback, calm, firstHi)
         val elapsed = if (job.totalMs >= 0) job.totalMs else SystemClock.elapsedRealtime() - job.started
         val root = root(p.title)
         add(root, bar("Result", true, lang = true), -1, -2)
         val body = scrollBody(root)
-        val modeRow = modeSwitcher(selectedMode, job.value)
-        add(body, modeRow, -1, -2)
+        val modeRow = if (apk) null else modeSwitcher(selectedMode, job.value)
+        modeRow?.let { add(body, it, -1, -2) }
         val upi = data.optJSONObject("upi")
-        val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble(), upi != null), modeIcons[selectedMode], calm)
+        val shownMode = if (apk) APK_MODE else selectedMode
+        val b = banner(p, why, checkedMeta(shownMode, elapsed.toDouble(), upi != null), modeIcons[shownMode], calm)
         b.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         if (job.mode == 2) add(b, txt(n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
         data.optString("scam_type", "").takeIf { it.isNotBlank() }?.let { scam ->
-            val kind = if (L10n.hindi) t(scam) else sentence(scam)
+            val scamHi = data.optString("scam_type_hi", "")
+            val kind = if (L10n.hindi) scamHi.ifBlank { t(scam) } else sentence(scam)
             add(b, txt(t("Type") + ": " + kind, 12f, p.on, 500, 16, raw = true), top = 8)
         }
         val actionsHi = strings(data.optJSONArray("actions_hi"))
@@ -2352,7 +2469,13 @@ class MainActivity : Activity() {
             else data.optJSONObject("report_card")
                 ?: if (alertLevel == "warn") data.optJSONObject("report_card_raised") else null
         if (reportCard != null) add(steps, shareRow(reportCard), top = 10)
-        if (clear && mode == 0) {
+        if (apk) {
+            divider(steps, 12)
+            add(steps, iconText(R.drawable.ic_info, n("apk_note"), T.ink2, 13f, 16, flex = true).apply {
+                minimumHeight = dp(48)
+                setPadding(0, dp(8), 0, dp(8))
+            }, top = 8)
+        } else if (clear && mode == 0) {
             divider(steps, 12)
             add(steps, iconText(R.drawable.ic_alert_circle, "Scammers copy real messages. If it asks for money or a code, check in the official app first.", T.ink2, 13f, 16, flex = true).apply {
                 minimumHeight = dp(48)
@@ -2370,7 +2493,7 @@ class MainActivity : Activity() {
         if (upi != null) add(body, upiCard(upi), top = 12)
         var whyCard: View? = null
         val shownEvidence = evidence.filter { it.isNotBlank() }
-        if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert && selectedMode != 2) {
+        if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert && job.mode != 2) {
             val evidenceCard = card()
             add(evidenceCard, heading("Why it's flagged", "संकेत"))
             add(evidenceCard, txt(n("model_only_evidence"), 14f, T.ink, 400, 20, raw = true), top = 8)
@@ -2384,12 +2507,14 @@ class MainActivity : Activity() {
             add(header, txt("${shownEvidence.size} $countWord", 11f, T.ink3, 600, raw = true), -2, -2)
             add(evidenceCard, header)
             val quotes = strings(data.optJSONArray("evidence_quotes"))
+            // App file results carry their own Hindi evidence (apk_check.py), written beside the English.
+            val evidenceHi = strings(data.optJSONArray("evidence_hi"))
             evidence.forEachIndexed { index, item ->
                 if (item.isBlank()) return@forEachIndexed
                 val chip = row().apply { gravity = Gravity.TOP; background = shape(p.chip, 12f); pad(this, 10, 8, 12, 8) }
                 add(chip, icon(if (calm) R.drawable.ic_check_circle else R.drawable.ic_alert_circle, 16, p.chipText), 16, 16)
                 val column = col()
-                val translated = if (L10n.hindi) t(item) else item
+                val translated = if (L10n.hindi) evidenceHi.getOrNull(index)?.takeIf { it.isNotBlank() } ?: t(item) else item
                 val shown = if (L10n.hindi && translated != item) translated else sentence(item)
                 val text = SpannableString(shown)
                 Regex("[a-z0-9-]+(\\.[a-z0-9-]+)+").findAll(text).forEach { match ->
@@ -2519,7 +2644,7 @@ class MainActivity : Activity() {
         whyCard?.let { after(it, cursor); cursor = it }
         explanationText?.let { after(it, cursor); cursor = it }
         statsHeader?.let { after(it, cursor); cursor = it }
-        after(modeRow, cursor)
+        modeRow?.let { after(it, cursor) }
         showScreen(root)
         if (job.explanation != null) applyExplanation(job)
     }
@@ -3025,6 +3150,10 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ApkInspector.PICK_REQUEST) {
+            if (resultCode == RESULT_OK) data?.data?.let { beginApkCheck(it) }
+            return
+        }
         if (requestCode != QR_REQUEST || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         Thread({

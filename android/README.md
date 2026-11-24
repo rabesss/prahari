@@ -110,6 +110,49 @@ and its upstream `applicationId`. The installed-app result is shown on screen on
 logged, stored in History or sent anywhere, and the verdict never depends on it. Tests:
 `android/tools/test_remote_apps.py`. Pending a Galaxy S23 re-test.
 
+## App file (.apk) inspector
+
+Scam calls and WhatsApp messages often send an `.apk` that poses as a bank, KYC, PM Kisan or RTO
+challan app. Share the file to Prahari (share sheet, `ACTION_SEND` with
+`application/vnd.android.package-archive`), or tap **Check an app file (.apk)** on Home (Storage
+Access Framework picker). Neither path needs a permission: the sender or the picker grants read
+access to that one file.
+
+`ApkInspector.kt` copies the file into the app cache (200 MB cap, enforced while copying), reads it
+with `PackageManager.getPackageArchiveInfo`, and deletes the copy in a `finally` block. It reads the
+package name, the label (from the archive's resources), requested permissions plus each service's
+and receiver's `android:permission` (Accessibility and device admin are declared there), and the
+signing certificate (`GET_SIGNING_CERTIFICATES`, then legacy `GET_SIGNATURES` as a fallback). A
+certificate that cannot be read is reported as "could not read", not as "unsigned". Nothing
+installs, opens or runs the app. The file is read on its own thread under the check's id, so
+Cancel or a newer check stops it.
+
+`android/python/apk_check.py` decides the verdict by rules alone:
+
+* Risky permission groups: SMS (`READ_SMS`, `RECEIVE_SMS`), Accessibility, device admin, draw over
+  other apps (`SYSTEM_ALERT_WINDOW`), install other apps (`REQUEST_INSTALL_PACKAGES`), call history
+  (`READ_CALL_LOG`).
+* A name claim: the label, package or file name matches a bank, UPI app or government office
+  (SBI, HDFC, Aadhaar, PM Kisan, RTO/e-challan, Income Tax and others, English and Hindi).
+* **DANGEROUS**: a name claim with any risky group; SMS with Accessibility, overlay or device admin;
+  Accessibility with overlay; or three or more groups. **SUSPICIOUS**: a name claim alone, one or two
+  other groups, no readable certificate, or a debug certificate. Otherwise **NO RISK FOUND — still
+  verify**.
+
+Steps, evidence, the result type and a fixed Hindi summary are written in English and Hindi. Llama
+sees only the rules' own words (the name claim from the fixed list, plain permission names, the
+signature state), never the app's label, package or file name, which the sender chose. Its reply
+goes through the shared explanation checks and an app-file pass that drops any generated advice to
+install, allow or trust the app on every verdict. If nothing written survives, the detector's fixed
+text is shown, labelled as such.
+
+Limits: the check reads declared metadata only, not the app's code or behaviour, so a NO RISK
+result is not a safety guarantee; a genuine bank app shared as a file is also flagged, because the
+advice (get it from Play Store) still holds. The thresholds were set by hand and have not been
+measured on a set of real APKs. Tests: `android/tools/test_apk_check.py` (synthetic manifests in
+`android/tools/fixtures/apk/`, mirrored the way `ApkInspector.kt` reads them).
+`getPackageArchiveInfo` itself has not run on a phone yet: pending a Galaxy S23 re-test.
+
 ## Known limits
 
 * The Android 1.5.1 and 1.6 `LlmGenerationConfig.maxNewTokens` field is not passed by the Android `generate` overload to the native runner. The bridge stops after 40 UTF-8 callbacks, which can each contain multiple token fragments; this is **not a guaranteed 40-token cap**. The exact budget needs a fixed upstream Android binding or a custom native bridge before claiming parity. TTFT is measured to the first callback, and decode tok/s comes from native stats.

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic test manifest (not a real app): a Hindi government-scheme name with no risky permission. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.yojana.status.check">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <application android:label="पीएम किसान स्टेटस"/>
+</manifest>

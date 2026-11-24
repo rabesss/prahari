@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic test manifest (not a real app): a device admin receiver and nothing else risky. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.family.parental.lock">
+    <application android:label="Parental Lock">
+        <receiver android:name=".Admin" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true"/>
+    </application>
+</manifest>
