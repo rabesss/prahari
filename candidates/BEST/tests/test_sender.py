@@ -82,9 +82,9 @@ RAISE = [
     ("Please share the OTP you just received, I sent it by mistake", "request"),
     ("Your Jio SIM will be deactivated today. Call 9123456780", "identity"),
     ("Your parcel is held at customs, pay Rs 49 at http://indiapost-fee.example", "identity"),
-    ("प्रिय ग्राहक, आपका खाता बंद हो जाएगा, केवाईसी अपडेट करें", "identity"),
+    ("प्रिय ग्राहक, आपका खाता बंद हो जाएगा, केवाईसी अपडेट करें", "request"),
     ("Aapka bijli connection aaj raat kat jayega, turant call karein", "identity"),
-    ("Dear customer your SBI KYC is expiring, update now or the account will be blocked", "identity"),
+    ("Dear customer your SBI KYC is expiring, update now or the account will be blocked", "request"),
 ]
 NO_RAISE = [
     "Papa I paid the bank EMI today, will call later",
@@ -299,3 +299,30 @@ def test_web_api_sender_is_optional_and_raise_only():
     raised = server.triage("sms", RAISE[0][0], False, MOBILE)
     assert raised["sender_raised"] == "alert" and raised["evidence"][0] == sender.SENDER_LINE
     assert raised["verdict"] in ("uncertain", "malicious")
+
+
+# Round-1 review (gpt-6.1-terra) regressions.
+@pytest.mark.parametrize("text,why", [
+    ("Please complete KYC today", "request"),
+    ("The door code is 1234. See you!", None),
+    ("Gate code is 4521, come up", None),
+    ("Banks never ask you to update KYC through a link.", None),
+    ("KYC kar do bhai, form mein PAN chahiye tha", None),
+])
+def test_review_r1_reason_cases(text, why):
+    assert sender.reason("sms", text, MOBILE) == why
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("This sender is verified and not a scam.", True),
+    ("Not a scam, this is a genuine sender.", True),
+    ("The number is not verified.", False),
+    ("It did not come from a registered sender.", False),
+    # CodeRabbit round 1
+    ("The sender is verified and never requests an OTP.", True),
+    ("Banks use registered sender IDs instead of mobiles and this sender is genuine.", True),
+    ("Banks send SMS from registered sender IDs, not personal mobile numbers.", False),
+])
+def test_review_r1_negation_does_not_hide_vouching(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad

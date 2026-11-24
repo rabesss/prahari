@@ -94,6 +94,7 @@ _KYC_ASK = re.compile(
     r"\b(?:update|verify|complete|link)\b[^.;!?।\n]{0,20}\b(?:kyc|e-?kyc|pan|aadhaa?r)\b|"
     r"(?:केवाईसी|आधार|पैन)[^.;!?।\n]{0,30}(?:अपडेट|सत्यापित|लिंक|पूरा|बंद)", re.I)
 _REQUEST_HARM = {"secret_request", "id_request"}
+_OTP_WORD = re.compile(r"\b(?:otp|one[- ]time (?:password|code|pin)|verification code|login code|security code)\b|ओटीपी", re.I)
 
 
 def reason(kind, text, sender):
@@ -112,13 +113,16 @@ def reason(kind, text, sender):
     a = mech.analyze(text)
     harm = {n for n, _ in a["harm"]}
     t = a["text"]
-    if a["otp_note"] or (a["receipt"] and (_YOUR_ACCOUNT.search(t) or _DEAR.search(t))):
+    # The OTP word itself is required: mech's OTP-note reading also covers "the door code is 1234".
+    if (a["otp_note"] and _OTP_WORD.search(t)) or (a["receipt"] and (_YOUR_ACCOUNT.search(t) or _DEAR.search(t))):
         return "alert"
-    if harm & _REQUEST_HARM or (a.get("request_cues") and _KYC_ASK.search(t)):
+    if harm & _REQUEST_HARM:
         return "request"
     advisory = not harm and (a["protective"] or a.get("awareness") or a.get("report") or a.get("advice"))
     if advisory:
         return None
+    if _KYC_ASK.search(t):
+        return "request"
     if _INSTITUTION.search(t) and (_DEAR.search(t) or _YOUR_ACCOUNT.search(t)):
         return "identity"
     return None

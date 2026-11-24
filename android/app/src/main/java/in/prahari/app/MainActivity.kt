@@ -1288,7 +1288,11 @@ class MainActivity : Activity() {
             faceLabel.textAlignment = View.TEXT_ALIGNMENT_CENTER
             add(segment, face, -2, -2)
             cap(faceLabel, segment, 24)
-            segment.setOnClickListener { selectedMode = i; refreshSegments() }
+            segment.setOnClickListener {
+                selectedMode = i
+                if (i != 0) senderField.setText("")  // the sender belongs to a message check only
+                refreshSegments()
+            }
             asButton(segment, modeNames[i])
             segments.add(segment)
             return segment
@@ -1398,6 +1402,7 @@ class MainActivity : Activity() {
         fun refreshInput() {
             inputValue = input.text.toString()
             val empty = inputValue.isEmpty()
+            if (empty && senderField.text.isNotEmpty()) senderField.setText("")
             clear.visibility = if (empty) View.INVISIBLE else View.VISIBLE
             clear.importantForAccessibility = if (empty) View.IMPORTANT_FOR_ACCESSIBILITY_NO else View.IMPORTANT_FOR_ACCESSIBILITY_YES
             val enabled = inputValue.isNotBlank()
@@ -1479,6 +1484,7 @@ class MainActivity : Activity() {
                 item.isNullOrEmpty() -> toast("The clipboard is empty.")
                 item.length > 100_000 -> toast("That text is too long to paste.")
                 else -> {
+                    senderInput?.setText("")  // a pasted message is a new message: its sender is unknown
                     input.setText(item)
                     input.setSelection(input.text.length)
                 }

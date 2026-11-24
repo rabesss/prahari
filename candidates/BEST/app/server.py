@@ -28,7 +28,7 @@ PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=
 <select id=k><option value=sms>Message</option><option value=url>Link</option><option value=upi>UPI QR / upi:// link</option><option value=flow>describe a network event (rule-based text check)</option></select>
 <label><input type=checkbox id=x checked> explain with on-device Llama</label>
 <textarea id=t placeholder="Paste the message or link" aria-label="Input"></textarea><input id=s maxlength=32 placeholder="Sender (optional), e.g. AX-HDFCBK-S or 98XXXXXXXX" aria-label="Sender (optional)"><button onclick=go()>Check</button><div id=o></div>
-<script>k.onchange=()=>{t.placeholder=k.value==='flow'?'describe a network event (rule-based text check)':k.value==='upi'?'Paste a upi://pay?... QR payload':'Paste the message or link'};function ps(kind,text){k.value=kind;k.onchange();t.value=text}
+<script>k.onchange=()=>{t.placeholder=k.value==='flow'?'describe a network event (rule-based text check)':k.value==='upi'?'Paste a upi://pay?... QR payload':'Paste the message or link'};function ps(kind,text){k.value=kind;k.onchange();t.value=text;s.value=''}
 async function go(){o.textContent='Checking...';const r=await fetch('/api/triage',{method:'POST',
 body:JSON.stringify({kind:k.value,input:t.value,sender:s.value,explain:x.checked})});const j=await r.json();
 o.innerHTML=`<p class="v ${j.verdict}">${j.verdict === "benign" ? "NO RISK FOUND — still verify" : j.verdict.toUpperCase()}</p><p>${(j.explanation||j.explanation_error||'').replace(/</g,'&lt;')}</p>

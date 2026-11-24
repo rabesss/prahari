@@ -1290,7 +1290,17 @@ _V_SENDER_TRUST = re.compile(
 
 # The general rule itself ("Banks use registered sender IDs, not mobile numbers") is a paraphrase.
 _V_SENDER_RULE = re.compile(r"\b(?:banks?|government|govt|they)\b[\w\s]{0,30}?\bregistered sender ids?\b"
-                            r"[\s,;-]{0,4}(?:and\s+|but\s+)?(?:not|never|instead of)\b[\w\s-]{0,30}", re.I)
+                            r"[\s,;-]{0,4}(?:and\s+|but\s+)?(?:not|never|instead of)\b(?:(?!\b(?:and|but|so|this|that|it|which|while|though)\b)[\w\s-]){0,30}", re.I)
+
+_V_TRUST_WORD = re.compile(r"\b(?:verified|genuine|legit\w*|authentic|trusted|registered|official|real|safe)\b", re.I)
+_V_TRUST_NEG = re.compile(r"(?:\b(?:not|never|no|isn't|wasn't|aren't)\b|n't)\s+(?:\w+\s+){0,3}$", re.I)
+
+
+def _vouches(clause):
+    """True when a trust word in the clause is not itself negated ("not verified" does not vouch;
+    "verified and not a scam" does)."""
+    return any(not _V_TRUST_NEG.search(clause[:m.start()]) for m in _V_TRUST_WORD.finditer(clause)) or \
+        bool(re.search(r"\b(?:sent|came|comes|is) (?:directly )?from (?:the|your|a real|an official) bank\b", clause, re.I))
 
 
 def unsupported(sent, ctx):
@@ -1303,7 +1313,7 @@ def unsupported(sent, ctx):
     if re.search(r"[ऀ-ॿ]", sent):
         return "script_mixing"
     if ctx.get("sender_raised") and any(
-            _V_SENDER_TRUST.search(c) and not _V_ADVICE.search(c) and not re.search(r"\bnot\b|n't\b|\bnever\b", c, re.I)
+            _V_SENDER_TRUST.search(c) and not _V_ADVICE.search(c) and _vouches(c)
             for c in _clauses(_V_SENDER_RULE.sub(" ", sent))):
         return "sender_contradiction"
     if _V_FIRST_PERSON.search(sent):
