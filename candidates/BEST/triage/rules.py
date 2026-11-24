@@ -70,7 +70,7 @@ def url_indicators(url):
     reg = registrable(host)
     # A pasted link has no message around it that could claim another organisation, so every listed
     # official domain and its subdomains count as official here. The SMS rules keep their own list.
-    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_official(host)
+    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_listed(host)
     if "xn--" in host:
         ev.append(("punycode", f"the domain {host} uses punycode, which can hide a lookalike name"))
     if any(ord(c) > 127 for c in host):
@@ -82,7 +82,7 @@ def url_indicators(url):
     if reg in SHORTENERS:
         ev.append(("shortener", f"the link uses a URL shortener ({reg}) that hides the real destination"))
     tld = host.rsplit(".", 1)[-1]
-    if tld in RISKY_TLDS:
+    if tld in RISKY_TLDS and not official:  # cred.club is official despite .club
         ev.append(("risky_tld", f"the domain ends in .{tld}, common for throwaway scam sites"))
     for b in BRANDS:
         if b in host and not official:
@@ -98,7 +98,7 @@ def url_indicators(url):
         target = typosquat.match(host)
         if target:
             ev.append(("typosquat", typosquat.describe(host, target)))
-    if typosquat.apk_download(url):
+    if not official and typosquat.apk_download(url):
         ev.append(("apk_download", typosquat.APK_DESC))
     if "@" in url:
         ev.append(("at_sign", "the link contains an @ sign that can hide the real destination"))

@@ -18,8 +18,9 @@ list of UPI apps; each domain from the organisation's own website.
 import re
 from urllib.parse import unquote, urlparse
 
-# registrable domain -> organisation. Labels shorter than five letters (sbi, jio, iob, dtdc) are
-# matched only through STEMS below, because one edit away from a short name is mostly real words.
+# registrable domain -> organisation. Labels shorter than five letters are matched only through
+# STEMS below (sbi, jio, dtdc), because one edit away from a short name is mostly real words; iob,
+# cred and myvi have no stem and are only kept off the flagged side.
 OFFICIAL = {
     # banks (RBI list of scheduled commercial banks)
     "sbi.co.in": "State Bank of India", "onlinesbi.sbi": "State Bank of India",
@@ -64,12 +65,13 @@ STEMS = {
     "bluedart": "bluedart.com", "delhivery": "delhivery.com", "dtdc": "dtdc.in", "xpressbees": "xpressbees.com",
 }
 # Words a lookalike adds around a brand. Not "bank", "card", "life", "pay" or "money": group
-# companies use those (sbicard.com, hdfclife.com, paytmbank.com). Not "my", "app" or "support"
-# either: brands register those for themselves (mypaytm.com, mydtdc.in, npcisupport.org.in).
+# companies use those (sbicard.com, hdfclife.com, paytmbank.com). Not "my", "app", "support" or
+# "india" either: brands register those for themselves (mypaytm.com, mydtdc.in, npcisupport.org.in,
+# dtdcindia.com).
 FILLER = {
     "online", "net", "netbanking", "ebanking", "login", "signin", "secure", "security", "verify",
     "verification", "kyc", "ekyc", "update", "updates", "care", "customer", "customercare",
-    "help", "helpdesk", "helpline", "service", "services", "official", "india", "in", "ind",
+    "help", "helpdesk", "helpline", "service", "services", "official", "in",
     "web", "portal", "e", "refund", "refunds", "reward", "rewards", "point", "points", "claim",
     "redeem", "bonus", "gift", "offer", "offers", "alert", "alerts", "unblock", "block", "blocked",
     "activate", "activation", "reactivate", "gov", "govt", "site", "page", "link", "info", "center",
@@ -114,6 +116,12 @@ def is_official(host):
     """An official domain, any subdomain of one, or a restricted-registry host: never a typosquat."""
     host = host.lower().strip(".")
     return host.endswith(RESTRICTED) or any(host == d or host.endswith("." + d) for d in OFFICIAL)
+
+
+def is_listed(host):
+    """A listed official domain or a subdomain of one (no registry suffixes)."""
+    host = host.lower().strip(".")
+    return any(host == d or host.endswith("." + d) for d in OFFICIAL)
 
 
 def distance(a, b, cap=3, sub_cost=1):
@@ -236,8 +244,9 @@ def apk_download(url):
     except ValueError:
         return False
     host = (parsed.hostname or "").lower()
-    path = unquote(parsed.path).lower().rstrip("/")
-    return bool(host) and path.endswith(".apk") and not is_official(host)
+    path = unquote(parsed.path).lower().rstrip("/.")
+    return (bool(host) and path.endswith(".apk") and not is_official(host)
+            and host.rsplit(".", 1)[-1] not in RESERVED_TLDS)
 
 
 APK_DESC = "the link points straight to an Android app file (.apk), which installs outside the Play Store"

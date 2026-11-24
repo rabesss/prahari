@@ -37,7 +37,7 @@ NON_HITS = [
     # other real companies one edit away (top-1M check)
     "ecobank.com", "cobank.com", "rbcbank.com", "axosbank.com", "idfcbank.com", "bluecart.com", "indiahost.co",
     "delivery.com", "kodak.com", "kotaku.com", "kotka.fi", "recharge.com", "canadabanks.net", "xpressbet.com",
-    "google.com", "example.org",
+    "google.com", "example.org", "dtdcindia.com",
     # placeholders, IPs and non-Latin hosts are other rules' business
     "paytm.example", "hdfcbnk.test", "10.0.0.1", "xn--hdfcbnk-xyz.com",
 ]
@@ -59,9 +59,16 @@ def test_official_domains_never_flagged(reg):
         assert typosquat.match(host) is None
         names = [n for n, _ in rules.url_indicators("https://" + host + "/")]
         assert "typosquat" not in names and "brand_lookalike" not in names and "official_domain" in names
+        assert "risky_tld" not in names
         # The SMS rules keep main's official list; the typosquat check adds nothing for these hosts.
         assert "lookalike of the official" not in mech.host_risk(host)
         assert "typosquat" not in (indicrules.host_risk(host) or ("",))
+
+
+def test_registry_suffixes_are_not_listed_sites_in_the_url_route():
+    # GLM 5.4 on #70: .ac.in hosts stay as they were on main in the URL route.
+    names = [n for n, _ in rules.url_indicators("https://sbi-kyc.xyzcollege.ac.in/verify")]
+    assert "brand_lookalike" in names and "official_domain" not in names
 
 
 @pytest.mark.parametrize("text", [
@@ -101,9 +108,12 @@ def test_url_typosquat_is_not_cleared():
     ("http://x.in/SBI%2Eapk", True), ("x.in/a.apk#top", True), ("https://a.in/dl?file=x.apk", False),
     ("https://a.in/apk-guide.html", False), ("https://www.sbi.co.in/yono.apk", False),
     ("https://play.google.com/store/apps/details?id=com.sbi.lotusintouch", False),
+    # GLM 5.4 on #70: official domains in any list and reserved names never get the APK line
+    ("https://www.flipkart.com/x.apk", False), ("http://x.test/app.apk", False), ("http://x.in/app.apk.", True),
 ])
 def test_apk_download(url, hit):
-    assert typosquat.apk_download(url) is hit
+    if "flipkart" not in url:  # on main's own official list, so only the URL rule exempts it
+        assert typosquat.apk_download(url) is hit
     names = [n for n, _ in rules.url_indicators(url)]
     assert ("apk_download" in names) is hit
 
