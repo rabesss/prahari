@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,16 +22,231 @@ assert intake.detect_mode('tcp connections to 200 different ports on 10.0.0.5 wi
 assert intake.detect_mode('{"num_failed_logins": 4, "serror_rate": 1}') == 2
 assert intake.detect_mode('') == 0
 assert intake.detect_mode('{not json}') == 0
+assert intake.clean_share('hi\x00there\x7f') == 'hithere'
+assert intake.clean_share('a\r\nb\tc') == 'a\nb\tc'
+assert intake.clean_share('  \x1bkeep  ') == 'keep'
+assert '\n' in intake.clean_share('line\nnext')
 print('share-text mode detection passed')
 
 hi = json.loads((ROOT / 'android/python/strings_hi.json').read_text(encoding='utf-8'))
-assert set(hi) >= {'ui', 'evidence', 'skip', 'new'}
+assert set(hi) >= {'ui', 'evidence', 'skip', 'new', 'templates'}
 assert isinstance(hi['ui'], dict) and hi['ui']['Check on this phone']
 assert isinstance(hi['evidence'], dict) and any('{host}' in k for k in hi['evidence'])
+assert isinstance(hi['templates'], list) and hi['templates']
 assert isinstance(hi['skip'], list) and hi['skip']
 for key, item in hi['new'].items():
-    assert 'en' in item and 'hi' in item, key
+    assert 'en' in item and 'hi' in item and item['hi'].strip(), key
 print('hindi string table shape passed')
+
+def _calls(name, src):
+    """Argument text of each call to name(, ignoring longer identifiers."""
+    out = []
+    token = name + '('
+    i = 0
+    while True:
+        j = src.find(token, i)
+        if j < 0:
+            break
+        if j > 0 and (src[j - 1].isalnum() or src[j - 1] == '_'):
+            i = j + len(token)
+            continue
+        k = j + len(token)
+        depth = 1
+        buf = []
+        while k < len(src) and depth:
+            c = src[k]
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth == 0:
+                    break
+            if depth:
+                buf.append(c)
+            k += 1
+        out.append(''.join(buf))
+        i = k + 1
+    return out
+
+def _lits(blob):
+    return re.findall(r'"((?:\\.|[^"\\])*)"', blob)
+
+def _split_args(blob):
+    """Top-level arguments of a call, respecting strings and nested brackets."""
+    out, buf, depth, quote, esc = [], [], 0, False, False
+    for ch in blob:
+        if quote:
+            buf.append(ch)
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                quote = False
+            continue
+        if ch == '"':
+            quote = True
+        elif ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            out.append(''.join(buf)); buf = []
+            continue
+        buf.append(ch)
+    out.append(''.join(buf))
+    return out
+
+def _arg_lit(blob, nth):
+    """The string literal that is argument nth itself, or None."""
+    args = _split_args(blob)
+    if nth >= len(args):
+        return None
+    m = re.fullmatch(r'\s*"((?:\\.|[^"\\])*)"\s*', args[nth])
+    return m.group(1) if m else None
+
+assert _arg_lit('this, "Offline", 12', 1) == 'Offline'
+assert _arg_lit('"Check", f(a, "x")', 0) == 'Check'
+assert _arg_lit('f(a, "x"), "Label"', 1) == 'Label'
+
+_SLOT = {
+    'n': r'(\d+)', 'count': r'(\d+)', 'tld': r'([A-Za-z0-9]+)',
+    'host': r"([^\s']+)", 'reg': r"([^\s']+)", 'ip': r"([^\s']+)",
+    'brand': r"([^']+)", 'b': r"([^']+)", 'what': r'(link|text|message)',
+}
+
+def _compile_slots(english):
+    names = []
+    pat = ['^']
+    i = 0
+    while i < len(english):
+        if english[i] == '{':
+            end = english.find('}', i + 1)
+            if end < 0:
+                return None
+            name = english[i + 1:end]
+            names.append(name)
+            pat.append(_SLOT.get(name, r'(.+?)'))
+            i = end + 1
+        else:
+            pat.append(re.escape(english[i]))
+            i += 1
+    pat.append('$')
+    return re.compile(''.join(pat)), names
+
+_TEMPLATES = []
+for item in hi['templates']:
+    compiled = _compile_slots(item['en'])
+    assert compiled, item
+    _TEMPLATES.append((compiled[0], compiled[1], item['hi'], len(item['en'])))
+for english, hindi_line in hi['evidence'].items():
+    if '{' not in english:
+        continue
+    compiled = _compile_slots(english)
+    if compiled:
+        _TEMPLATES.append((compiled[0], compiled[1], hindi_line, len(english)))
+_TEMPLATES.sort(key=lambda row: -row[3])
+
+def hindi_line(english):
+    """Same order as L10n.t: exact ui, exact evidence, then templates."""
+    if english in hi['skip']:
+        return english
+    if english in hi['ui']:
+        return hi['ui'][english]
+    if english in hi['evidence']:
+        return hi['evidence'][english]
+    for regex, names, hindi_text, _length in _TEMPLATES:
+        match = regex.match(english)
+        if not match:
+            continue
+        out = hindi_text
+        for index, name in enumerate(names):
+            out = out.replace('{' + name + '}', match.group(index + 1))
+        return out
+    return None
+
+_kt = (ROOT / 'android/app/src/main/java/in/prahari/app/MainActivity.kt').read_text(encoding='utf-8')
+_used = set()
+for _fn, _nth in (
+    ('txt', 0), ('toast', 0), ('button', 0), ('heading', 0), ('bar', 0), ('root', 0),
+    ('iconButton', 1), ('iconText', 1), ('asButton', 1), ('a11yText', 1), ('bottom', 1),
+):
+    for _args in _calls(_fn, _kt):
+        _lit = _arg_lit(_args, _nth)
+        if _lit is not None:
+            _used.add(_lit)
+for _args in _calls('t', _kt):
+    _found = _lits(_args)
+    if _found:
+        _used.add(_found[0])
+_new_keys = set()
+for _args in _calls('n', _kt):
+    _found = _lits(_args)
+    if _found:
+        _new_keys.add(_found[0])
+
+_KEEP = {'Prahari', 'EN', 'Llama 3.2', 'OK'}
+_missing = []
+for _key in sorted(_used):
+    if not _key or _key in hi['skip'] or _key in _KEEP or _key in hi['new']:
+        continue
+    if '$' in _key or '\\' in _key:
+        continue
+    if not re.search(r'[A-Za-z]', _key):
+        continue
+    if hindi_line(_key) in (None, '', _key):
+        _missing.append(_key)
+for _key in sorted(_new_keys):
+    _item = hi['new'].get(_key)
+    if not _item or not str(_item.get('hi', '')).strip():
+        _missing.append('new:' + _key)
+assert not _missing, 'Hindi missing for app strings:\n' + '\n'.join(_missing)
+
+_samples = [
+    "the domain amaz0n-refund-help.top imitates 'amazon' on .top",
+    "the domain pay.sbi-secure.top imitates 'sbi' and uses .top, a throwaway registry",
+    "the domain amaz0n-refund-help.top swaps letters for digits to imitate a brand",
+    "the domain amaz0n-refund-help.top is unusually long or hyphenated",
+    "the domain bit.ly is a URL shortener that hides its destination",
+    "12 failed logins",
+    "3 failed login attempts on the connection",
+    "traffic to 200 different ports on 10.0.0.5",
+    "traffic to 200 different ports",
+    "official domain www.irctc.co.in",
+    "lookalike domain sbi-kyc.top",
+    "risky .top lookalike domain sbi-kyc.top",
+    "URL shortener bit.ly",
+]
+for _sample in _samples:
+    _got = hindi_line(_sample)
+    assert _got and _got != _sample, _sample
+    assert 'The domain' not in _got and 'this phone' not in _got.lower()
+    # The host or count from the English line is kept, not translated away.
+    _token = re.search(r"[\w.-]*\d[\w.-]*|[a-z0-9.-]+\.[a-z]{2,}", _sample)
+    if _token and _token.group(0) not in ('12',):
+        assert _token.group(0) in _got, (_sample, _got)
+print('every app string has Hindi, including evidence templates')
+
+def device_words(text):
+    """Mirror of MainActivity.onDevice for an x86/x86_64 ABI. arm64 does not call this."""
+    return (text
+            .replace("this phone's", "this emulator's")
+            .replace('this phone', 'this emulator')
+            .replace('इसी फ़ोन', 'इसी एम्युलेटर')
+            .replace('इस फ़ोन', 'इस एम्युलेटर'))
+
+_phone_bits = ('this phone', 'इस फ़ोन', 'इसी फ़ोन')
+_hi_values = list(hi['ui'].values()) + list(hi['evidence'].values())
+_hi_values += [item['hi'] for item in hi['new'].values()]
+_hi_values += [item['hi'] for item in hi['templates']]
+for _value in _hi_values:
+    if any(bit in _value for bit in ('इस फ़ोन', 'इसी फ़ोन')):
+        _shown = device_words(_value)
+        assert 'इस फ़ोन' not in _shown and 'इसी फ़ोन' not in _shown, _value
+for _key in list(hi['ui']) + [item['en'] for item in hi['new'].values()]:
+    if 'this phone' in _key:
+        assert 'this phone' not in device_words(_key), _key
+print('emulator wording drops this phone and इस फ़ोन')
 
 import qrdec
 _HI = """
