@@ -29,7 +29,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import asr, callrules
+from . import asr, callrules, sender
 
 CAND = Path(__file__).resolve().parents[1]
 REPO = CAND.parents[1]
@@ -112,7 +112,7 @@ def classify_call(transcript: str) -> dict:
     stop_warning = lab == 1
     speech_script = build_speech_script(lab, call_a["is_digital_arrest"], evidence, actions)
 
-    return {
+    res = {
         "label": lab,
         "verdict": VERDICT[lab],
         "stop_warning": stop_warning,
@@ -124,6 +124,12 @@ def classify_call(transcript: str) -> dict:
         "actions": actions,
         "speech_script": speech_script,
     }
+    # Advisory only: a call that mentions a bank gets the 1600-series note; the verdict is unchanged.
+    note = sender.call_note(text)
+    if note:
+        res["advisory"] = note
+        res["advisory_hi"] = sender.NOTE_1600_HI
+    return res
 
 
 def _protective_reminder(text: str, call_a: dict, det_lab) -> bool:

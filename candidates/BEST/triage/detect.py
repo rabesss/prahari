@@ -4,7 +4,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from . import indicrules, mech, rules, textmodel, upi
+from . import indicrules, mech, rules, sender, textmodel, upi
 
 ART = Path(__file__).resolve().parents[1] / "artifacts"
 _cache = {}
@@ -196,8 +196,19 @@ def predict_flow_text(text):
 
 
 
-def classify_any(kind, inp):
-    """Used by explain: returns (label, score, evidence) for any input kind."""
+def classify_any(kind, inp, sender_id=None):
+    """Used by explain: returns (label, score, evidence) for any input kind.
+
+    sender_id is the optional sender the reader typed in. It can only raise a text message (see
+    sender.py); with no sender the result is exactly the detector's.
+    """
+    lab, score, ev = _classify(kind, inp)
+    if sender_id:
+        lab, score, ev = sender.apply(lab, score, ev, sender.reason(kind, inp, sender_id))
+    return lab, score, ev
+
+
+def _classify(kind, inp):
     if kind == "upi" or (kind in ("url", "sms") and upi.is_upi_payload(inp)):
         return upi.classify(inp)
     if kind == "url":

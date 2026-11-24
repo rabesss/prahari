@@ -447,3 +447,36 @@ upi_unknown = json.loads(mobile.check(
 assert upi_unknown['verdict'] == 'SUSPICIOUS' and upi_unknown['level'] == 'warn'
 assert all(upi_unknown['actions_hi']), upi_unknown['actions_hi']
 print('mobile.check runs with only NumPy installed (including UPI QR payloads)')
+
+# Optional sender: only a personal mobile number on an official-looking message changes anything.
+from triage import sender as sender_rules
+alert = 'Dear customer, your SBI a/c XX1234 is debited Rs 5000. Not you? Call 1800111109'
+plain = json.loads(mobile.verdict('sms', alert))
+for hdr in ('', 'AX-SBIINB-S', 'SBIINB', 'VM-123456'):
+    assert json.loads(mobile.verdict('sms', alert, hdr)) | {'detector_ms': 0} == plain | {'detector_ms': 0}, hdr
+assert 'sender_raised' not in plain
+raised = json.loads(mobile.verdict('sms', alert, '+91 98765 43210'))
+assert raised['level'] in ('warn', 'danger') and raised['sender_raised'] == 'alert', raised
+assert raised['evidence'][0] == sender_rules.SENDER_LINE and raised['evidence_quotes'][0] == ''
+assert len(raised['evidence']) == len(raised['evidence_quotes'])
+assert sender_rules.SENDER_LINE_HI in raised.get('summary_hi', ''), raised.get('summary_hi')
+_table = json.loads((ROOT / 'android/python/strings_hi.json').read_text(encoding='utf-8'))
+assert _table['evidence'][sender_rules.SENDER_LINE] == sender_rules.SENDER_LINE_HI
+
+
+class Capture(Echo):
+    prompts = []
+
+    def generate(self, prompt):
+        Capture.prompts.append(prompt)
+        return super().generate(prompt)
+
+
+both = json.loads(mobile.check('sms', alert, Capture(), '9876543210'))
+assert both['sender_raised'] == 'alert' and sender_rules.OPENING['alert'] in Capture.prompts[-1]
+mobile.check('sms', alert, Capture())
+assert sender_rules.OPENING['alert'] not in Capture.prompts[-1]  # the flag never leaks to the next check
+danger = 'Your SBI KYC expires tonight. Send your OTP to 9123456780 now or the account will be blocked.'
+assert json.loads(mobile.verdict('sms', danger, '9876543210'))['level'] == 'danger'
+assert 'sender_raised' not in json.loads(mobile.verdict('url', 'http://sbi-kyc.in-verify.top/login', '9876543210'))
+print('optional sender check passed (raise-only, header never changes the result)')

@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 import mobile
-from triage import asr, callguard, callrules, llm
+from triage import asr, callguard, callrules, llm, sender
 
 _CALL_HI_STEPS = {
     callguard.DIGITAL_ARREST_ACTIONS[0]:
@@ -127,6 +127,11 @@ def verdict_call(transcript, truncated=False, partial=False, checked_seconds=30)
     report = mobile._report_buttons('sms', lab, scam, actions)
     if report:
         out['report_buttons'] = report
+    # Advisory only (1600-series bank service calls); never changes the verdict.
+    note = sender.call_note(text)
+    if note:
+        out['advisory'] = note
+        out['advisory_hi'] = sender.NOTE_1600_HI
     return json.dumps(out, ensure_ascii=False)
 
 

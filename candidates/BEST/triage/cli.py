@@ -4,7 +4,7 @@ import json
 import sys
 import time
 
-from . import detect
+from . import detect, sender
 
 VERDICT = {1: "malicious", 0: "benign", "uncertain": "uncertain"}
 
@@ -24,6 +24,9 @@ def cmd_predict(a):
     rows = read_jsonl(a.inp)
     if a.task == "sms":
         res = detect.predict_text([r["text"] for r in rows])
+        # Optional "sender" (absent from every eval set): it can only raise a row.
+        res = [sender.apply(lab, s, ev, sender.reason("sms", r["text"], r.get("sender")))
+               if r.get("sender") else (lab, s, ev) for r, (lab, s, ev) in zip(rows, res)]
     elif a.task == "url":
         res = detect.predict_url([r["url"] for r in rows])
     elif a.task == "upi":
@@ -43,7 +46,9 @@ def cmd_explain(a):
     for r in rows:
         t0 = time.time()
         kind, inp = r["kind"], r["input"]
-        lab, score, ev = detect.classify_any(kind, inp)
+        sid = r.get("sender")
+        why = sender.reason(kind, inp, sid) if sid else None
+        lab, score, ev = detect.classify_any(kind, inp, sid)
         row = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
                     "category": scam_type(kind, inp, lab),
                     "actions": actions_for(kind, lab, inp), "evidence_used": ev}
@@ -52,10 +57,15 @@ def cmd_explain(a):
             hi = summary_hi(kind, inp, lab, ev)
         except Exception:  # an aid only; a table problem must never stop the explain run
             hi = ""
+        if hi and why:
+            hi = f"{hi} {sender.SENDER_LINE_HI}।"
         if hi:
             row["summary_hi"] = hi
+        if why:
+            row["sender_raised"] = why
         try:
-            text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
+            extra = {"sender_reason": why, "sender_id": sid} if why else {}
+            text, stats = ex.generate(ex.prompt(kind, inp, lab, ev, **extra))
             if not isinstance(text, str) or not text.strip():
                 raise ValueError('empty explanation')
             row.update(explanation=text, llm=stats, explanation_status='success')

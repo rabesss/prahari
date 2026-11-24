@@ -431,7 +431,8 @@
   "no request for a payment or link in the link": "इस लिंक में पैसे या लिंक की कोई मांग नहीं है",
   "no request for a secret or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या लिंक की कोई मांग नहीं है",
   "no request for a secret or payment in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या पैसे की कोई मांग नहीं है",
-  "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है"
+  "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है",
+  "Banks and government send SMS from registered sender IDs like XX-ABCDEF, not personal mobile numbers": "बैंक और सरकारी विभाग SMS रजिस्टर्ड सेंडर ID (जैसे XX-ABCDEF) से भेजते हैं, निजी मोबाइल नंबर से नहीं"
  },
  "skip": [
   "$label · $hi",
@@ -557,6 +558,18 @@
   "upi_caveat": {
    "en": "Always verify the payee name and amount in your UPI app before entering your PIN. Receiving money never needs a PIN.",
    "hi": "PIN डालने से पहले अपने UPI ऐप में नाम और राशि ज़रूर जांचें। पैसे पाने के लिए PIN कभी नहीं लगता।"
+  },
+  "sender_label": {
+   "en": "Sender (optional)",
+   "hi": "भेजने वाला (ज़रूरी नहीं)"
+  },
+  "sender_hint": {
+   "en": "AX-HDFCBK-S or 98XXXXXXXX",
+   "hi": "AX-HDFCBK-S या 98XXXXXXXX"
+  },
+  "sender_note": {
+   "en": "The name or number shown at the top of the SMS. A sender ID never proves a message is real.",
+   "hi": "SMS में सबसे ऊपर दिखने वाला नाम या नंबर। सेंडर ID से यह साबित नहीं होता कि मैसेज असली है।"
   }
  },
  "templates": [

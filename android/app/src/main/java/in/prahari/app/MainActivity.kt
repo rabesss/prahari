@@ -120,6 +120,9 @@ private fun hasOwnContact(text: String): Boolean =
 private fun bankAlertLevel(verdict: JSONObject, value: String): String? {
     val level = verdict.optString("level", "clear")
     if (level != "clear" && level != "warn") return null
+    // A personal-mobile sender already raised this result to SUSPICIOUS with its own evidence line;
+    // the amber CHECK THIS ALERT banner would hide that line, so the level is left as it is.
+    if (verdict.has("sender_raised")) return null
     val actions = verdict.optJSONArray("actions") ?: return null
     val vetted = (0 until actions.length()).any { val a = actions.optString(it); a == DEBIT_STEP || a == CHECK_STEP }
     if (!vetted) return null
@@ -220,7 +223,9 @@ internal object Bridge {
         val mode: Int,
         val value: String,
         val started: Long,
-        val verdict: JSONObject
+        val verdict: JSONObject,
+        /** Optional sender typed for this check (message mode only); never stored in History. */
+        val sender: String = ""
     ) {
         @Volatile var explanation: JSONObject? = null
         @Volatile var totalMs: Long = -1L
@@ -397,30 +402,30 @@ private fun requestModel(force: Boolean) {
     }
 }
 
-private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long) {
+private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, sender: String) {
     Bridge.worker.execute {
         try {
-            runCheck(id, mode, value, started)
+            runCheck(id, mode, value, started, sender)
         } catch (t: Throwable) {
             Log.e(TAG, "check escaped", t)
         }
     }
 }
 
-private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
+private fun runCheck(id: Int, mode: Int, value: String, started: Long, sender: String) {
     try {
         if (!Bridge.still(id)) return
         if (Bridge.pythonError != null || !Python.isStarted()) {
             throw IllegalStateException(Bridge.pythonError ?: "Python is not running")
         }
         val bridge = Python.getInstance().getModule("mobile")
-        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value).toString())
+        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value, sender).toString())
         val level = verdict.optString("level")
         if (level != "danger" && level != "warn" && level != "clear") {
             throw IllegalStateException("Invalid detector verdict")
         }
         if (!Bridge.still(id)) return
-        val job = Bridge.Job(id, mode, value, started, verdict)
+        val job = Bridge.Job(id, mode, value, started, verdict, sender)
         if (!Bridge.publish(id, job)) return
         Bridge.app?.let { ctx ->
             try {
@@ -470,6 +475,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
             act.inputValue = value
+            act.senderValue = sender
             act.selectedMode = mode
             act.showHome()
             act.failureToast(detail)
@@ -586,6 +592,9 @@ class MainActivity : Activity() {
     internal var screen = "home"
     internal var selectedMode = 0
     internal var inputValue = ""
+    /** Optional sender for the current message check. Cleared for shared, QR and sample text. */
+    internal var senderValue = ""
+    private var senderInput: EditText? = null
     private var sharedBanner = false
     private var advancedOpen = false
     internal var shownId = Int.MIN_VALUE
@@ -1030,6 +1039,7 @@ class MainActivity : Activity() {
         savedInstanceState?.let {
             selectedMode = it.getInt("mode", 0).coerceIn(0, KINDS.lastIndex)
             inputValue = it.getString("input") ?: ""
+            senderValue = it.getString("sender") ?: ""
             sharedBanner = it.getBoolean("shared")
             advancedOpen = it.getBoolean("advanced")
         }
@@ -1072,8 +1082,10 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(out: Bundle) {
         super.onSaveInstanceState(out)
         if (screen == "home" && ::input.isInitialized) inputValue = input.text?.toString() ?: inputValue
+        if (screen == "home") senderInput?.let { senderValue = it.text?.toString() ?: senderValue }
         out.putInt("mode", selectedMode)
         out.putString("input", inputValue)
+        out.putString("sender", senderValue)
         out.putString("screen", screen)
         out.putBoolean("shared", sharedBanner)
         out.putBoolean("advanced", advancedOpen)
@@ -1081,6 +1093,7 @@ class MainActivity : Activity() {
         if (job != null) {
             out.putString("verdict", job.verdict.toString())
             out.putString("value", job.value)
+            out.putString("jobSender", job.sender)
             out.putInt("jobMode", job.mode)
             out.putLong("started", job.started)
             job.explanation?.let { out.putString("explanation", it.toString()) }
@@ -1098,7 +1111,8 @@ class MainActivity : Activity() {
                 mode = state.getInt("jobMode", selectedMode),
                 value = state.getString("value") ?: inputValue,
                 started = state.getLong("started", SystemClock.elapsedRealtime()),
-                verdict = JSONObject(raw)
+                verdict = JSONObject(raw),
+                sender = state.getString("jobSender") ?: ""
             )
             val explanation = state.getString("explanation")
             job.explanation = if (explanation != null) JSONObject(explanation)
@@ -1145,7 +1159,7 @@ class MainActivity : Activity() {
     private fun goHome(clear: Boolean = false) {
         stopSpeech()
         Bridge.cancel()
-        if (clear) inputValue = ""
+        if (clear) { inputValue = ""; senderValue = "" }
         showHome()
     }
 
@@ -1210,6 +1224,44 @@ class MainActivity : Activity() {
         }
         label.id = View.generateViewId()
         label.labelFor = input.id
+        // Optional sender (message mode only). It can only raise a result: a personal mobile number
+        // on a bank-style message is marked suspicious; a sender ID never makes a message safe.
+        val senderCard = col().apply {
+            background = shape(T.white, 16f, 1, T.outline2)
+            pad(this, 16, 12, 16, 10)
+        }
+        val senderLabel = txt(n("sender_label"), 12f, T.brand, 600, 16, raw = true)
+        val senderField = EditText(this).apply {
+            setText(senderValue)
+            hint = n("sender_hint")
+            setTextColor(T.ink)
+            setHintTextColor(T.ink3)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            includeFontPadding = true
+            filters = arrayOf(android.text.InputFilter.LengthFilter(32))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            // Wraps instead of scrolling sideways, so the hint stays readable at font scale 2.0.
+            setHorizontallyScrolling(false)
+            maxLines = 2
+            minHeight = dp(48)
+            background = null
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            setPadding(0, dp(4), 0, dp(4))
+            id = View.generateViewId()
+        }
+        senderLabel.id = View.generateViewId()
+        senderLabel.labelFor = senderField.id
+        senderField.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { senderValue = s?.toString().orEmpty() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        add(senderCard, senderLabel)
+        add(senderCard, senderField, -1, -2, top = 4)
+        add(senderCard, txt(n("sender_note"), 12f, T.ink2, 400, 17, raw = true), top = 2)
+        senderInput = senderField
         fun refreshSegments() {
             segments.forEachIndexed { i, v ->
                 val selected = i == selectedMode
@@ -1222,6 +1274,7 @@ class MainActivity : Activity() {
             }
             label.text = t(labels[selectedMode])
             input.hint = t(hints[selectedMode])
+            senderCard.visibility = if (selectedMode == 0) View.VISIBLE else View.GONE
         }
         fun modeChip(i: Int): LinearLayout {
             val segment = col().apply {
@@ -1296,7 +1349,7 @@ class MainActivity : Activity() {
             minimumWidth = dp(48)
             minimumHeight = dp(48)
             setPadding(dp(4), 0, dp(4), 0)
-            setOnClickListener { input.setText("") }
+            setOnClickListener { input.setText(""); senderField.setText("") }
         }
         asButton(clear, "Clear text")
         add(tools, paste, -2, -2)
@@ -1304,6 +1357,7 @@ class MainActivity : Activity() {
         add(tools, clear, -2, -2)
         add(inputCard, tools)
         add(body, inputCard, -1, -2, top = 12)
+        add(body, senderCard, -1, -2, top = 8)
         focusBorder()
         refreshSegments()
         add(body, heading("Try a sample", "नमूना आज़माएँ"), top = 12)
@@ -1321,6 +1375,7 @@ class MainActivity : Activity() {
                         applyAdvanced()
                     }
                     refreshSegments()
+                    senderField.setText("")
                     input.setText(sample.value)
                     input.setSelection(input.text.length)
                 }
@@ -1506,6 +1561,7 @@ class MainActivity : Activity() {
             else -> {
                 sharedBanner = true
                 inputValue = text
+                senderValue = ""  // shared text carries no sender
                 selectedMode = detectMode(text)
                 showHome()
             }
@@ -1555,10 +1611,12 @@ class MainActivity : Activity() {
 
     private fun startCheck() {
         if (!::input.isInitialized) return
-        beginCheck(selectedMode, input.text?.toString() ?: "")
+        val sender = if (selectedMode == 0) senderInput?.text?.toString()?.trim().orEmpty() else ""
+        beginCheck(selectedMode, input.text?.toString() ?: "", sender)
     }
 
-    private fun beginCheck(mode: Int, value: String) {
+    /** [sender] defaults to the current check's sender, so a mode switch re-check keeps it. */
+    private fun beginCheck(mode: Int, value: String, sender: String = senderValue) {
         if (value.isBlank()) {
             toast("Paste a message, link or network event first.")
             return
@@ -1568,6 +1626,7 @@ class MainActivity : Activity() {
             return
         }
         inputValue = value
+        senderValue = sender.take(32)
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
         sharedBanner = false
         stopSpeech()
@@ -1575,7 +1634,7 @@ class MainActivity : Activity() {
         val id = Bridge.begin()
         val started = SystemClock.elapsedRealtime()
         showChecking(selectedMode, value)
-        enqueueCheck(id, selectedMode, value, started)
+        enqueueCheck(id, selectedMode, value, started, senderValue)
     }
 
     private fun showChecking(mode: Int, value: String) {
@@ -1969,6 +2028,7 @@ class MainActivity : Activity() {
         visibleJob = job
         selectedMode = job.mode.coerceIn(0, KINDS.lastIndex)
         inputValue = job.value
+        senderValue = job.sender
         screen = "result"
         networkBody = null
         val data = job.verdict
@@ -2656,7 +2716,7 @@ class MainActivity : Activity() {
                 }
                 // The decoded text is checked here. It is never opened as a link or a UPI intent.
                 inputValue = text
-                beginCheck(detectMode(text), text)
+                beginCheck(detectMode(text), text, "")
             }
         }, "prahari-qr").start()
     }
