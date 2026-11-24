@@ -1,0 +1,11 @@
+check,status,airplane_mode,detector_ms,first_token_ms,decode_tps,total_s,app_memory_mb,polled_peak_pss_mib,polled_peak_rss_mib,cpu_abi
+kyc-cold,ok,False,447.0,1780.0,23.0,3.97,1678.1,1774.1,1880.6,arm64-v8a
+kyc-warm-1,ok,False,45.0,1520.0,22.3,2.95,1689.7,1693.2,1799.6,arm64-v8a
+kyc-warm-2,ok,False,16.0,1510.0,22.6,2.9,1689.8,1692.7,1799.2,arm64-v8a
+kyc-warm-3,ok,False,25.0,1460.0,22.5,2.83,1691.5,1698.1,1804.6,arm64-v8a
+bill-benign,ok,False,76.0,1210.0,26.2,2.49,1693.1,1697.6,1804.2,arm64-v8a
+bank-debit,ok,False,30.0,1640.0,21.7,3.15,1694.9,1697.4,1804.1,arm64-v8a
+lookalike-link,timeout,False,244.0,,,5.86,1727.4,1746.2,1853.0,arm64-v8a
+official-link,ok,False,0.0,1040.0,27.2,2.15,1733.5,1737.6,1850.8,arm64-v8a
+port-scan,ok,False,6.0,1400.0,22.5,3.19,1734.7,1738.5,1851.7,arm64-v8a
+kyc-airplane,ok,True,19.0,1450.0,22.9,2.8,1733.7,1736.5,1850.8,arm64-v8a

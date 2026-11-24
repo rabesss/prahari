@@ -1,0 +1,2 @@
+ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac  /sdcard/Android/data/in.prahari.app/files/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte
+82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55  /sdcard/Android/data/in.prahari.app/files/tokenizer.model

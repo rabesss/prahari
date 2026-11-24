@@ -1,0 +1,36 @@
+{
+  "timestamp_utc": "2026-11-24T04:21:14Z",
+  "serial": "localhost:52790",
+  "device": {
+    "model": "SM-S911B",
+    "manufacturer": "samsung",
+    "android_release": "14",
+    "sdk": "34",
+    "abilist": "arm64-v8a,armeabi-v7a,armeabi",
+    "soc_model": "SM8550",
+    "soc_manufacturer": "QTI",
+    "cpu_parts": [
+      "0xd46",
+      "0xd4d",
+      "0xd47"
+    ],
+    "isa_arm_features": [
+      "asimd",
+      "asimddp",
+      "asimdhp",
+      "bf16",
+      "fphp",
+      "i8mm"
+    ]
+  },
+  "mem_total_line": "MemTotal:        7226268 kB",
+  "battery": {
+    "level_pct": 79,
+    "temp_c": 43.6
+  },
+  "package_installed": false,
+  "internet_permission_declared": false,
+  "model_sha256_raw": "",
+  "pte_hash_ok": false,
+  "tokenizer_hash_ok": false
+}
