@@ -794,8 +794,11 @@ def test_gating_run_on_older_apk_is_not_failed(tmp_path, monkeypatch):
     out = tmp_path / "out"
     rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
                          "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
-    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    row = rep["checks"][0]
     assert rc == 0 and row["status"] == "ok" and row["gating_mode_observed"] is None
+    # CodeRabbit r2: never presented as a gating comparison.
+    assert rep["summary"]["by_gating_mode"] == {"unconfirmed": {"checks": 1}}
 
 
 def test_failed_pass_launch_keeps_measured_rows(tmp_path, monkeypatch):

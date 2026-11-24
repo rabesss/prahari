@@ -459,10 +459,20 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
 
 
 def _gating_summary(rows: list[dict]) -> dict:
-    """Per requested gating mode: checks, how many skipped Llama, and median totals for each group."""
+    """Per gating mode: checks, how many skipped Llama, and median totals for each group.
+
+    Only rows whose app record confirmed the requested mode count. An older APK writes no record and
+    ignores the launch extra, so its rows (status ok, gating_mode_observed None) are counted under
+    `unconfirmed` and never as a gating comparison.
+    """
     out: dict = {}
+    unconfirmed = [r for r in rows if r.get("gating_mode") and r.get("gating_mode_observed") != r.get("gating_mode")]
+    if unconfirmed:
+        out["unconfirmed"] = {"checks": len(unconfirmed)}
     for mode in sorted({r.get("gating_mode") for r in rows if r.get("gating_mode")}):
-        group = [r for r in rows if r.get("gating_mode") == mode]
+        group = [r for r in rows if r.get("gating_mode") == mode and r.get("gating_mode_observed") == mode]
+        if not group:
+            continue
         skipped = [r for r in group if r.get("llama_skipped")]
         ran = [r for r in group if not r.get("llama_skipped")]
         out[mode] = {
@@ -518,6 +528,9 @@ def render_android_md(report: dict) -> str:
         lines += ["", "| Gating | Checks | Llama skipped | Median total, skipped (s) | Median total, Llama ran (s) |",
                   "|---|---:|---:|---:|---:|"]
         for mode, g in by_mode.items():
+            if mode == "unconfirmed":
+                lines.append(f"| unconfirmed (no app record; not a gating result) | {g['checks']} | — | — | — |")
+                continue
             lines.append(f"| `{mode}` | {g['checks']} | {g['llama_skipped']} | {cell(g['total_s_median_skipped'])} | "
                          f"{cell(g['total_s_median_llama'])} |")
     return "\n".join(lines) + "\n"
@@ -833,6 +846,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
             return
         perf_before = read_perf(serial)
+        if out_of_time():  # the log read itself can take a while
+            rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
+            return
         poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
         active_poller["p"] = poller
         poller.start()
