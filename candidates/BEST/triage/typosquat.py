@@ -9,8 +9,8 @@ any subdomain of one, or a host under a restricted Indian registry (.gov.in, .ni
 .ac.in, .edu.in), which only verified owners can register.
 
 The list is short on purpose: the organisations Indian scam messages imitate most. Each entry was
-checked on 24 Nov 2026 to serve the organisation's own site (or redirect to its .bank.in site).
-Domains that no longer resolve or that changed hands were left out (for example psbindia.com now
+fetched on 24 Nov 2026: most served the organisation's own page or redirected to its .bank.in site;
+a few bank sites blocked the automated request but resolved. Domains that no longer resolve or that changed hands were left out (for example psbindia.com now
 serves a gambling page), because treating a lapsed domain as official would clear a scam link.
 Sources: bank and payment-app names from the RBI list of scheduled commercial banks and the NPCI
 list of UPI apps; each domain from the organisation's own website.

@@ -27,9 +27,11 @@ Any official domain in the list, its subdomains, hosts under `.gov.in`, `.nic.in
 ## Official list and sources
 56 registrable domains: major banks and RBI (RBI list of scheduled commercial banks), NPCI,
 BHIM and UPI apps (NPCI's list of UPI apps), India Post, IRCTC, income tax, EPFO, UIDAI, DigiLocker,
-LIC, Airtel, Jio, Vi, BSNL and the main couriers. On 24 Nov 2026 each domain was checked to serve
-the organisation's site or redirect to its `.bank.in` site. Domains that no longer resolve or have
-changed hands were left out (`psbindia.com` now serves a gambling page), because a lapsed domain on
+LIC, Airtel, Jio, Vi, BSNL and the main couriers. On 24 Nov 2026 each domain was fetched: most served
+the organisation's page or redirected to its `.bank.in` site; a few bank sites (UCO, Union, Central,
+Bank of Maharashtra, South Indian, Bank of India, NPCI) answered with a bot block or timed out, but their
+names resolved and they are the domains those organisations publish. Domains that no longer resolve or
+have changed hands were left out (`psbindia.com` now serves a gambling page), because a lapsed domain on
 an allow list would clear a scam link. The verified list also counts as official in the existing
 URL, SMS and Indian-text rules.
 
