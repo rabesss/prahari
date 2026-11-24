@@ -595,6 +595,8 @@ class MainActivity : Activity() {
     /** The shared text and its source hint, used only if that exact text is then checked. */
     private var sharedText = ""
     private var sharedSource = ""
+    /** Source of the check in flight, so a mode switch on the checking screen keeps it. */
+    private var checkSource = ""
     private var advancedOpen = false
     internal var shownId = Int.MIN_VALUE
     private var visibleJob: Bridge.Job? = null
@@ -1452,7 +1454,9 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val shared = readShare(intent) ?: return
-        openShared(shared)
+        // getReferrer() still names the app that first launched this singleTop activity, so a
+        // later share gets no medium hint rather than a stale one.
+        openShared(shared, trustReferrer = false)
     }
 
     /** ACTION_SEND uses EXTRA_TEXT. ACTION_PROCESS_TEXT uses EXTRA_PROCESS_TEXT. Never log the text. */
@@ -1502,7 +1506,7 @@ class MainActivity : Activity() {
     }
 
     /** Share opens Home with the text filled in. Nothing is checked, and no link is opened, until Check. */
-    private fun openShared(raw: String) {
+    private fun openShared(raw: String, trustReferrer: Boolean = true) {
         stopSpeech()
         Bridge.cancel()
         val text = cleanShare(raw)
@@ -1520,7 +1524,7 @@ class MainActivity : Activity() {
             else -> {
                 sharedBanner = true
                 sharedText = text
-                sharedSource = shareSource()
+                sharedSource = if (trustReferrer) shareSource() else ""
                 inputValue = text
                 selectedMode = detectMode(text)
                 showHome()
@@ -1577,7 +1581,7 @@ class MainActivity : Activity() {
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
             }
             add(chip, label, 0, -2, left = 4, weight = 1f)
-            chip.setOnClickListener { if (i != selected) beginCheck(i, value, visibleJob?.source.orEmpty()) }
+            chip.setOnClickListener { if (i != selected) beginCheck(i, value, visibleJob?.source ?: checkSource) }
             val modeLabel = t(modeNames[i])
             asButton(chip, if (on) "$modeLabel, ${t("selected")}" else "${t("Change to")} $modeLabel")
             add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
@@ -1604,6 +1608,7 @@ class MainActivity : Activity() {
         inputValue = value
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
         sharedBanner = false
+        checkSource = source
         stopSpeech()
         hideKeyboard()
         val id = Bridge.begin()
@@ -2440,9 +2445,9 @@ class MainActivity : Activity() {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText(n("report_copy"), text)
             if (Build.VERSION.SDK_INT >= 33) {
-                // The report has masked codes and defanged links; Android may preview it.
+                // Codes are masked, but the report can quote the message: keep it out of the preview.
                 clip.description.extras = android.os.PersistableBundle().apply {
-                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false)
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
                 }
             }
             clipboard.setPrimaryClip(clip)
@@ -2770,6 +2775,9 @@ class MainActivity : Activity() {
                 }
                 // The decoded text is checked here. It is never opened as a link or a UPI intent.
                 inputValue = text
+                // Back to Home and Check again on the same text keeps the QR medium.
+                sharedText = text
+                sharedSource = "qr"
                 beginCheck(detectMode(text), text, "qr")
             }
         }, "prahari-qr").start()

@@ -7,8 +7,6 @@ import types
 from pathlib import Path
 import numpy as np
 import portable
-import remote_apps
-import report_card
 
 # detect imports joblib at module level, but Android never loads pickles: the
 # detectors below use exported portable parameters. Chaquopy ships no joblib,
@@ -23,6 +21,15 @@ textmodel.prob = lambda bundle, texts: np.array([portable.probability('indic', t
 sys.modules['triage.textmodel'] = textmodel
 from triage import detect, explain_hi, llm, upi
 detect.textmodel = textmodel
+# The report card and the remote-app flag are aids: a broken module must not stop checks.
+try:
+    import report_card
+except Exception:
+    report_card = None
+try:
+    import remote_apps
+except Exception:
+    remote_apps = None
 
 class Linear:
     def __init__(self, name): self.name = name
@@ -263,6 +270,8 @@ def _report_card(kind, text, lab, scam, ev, quotes, actions, source):
 
     report_card is for a SCAM or SUSPICIOUS result. report_card_raised is only for a bank alert
     that the app itself raises to SUSPICIOUS because it names its own link or number."""
+    if report_card is None:
+        return {}
     try:
         card = report_card.card(kind, text, lab, scam, ev, quotes, source)
         if card:
@@ -324,7 +333,7 @@ def verdict(kind, text, source=''):
     source = source if source in ('qr', 'whatsapp', 'sms') else ''
     out.update(_report_card(eff_kind, text, lab, scam, ev, out['evidence_quotes'], actions or [], source))
     try:
-        if remote_apps.needs_check(eff_kind, text, lab, scam, actions or []):
+        if remote_apps is not None and remote_apps.needs_check(eff_kind, text, lab, scam, actions or []):
             out['remote_app_check'] = True
     except Exception:
         pass  # an aid only: the verdict is shown without the banner

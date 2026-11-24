@@ -10,6 +10,7 @@ communication?", items i-xi, sancharsaathi.gov.in), English names kept exactly a
 import json
 import re
 import time
+import unicodedata
 from pathlib import Path
 
 # id, official English name, Hindi name. Order is the FAQ order.
@@ -20,7 +21,7 @@ CHAKSHU = (
      'पुलिस, CBI, कस्टम, आधार, RBI आदि बनकर धोखा'),
     ('relative', 'Impersonation as a relative / friend', 'रिश्तेदार / दोस्त बनकर धोखा'),
     ('kyc_payment', 'KYC and Payment related to Bank / Electricity / Gas / Insurance etc',
-     'बैंक / बिजली / गैस / बीमा आदि से जुड़ा KYC और भुगतान'),
+     'बैंक / बिजली / गैस / बीमा आदि से जुड़े KYC और भुगतान'),
     ('customer_care', 'Fake Customer Care Helpline', 'नकली कस्टमर केयर हेल्पलाइन'),
     ('job_offer', 'Online job/ gift/ lottery / loans offers', 'ऑनलाइन नौकरी / उपहार / लॉटरी / लोन का ऑफ़र'),
     ('ivr', 'IVR / Robo Calls', 'IVR / रोबो कॉल'),
@@ -146,13 +147,16 @@ _RELATIVE = re.compile(
 _POLICE = re.compile(
     r'\b(?:police|cbi|ncb|narcotics|customs|court|arrest|warrant|fir|cyber cell|aadhaar|aadhar|rbi|ed)\b|'
     r'digital arrest|पुलिस|गिरफ़्तार|गिरफ्तार|आधार', re.I)
+# A bank or KYC scam is reported as fake customer care only when it names a support desk, not
+# when it merely quotes a helpline or toll-free number.
+_CARE_DESK = re.compile(r'customer (?:care|support|service)|support (?:team|executive|agent)|कस्टमर केयर', re.I)
 _CARE = re.compile(r'customer (?:care|support|service)|helpline|help desk|support (?:team|executive|agent)|toll[- ]free|'
                    r'कस्टमर केयर', re.I)
 _IVR = re.compile(r'\bivr\b|press \d|dabay?e|दबाएं|recorded (?:message|call)|robo ?call', re.I)
 _JOB = re.compile(r'\b(?:job|salary|loan|lottery|prize|gift|reward|work from home|part[- ]time|task|lucky draw|kbc)\b|'
                   r'नौकरी|लोन|लॉटरी|इनाम', re.I)
 _INVEST = re.compile(r'\b(?:invest\w*|trading|stock|share market|ipo|returns?|profit|double)\b|निवेश|मुनाफ़ा|मुनाफा', re.I)
-_PARCEL = re.compile(r'\b(?:customs|courier|parcel|fedex|dhl|india post|shipment)\b|पार्सल|कस्टम', re.I)
+_CUSTOMS = re.compile(r'\bcustoms\b|कस्टम', re.I)
 _BANK = re.compile(r'\b(?:bank|kyc|upi|otp|pin|account|card|electricity|bijli|gas|insurance|refund)\b|बैंक|खाता|बिजली', re.I)
 _THREAT = re.compile(r'case|warrant|arrest|legal|parcel|illegal|मुकदमा|गिरफ़्तार|गिरफ्तार', re.I)
 
@@ -169,14 +173,14 @@ def category(kind, text, scam_type):
     if base == 'relative' or (base is None and _RELATIVE.search(text)):
         return 'relative'
     if base:
-        if base == 'kyc_payment' and _CARE.search(text):
+        if base == 'kyc_payment' and scam != DEBIT_ALERT and _CARE_DESK.search(text):
             return 'customer_care'
         return base
     # A mechanism phrase or a generic one: only text context names the category.
     if _POLICE.search(text) and _THREAT.search(text):
         return 'police_govt'
-    if scam == 'an advance-fee scam' and _PARCEL.search(text):
-        return 'police_govt'  # customs or courier fee: impersonates customs
+    if scam == 'an advance-fee scam' and _CUSTOMS.search(text):
+        return 'police_govt'  # a customs fee impersonates customs; a plain courier fee does not
     if _CARE.search(text):
         return 'customer_care'
     if _INVEST.search(text) and scam != 'an advance-fee scam':
@@ -213,26 +217,63 @@ def defang(s):
     return ''.join(out)
 
 
+# Two-part public suffixes common in Indian scam links; anything else keeps its last two labels.
+_SUFFIX2 = {'co.in', 'gov.in', 'nic.in', 'org.in', 'net.in', 'ac.in', 'edu.in', 'res.in', 'firm.in', 'gen.in',
+            'ind.in', 'co.uk', 'org.uk', 'com.au', 'com.sg', 'com.my', 'co.za', 'com.br', 'com.cn', 'com.hk',
+            'com.pk', 'com.bd', 'com.np', 'com.ng', 'co.id', 'co.jp', 'co.kr', 'co.nz'}
+
+
+def registrable(host):
+    """The registered name of a host (evil.top for a.b.evil.top, sbi.co.in for x.sbi.co.in).
+
+    Subdomains and paths are what a scammer can personalise per victim at no cost; the
+    registered name is what the family needs to avoid."""
+    labels = [x for x in host.split('.') if x]
+    keep = 3 if len(labels) >= 3 and '.'.join(labels[-2:]) in _SUFFIX2 else 2
+    return '.'.join(labels[-keep:])
+
+
 def link_origin(text):
-    """First link in the text as scheme and host only, defanged. No path or query: those can
-    carry the reader's own id or number."""
-    m = re.search(r'(?i)\b(https?)://([^\s/?#<>"\']+)|\bwww\.([^\s/?#<>"\']+)', str(text or ''))
-    if not m:
-        return ''
+    """First link in the text as scheme and registered domain only, defanged. No subdomain, path
+    or query: those can carry the reader's own name, id or number."""
+    for m in re.finditer(r'(?i)\b(https?)://([^\s/?#<>"\']+)|\bwww\.([^\s/?#<>"\']+)', str(text or '')):
+        if _official(m.group(0).rstrip('.,);!')):
+            continue  # an official link quoted beside the scam one is not what to avoid
+        return _origin(m)
+    return ''
+
+
+def _official(url):
+    try:
+        from triage import rules
+        return any(name == 'official_domain' for name, _ in rules.url_indicators(url))
+    except Exception:
+        return False
+
+
+def _origin(m):
     if m.group(1):
         host = m.group(2).split('@')[-1].split(':')[0]
         origin = f'{m.group(1).lower()}://{host.lower()}'
     else:
         origin = 'www.' + m.group(3).split(':')[0].lower()
-    origin = origin.rstrip('.,);!')
-    # A personalised host can carry a phone or account number; leave such a link out.
-    if re.search(r'\d{4,}', origin) or not _HOST.search(origin):
+    scheme, _, host = origin.rpartition('://') if '://' in origin else ('', '', origin)
+    host = registrable(host.rstrip('.,);!').removeprefix('www.'))
+    origin = f'{scheme}://{host}' if scheme else host
+    # A registered name can still carry a number, even split by hyphens; leave such a link out.
+    # Internationalised names (secure.भारत) are kept.
+    if re.search(r'\d{4,}', host) or len(re.findall(r'\d', host)) >= 6:
+        return ''
+    tld = host.rsplit('.', 1)[-1] if '.' in host else ''
+    if len(tld) < 2 or not all(c.isalpha() or unicodedata.category(c) in ('Mn', 'Mc') for c in tld):
         return ''
     return defang(origin)
 
 
-_SENDER_LINE = re.compile(r'^\s*(?:from|sender|प्रेषक)\s*[:\-]\s*([^\n]{2,40})$', re.I | re.M)
-_DLT = re.compile(r'^\s*([A-Z]{2}-[A-Z0-9]{6}(?:-[SPTG])?)\b')
+# [ \t]* keeps both linear on long runs of blank lines. The value must look like a sender ID or
+# number (no spaces), so "from: 10 AM to 11 AM" is not taken for a sender.
+_SENDER_LINE = re.compile(r'^[ \t]*(?:from|sender|प्रेषक)[ \t]*[:\-][ \t]*([A-Za-z0-9+@._-]{3,40})[ \t]*$', re.I | re.M)
+_DLT = re.compile(r'\A[ \t]*([A-Z]{2}-(?=[A-Z0-9]{0,5}[A-Z])[A-Z0-9]{6}(?:-[SPTG])?)\b')
 
 
 def sender(text):
@@ -318,17 +359,23 @@ def _date(today):
     return time.strftime('%d-%m-%Y', t)
 
 
+def mask(s):
+    """Hide 4+ digit runs (OTPs, account and phone numbers) the same way quote_span does."""
+    return re.sub(r'(?<!\d)\d{4,}(?!\d)', lambda m: '•' * len(m.group(0)), str(s or ''))
+
+
 def _quote(q, seen):
-    q = defang(str(q or '').strip().replace('"', "'"))
+    # UPI quotes come straight from the parsed payload, so they are masked here as well.
+    q = mask(defang(str(q or '').strip().replace('"', "'")))
     if not q or q in seen:
         return ''
     seen.add(q)
     return f': "{q}"'
 
 
-def report_text(lang, kind, text, scam, evidence, quotes, source='', today=None):
+def report_text(lang, kind, text, scam, evidence, quotes, source='', today=None, cid=None):
     hi = lang == 'hi'
-    cid = category(kind, text, scam)
+    cid = cid or category(kind, text, scam)
     en_name, hi_name = _NAMES[cid]
     med = MEDIUM[medium_key(kind, source)]
     who = sender(text)
@@ -337,7 +384,7 @@ def report_text(lang, kind, text, scam, evidence, quotes, source='', today=None)
     lines.append(('माध्यम: ' if hi else 'Medium: ') + (med[1] if hi else med[0]))
     lines.append(f'श्रेणी: {hi_name} ({en_name})' if hi else f'Category: {en_name}')
     if who:
-        lines.append(('भेजने वाला: ' if hi else 'Sender: ') + who)
+        lines.append(('भेजने वाला: ' if hi else 'Sender: ') + defang(who))
     lines.append(('जांच की तारीख: ' if hi else 'Checked on: ') + _date(today))
     if scam:
         lines.append(('प्रकार: ' if hi else 'Type: ') + ((hindi_line(scam) or scam) if hi else scam))
@@ -348,20 +395,20 @@ def report_text(lang, kind, text, scam, evidence, quotes, source='', today=None)
         seen = set()
         for line, quote in shown:
             words = (hindi_line(line) or line) if hi else line
-            lines.append(f'- {defang(words)}{_quote(quote, seen)}')
+            lines.append(f'- {mask(defang(words))}{_quote(quote, seen)}')
     lines.append('इस फ़ोन पर Prahari से ऑफ़लाइन जांचा गया। कुछ भी भेजा नहीं गया।' if hi
                  else 'Checked offline on this phone by Prahari. Nothing was sent.')
     lines.append(LOST_MONEY[1] if hi else LOST_MONEY[0])
     return '\n'.join(lines)
 
 
-def family_text(lang, kind, text, scam, lab=1, source=''):
+def family_text(lang, kind, text, scam, lab=1, source='', cid=None):
     """Short warning to forward. Never the message body, sender, numbers or names.
 
     It speaks only about the one checked item: "flagged as a scam" for DANGEROUS, "may be a scam"
     for SUSPICIOUS."""
     hi = lang == 'hi'
-    cid = category(kind, text, scam)
+    cid = cid or category(kind, text, scam)
     what_en, step_en, what_hi, step_hi = FAMILY['upi' if kind == 'upi' else cid]
     key = medium_key(kind, source)
     # A link or UPI item already says what it is; only a message or QR names how it arrived.
@@ -369,7 +416,7 @@ def family_text(lang, kind, text, scam, lab=1, source=''):
     link = link_origin(text)
     sure = lab == 1
     if hi:
-        noun = f' ({MEDIUM[key][1]})' if med[0] else ''
+        noun = f" ({MEDIUM[key][1].removesuffix(' मैसेज')})" if med[0] else ''
         head = (f'ठगी की चेतावनी: {what_hi}{noun}। Prahari ने इसे ठगी बताया।' if sure
                 else f'सावधान: {what_hi}{noun}। यह ठगी हो सकती है।')
         parts = [head, step_hi]
@@ -404,8 +451,8 @@ def card(kind, text, lab, scam, evidence, quotes, source='', today=None, raised=
     en_name, hi_name = _NAMES[cid]
     return {
         'category': cid, 'category_en': en_name, 'category_hi': hi_name,
-        'report_en': report_text('en', kind, text, scam, evidence, quotes, source, today),
-        'report_hi': report_text('hi', kind, text, scam, evidence, quotes, source, today),
-        'family_en': family_text('en', kind, text, scam, lab, source),
-        'family_hi': family_text('hi', kind, text, scam, lab, source),
+        'report_en': report_text('en', kind, text, scam, evidence, quotes, source, today, cid),
+        'report_hi': report_text('hi', kind, text, scam, evidence, quotes, source, today, cid),
+        'family_en': family_text('en', kind, text, scam, lab, source, cid),
+        'family_hi': family_text('hi', kind, text, scam, lab, source, cid),
     }
