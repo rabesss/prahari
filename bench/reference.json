@@ -311,6 +311,108 @@
     }
   },
   "stress": {
+    "benign_tripwires.jsonl": {
+      "sha256": "e9e4c6082868825d624772fb9ad835a3cf488855bc3a95288cefea7ed47429dc",
+      "n": 16,
+      "rows": {
+        "bt-001": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-002": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-003": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-004": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-005": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-006": {
+          "label": 0,
+          "prediction": 1,
+          "correct": false,
+          "gate": false
+        },
+        "bt-007": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-008": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-009": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "bt-010": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-011": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-012": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-013": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-014": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-015": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "bt-016": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
     "hi_mix.jsonl": {
       "sha256": "57b60c0df6c3781e05998e01fb77ce48836b57a8f36c8b6f4acd56e6d4a65748",
       "n": 21,
@@ -1582,6 +1684,126 @@
           "gate": true
         },
         "r4-058": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        }
+      }
+    },
+    "r5_sms.jsonl": {
+      "sha256": "7a18f8fd31016318fabfb98acfccebc2490cc94717d4c53044cd31cd16f7e658",
+      "n": 19,
+      "rows": {
+        "r5-001": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-002": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-003": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-004": {
+          "label": 1,
+          "prediction": 0,
+          "correct": false,
+          "gate": false
+        },
+        "r5-005": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-006": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-007": {
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "gate": true
+        },
+        "r5-008": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-009": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-010": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-011": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-012": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-013": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-014": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-015": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-016": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-017": {
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "gate": true
+        },
+        "r5-018": {
+          "label": 0,
+          "prediction": 1,
+          "correct": false,
+          "gate": false
+        },
+        "r5-019": {
           "label": 0,
           "prediction": 0,
           "correct": true,
