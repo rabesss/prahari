@@ -123,15 +123,16 @@ def build_arm_perf_chart() -> Path:
     _style_ax(ax2)
     targets = [
         "Oracle N1\n(2 vCPU)",
+        "S23 5b59ee2\n(24 Nov eve, warm)",
         "S23 round-3 build\n(24 Nov, warm)",
         "S23 r1 APK\n(23 Nov, airplane)",
         "S23 r1 APK\n(23 Nov, warm)",
         "Neoverse-V2\n(2T)",
         "Neoverse-V2\n(8T)",
     ]
-    tps_vals = [19.9, 21.5, 39.0, 43.4, 46.7, 104.6]
-    lat_vals = [3.84, 2.90, 1.42, 1.20, 1.73, 0.98]
-    colors = [SLATE, AMBER, TEAL, BLUE, INDIGO, "#312E81"]
+    tps_vals = [19.9, 32.5, 21.5, 39.0, 43.4, 46.7, 104.6]
+    lat_vals = [3.84, 1.86, 2.90, 1.42, 1.20, 1.73, 0.98]
+    colors = [SLATE, "#B45309", AMBER, TEAL, BLUE, INDIGO, "#312E81"]
     y = np.arange(len(targets))
 
     ax2.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
@@ -141,7 +142,7 @@ def build_arm_perf_chart() -> Path:
     ax2.set_yticklabels(targets, fontsize=8.8)
     ax2.set_xlabel("Llama 3.2 1B INT4 decode speed (tok/s)", fontsize=9.5, color=SLATE)
     ax2.set_xlim(0, 165)
-    ax2.set_ylim(-0.65, 5.55)
+    ax2.set_ylim(-0.65, 6.55)
     ax2.tick_params(axis="x", labelsize=9)
     for b, tps, lat in zip(hbars, tps_vals, lat_vals):
         ax2.text(
