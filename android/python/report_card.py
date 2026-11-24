@@ -11,6 +11,7 @@ import json
 import re
 import time
 import unicodedata
+from urllib.parse import unquote
 from pathlib import Path
 
 # id, official English name, Hindi name. Order is the FAQ order.
@@ -223,13 +224,21 @@ _SUFFIX2 = {'co.in', 'gov.in', 'nic.in', 'org.in', 'net.in', 'ac.in', 'edu.in', 
             'com.pk', 'com.bd', 'com.np', 'com.ng', 'co.id', 'co.jp', 'co.kr', 'co.nz'}
 
 
+_GENERIC2 = {'com', 'co', 'net', 'org', 'gov', 'ac', 'edu', 'ltd', 'plc', 'nic', 'res', 'mil', 'or', 'ne', 'go'}
+# Characters IDNA treats as a label dot (ideographic, fullwidth and halfwidth full stops).
+_IDNA_DOTS = re.compile('[\u3002\uff0e\uff61]')
+
+
 def registrable(host):
     """The registered name of a host (evil.top for a.b.evil.top, sbi.co.in for x.sbi.co.in).
 
     Subdomains and paths are what a scammer can personalise per victim at no cost; the
     registered name is what the family needs to avoid."""
     labels = [x for x in host.split('.') if x]
-    keep = 3 if len(labels) >= 3 and '.'.join(labels[-2:]) in _SUFFIX2 else 2
+    two = '.'.join(labels[-2:])
+    # com.tr, co.th, org.au...: a generic second level under a country code is a public suffix.
+    suffix2 = two in _SUFFIX2 or (len(labels[-1]) == 2 and labels[-2] in _GENERIC2) if len(labels) >= 2 else False
+    keep = 3 if len(labels) >= 3 and suffix2 else 2
     return '.'.join(labels[-keep:])
 
 
@@ -258,6 +267,8 @@ def _origin(m):
     else:
         origin = 'www.' + m.group(3).split(':')[0].lower()
     scheme, _, host = origin.rpartition('://') if '://' in origin else ('', '', origin)
+    # Percent-encoded and IDNA dots separate labels too, so they cannot hide a subdomain.
+    host = _IDNA_DOTS.sub('.', unquote(host)).lower()
     host = registrable(host.rstrip('.,);!').removeprefix('www.'))
     origin = f'{scheme}://{host}' if scheme else host
     # A registered name can still carry a number, even split by hyphens; leave such a link out.
@@ -265,7 +276,8 @@ def _origin(m):
     if re.search(r'\d{4,}', host) or len(re.findall(r'\d', host)) >= 6:
         return ''
     tld = host.rsplit('.', 1)[-1] if '.' in host else ''
-    if len(tld) < 2 or not all(c.isalpha() or unicodedata.category(c) in ('Mn', 'Mc') for c in tld):
+    punycode = re.fullmatch(r'xn--[a-z0-9-]{2,59}', tld)
+    if not punycode and (len(tld) < 2 or not all(c.isalpha() or unicodedata.category(c) in ('Mn', 'Mc') for c in tld)):
         return ''
     return defang(origin)
 
