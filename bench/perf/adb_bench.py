@@ -828,6 +828,10 @@ def cmd_run(args: argparse.Namespace) -> int:
                          "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
                          "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
             return
+        if out_of_time():
+            # Chip search and UI dumps can cross the deadline; do not start a check past it.
+            rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
+            return
         perf_before = read_perf(serial)
         poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
         active_poller["p"] = poller
@@ -879,14 +883,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         rec["gating_mode"] = gating
         perf = new_perf_record(perf_before, read_perf(serial), "result")
         merge_perf(rec, perf)
-        if status == "ok" and gating and pass_has_telemetry["v"]:
-            # A gating pass on an app that writes PrahariPerf records needs this check's record, in the
-            # requested mode. An older APK writes none (and ignores the launch extra): its rows keep
-            # status ok with gating_mode_observed None.
-            if perf is None:
+        if status == "ok" and gating:
+            # Any record present must report the requested mode. A missing record fails the check only
+            # when this pass has shown the app writes records (preload record or an earlier result);
+            # an older APK writes none and ignores the launch extra, so its rows keep status ok with
+            # gating_mode_observed None.
+            if perf is not None:
+                pass_has_telemetry["v"] = True
+                if perf.get("gating") != gating:
+                    status = "gating-mismatch"
+            elif pass_has_telemetry["v"]:
                 status = "telemetry-missing"
-            elif perf.get("gating") != gating:
-                status = "gating-mismatch"
             if status != "ok":
                 print(f"[adb_bench] ERROR: {check_id}: {status} (requested {gating}, "
                       f"record {perf.get('gating') if perf else None})", file=sys.stderr)

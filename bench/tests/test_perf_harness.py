@@ -737,7 +737,7 @@ def test_parse_dir_keeps_gating_telemetry(tmp_path):
     assert row["detector_ms"] == 7.25 and row["llama_skipped"] is True
 
 
-def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None):
+def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None, emit_model=True, report_gating=None):
     run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
     home = (run8 / "sample-row.xml").read_text(encoding="utf-8")
     stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")
@@ -759,7 +759,7 @@ def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None):
             st["session"] += 1
             st["seq"] = 0
             st["gating"] = a[a.index(adb_bench.GATING_EXTRA) + 1] if adb_bench.GATING_EXTRA in a else None
-            if emit_records:
+            if emit_records and emit_model:
                 log({"event": "model", "state": "ready", "gating": st["gating"]})
             return ""
         if a[:2] == ["logcat", "-d"]:
@@ -769,7 +769,8 @@ def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None):
             if st["screen"] == "home" and (x, y) == (540, 1726):
                 st["screen"] = "result"
                 if emit_records:
-                    log({"event": "result", "gating": st["gating"], "llama_skipped": False, "total_ms": 1200})
+                    log({"event": "result", "gating": report_gating or st["gating"], "llama_skipped": False,
+                         "total_ms": 1200})
             elif st["screen"] == "result" and y > 2000:
                 st["screen"] = "home"
         return ""
@@ -821,3 +822,13 @@ def test_deadline_rechecked_after_launch(tmp_path, monkeypatch):
                     "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "50", "--deadline-s", "7"])
     row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
     assert row["status"] == "skipped-deadline"
+
+
+def test_mode_mismatch_caught_without_preload_record(tmp_path, monkeypatch):
+    """Terra r2: a late or unread preload record must not switch off mode validation."""
+    _fake_device(monkeypatch, emit_model=False, report_gating="flagged-only")
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert rc == 2 and row["status"] == "gating-mismatch"
