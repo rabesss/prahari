@@ -94,6 +94,13 @@ assert rc.link_origin('http://x.sbl-help.co.in/a') == 'hxxp://sbl-help[.]co[.]in
 assert rc.link_origin('http://x.sbi.co.in/a') == ''  # only official links: nothing to avoid
 assert rc.link_origin('http://98765-43210.top/') == ''  # a number in the registered name itself
 assert rc.link_origin('no link here') == ''
+assert rc.link_origin('http://x%0Aupi%3A%2F%2Fpay%3Fpa%3Drahul%40ybl.com') == ''  # decoded newline/URL
+assert rc.link_origin('https://asha%40gmail.com/phish') == ''  # decoded '@'
+assert rc.link_origin('https://evil%E2%80%AE.top/x') == ''  # decoded bidi override
+assert rc.link_origin('https://asha.com.in/kyc') == ''  # com.in is not a listed suffix: left out
+for _odd in ('http://x%0Aupi%3A%2F%2Fpay%3Fpa%3Drahul%40ybl.com', 'https://asha%40gmail.com/phish'):
+    _fam = rc.family_text('en', 'sms', 'Pay now ' + _odd, 'a fake payment request', 1)
+    assert '@' not in _fam and 'upi://' not in _fam and 'asha' not in _fam and 'rahul' not in _fam, _fam
 assert rc.link_origin('https://asha。evil.top/x') == 'hxxps://evil[.]top'  # IDNA dot
 assert rc.link_origin('https://asha%2Eevil.top/x') == 'hxxps://evil[.]top'  # percent-encoded dot
 assert rc.link_origin('https://secure.xn--h2brj9c/verify') == 'hxxps://secure[.]xn--h2brj9c'  # punycode TLD

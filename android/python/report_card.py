@@ -277,6 +277,11 @@ def _origin(m):
     scheme, _, host = origin.rpartition('://') if '://' in origin else ('', '', origin)
     # Percent-encoded and IDNA dots separate labels too, so they cannot hide a subdomain.
     host = _IDNA_DOTS.sub('.', unquote(host)).lower()
+    # A decoded host may only hold hostname characters: letters (with Indic vowel signs), digits,
+    # hyphens and dots. Anything else (a newline, '@', ':', '/', a bidi control) leaves the link out,
+    # so no decoded text can reach the family message.
+    if not host or not all(c.isalnum() or c in '.-' or unicodedata.category(c) in ('Mn', 'Mc') for c in host):
+        return ''
     host = registrable(host.rstrip('.,);!').removeprefix('www.'))
     if _ambiguous(host):
         return ''
