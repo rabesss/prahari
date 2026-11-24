@@ -629,6 +629,8 @@ class MainActivity : Activity() {
         Sample("KYC scam SMS", 0, "Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked"),
         Sample("Bill reminder", 0, "Your electricity bill of Rs 1,240 is due on 15 Dec. Pay through the mahadiscom app; no link is attached."),
         Sample("Lookalike link", 1, "http://amaz0n-refund-help.top/claim?id=8812"),
+        Sample("UPI refund QR scam", 1, "upi://pay?pa=cashback.refund99@ybl&pn=Amazon%20Refund%20Desk&am=4999&cu=INR&tn=Scan%20and%20enter%20UPI%20PIN%20to%20receive%20refund"),
+        Sample("Legit kirana QR", 1, "upi://pay?pa=sharma.kirana@okicici&pn=Sharma%20Kirana%20Store&mc=5411&cu=INR&tn=Grocery%20bill"),
         Sample("Official link", 1, "https://www.irctc.co.in/nget/train-search"),
         Sample("Port scan", 2, "tcp connections to 200 different ports on 10.0.0.5 within 10 seconds, all rejected"),
         Sample("Hinglish electricity", 0, "Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein."),
@@ -1731,12 +1733,58 @@ class MainActivity : Activity() {
     }
 
     /** "SMS · checked on this phone in 1.2 s", with the Hindi line when that mode is on. */
-    private fun checkedMeta(mode: Int, elapsedMs: Double): String {
+    private fun checkedMeta(mode: Int, elapsedMs: Double, isUpi: Boolean = false): String {
         val tail = formatMs(elapsedMs)
-        val name = modeNames[mode.coerceIn(0, modeNames.lastIndex)]
+        val name = if (isUpi) "UPI QR" else modeNames[mode.coerceIn(0, modeNames.lastIndex)]
         val where = t("checked on this phone")
         val shownName = t(name)
         return if (L10n.hindi) "$shownName · $where · $tail" else "$shownName · $where in $tail"
+    }
+
+    private fun upiCard(upi: JSONObject): LinearLayout {
+        val box = card()
+        add(box, heading("UPI QR details", "UPI QR विवरण"))
+        val direction = upi.optString("direction", "sends_money")
+        val intentLabel = upi.optString("intent_label", "Sends money from your account")
+        val badgeFill = if (direction == "sends_money") T.warnC else T.dangerC
+        val badgeInk = if (direction == "sends_money") T.onWarnC else T.onDanger
+        val badge = iconText(R.drawable.ic_alert_circle, intentLabel, badgeInk, 13f, 16, flex = true).apply {
+            background = shape(badgeFill, 12f)
+            pad(this, 10, 7, 12, 7)
+        }
+        add(box, badge, -1, -2, top = 8)
+        fun fieldRow(label: String, value: String, mono: Boolean = false, first: Boolean = false) {
+            if (!first) divider(box, 6)
+            val line = row().apply { gravity = Gravity.TOP; pad(this, 0, 6, 0, 2) }
+            add(line, txt(label, 12f, T.ink3, 600, 18), 88, -2)
+            val v = txt(value, 14f, T.ink, 500, 20, raw = true).apply {
+                if (mono) typeface = Typeface.MONOSPACE
+            }
+            add(line, v, 0, -2, left = 8, weight = 1f)
+            add(box, line, -1, -2)
+        }
+        val rows = ArrayList<Triple<String, String, Boolean>>()
+        val pn = upi.optString("payee_name", "")
+        val pa = upi.optString("payee_vpa", "")
+        val amt = upi.optString("amount", "")
+        val cu = upi.optString("currency", "INR")
+        val mc = upi.optString("merchant_code", "")
+        val isMerchant = upi.optBoolean("is_merchant", false)
+        val note = upi.optString("note", "")
+        if (pn.isNotBlank()) rows.add(Triple("Payee", pn, false))
+        if (pa.isNotBlank()) rows.add(Triple("UPI ID", pa, true))
+        rows.add(Triple("Amount", if (amt.isNotBlank()) "$cu $amt" else t("Entered by you"), amt.isNotBlank()))
+        val cat = when {
+            mc.isNotBlank() -> "MCC $mc"
+            isMerchant -> t("Merchant")
+            else -> t("Personal / P2P")
+        }
+        rows.add(Triple("Category", cat, isMerchant))
+        if (note.isNotBlank()) rows.add(Triple("Note", note, false))
+        rows.forEachIndexed { idx, item -> fieldRow(item.first, item.second, item.third, idx == 0) }
+        divider(box, 8)
+        add(box, iconText(R.drawable.ic_lock, "Checked safely — no UPI app was opened", T.ink3, 12f, 14, flex = true), -1, -2, top = 8)
+        return box
     }
 
     private fun banner(p: Palette, why: String, meta: String, metaIcon: Int, stillVerify: Boolean = false): LinearLayout {
@@ -1949,7 +1997,8 @@ class MainActivity : Activity() {
         val body = scrollBody(root)
         val modeRow = modeSwitcher(selectedMode, job.value)
         add(body, modeRow, -1, -2)
-        val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble()), modeIcons[selectedMode], calm)
+        val upi = data.optJSONObject("upi")
+        val b = banner(p, why, checkedMeta(selectedMode, elapsed.toDouble(), upi != null), modeIcons[selectedMode], calm)
         b.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         if (job.mode == 2) add(b, txt(n("replay_label"), 13f, p.on, 600, 18, raw = true), top = 8)
         metaText = b.findViewWithTag<TextView>("prahari-meta")
@@ -2044,12 +2093,14 @@ class MainActivity : Activity() {
             }, top = 8)
         } else if (clear && mode == 1) {
             divider(steps, 12)
-            add(steps, iconText(R.drawable.ic_alert_circle, n("link_caveat"), T.ink2, 13f, 16, flex = true).apply {
+            val caveat = if (upi != null) n("upi_caveat") else n("link_caveat")
+            add(steps, iconText(R.drawable.ic_alert_circle, caveat, T.ink2, 13f, 16, flex = true).apply {
                 minimumHeight = dp(48)
                 setPadding(0, dp(8), 0, dp(8))
             }, top = 8)
         }
         add(body, steps, top = 12)
+        if (upi != null) add(body, upiCard(upi), top = 12)
         var whyCard: View? = null
         val shownEvidence = evidence.filter { it.isNotBlank() }
         if (shownEvidence.isEmpty() && (level == "danger" || level == "warn") && !bankAlert && selectedMode != 2) {
@@ -2095,6 +2146,18 @@ class MainActivity : Activity() {
             }
             whyCard = evidenceCard
             add(body, evidenceCard, top = 12)
+        }
+        // Hindi mode: the detector's fixed-text Hindi summary leads, labelled as not AI-written.
+        // Llama 3.2 1B cannot write reliable Hindi, so its explanation below stays in English.
+        val summaryHi = data.optString("summary_hi", "")
+        if (L10n.hindi && summaryHi.isNotEmpty()) {
+            val hiCard = card()
+            add(hiCard, txt(data.optString("summary_hi_label", ""), 12f, T.ink3, 600, 16, raw = true))
+            add(hiCard, txt(summaryHi, 15f, T.ink, 400, 24, raw = true).apply {
+                includeFontPadding = true
+                isFallbackLineSpacing = true
+            }, top = 6)
+            add(body, hiCard, top = 12)
         }
         val llama = card(T.surface2, false)
         add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
@@ -2264,7 +2327,7 @@ class MainActivity : Activity() {
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
         fillStats(job.verdict, result.optJSONObject("llm"), total, pss)
-        metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble())
+        metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
     }
 
     private fun launch(intent: Intent) {

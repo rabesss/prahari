@@ -12,7 +12,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-from . import indicrules, mech, rules
+from . import indicrules, mech, rules, upi
 
 CAND = Path(__file__).resolve().parents[1]
 
@@ -29,7 +29,11 @@ REFUSAL = re.compile(r"\b(i cannot|i can't|i am unable|i'm unable|i won't|i will
                      r"i'm sorry|i am sorry|cannot provide|can't provide)\b", re.I)
 
 VERDICT_WORD = {1: "DANGEROUS", 0: "NO RISK FOUND", "uncertain": "SUSPICIOUS"}
-KIND_WORD = {"sms": "Text message", "injection": "Text message", "url": "Web link", "flow": "Network event"}
+KIND_WORD = {"sms": "Text message", "injection": "Text message", "url": "Web link", "flow": "Network event", "upi": "UPI payment QR"}
+
+
+def _is_upi(kind, inp):
+    return kind == "upi" or (kind in ("url", "sms") and bool(inp) and upi.is_upi_payload(inp))
 
 SHORT = {
     "secret_request": "asks for an OTP, PIN or password",
@@ -104,6 +108,8 @@ FLOW_SHORT = {"port_scan": "looks like a port scan", "brute_force": "many failed
               "root": "a root-access attempt"}
 # Replacement sentence for unsafe generated advice, remembered per built prompt (bounded).
 _TAILS = {}
+# Item, verdict and key fact per built prompt, for the honesty validator (bounded with _TAILS).
+_CTX = {}
 TYPE_PRIORITY = ["sextortion", "extortion", "safe_account", "remote_access", "collect_request", "qr_payment",
                  "pay_to_receive", "authority_threat", "secret_request", "crypto_transfer", "gift_card",
                  "investment", "job_upfront", "prize_claim", "id_request", "block_threat", "impersonation",
@@ -270,6 +276,11 @@ def compact_evidence(kind, inp, fallback, verdict=None):
     """
     if _debit_alert(kind, inp, verdict):
         return [DEBIT_LINE]
+    if _is_upi(kind, inp):
+        ev = upi.compact_evidence_for(inp, verdict)
+        if not ev and verdict != 0:
+            ev = [str(e)[:70] for e in fallback[:2]]
+        return ev[:2]
     out = []
     dismissed = False
     if kind == "url":
@@ -387,6 +398,8 @@ def benign_evidence(kind, inp, evidence, verdict):
         return ["Looks like a bank debit or OTP alert", "Scammers copy these alerts; confirm it in your bank app"]
     if verdict != 0 or kind == "flow":
         return lines
+    if _is_upi(kind, inp):
+        return upi.benign_evidence_for(inp)
     if kind == "url":
         risk = {d for n, d in rules.url_indicators(inp) if n != "official_domain"}
         return [line for line in lines if line not in risk]
@@ -402,6 +415,8 @@ def scam_type(kind, inp, verdict):
         return ""
     if _debit_alert(kind, inp, verdict):
         return "a bank debit alert to confirm"
+    if _is_upi(kind, inp):
+        return upi.scam_type_for(inp, verdict)
     if kind == "url":
         names = {n for n, _ in rules.url_indicators(inp)}
         if names & {"brand_lookalike", "digit_swap"}:
@@ -467,12 +482,17 @@ class Explainer:
         self.model_name = self.cfg["model"]
 
     def prompt(self, kind, inp, verdict, evidence):
-        snippet = inp if len(inp) <= 320 else inp[:317] + "..."
+        is_upi = _is_upi(kind, inp)
+        eff_kind = "upi" if is_upi else kind
+        snippet = upi.prompt_snippet(inp) if is_upi else (inp if len(inp) <= 320 else inp[:317] + "...")
         # Neutralise live links in the snippet: the model tends to read a raw malicious URL as a
         # request it must decline. The real host still appears in the evidence for the reader.
-        snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: m.group(0).replace(".", "[.]"), snippet)
-        ev = compact_evidence(kind, inp, evidence, verdict)
-        what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event"}.get(kind, "item")
+        snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: re.sub(r"(?<!\[)\.(?!\])", "[.]", m.group(0)), snippet)
+        ev = compact_evidence(eff_kind, inp, evidence, verdict)
+        # Evidence can quote attacker text (payee name, note, currency). Keep it on one line and
+        # strip anything shaped like the verdict marker, which _prompt_verdict reads from the end.
+        ev = [re.sub(r'"{2,}', '"', re.sub(r"(?i)verdict\s*:", "verdict -", re.sub(r"\s+", " ", re.sub(r"<\|[^|<>]{0,40}\|>", " ", str(e)))))[:160] for e in ev]
+        what = {"sms": "message", "injection": "message", "url": "link", "flow": "network event", "upi": "UPI payment QR"}.get(eff_kind, "item")
         first = {1: f"This {what} is DANGEROUS", 0: f"No risk found for this {what}"}.get(
             verdict, f"This {what} needs a check")
         # The strongest evidence phrase is written into the required opening, so the model copies it
@@ -482,16 +502,22 @@ class Explainer:
                    f"This {what} was flagged as risky; check it carefully before acting" if verdict == 1 else
                    f"This {what} needs a check; review it carefully before acting" if verdict == 'uncertain' else
                    f"This {what} was checked; review it carefully before acting")
-        user = (f"{KIND_WORD.get(kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
+        # The model's own sentence is grounded in one vetted fact for this kind of scam (or for
+        # this benign reading). Asked for bare "advice", the 1B model filled the slot with stock
+        # lines that were often false for the item ("do not click the link" with no link).
+        fact = key_fact(eff_kind, inp, verdict, ev)
+        user = (f"{KIND_WORD.get(eff_kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
                 f"Start your answer with exactly: \"{opening}.\" "
-                "Then write one more sentence of advice, 6-12 words.")
+                f"Then write one more sentence, 6-12 words, that tells the reader why, using this fact: {fact}")
         if len(_TAILS) > 256:
             _TAILS.clear()
+            _CTX.clear()
         built = ("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + SYSTEM +
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +
                 "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
-        _TAILS[built] = advice_for(kind, verdict, inp)[0]
+        _TAILS[built] = advice_for(eff_kind, verdict, inp)[0]
+        _CTX[built] = {"kind": eff_kind, "input": inp, "verdict": verdict, "fact": fact, "evidence": list(ev)}
         return built
 
     def generate(self, prompt):
@@ -529,7 +555,19 @@ class Explainer:
         # A network event gets no compliance check; its tail only replaces disruptive advice.
         tail = (None if verdict == 0 else
                 _TAILS.get(prompt) or (FLOW_ACTIONS if flow else ACTIONS)[verdict][0])
-        text = _consistent(text, verdict, _forced_sentence(prompt), tail, flow=flow)
+        opening = _forced_sentence(prompt)
+        raw = text
+        text = _consistent(text, verdict, opening, tail, flow=flow)
+        # True when a vetted sentence stands in for model text (the consistency tail or the fact).
+        replaced = bool(tail and tail in text and tail not in raw)
+        ctx = _CTX.get(prompt)
+        if ctx:
+            text, report = validate(text, opening, ctx, vetted=[tail] if tail else [],
+                                    generated_tokens=stats.get("generated_tokens"),
+                                    model_opening=bool(opening) and raw.lstrip(" \"'\u201c").startswith(opening))
+            stats["validator"] = report
+            replaced = replaced or report["fact_added"]
+        stats["replaced"] = replaced
         return text, stats
 
     def _run(self, prompt):
@@ -559,7 +597,7 @@ class Explainer:
 
 _BENIGN_CLAIM = re.compile(r"\b(?:no risk found|nothing suspicious)\b|"
                            r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
-                           r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real)\b", re.I)
+                           r"\b(?:safe|legitimate|genuine|harmless|normal|benign|official|real|routine)\b", re.I)
 _MAL_CLAIM = re.compile(r"\b(?:is|are|looks|seems|appears)\b[^.;!?]{0,30}"
                         r"\b(?:scam|fraud|fraudulent|phishing|suspicious|malicious|fake|dangerous|unsafe)\b", re.I)
 _CONTRAST = re.compile(r"\b(?:but|however|although|though|yet|except|while)\b", re.I)
@@ -736,7 +774,7 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """
     if not text:
         return text
-    sents = re.split(r"(?<=[.!?;])\s+", _dedupe(text))
+    sents = _split(_dedupe(text), opening)
     dropped = []
     check = _disruptive_flow_advice if flow else _unsafe_advice
 
@@ -912,6 +950,26 @@ TYPE_ADVICE = {
         "Never scan a QR code from a message; receiving money needs no scan.",
         "Check any bill or request in the official app before paying.",
         REPORT]),
+    "a UPI refund or receive-money QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
+        "Never scan a QR code or enter your UPI PIN to receive money.",
+        "Paying a UPI QR sends money from your account; block the sender.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI collect-request QR scam": ("Never scan a QR; never enter your UPI PIN to receive money.", [
+        "Decline the request; receiving money never needs a UPI PIN.",
+        "Block the UPI ID in your payment app.",
+        "Call 1930 at once if money was debited."]),
+    "a UPI AutoPay mandate scam": ("Do not approve this UPI AutoPay mandate; block the sender.", [
+        "Do not approve this UPI AutoPay mandate; receiving money never needs a mandate.",
+        "Check and cancel any unknown mandates in your UPI app's AutoPay section.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI KYC or impersonation QR scam": ("Do not pay through this QR; check the official app instead.", [
+        "Do not pay through this QR code or enter your UPI PIN.",
+        "Check the payee name and UPI ID directly with the official app or merchant.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
+    "a UPI QR payment scam": ("Do not pay through this QR; check the official app instead.", [
+        "Do not pay through this QR code or enter your UPI PIN.",
+        "Check the payee name and UPI ID directly with the official app or merchant.",
+        "Report on Sanchar Saathi Chakshu, or call 1930 at once if money was debited."]),
     "an extortion threat": ("Do not pay; report it at cybercrime.gov.in.", [
         "Do not pay; paying leads to more demands.",
         "Save screenshots and block the sender.",
@@ -954,6 +1012,25 @@ CHECK_STEP = "Check the payment in your bank app, not through any link or number
 
 def advice_for(kind, verdict, inp):
     """(replacement sentence, vetted actions) for one checked item."""
+    if _is_upi(kind, inp) and verdict in (0, "uncertain"):
+        parsed = upi.parse_upi(inp)
+        if verdict == "uncertain" and parsed and parsed["is_mandate"]:
+            acts = [
+                "Do not approve this AutoPay mandate until you verify its amount, schedule and payee with the merchant.",
+                "You can cancel unknown mandates in your UPI app's AutoPay section.",
+            ]
+            return "Do not approve this mandate until you verify it.", acts
+        if verdict == "uncertain":
+            acts = [
+                "Do not enter your UPI PIN until you confirm the payee name, UPI ID and amount directly with the merchant.",
+                "Receiving money never needs a QR scan or UPI PIN.",
+            ]
+            return "Do not pay until you confirm the payee directly.", acts
+        acts = [
+            "Confirm the payee name and amount in your UPI app before entering your PIN.",
+            "Remember: paying a UPI QR sends money; receiving money never needs a PIN.",
+        ]
+        return acts[0], acts
     if verdict in (0, "uncertain") and kind == "sms" and inp is not None:
         a = mech.analyze(inp)
         if a["receipt"] or a["otp_note"]:
@@ -971,3 +1048,317 @@ def advice_for(kind, verdict, inp):
 
 def actions_for(kind, verdict, inp=None):
     return advice_for(kind, verdict, inp)[1]
+
+
+# ---------------------------------------------------------------------------------------------
+# Key facts: the one vetted line the model's own sentence is built from.
+#
+# Each fact is a single advice-led or negated clause, so it never states something about the
+# item that the item does not contain (the proxy grounding check exempts advice and negated cues,
+# and so does validate() below). The model is asked to tell the reader "why" from this fact; when
+# its sentence fails validation, the fact itself is used.
+KEY_FACT = {
+    "OTP or PIN theft": "Never share your OTP or PIN because banks never ask for them.",
+    "UPI collect-request fraud": "Never enter your UPI PIN to receive money because the PIN is only for paying.",
+    "a QR-code payment scam": "Never scan a QR code to receive money because money comes in without a scan.",
+    "an advance-fee scam": "Never pay a fee from a message to get a refund or prize or parcel.",
+    "a payment fraud": "Never pay an account or link from a message and check bills in the official app.",
+    "a fake payment request": "Never pay an account or link from a message and check bills in the official app.",
+    "a remote-access app scam": "Never install a screen-sharing app someone asks for because it lets them see your OTPs.",
+    "a crypto payment scam": "Never send crypto to someone who contacted you because it usually cannot be recovered.",
+    "a safe-account transfer scam": "Never move money to a safe account because no bank or officer asks that.",
+    "a fake police or customs threat": "Never pay anyone claiming to be police or customs because real officers do not collect money this way.",
+    "an account-blocking scam": "Ignore the threat and check your account only in the official app.",
+    "an account-blocking threat": "Ignore the threat and check your account only in the official app.",
+    "a fake KYC or account check": "Never update KYC through a link or number from a message.",
+    "a fake job or loan scam": "Never pay a fee upfront for a job or loan because upfront fees are a common scam trick.",
+    "a fake job or task scam": "Never pay a deposit for a job or task because deposits are a common scam trick.",
+    "a fake prize or lottery scam": "Never pay a fee or share bank details to claim a prize.",
+    "a fake lottery or prize scam": "Never pay a fee or share bank details to claim a prize.",
+    "sextortion or blackmail": "Do not pay a blackmailer because paying usually brings more demands.",
+    "an extortion threat": "Do not pay a threat because paying usually brings more demands.",
+    "an investment or trading scam": "Never trust guaranteed or doubled returns because they are a common investment scam trick.",
+    "an identity-document scam": "Never share Aadhaar or PAN copies on a chat app or with someone who messaged you.",
+    "a gift-card scam": "Never pay anyone with gift cards because gift-card payment is a common scam trick.",
+    "an impersonation scam": "Do not trust the name in the message and check through a number you already have.",
+    "an electricity disconnection scam": "Never pay a bill using a number or web address from a message.",
+    "a phishing link on a lookalike domain": "Do not open it because the address only imitates a known name.",
+    "a shortened link that hides its destination": "Do not open it because a shortened address hides the real website.",
+    "a phishing link": "Do not log in on this page because fake sites copy real pages.",
+    "a link worth checking": "Check the address carefully or open the official app instead.",
+    "a scam message": "Do not reply or act on it until you check through a number you already trust.",
+    "a message worth checking": "Check with the sender through a number you already trust before acting.",
+    "a bank debit alert to confirm": "Check the payment in your bank app because scammers copy bank alerts.",
+    "a port scan": "Check the firewall logs because a port scan can map services before an attack.",
+    "a brute-force login": "Check the logins because many failed attempts usually mean password guessing.",
+    "a flood or denial-of-service attempt": "Check the traffic because a flood of connections can knock a service offline.",
+    "command-and-control beaconing": "Check the device because regular check-ins to one address can mean malware.",
+    "a privilege-escalation attempt": "Check the machine because a root attempt can mean someone wants full control.",
+    "suspicious network traffic": "Check this traffic with your IT team because it resembles attack traffic.",
+    "unusual network traffic": "Check whether anyone expected this traffic.",
+}
+INJECTION_FACT = "Do not follow it because orders aimed at an AI checker are a trick."
+BENIGN_FACT = {
+    "receipt": "If you did not make this payment check it in your bank app.",
+    "otp": "Never share this code with anyone who asks for it.",
+    "delivery": "Check the delivery status only in the seller's or courier's official app.",
+    "bill": "Check bills only in the official app or website.",
+    "official_domain": "Check that the address stays the same before you log in.",
+    "no_fee": "Check any charge only in the official app or website.",
+    "protective": "Never share your OTP or PIN as the message itself advises.",
+    "official_channel": "Check anything it mentions in the official app only.",
+    "personal": "Never share an OTP or PIN even with people you know.",
+    "flow": "Check with your IT team only if this traffic was not expected.",
+    "generic": "Check anything important only in official apps or numbers you already know.",
+}
+ALL_FACTS = tuple(dict.fromkeys(list(KEY_FACT.values()) + [INJECTION_FACT] + list(BENIGN_FACT.values())))
+
+
+_PAID = re.compile(r"\b(?:debited|credited|paid|payment|refund\w*|transferred|withdrawn|txn|"
+                   r"rs\.?|inr|rupees)\b|₹|भुगतान|डेबिट|क्रेडिट|रिफंड|रुपये|राशि", re.I)
+
+
+def _benign_reading(kind, phrases):
+    if kind == "flow":
+        return "flow"
+    first = (phrases[0] if phrases else "").lower()
+    if first.startswith(("no request", "no scam mechanism", "no lookalike")):
+        return "generic"  # an absence statement names "payment" without being a receipt
+    for key, pat in (("otp", r"otp notification"), ("no_fee", r"says no (?:fee|charge|payment)"),
+                     ("bill", r"bill reminder"),
+                     ("receipt", r"payment|refund|receipt"),  # after bill, no-fee and absence
+                     ("delivery", r"order|delivery|tracking"),
+                     ("official_domain", r"official domain"),
+                     ("protective", r"never asks|says no |protective|not to share"),
+                     ("official_channel", r"official app|official channel|mentions .* branch|mentions the branch"),
+                     ("personal", r"personal conversation")):
+        if re.search(pat, first):
+            return key
+    return "generic"
+
+
+def key_fact(kind, inp, verdict, evidence):
+    """The vetted fact the model's sentence is built from, for this item and verdict."""
+    if verdict == 0:
+        reading = _benign_reading(kind, compact_evidence(kind, inp, evidence, verdict))
+        if reading == "receipt" and not _PAID.search(inp or ""):
+            # The detector's receipt reading also covers orders and notices; payment advice only
+            # fits a message that itself reports money moving.
+            reading = "delivery" if re.search(r"order|deliver|shipped|track|parcel|courier", inp or "", re.I) else "generic"
+        return BENIGN_FACT[reading]
+    label = scam_type(kind, inp, verdict)
+    if kind == "injection" and rules.injection_indicators(inp) and label in ("a scam message", "a message worth checking", ""):
+        return INJECTION_FACT
+    return KEY_FACT.get(label) or KEY_FACT["a scam message" if verdict == 1 else "a message worth checking"]
+
+
+# ---------------------------------------------------------------------------------------------
+# Honesty validator.
+#
+# Runs on every generated sentence after the required opening (and on text glued to the opening
+# sentence). A sentence is dropped when it states something about the item that the item does not
+# support. The claim rules mirror the proxy grounding check: clauses are split on punctuation and
+# "so/but", advice clauses are exempt, a cue governed by a negation is not a claim, and a payment
+# request is not supported by a receipt. Input-side matching also accepts the Hindi and Hinglish
+# words for the same concept. Further rules catch the 1B model's stock lines: a link, website or
+# attachment that does not exist, a number or domain that is not in the item, a hedge against a
+# NO RISK verdict, the wrong channel (ports for a message, a link for a network event) and
+# Devanagari in English output.
+_V_ADVICE = re.compile(r"^\s*(?:never|don't|do not|avoid|report|call|block|delete|verify|check|contact|ignore|if|"
+                       r"when|unless|you should|you may want to|please|it is safer to|i would say)\b", re.I)
+_V_NOTE = re.compile(r"^\s*(?:please\s+)?(?:note|be aware|remember)\s+(?:that\s+)?", re.I)
+_V_SPLIT = re.compile(r"[,;।!?:]|\b(?:and then|so|but)\b", re.I)
+# As in the proxy: "and" before an advice word starts a new (advice) clause.
+_V_AND_ADVICE = re.compile(r"\band\s+(?=(?:you should|you may want to|please|it is safer to|never|don't|do not|report|"
+                           r"call|block|delete|verify|check|contact|ignore)\b)", re.I)
+_V_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_V_NEG = re.compile(r"\b(?:no|not|never|doesn't|don't|didn't|does not|do not|did not|without)\b", re.I)
+_V_CUES = {
+    "payment": (re.compile(r"\b(?:pay(?:ment|ing|s)?|transfer|money|funds|fee|deposit|recharge|collect request)\b", re.I),
+                re.compile(r"\b(?:pay\w*|transfer|money|funds|fee|deposit|recharge|collect|amount|rs\.?|inr|rupees|"
+                           r"paisa|paise|bhej\w*|jama)\b|₹|भुगतान|पैस|शुल्क|फीस|राशि|जमा|रुपये", re.I)),
+    "otp": (re.compile(r"\b(?:otp|pin|code|one[- ]time password|password|cvv)\b", re.I),
+            re.compile(r"\b(?:otp|pin|code|password|passcode|cvv)\b|ओटीपी|पिन|पासवर्ड|कोड", re.I)),
+    "link": (re.compile(r"\b(?:link|links|url|website|web site|click|clicking|attachment|attachments)\b", re.I), None),
+    "app": (re.compile(r"\b(?:app(?:lication)?|apk|download|install)\b", re.I),
+            re.compile(r"\b(?:app\w*|apk|download|install\w*|anydesk|teamviewer|quicksupport|screen)\b|ऐप|एप", re.I)),
+    "kyc": (re.compile(r"\b(?:kyc|know your customer)\b", re.I), re.compile(r"\bkyc\b|केवाईसी", re.I)),
+    "call": (re.compile(r"\b(?:call|phone|dial|telephone|helpline)\b", re.I),
+             re.compile(r"\b(?:call\w*|phone|dial|helpline|number|caller)\b|कॉल|फोन|फ़ोन|नंबर", re.I)),
+    "email": (re.compile(r"\b(?:e-?mails?|inbox)\b", re.I), re.compile(r"\be-?mails?\b|ईमेल", re.I)),
+}
+_V_RECEIPT = re.compile(r"\b(?:payment|money|funds|amount|refund|deposit)\b.{0,45}\b(?:received|credited|paid|completed|"
+                        r"processed|successful|debited)\b|\b(?:received|credited|paid|debited)\b|\breceipt\b", re.I)
+_V_REQUEST_IN = re.compile(r"\b(?:pay|send|transfer|recharge|due|collect request|payment request|payment required)\b|"
+                           r"भुगतान.{0,30}मांग", re.I)
+_V_REQUEST_CLAIM = re.compile(r"\b(?:ask(?:s|ed|ing)?|request(?:s|ed|ing)?|want(?:s|ed)?|demand(?:s|ed|ing)?|"
+                              r"require(?:s|d)?|told to)\b", re.I)
+_V_DEVICE = re.compile(r"\b(?:computer|laptop|virus|viruses|malware|spyware|hackers?|hacked)\b", re.I)
+_V_NETWORK = re.compile(r"\b(?:firewall|ports?|ip address|router|server|traffic)\b", re.I)
+_V_MESSAGE = re.compile(r"\b(?:message|sms|text|link|url|click|sender|reply|otp|pin|upi)\b", re.I)
+_V_HEDGE = re.compile(r"\b(?:scam\w*|phishing|fraud\w*|suspicious|malicious|cautious|caution|beware|wary|"
+                      r"risky|dangerous|unsafe|harm\w*|malware|virus\w*)\b", re.I)
+_V_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd)\b|\b(?i:me|my|mine|we|we're|we've|our)\b")
+_V_OVERCLAIM = re.compile(r"\b(?:known|confirmed|proven)\s+(?:scam\w*|phishing|fraud\w*|malicious|attack\w*)|"
+                          r"\b(?:definitely|certainly|undoubtedly)\b|\b100 ?%\s*(?:a\s+|an\s+)?(?:scam|fraud|fake|phishing|"
+                          r"malicious|sure|certain|safe|genuine)\b", re.I)
+_V_VAGUE = re.compile(r"\s*(?:please\s+)?(?:be|stay|remain)\s+(?:very\s+)?(?:cautious|careful|vigilant|wary|alert)\b", re.I)
+_V_DOMAIN = re.compile(r"(?<![\w@.])(?:https?://)?(?:[a-z0-9-]+(?:\.|\[\.\]))+[a-z]{2,}\b", re.I)
+_V_HELP = ("cybercrime.gov.in", "sancharsaathi.gov.in", "cert-in.org.in", "sachet.rbi.org.in")
+
+
+def _clauses(sent):
+    return [p for c in _V_SPLIT.split(sent) if c and c.strip() for p in _V_AND_ADVICE.split(c) if p.strip()]
+
+
+def _negated(clause, m):
+    before = re.split(r"\band\b", clause[:m.start()], flags=re.I)[-1]
+    if _V_NEG.search(before):
+        return True
+    return bool(re.match(r"\s*(?:is|was|were|are)?\s*\b(?:not|never)\b", clause[m.end():], re.I))
+
+
+def _has_link(inp):
+    return bool(LINK_WORDS.search(inp or ""))
+
+
+def unsupported(sent, ctx):
+    """The reason a generated sentence is not backed by the item, or None."""
+    inp = ctx.get("input") or ""
+    kind = ctx.get("kind")
+    verdict = ctx.get("verdict")
+    fact = ctx.get("fact") or ""
+    low_inp = inp.lower().replace("[.]", ".")
+    if re.search(r"[ऀ-ॿ]", sent):
+        return "script_mixing"
+    if _V_FIRST_PERSON.search(sent):
+        # "I checked the official app", "my top priority": the model claiming actions it never took.
+        return "first_person"
+    if verdict != 0 and _V_OVERCLAIM.search(sent):
+        # "a known phishing attempt": the detector flags signs, it does not confirm a scam.
+        return "overclaim"
+    if verdict == 0 and any(not _negated(c, m) for c in _clauses(sent) for m in _V_HEDGE.finditer(c)):
+        return "hedge_against_verdict"
+    if verdict != 0 and _V_VAGUE.match(sent):
+        # "Be cautious of suspicious messages ..." names no step and no reason.
+        return "vague"
+    # A link, website or attachment the item does not have, in advice or claim alike.
+    if kind != "url" and not _has_link(inp) and _V_CUES["link"][0].search(sent):
+        # A claim that the item has a link is never excused; advice that names a link is
+        # excused only when the vetted fact itself is about links.
+        claims = [c for c in _clauses(sent) if _V_CUES["link"][0].search(c) and not _V_ADVICE.search(c)]
+        if claims or not _V_CUES["link"][0].search(fact):
+            return "link_not_in_input"
+    if _V_CUES["email"][0].search(sent) and not (_V_CUES["email"][1].search(inp) or _V_EMAIL.search(inp)):
+        return "email_not_in_input"
+    if kind != "flow" and _V_DEVICE.search(sent) and not _V_DEVICE.search(inp) and not _V_DEVICE.search(fact):
+        return "device_not_in_input"
+    if kind == "flow" and _V_MESSAGE.search(sent):
+        return "wrong_channel"
+    net = [m.group(0).lower() for m in _V_NETWORK.finditer(sent)]
+    if kind in ("sms", "injection", "url") and net and not _V_NETWORK.search(inp) \
+            and not (set(net) <= {"ip address"} and re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", inp)):
+        return "wrong_channel"
+    numbers = {re.sub(r"\D", "", n) for n in re.findall(r"\d[\d,]*", inp)}
+    for num in re.findall(r"\d[\d,]{2,}", sent):
+        d = re.sub(r"\D", "", num)
+        if d != "1930" and d not in numbers:
+            return "number_not_in_input"
+    for m in _V_DOMAIN.finditer(sent):
+        host = re.sub(r"^https?://", "", m.group(0).lower()).replace("[.]", ".").rstrip(".")
+        if "." in host and host not in low_inp and not any(host == h or host.endswith("." + h) for h in _V_HELP):
+            return "domain_not_in_input"
+    devanagari = bool(re.search(r"[\u0900-\u097F]", inp))
+    for clause in _clauses(sent):
+        clause = _V_NOTE.sub("", clause)  # "Please note the sender asks for your OTP" is a claim
+        if _V_ADVICE.search(clause):
+            continue
+        for name, (claim, support) in _V_CUES.items():
+            if name in ("link", "email"):
+                continue
+            hits = [m for m in claim.finditer(clause) if not _negated(clause, m)]
+            if not hits:
+                continue
+            # The proxy's own cue must be in the input; the wider Hindi/Hinglish words count only
+            # for a Devanagari message, which the proxy's English cues cannot see.
+            if not (claim.search(inp) or (devanagari and support.search(inp))):
+                return f"{name}_claim_not_in_input"
+            if (name == "payment" and _V_REQUEST_CLAIM.search(clause) and _V_RECEIPT.search(inp)
+                    and not _V_REQUEST_IN.search(inp)):
+                return "payment_request_on_receipt"
+    return None
+
+
+def _split(text, opening=None):
+    """Sentences, with the required opening kept whole even when it contains a semicolon.
+
+    The old split on ";" cut "...OTP alert; scammers copy these" in two, so the opening was not
+    recognised and was added a second time.
+    """
+    head = []
+    if opening and text.startswith(opening):
+        end = len(opening)
+        punct = re.match(r"[.!?;:]*", text[end:]).end()
+        if punct:
+            end += punct
+        else:
+            # Words glued to the opening ("... service and verify the KYC") stay in its sentence.
+            m = re.search(r"[.!?](?=\s|$)", text[end:])
+            end = end + m.end() if m else len(text)
+        head = [text[:end]]
+        text = text[end:].strip()
+    return head + [s for s in re.split(r"(?<=[.!?;])\s+", text) if s.strip()]
+
+
+def validate(text, opening, ctx, vetted=(), generated_tokens=None, model_opening=True):
+    """(text, report): drop generated sentences the item does not support.
+
+    The opening is the detector's own evidence and is kept. A dropped sentence is replaced by the
+    key fact; when the model wrote nothing after the opening, the fact is added so the reader
+    still learns why. Vetted sentences (the replacement advice _consistent may have added, and
+    the fact) are never checked. Token counts in the stats are not changed.
+    """
+    fact = ctx.get("fact") or ""
+    vetted = {v.strip() for v in vetted if v} | {fact}
+    sents = _split(text or "", opening)
+    kept, dropped = [], []
+    for i, sent in enumerate(sents):
+        if i == 0 and opening and sent.startswith(opening):
+            rest = sent[len(opening):].lstrip(" .!?;:")
+            if rest:
+                why = unsupported(rest, ctx)
+                if why:
+                    dropped.append(why)
+                    sent = opening + "."
+            kept.append(sent)
+            continue
+        if sent.strip() in vetted:
+            kept.append(sent)
+            continue
+        why = unsupported(sent, ctx)
+        if why:
+            dropped.append(why)
+        else:
+            kept.append(sent)
+    # Model text is what remains after removing vetted sentences (matched as whole strings, since
+    # a vetted sentence may itself contain a semicolon) and an opening _consistent re-inserted.
+    rest = " ".join(kept)
+    # The fact is only appended below, so a copy of it here was written by the model.
+    for v in sorted(vetted - {fact}, key=len, reverse=True):
+        rest = rest.replace(v, " ")
+    if opening and not model_opening:
+        rest = rest.replace(opening + ".", " ", 1).replace(opening, " ", 1)
+    if not re.search(r"\w", rest):
+        # Nothing the model wrote survived (no copied opening, every sentence unsupported): the
+        # explanation is reported as failed rather than replaced by fixed text alone.
+        raise ValueError("explanation contained no supported model sentence")
+    has_body = any(not (i == 0 and opening and k.startswith(opening)) for i, k in enumerate(kept))
+    added = False
+    if fact and (dropped or not has_body) and fact not in " ".join(kept):
+        words = len(" ".join(kept + [fact]).split())
+        # Never let fixed text outweigh what the model generated (llm_plausible: tokens >= 0.6 words).
+        if generated_tokens is None or generated_tokens >= 0.6 * words:
+            kept.append(fact)
+            added = True
+    out = " ".join(k.strip() for k in kept).strip()
+    return out, {"dropped": dropped, "fact_added": added}

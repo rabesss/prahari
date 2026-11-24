@@ -26,6 +26,8 @@ def cmd_predict(a):
         res = detect.predict_text([r["text"] for r in rows])
     elif a.task == "url":
         res = detect.predict_url([r["url"] for r in rows])
+    elif a.task == "upi":
+        res = detect.predict_upi([r.get("upi") or r.get("url") or r.get("input") or r.get("text", "") for r in rows])
     else:
         res = detect.predict_flow([r["features"] for r in rows])
     write_jsonl(a.out, [{"id": r["id"], "label": lab, "score": round(s, 4), "evidence": ev}
@@ -33,6 +35,7 @@ def cmd_predict(a):
 
 
 def cmd_explain(a):
+    from .explain_hi import summary_hi
     from .llm import Explainer, actions_for, scam_type
     rows = read_jsonl(a.inp)
     ex = Explainer()
@@ -44,6 +47,13 @@ def cmd_explain(a):
         row = {"id": r["id"], "verdict": VERDICT[lab], "score": round(score, 4),
                     "category": scam_type(kind, inp, lab),
                     "actions": actions_for(kind, lab, inp), "evidence_used": ev}
+        # Fixed-text Hindi summary from the detector result (not model text; see explain_hi.py).
+        try:
+            hi = summary_hi(kind, inp, lab, ev)
+        except Exception:  # an aid only; a table problem must never stop the explain run
+            hi = ""
+        if hi:
+            row["summary_hi"] = hi
         try:
             text, stats = ex.generate(ex.prompt(kind, inp, lab, ev))
             if not isinstance(text, str) or not text.strip():
@@ -61,7 +71,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="triage")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("predict")
-    p.add_argument("--task", choices=["sms", "url", "flow"], required=True)
+    p.add_argument("--task", choices=["sms", "url", "flow", "upi"], required=True)
     p.add_argument("--in", dest="inp", required=True)
     p.add_argument("--out", required=True)
     e = sub.add_parser("explain")

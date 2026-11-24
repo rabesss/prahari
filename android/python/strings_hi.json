@@ -203,7 +203,30 @@
   "Runs on the emulator's CPU through ExecuTorch (INT4, XNNPACK). It only writes the explanation.": "यह ExecuTorch से इस एम्युलेटर के CPU पर चलता है (INT4, XNNPACK)। यह सिर्फ़ व्याख्या लिखता है।",
   "The on-device checker could not start.": "फ़ोन पर जांच सिस्टम शुरू नहीं हो सका।",
   "Couldn't load the on-device model.": "फ़ोन पर मौजूद मॉडल लोड नहीं हो सका।",
-  "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown.": "यह अलर्ट अपना ही लिंक या नंबर देता है, इसलिए इसे संदिग्ध माना गया है। AI की टिप्पणी पहले के नतीजे के लिए लिखी गई थी, इसलिए नहीं दिखाई गई।"
+  "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown.": "यह अलर्ट अपना ही लिंक या नंबर देता है, इसलिए इसे संदिग्ध माना गया है। AI की टिप्पणी पहले के नतीजे के लिए लिखी गई थी, इसलिए नहीं दिखाई गई।",
+  "UPI QR": "UPI QR",
+  "UPI QR details": "UPI QR विवरण",
+  "UPI refund QR scam": "UPI रिफ़ंड QR ठगी",
+  "Legit kirana QR": "असली किराना QR",
+  "Payee": "प्राप्तकर्ता",
+  "UPI ID": "UPI ID",
+  "Amount": "राशि",
+  "Category": "श्रेणी",
+  "Note": "नोट",
+  "Entered by you": "आप खुद दर्ज करेंगे",
+  "Personal / P2P": "निजी / P2P",
+  "Merchant": "व्यापारी",
+  "Sends money from your account": "आपके खाते से पैसे भेजता है",
+  "Collect payment request (debits your account)": "कलेक्ट पेमेंट रिक्वेस्ट (आपके खाते से पैसे काटती है)",
+  "Recurring UPI AutoPay mandate": "बार-बार कटने वाला UPI AutoPay मैंडेट",
+  "Checked safely — no UPI app was opened": "सुरक्षित रूप से जाँचा गया — कोई UPI ऐप नहीं खोला गया",
+  "a UPI refund or receive-money QR scam": "UPI रिफ़ंड या पैसे पाने के झांसे की QR ठगी",
+  "a UPI collect-request QR scam": "UPI कलेक्ट-रिक्वेस्ट QR ठगी",
+  "a UPI AutoPay mandate scam": "UPI AutoPay मैंडेट ठगी",
+  "a UPI KYC or impersonation QR scam": "UPI KYC या नकली पहचान QR ठगी",
+  "a UPI QR payment scam": "UPI QR पेमेंट ठगी",
+  "a UPI AutoPay mandate to review": "जांचने योग्य UPI AutoPay मैंडेट",
+  "a UPI payment QR worth checking": "जांचने योग्य UPI पेमेंट QR"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
@@ -372,7 +395,31 @@
   "no scam mechanism was found in the link": "इस लिंक में ठगी का कोई तरीका नहीं मिला",
   "no scam mechanism was found in the text": "इस मैसेज में ठगी का कोई तरीका नहीं मिला",
   "no scam mechanism was found in the message": "इस मैसेज में ठगी का कोई तरीका नहीं मिला",
-  "Sends you to its own link or number; real bank alerts point to the bank app or a toll-free line": "यह अपना ही लिंक या नंबर देता है; असली बैंक अलर्ट बैंक ऐप या टोल-फ़्री नंबर बताते हैं"
+  "Sends you to its own link or number; real bank alerts point to the bank app or a toll-free line": "यह अपना ही लिंक या नंबर देता है; असली बैंक अलर्ट बैंक ऐप या टोल-फ़्री नंबर बताते हैं",
+  "asks you to scan or enter your UPI PIN to receive money; paying or approving a UPI request only sends money out of your account": "पैसे पाने के लिए QR स्कैन करने या UPI PIN डालने को कहता है; UPI भुगतान या अनुरोध मंज़ूर करने पर पैसे सिर्फ़ आपके खाते से जाते हैं",
+  "promises a refund, cashback, prize or incoming payment, but paying or approving a UPI request only sends money out of your account": "रिफ़ंड, कैशबैक या पैसे मिलने का वादा करता है, जबकि UPI भुगतान या अनुरोध मंज़ूर करने पर पैसे सिर्फ़ आपके खाते से जाते हैं",
+  "uses a upi://collect payment request, commonly abused to trick people into approving debits": "upi://collect पेमेंट रिक्वेस्ट का इस्तेमाल करता है, जिसका दुरुपयोग पैसे कटवाने के लिए किया जाता है",
+  "sets up a recurring UPI AutoPay mandate that can debit your account repeatedly": "बार-बार पैसे काटने वाला UPI AutoPay मैंडेट सेट करता है",
+  "the UPI payload mentions KYC, PAN or Aadhaar verification to pressure a payment": "पेमेंट का दबाव डालने के लिए UPI QR में KYC, PAN या आधार वेरिफ़िकेशन का ज़िक्र है",
+  "the transaction note threatens account blocking or service disconnection": "लेन-देन के नोट में खाता ब्लॉक करने या सेवा बंद करने की धमकी है",
+  "the transaction note cites customs, parcel release, police or court action to demand money": "पैसे मांगने के लिए नोट में कस्टम, पार्सल, पुलिस या कोर्ट कार्रवाई का डर दिखाया गया है",
+  "the transaction note asks for an upfront processing, verification or release fee": "नोट में पहले से प्रोसेसिंग, वेरिफ़िकेशन या रिलीज़ फ़ीस मांगी गई है",
+  "the transaction note asks for a UPI PIN, OTP, CVV or password": "नोट में आपका UPI PIN, OTP, CVV या पासवर्ड मांगा गया है",
+  "the transaction note uses urgent wording to pressure an immediate payment": "तुरंत पेमेंट कराने के लिए नोट में जल्दबाज़ी का दबाव डाला गया है",
+  "the UPI payload tries to inject instructions into the assistant": "UPI QR में सहायक (AI) को गुमराह करने के निर्देश डाले गए हैं",
+  "the UPI payload contains invisible characters that can hide the recipient or amount": "UPI QR में छिपे हुए अक्षर हैं जो प्राप्तकर्ता या राशि छिपा सकते हैं",
+  "the payee UPI ID (pa) is missing or malformed": "प्राप्तकर्ता की UPI ID (pa) गायब या अमान्य है",
+  "the UPI ID {pa} uses refund, KYC, prize or support-desk wording typical of scam handles": "UPI ID {pa} में रिफ़ंड, KYC, इनाम या सपोर्ट डेस्क जैसे शब्द हैं जो ठगी के खातों में आम हैं",
+  "the UPI ID {pa} swaps letters for digits to imitate '{brand}'": "UPI ID {pa} '{brand}' की नकल करने के लिए अक्षरों की जगह नंबर इस्तेमाल करता है",
+  "the UPI handle '@{handle}' imitates an official organisation or lure rather than a real Indian bank PSP": "UPI हैंडल '@{handle}' असली बैंक PSP नहीं है, बल्कि किसी आधिकारिक संस्था या झांसे की नकल करता है",
+  "the UPI handle '@{handle}' is not on the known Indian bank and payment-app PSP list": "UPI हैंडल '@{handle}' ज्ञात भारतीय बैंक या पेमेंट ऐप सूची में नहीं है",
+  "payee name '{pn}' claims '{brand}', but the UPI ID {pa} is a personal mobile number": "नाम '{pn}' '{brand}' का दावा करता है, लेकिन UPI ID {pa} एक निजी मोबाइल नंबर है",
+  "payee name '{pn}' claims '{brand}', which does not match personal UPI ID {pa}": "नाम '{pn}' '{brand}' का दावा करता है, जो निजी UPI ID {pa} से मेल नहीं खाता",
+  "pre-fills Rs {amt} to debit from your account despite claiming a refund or incoming payment": "रिफ़ंड या पैसे मिलने का दावा करके भी आपके खाते से ₹{amt} काटने की राशि भरी है",
+  "pre-fills a high amount (Rs {amt}) on an unverified personal UPI QR": "बिना जांच वाले निजी UPI QR में बड़ी राशि (₹{amt}) पहले से भरी है",
+  "merchant UPI QR for {who} on a known UPI handle (MCC {mc})": "ज्ञात UPI हैंडल पर {who} का मर्चेंट UPI QR (MCC {mc})",
+  "UPI payment QR for {who} on a known UPI handle": "ज्ञात UPI हैंडल पर {who} का UPI पेमेंट QR",
+  "pre-fills Rs {amt} ({cu}) to send from your account": "आपके खाते से भेजने के लिए ₹{amt} ({cu}) पहले से भरा है"
  },
  "skip": [
   "$label · $hi",
@@ -494,6 +541,10 @@
   "language_name": {
    "en": "Language",
    "hi": "भाषा"
+  },
+  "upi_caveat": {
+   "en": "Always verify the payee name and amount in your UPI app before entering your PIN. Receiving money never needs a PIN.",
+   "hi": "PIN डालने से पहले अपने UPI ऐप में नाम और राशि ज़रूर जांचें। पैसे पाने के लिए PIN कभी नहीं लगता।"
   }
  },
  "templates": [

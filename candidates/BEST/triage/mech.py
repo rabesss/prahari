@@ -1083,6 +1083,226 @@ def _self_block(text):
     return bool(SELF_BLOCK.search(text)) and not PASSIVE_THREAT.search(text) and not CONTACT_NUMBER.search(text)
 
 
+# A warning segment states what the sender will never do or what the reader must never do: a negated
+# mention of a secret, payment, app or link ("RBI never asks for your OTP", "kabhi AnyDesk install na
+# karein", "OTP kisi se share mat karein"). A negated order with no such object ("do not tell your
+# family", "vakil se sampark na karein") is a scam's isolation cue and stays, and so does a
+# conditional threat ("agar payment nahi hua toh..."). A segment that orders the reader, threatens
+# them or makes an exception ("except our executive") is never a warning. Segments are clauses split
+# at ", ", dashes, contrast words and connectors before an order, so a negation reaches only its own
+# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Hypothetical callers,
+# self-check lead-ins and doorstep handovers were tried and dropped: they added little and each
+# opened ways to hide a demand (PR #48 review). A report that quotes what fraudsters asked for is not
+# a warning segment: by controller decision a quoted credential demand stays flagged.
+SEG_SPLIT = re.compile(r",\s|:\s|[–—]|\s-\s|\b(?:but|instead|just|however|lekin|balki|bas|sirf)\b|"
+                       r"(?:^|\s)(?:लेकिन|बल्कि|बस|सिर्फ़|सिर्फ)(?=\s|$)", re.I)
+_SEG_NEG = re.compile(r"\b(?:never|not|no|no one|nobody|don'?t|doesn'?t|won'?t|cannot|can'?t|kabhi|kabhee|"
+                      r"nahi|nahin|mat|na)\b|n't\b|(?:^|[\s,;:])(?:कभी|नहीं|न|ना|मत)(?=[\s,;:।]|$)", re.I)
+_SEG_PROTECTED = re.compile(
+    r"\b(?:otp|pin|cvv|password|passcode|card|bank details|account details|upi|link|links|url|app|apps|"
+    r"apk|anydesk|teamviewer|quicksupport|screen[- ]?shar\w*|remote|qr|collect|payment|pay|money|paise|"
+    r"paisa|fee|fees|charges?|transfer|kyc|aadhaar|aadhar|details|code)\b|"
+    r"ओटीपी|पिन|पासवर्ड|कार्ड|लिंक|ऐप|पैसे|पैसा|भुगतान|शुल्क|यूपीआई|क्यूआर|केवाईसी|आधार|विवरण|कोड", re.I)
+_SEG_CONDITION = re.compile(r"\b(?:if|agar|unless|warna|otherwise|toh|varna)\b|(?:^|\s)(?:तो|वरना|अगर|यदि)(?=\s|$)", re.I)
+# A short segment with an order in it ("pay now", "turant paise bhejein") is a request of its own.
+_SEG_COMMAND = re.compile(r"\b(?:pay|send|share|transfer|tell|give|click|call|install|download|enter|type|"
+                          r"forward|deposit|scan|approve|reply|bhej\w*|kar[oe]\w*|de\s?d[oe]|bata\w*|daal\w*)\b|"
+                          r"करें|करो|भेजें|भेजो|दें|दो|बताएं|बताओ|डालें", re.I)
+# An order to hand over, pay, send or install. Outside a warning segment it blocks clearing.
+_RISKY_COMMAND = re.compile(
+    r"\b(?:share|sharing|send|sending|tell|telling|give|giving|forward|transfer|move|pay|deposit|install|download|"
+    r"approve|accept|authori[sz]e|scan|enter|type|reply|upload|dictate|read|provide|fill|buy|purchase|"
+    r"hand(?:ing)? over|bhej\w*|bata\w*|de\s?d[oe]|de\s+(?:dijiye|dein|dena|do)|dijiye|dijiyega|dena hoga|dena hai|daal\w*|"
+    r"bhar(?:o|ein|en|iye|dein|do)|jama)\b|भेजें|भेजो|भेजिए|भेजिये|भेज दें|बताएं|बताओ|बता दें|बता देना|बताइए|"
+    r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा|रिचार्ज|इंस्टॉल", re.I)
+# A verb in its oblique infinitive ("scan karne ki zaroorat nahi", "bhejne se pehle") names an action;
+# it does not order one.
+_INFINITIVE_AFTER = re.compile(r"^\s*(?:kar(?:ne|na)|करने|करना)\b|^(?:ne|na)\b", re.I)
+_NEG_NEAR_BEFORE = re.compile(r"(?:\b(?:never|not|no|don'?t|do not|does not|doesn'?t|won'?t|cannot|can'?t|"
+                              r"no need to|na|mat|nahi|nahin)|n't|(?:^|\s)(?:न|मत|नहीं|ना))\s+(?:\S+\s+){0,2}$|"
+                              # "will not ask you to forward it", "never asks customers to share"
+                              r"\b(?:never|not|n't|no)\s+(?:\S+\s+)?(?:ask|asks|request|requests|tell|tells|require|"
+                              r"requires|want|wants)\s+(?:\S+\s+){0,2}to\s+$", re.I)
+_NEG_NEAR_AFTER = re.compile(r"^\s*(?:\S+\s+){0,2}?(?:na|mat|nahi|nahin|not|never)\b|"
+                             r"^\s*(?:\S+\s+){0,2}?(?:न|मत|नहीं|ना)(?=[\s,;:।]|$)", re.I)
+_ATTENTION = re.compile(r"ध्यान दें|dhyan d\w+", re.I)
+_LIST_TAIL = re.compile(r"^\s*(?:or|and|nor|ya|aur|या|और|एवं|तथा)(?=\s|$)", re.I)
+
+
+# A new order joined by a connector ("and send", "please share", "then dictate") is a segment of its own.
+_AND_ORDER = re.compile(r"\s(?:and|aur|और|then|please|kindly|pls|now|so|phir|abhi|turant|instead|simply|just)\s+"
+                        r"(?:then\s+|please\s+|kindly\s+|just\s+|simply\s+)?(?=(?:share|send|tell|give|forward|"
+                        r"transfer|move|pay|deposit|install|download|approve|accept|authori[sz]e|scan|enter|type|"
+                        r"reply|upload|dictate|read|provide|buy|hand)\b)", re.I)
+
+
+# A negation that encourages ("don't hesitate to share", "why not share") is an order.
+_AFFIRM = re.compile(r"\b(?:don'?t|do not|never|dont)\s+hesitate\s+to\b|\bwhy not\b|\bno harm in\b|"
+                     r"\bfeel free to\b|\bno problem (?:in|to)\b", re.I)
+
+
+def _ordered(seg, threat=True):
+    """The segment itself orders the reader to hand over, pay, send or install, or threatens them:
+    "share the OTP with our officer", "koi bhi OTP humein bhejein". An order counts unless a negation
+    sits within two words of the verb ("never share", "share mat karein", "install na karein"), it
+    continues a negated list ("never share your OTP or install AnyDesk"), or the verb is an oblique
+    infinitive ("scan karne ki zaroorat nahi")."""
+    if threat and _threatens(seg):
+        return True
+    text = _AFFIRM.sub(" ", _ATTENTION.sub(" ", seg))
+    negated_before = False
+    for m in _RISKY_COMMAND.finditer(text):
+        before, after = text[:m.start()], text[m.end():]
+        if _INFINITIVE_AFTER.match(after) or re.search(r"[a-z]ne$", m.group(), re.I):
+            continue
+        if _NEG_NEAR_BEFORE.search(before) or _NEG_NEAR_AFTER.match(after) or \
+                (negated_before and re.search(r"(?:\b(?:or|nor|ya)|या)\s+(?:\S+\s+)?$", before, re.I)):
+            negated_before = True
+            continue
+        return True
+    return False
+
+
+def _threatens(seg, imperative=True):
+    """A threat to the reader. With imperative=False the bare "block the card" wording of THREAT is not
+    counted: in a self-check it is the reader's own remedy, while "will be blocked", "band ho jayega",
+    a penalty or an FIR still are threats."""
+    return bool((imperative and _clause_hit(THREAT, seg)) or _clause_hit(BLOCK_FUTURE, seg)
+                or PASSIVE_THREAT.search(seg) or _clause_hit(_OTHER_THREAT, seg) or re.search(r"\bFIR\b", seg))
+
+
+_OTHER_THREAT = (r"\b(?:penalty|fine of|jurmana|arrest\w*|legal action|forfeit\w*|seiz\w*|warrant)\b|"
+                 r"जुर्माना|गिरफ्तार|कानूनी कार्रवाई|एफआईआर")
+
+
+# "Never share your OTP with anyone except our executive" turns the warning into a request.
+_EXCEPT = re.compile(r"\b(?:except|other than|apart from|siwa|sivay|siway|ke alawa|ke alava)\b|सिवाय|के अलावा|को छोड़कर", re.I)
+
+
+def _warning_segment(seg):
+    if _EXCEPT.search(seg) or _AFFIRM.search(seg) or _ordered(seg):
+        return False
+    return bool(_SEG_NEG.search(seg) and _SEG_PROTECTED.search(seg) and not _SEG_CONDITION.search(seg))
+
+
+def _segments(clause):
+    """(start, end) spans of a clause's segments. A short list item ("card CVV", "or OTP") stays with
+    the segment before it, so a negation covers the whole list it heads. A tail with an order or a
+    negation of its own ("and share your OTP", "not your family") is a segment of its own."""
+    cuts = [0] + [m.end() for m in SEG_SPLIT.finditer(clause)]
+    cuts += [m.end() for m in re.finditer(r"\s(?:और|aur)\s", clause)]
+    cuts += [m.start() + 1 for m in _AND_ORDER.finditer(clause)]
+    cuts = sorted(set(cuts)) + [len(clause)]
+    spans = []
+    for a, b in zip(cuts, cuts[1:]):
+        if not clause[a:b].strip():
+            continue
+        if spans and not _SEG_COMMAND.search(clause[a:b]) and not _SEG_NEG.search(clause[a:b]) and \
+                (_LIST_TAIL.match(clause[a:b]) or len(clause[a:b].split()) <= 3):
+            spans[-1] = (spans[-1][0], b)
+        else:
+            spans.append((a, b))
+    return spans
+
+
+def request_text(text):
+    """The text with warning segments blanked out in place: what the message actually asks of the
+    reader. Everything else keeps its original wording and punctuation."""
+    drop = []
+    for off, clause in clauses(text):
+        for a, b in _segments(clause):
+            if _warning_segment(clause[a:b]):
+                drop.append((off + a, off + b))
+    out, last = [], 0
+    for a, b in drop:
+        out.append(text[last:a])
+        last = b
+    out.append(text[last:])
+    return " ".join("".join(out).split())
+
+
+# Only these mechanisms can be explained away by warning context: they are what genuine OTP messages
+# and advisories mention. A payment, transfer, prize, job, investment or authority
+# demand is never cleared by surrounding warnings.
+CLEARABLE = {"secret_request", "remote_access", "qr_payment", "collect_request"}
+
+
+def _warning_only(a):
+    """True when every harmful mechanism sits in a warning segment and the message gives no
+    contact of its own: a genuine advisory, self-check alert or doorstep OTP. A spoofed advisory
+    always hands the reader a number, chat handle or link somewhere, so it is never cleared here."""
+    if not a["harm"] or a["own_contact"] or a["risky"] or _contact_anywhere(a):
+        return False
+    if not {n for n, _ in a["harm"]} <= CLEARABLE:
+        return False
+    rest = request_text(a.get("text", ""))
+    if _ordered(rest):
+        # Something outside the warnings still tells the reader to hand over, pay, send or install
+        # ("Never share your PIN. Share it with our officer"): never cleared, whatever re-analysis says.
+        return False
+    if not rest.strip():
+        return True
+    b = analyze(rest)
+    return not (b["harm"] or b["threat"] or b["request_cues"])
+
+
+
+# A direct order to pay, recharge or deposit ("pehle 500 rupaye recharge karein", "pay Rs 99 now").
+PAY_COMMAND = (r"\b(?:pay|recharge|deposit|transfer|top[- ]?up)\b[^.;!?।\n]{0,40}"
+               r"(?:rs\.?|inr|₹|rupees|\d)|(?:₹|rs\.?|inr)\s?[\d,]+[^.;!?।\n]{0,30}\b(?:pay|recharge|deposit|"
+               r"transfer|bhej\w*|jama)\b|(?:रिचार्ज|भुगतान|जमा|भेज)\S*\s*(?:करें|करो|कीजिए|कीजिये|दें|दो)|"
+               r"\b(?:recharge|payment|pay|jama|bhej)\w*\s+(?:karo|karein|karen|kare|kijiye|do|dein|dijiye)\b")
+# A threat in any word order: "account band ho jayega", "will be blocked", "बंद हो जाएगा".
+BLOCK_FUTURE = (r"\b(?:band|block\w*|suspend\w*|freeze|frozen|deactivat\w*|kat|cut|disconnect\w*)\s+"
+                r"(?:ho|kar|kar di|kar diya|kar diye)?\s*(?:jayega|jaega|jayegi|jaegi|jaayega|denge|dega|di jayegi)\b|"
+                r"\bwill be (?:blocked|suspended|frozen|deactivated|closed|disconnected|cut|barred)\b|"
+                r"(?:बंद|ब्लॉक|निलंबित)\s*(?:हो|कर)\s*(?:जाएगा|जाएगी|दिया जाएगा|दी जाएगी)")
+
+
+def _actionable(a):
+    """A text-model score alone flags a message only when the reader is given something to act on:
+    a contact of the sender's own (a mobile number, a chat, a lookalike or unknown link) or a direct
+    request. Genuine bank, OTP, bill and notice messages often score high on vocabulary alone, but
+    with no destination and no request a scam has no way to reach its victim."""
+    text = a.get("text", "")
+    return bool(a["own_contact"] or a["request_cues"] or a["reader_direct"] or
+                _clause_hit(BLOCK_FUTURE, text) or
+                _contact_anywhere(a) or _clause_hit(PAY_COMMAND, text) or _ordered(text, threat=False) or
+                bool(_EXCEPT.search(text)))
+
+
+_HANDLE = re.compile(r"@\w|wa\.me|\bt\.me\b|\(at\)|\[\.\]", re.I)
+# A host written without a scheme on a TLD the main URL pattern does not list ("sbi-netbanking.pw/verify",
+# "forms.gle/abc"): a dotted name with a path, or a hyphenated name, ending in letters.
+_LOOSE_HOST = re.compile(r"\b((?:[a-z0-9-]+\.)+[a-z]{2,10})(?=/[^\s]*|\b)(/\S*)?", re.I)
+
+
+# Real TLDs the main URL pattern does not list, so a bare "sbihelp.pw" still counts as a link.
+_EXTRA_TLDS = {"pw", "us", "cn", "ru", "uk", "ws", "su", "gl", "gd", "do", "be", "ai", "gg", "store", "website",
+               "support", "help", "tech", "space", "fun", "digital", "today", "world", "email", "services",
+               "center", "network", "bond", "cyou", "cfd", "sbs", "lat", "mobi", "asia", "page", "net", "org"}
+
+
+def _loose_hosts(text):
+    out = []
+    for m in _LOOSE_HOST.finditer(text):
+        h = m.group(1).lower()
+        label = h.split(".")[0]
+        if m.group(2) or "-" in label or h in SHORTENERS or h in ("forms.gle", "bit.do", "youtu.be", "t.ly") \
+                or h.rsplit(".", 1)[-1] in _EXTRA_TLDS:
+            if not re.fullmatch(r"(?:rs|inr|no|ac|ref|txn)", label):
+                out.append(h)
+    return out
+
+
+def _contact_anywhere(a):
+    """Any contact a reader could use that is not the organisation's own, wherever it stands: a link
+    to a site that is not official, a mobile number in any spelling, a chat handle or an obfuscated
+    link. Unlike own_contact this does not need a clause that asks the reader to act."""
+    text = a.get("text", "")
+    return bool(any(not is_official(h) for h in a["hosts"] + _loose_hosts(text)) or CONTACT_NUMBER.search(text)
+                or _HANDLE.search(text) or _any(CHAT_CONTACT, text))
+
 def decide(p_model, a, gate=0.85):
     """Turn the mechanism analysis plus the text-model probability into a label and score.
 
@@ -1092,6 +1312,11 @@ def decide(p_model, a, gate=0.85):
     when no harmful mechanism is present. The model probability is a tie-breaker for novel wording.
     """
     harm = [n for n, _ in a["harm"]]
+    if harm and _warning_only(a):
+        # Every harmful mechanism is described, negated or conditional, and there is nowhere of the
+        # sender's own to act on: the message warns the reader instead of asking anything.
+        cleared = dict(a, harm=[], safe=list(a["safe"]) + ["warning_only"])
+        return 0, min(p_model, 0.40), cleared
     if a.get("report") and not a.get("reader_direct") and not harm:
         # A report describes the scam to a third party; it makes no request of the reader.
         return 0, min(p_model, 0.40), a
@@ -1135,7 +1360,7 @@ def decide(p_model, a, gate=0.85):
                 (a["request_cues"] or p_model >= gate):
             # An OTP delivered to the reader with "do not share it", or an alert that says what to
             # do "if you did not request this", is the sender's own protection, not a demand.
-            return (1 if p_model >= gate else 0), p_model, a
+            return (1 if p_model >= gate and _actionable(a) else 0), p_model, a
         if a["receipt"] or a["otp_note"]:
             # A completed transaction or an OTP notification is a record, not a request.
             return 0, min(p_model, 0.35), a
@@ -1150,9 +1375,9 @@ def decide(p_model, a, gate=0.85):
             return 0, min(p_model, 0.40), a
         if a["awareness"]:
             return 0, min(p_model, 0.40), a
-        if p_model >= gate:
+        if p_model >= gate and _actionable(a):
             return 1, p_model, a
-        return 0, p_model, a
+        return 0, (min(p_model, 0.55) if p_model >= gate else p_model), a
     # A warning carried on the service's own app or portal is a notice, not a demand: only a
     # secret request or a payment to an unverified payee survives the official-channel test.
     if a["official_channel"] and set(harm) <= {"block_threat", "job_offer"} and \
@@ -1225,6 +1450,7 @@ SAFE_DESC = {
     "collect_review": "reads like a pending collect-request notice to review",
     "awareness": "reads like a warning or news report about a scam",
     "no_hurry": "says there is no hurry",
+    "warning_only": "its risky words are only safety warnings or checks, with no contact to act on",
 }
 
 
@@ -1263,7 +1489,7 @@ def evidence(a):
             out.append(r)
     if not a["harm"]:
         for s in ("official_channel", "transaction_receipt", "otp_notification", "protective", "opt_out", "notice",
-                  "promo", "consumer_advice", "collect_review", "awareness", "no_hurry"):
+                  "promo", "consumer_advice", "collect_review", "awareness", "no_hurry", "warning_only"):
             if s in a["safe"]:
                 out.append(safe_description(s, a['text']))
     return out[:5]

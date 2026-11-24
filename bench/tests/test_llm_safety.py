@@ -278,10 +278,13 @@ def test_ordinary_flow_advice_is_kept():
                    "Contact your IT team and update the router firmware.",
                    "Change the exposed passwords and review the logs.",
                    "Close unused ports and turn off remote admin.",
-                   "Do not disconnect the server; block the source address instead.",
-                   "Be cautious of suspicious activity immediately."):
+                   "Do not disconnect the server; block the source address instead."):
         text = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN), SCAN_OPEN + ". " + advice)
         assert text == SCAN_OPEN + ". " + advice, advice
+    # A vague "be cautious" line names no step; the honesty validator swaps in the vetted fact.
+    vague = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN),
+                     SCAN_OPEN + ". Be cautious of suspicious activity immediately.")
+    assert vague == SCAN_OPEN + ". " + llm.KEY_FACT["a port scan"]
 
 
 def test_vetted_flow_actions_are_never_treated_as_disruptive():
@@ -293,7 +296,9 @@ def test_vetted_flow_actions_are_never_treated_as_disruptive():
 
 
 def test_flow_opening_is_never_replaced():
-    assert _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN), SCAN_OPEN + ".") == SCAN_OPEN + "."
+    # With nothing generated after the opening, the vetted key fact follows it; the opening stays.
+    assert _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN), SCAN_OPEN + ".") == \
+        SCAN_OPEN + ". " + llm.KEY_FACT["a port scan"]
     glued = _explain("flow", PORT_SCAN, 1, _flow_evidence(PORT_SCAN),
                      SCAN_OPEN + " and disconnect all affected systems immediately.")
     assert glued == SCAN_OPEN + ". " + llm.FLOW_ACTIONS[1][0]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "call-scam-digital-arrest-cbi",
+    "file": "digital_arrest_cbi.wav",
+    "expected": "malicious",
+    "language": "en",
+    "voice": "piper:en_US-libritts_r-medium",
+    "description": "Synthetic English Indian 'digital arrest' call: fake Mumbai Cyber Crime / CBI inspector, customs drug parcel, arrest warrant, do not disconnect, stay alone on video call, transfer Rs 50,000 to RBI safe verification account.",
+    "speaker": 20,
+    "script": "This is Inspector Rajesh Sharma from Mumbai Cyber Crime and CBI. An arrest warrant has been issued in your name, because a parcel with illegal drugs was seized by customs. Do not disconnect this call, and stay on video call alone. Transfer fifty thousand rupees to the RBI safe verification account immediately, or police will arrest you."
+  },
+  {
+    "id": "call-scam-trai-parcel",
+    "file": "trai_customs_parcel.wav",
+    "expected": "malicious",
+    "language": "en",
+    "voice": "piper:en_US-libritts_r-medium",
+    "description": "Synthetic English TRAI / customs scam call: mobile disconnection within 2 hours, illegal narcotics parcel linked to Aadhaar, stay on line, don't tell family, press 9 to speak to cyber officer and verify bank account.",
+    "speaker": 100,
+    "script": "Alert from TRAI telecom department. Your mobile number will be disconnected within two hours, due to an illegal narcotics parcel linked to your Aadhaar card. Stay on the line, and do not tell your family. Press nine to speak to the cyber officer and verify your bank account."
+  },
+  {
+    "id": "call-benign-bank-reminder",
+    "file": "legit_bank_alert.wav",
+    "expected": "benign",
+    "language": "en",
+    "voice": "piper:en_US-libritts_r-medium",
+    "description": "Synthetic English benign look-alike: genuine SBI security reminder advising never to share OTP/PIN on any call and to block cards only inside the official YONO app or home branch.",
+    "speaker": 40,
+    "script": "Hello, this is a routine security reminder from State Bank of India. Never share your OTP, UPI PIN, or password on any phone call. If you did not authorize a card transaction, block your card directly inside the official YONO app, or visit your home branch."
+  },
+  {
+    "id": "call-benign-clinic-courier",
+    "file": "legit_clinic_courier.wav",
+    "expected": "benign",
+    "language": "en",
+    "voice": "piper:en_US-libritts_r-medium",
+    "description": "Synthetic English benign call: dental clinic appointment confirmation plus courier package at reception desk with no fee or payment required.",
+    "speaker": 3,
+    "script": "Hi, this is Priya from City Dental Clinic, calling to confirm your appointment tomorrow at eleven a.m. Also, your courier delivery arrived at the building reception desk. No fee or payment is required. Please call back whenever it is convenient."
+  }
+]

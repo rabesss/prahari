@@ -8,8 +8,15 @@ import json
 import re
 from pathlib import Path
 
-_BARE = re.compile(r'(?i)^(https?://|upi://|www\.)\S+$')
-_URL = re.compile(r'(?i)\b(?:https?://|upi://|www\.)\S+')
+_BARE = re.compile(
+    r'(?i)^(?:https?://|upi://|upiglobal://|tez://|gpay://|phonepe://|paytmmp://|'
+    r'bhim://|credpay://|amazonpay://|intent://[^\s#]*#Intent;[^\s]*scheme=upi|www\.)\S+$'
+)
+_URL = re.compile(
+    r'(?i)\b(?:https?://|upi://|upiglobal://|tez://|gpay://|phonepe://|paytmmp://|'
+    r'bhim://|credpay://|amazonpay://|www\.)\S+'
+)
+_BARE_UPI_QUERY = re.compile(r'(?i)^(?:[a-z][a-z0-9_]{0,15}=[^&\s]*&)+[a-z][a-z0-9_]{0,15}=[^&\s]*$')
 _FLOW = re.compile(
     r'(?i)\b(?:port scans?|ports|tcp|udp|syn[- ]flood|failed logins?|'
     r'serror_rate|dst_host|num_failed_logins|packet fragments?|'
@@ -40,6 +47,8 @@ def detect_mode(text):
         except (ValueError, TypeError):
             pass
     if _BARE.match(t):
+        return 1
+    if _BARE_UPI_QUERY.match(t) and re.search(r'(?i)(?:^|&)pa=[^&\s]+(?:@|%40)[^&\s]+', t):
         return 1
     urls = list(_URL.finditer(t))
     if len(urls) == 1:

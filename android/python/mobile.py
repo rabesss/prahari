@@ -19,7 +19,7 @@ from triage import mech
 textmodel = types.ModuleType('triage.textmodel')
 textmodel.prob = lambda bundle, texts: np.array([portable.probability('indic', t) for t in texts])
 sys.modules['triage.textmodel'] = textmodel
-from triage import detect, llm
+from triage import detect, explain_hi, llm, upi
 detect.textmodel = textmodel
 
 class Linear:
@@ -158,6 +158,30 @@ def _clip(span, limit=48):
     return span[:limit - 1].rstrip() + '…'
 
 
+def _upi_quote(evidence, parsed, limit=48):
+    """Quote the exact parsed UPI field an evidence line refers to, or ''."""
+    low = str(evidence or '').lower()
+    if not parsed:
+        return ''
+    if any(w in low for w in ('upi id', 'handle', 'vpa', 'pa)')) and parsed.get('pa'):
+        return _clip(f"pa={parsed['pa']}", limit)
+    if any(w in low for w in ('payee name', 'poses as', 'claimed organisation', 'claiming')) and parsed.get('pn'):
+        return _clip(f"pn={parsed['pn']}", limit)
+    if any(w in low for w in ('merchant code', 'merchant category', 'mcc', 'p2p code')) and parsed.get('mc'):
+        return _clip(f"mc={parsed['mc']}", limit)
+    if any(w in low for w in ('amount', 'pre-fills', 'minimum payment', 'debit')) and parsed.get('am'):
+        return _clip(f"am={parsed['am']}", limit)
+    if 'currency' in low and parsed.get('cu'):
+        return _clip(f"cu={parsed['cu']}", limit)
+    if 'reference link' in low and parsed.get('url'):
+        return _clip(_defang(parsed['url']), limit)
+    if any(w in low for w in ('note', 'refund', 'cashback', 'pin', 'kyc', 'urgent', 'customs', 'fee', 'inject')) and parsed.get('tn'):
+        return _clip(_defang(parsed['tn']), limit)
+    if 'autopay' in low or 'mandate' in low or 'collect' in low:
+        return _clip(f"{parsed.get('scheme', 'upi')}://{parsed.get('action', 'pay')}", limit)
+    return ''
+
+
 def quote_span(evidence, text, limit=48):
     """Short span of the user's text that an evidence line refers to, or ''.
 
@@ -168,6 +192,8 @@ def quote_span(evidence, text, limit=48):
     src = str(text or '')
     if not ev.strip() or not src.strip():
         return ''
+    if upi.is_upi_payload(src):
+        return _upi_quote(ev, upi.parse_upi(src), limit)
     low_ev = ev.lower()
     low = src.lower()
     urls = list(re.finditer(r'(?i)https?://[^\s<>"\']+|www\.[^\s<>"\']+', src))
@@ -233,26 +259,43 @@ def quote_span(evidence, text, limit=48):
 def verdict(kind, text):
     """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds."""
     t0 = time.perf_counter()
-    if kind == 'flow' and text.strip().startswith('{'):
+    is_upi = kind == 'upi' or (kind in ('url', 'sms') and upi.is_upi_payload(text))
+    upi_info = None
+    if is_upi:
+        analysis = upi.analyze_upi(text)
+        lab, score, ev = analysis['label'], analysis['score'], analysis['evidence']
+        if analysis['is_upi']:
+            upi_info = analysis['summary']
+    elif kind == 'flow' and text.strip().startswith('{'):
         lab, score, ev = _flow_json(text)
     else:
         lab, score, ev = detect.classify_any(kind, text)
-    if kind == 'url':
+    if kind == 'url' and not is_upi:
         ev = _promote_link_signals(ev)
     # A cleared item, or a debit alert to confirm, must not show the threat phrase the detector
     # overruled or set aside.
     if lab in (0, 'uncertain'):
-        ev = llm.benign_evidence(kind, text, ev, lab)
+        ev = llm.benign_evidence('upi' if is_upi else kind, text, ev, lab)
     ms = (time.perf_counter() - t0) * 1000
-    actions = llm.actions_for(kind, lab, text)
-    scam = llm.scam_type(kind, text, lab)
-    _last.clear(); _last.update(kind=kind, text=text, lab=lab, ev=ev)
+    eff_kind = 'upi' if is_upi else kind
+    actions = llm.actions_for(eff_kind, lab, text)
+    scam = llm.scam_type(eff_kind, text, lab)
+    try:
+        summary_hi = explain_hi.summary_hi(eff_kind, text, lab, ev)
+    except Exception:
+        summary_hi = ''  # the Hindi summary is an aid; the verdict never depends on it
+    _last.clear(); _last.update(kind=eff_kind, text=text, lab=lab, ev=ev)
     out = {'verdict': VERDICT[lab], 'level': {1: 'danger', 'uncertain': 'warn', 0: 'clear'}[lab],
            'score': score, 'scam_type': scam, 'evidence': ev,
            'evidence_quotes': [quote_span(line, text) for line in ev],
            'actions': actions, 'actions_hi': _actions_hi(actions),
            'buttons': _HINDI['buttons'], 'detector_ms': ms}
-    report = _report_buttons(kind, lab, scam, actions)
+    if summary_hi:
+        out['summary_hi'] = summary_hi
+        out['summary_hi_label'] = explain_hi.label_hi()
+    if upi_info:
+        out['upi'] = upi_info
+    report = _report_buttons(eff_kind, lab, scam, actions)
     if report:
         out['report_buttons'] = report
     return json.dumps(out, ensure_ascii=False)
@@ -279,6 +322,8 @@ def _replacement_pool(kind, lab, text):
             add(acts[0])
     for tail, _acts in llm.TYPE_ADVICE.values():
         add(tail)
+    for fact in llm.ALL_FACTS:
+        add(fact)
     return pool
 
 
@@ -294,7 +339,10 @@ def explain(runner):
     """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
     ex = BridgeExplainer(runner)
     text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
-    replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
+    # The explainer reports replacement explicitly; suffix matching is the fallback for old stats.
+    replaced = stats.get('replaced')
+    if replaced is None:
+        replaced = ends_with_replacement(text, _last['kind'], _last['lab'], _last['text'])
     return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 

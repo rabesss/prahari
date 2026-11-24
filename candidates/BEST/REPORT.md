@@ -167,9 +167,13 @@ Hindi accuracy on the hidden set is 0.875; other Indic scripts are outside the p
 v2 recall is 0.720 with FPR 0.040 (injection recall 0.70). Flow
 detection uses KDDTrain+ only, so the KDDTest+ shift keeps recall at 0.757 and F1 at 0.8505; novel
 attack families (apache2, mscan, snmpget) still look normal. A scam that asks for nothing and only
-states a false fact can pass. The explanation model can still produce a wrong detail. The evaluator heuristically checks
-explanations for certain invented domains and long numbers; the application does not filter generated text
-for invented domains or numbers and does not guarantee that fabrications or unsafe advice are caught.
+states a false fact can pass. The explanation model can still produce a wrong detail. An honesty validator now drops generated
+sentences that name a link, number or domain the item does not contain, or make an unsupported
+OTP, payment, app, KYC or call claim, and substitutes a vetted key fact; it is a set of rules, not
+a guarantee, and it cannot correct a wrong detector evidence phrase, which the opening repeats. In
+blind audits on fresh 20-item sets (`research/explain-audit.md` in the repository) most remaining wrong
+explanations came from wrong detector evidence. Llama 3.2 1B cannot write usable Hindi, so Hindi
+mode shows a fixed-text Hindi summary of the detector result next to the English Llama text.
 
 ## Demo plan
 
@@ -205,3 +209,16 @@ communication by itself. The detector is not a substitute for reporting fraud to
 ## Flow input distinction
 
 The UI and `--demo` classify descriptions with `predict_flow_text` rules. The trained NSL-KDD model accepts feature records via `bin/predict --task flow` as dataset replay. `bin/monitor` feeds those same rules from a live source on Linux: it samples the kernel's socket table (`/proc/net/tcp`, `/proc/net/tcp6`) and TCP counters (`/proc/net/snmp`) for one window and describes the window in a sentence (README, "Live connection monitor"). It is not packet capture and needs no root: refused or short-lived connections appear only as counter jumps without addresses, so a scan of closed ports is reported as a burst of failed connects, not named as a port scan. `bin/explain` reclassifies a flow description using text rules; its verdict can differ from the feature-model verdict and does not explain that verdict. See `docs/phase1/report.md` for the current report.
+
+## Call Guard (preview)
+
+An optional audio path for scam calls. A shared voice note or consented recording is transcribed on the
+device by ExecuTorch Whisper Tiny INT8 (Arm export, Apache-2.0). The existing SMS detector plus new
+Indian digital-arrest call-script rules classify the transcript, and Llama 3.2 1B through ExecuTorch writes
+a STOP warning, with vetted 1930 and Chakshu steps. On the Oracle Neoverse-N1 VM, the four synthetic
+demo calls were all classified as expected. ASR took 3.2–5.0 s for 11–18 s clips (2.7–4.8x real time),
+end to end with Llama took 6.8–13.3 s per call on a shared host, and peak RSS was 832 MiB without
+Llama and 2,611 MiB with it (`artifacts/callguard_demo_neoverse_n1*.json`). Limits: apps cannot tap live
+call audio; Hindi transcription with Whisper Tiny is unreliable; the clips are synthetic US-voice TTS,
+so real-call accuracy is unmeasured; the Android hook is unwired and untested on a phone. Full
+write-up: `docs/call-guard.md`.

@@ -10,6 +10,10 @@ import intake
 assert intake.detect_mode('http://amaz0n-refund-help.top/claim') == 1
 assert intake.detect_mode('  https://www.irctc.co.in/nget/train-search  ') == 1
 assert intake.detect_mode('upi://pay?pa=refund@ybl&am=5000') == 1
+assert intake.detect_mode('upi://collect?pa=9876543210@ibl&am=5000') == 1
+assert intake.detect_mode('upi://mandate?pa=verify@okaxis&am=15000&recur=MONTHLY') == 1
+assert intake.detect_mode('phonepe://pay?pa=q123456@ybl&pn=Shop&mc=5411') == 1
+assert intake.detect_mode('pa=sharma@okicici&pn=Sharma&mc=5411&cu=INR') == 1
 assert intake.detect_mode('www.example.com/path') == 1
 assert intake.detect_mode('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked') == 0
 assert intake.detect_mode('Aapka bijli connection aaj raat 9:30 kat jayega. Turant 98XXXXXX12 par call karein ya http://uppcl-bill-pay.top kholein.') == 0
@@ -396,8 +400,50 @@ class Echo:
         return json.dumps({'text': reply.get(word, 'This item is SUSPICIOUS.'), 'stats': {}})
 for kind, text in [('sms', 'Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked'),
                    ('url', 'http://sbi-kyc.in-verify.top/login'),
+                   ('url', 'upi://pay?pa=cashback.refund99@ybl&pn=Amazon%20Refund%20Desk&am=4999&cu=INR&tn=Scan%20and%20enter%20UPI%20PIN%20to%20receive%20refund'),
+                   ('url', 'upi://pay?pa=sharma.kirana@okicici&pn=Sharma%20Kirana%20Store&mc=5411&cu=INR&tn=Grocery%20bill'),
                    ('flow', 'many connections to different ports from one host in a few seconds')]:
     out = json.loads(mobile.check(kind, text, Echo()))
     assert out['verdict'] in ('DANGEROUS', 'SUSPICIOUS', 'NO RISK FOUND — still verify'), out
+    # The Hindi summary is built from the detector result with only NumPy and package data.
+    assert out.get('summary_hi') and any('\u0900' <= c <= '\u097F' for c in out['summary_hi']), out
+    assert out.get('summary_hi_label'), out
     print(kind, out['verdict'], out['evidence'][:2])
-print('mobile.check runs with only NumPy installed')
+
+# UPI QR verdicts, parsed summary, quotes, Hindi actions and report buttons with only NumPy installed.
+upi_scam = json.loads(mobile.check(
+    'url',
+    'upi://pay?pa=cashback.refund99@ybl&pn=Amazon%20Refund%20Desk&am=4999&cu=INR&tn=Scan%20and%20enter%20UPI%20PIN%20to%20receive%20refund',
+    Echo(),
+))
+assert upi_scam['verdict'] == 'DANGEROUS' and upi_scam['level'] == 'danger'
+assert upi_scam['upi']['payee_vpa'] == 'cashback.refund99@ybl'
+assert upi_scam['upi']['direction'] == 'sends_money'
+assert upi_scam['report_buttons']['primary']['id'] == 'report_chakshu'
+assert all(upi_scam['actions_hi']), upi_scam['actions_hi']
+assert any(upi_scam['evidence_quotes']), upi_scam['evidence_quotes']
+
+upi_merch = json.loads(mobile.check(
+    'url',
+    'upi://pay?pa=sharma.kirana@okicici&pn=Sharma%20Kirana%20Store&mc=5411&cu=INR&tn=Grocery%20bill',
+    Echo(),
+))
+assert upi_merch['verdict'] == 'NO RISK FOUND — still verify' and upi_merch['level'] == 'clear'
+assert upi_merch['upi']['is_merchant'] is True and upi_merch['upi']['merchant_code'] == '5411'
+assert all(upi_merch['actions_hi']), upi_merch['actions_hi']
+
+upi_p2p = json.loads(mobile.check(
+    'url',
+    'upi://pay?pa=priya.verma@okhdfcbank&pn=Priya%20Verma&am=450&cu=INR&tn=Dinner%20split',
+    Echo(),
+))
+assert upi_p2p['verdict'] == 'NO RISK FOUND — still verify' and upi_p2p['upi']['is_merchant'] is False
+
+upi_unknown = json.loads(mobile.check(
+    'url',
+    'upi://pay?pa=shop1@quickpayxyz&pn=Local%20Shop&am=500&cu=INR',
+    Echo(),
+))
+assert upi_unknown['verdict'] == 'SUSPICIOUS' and upi_unknown['level'] == 'warn'
+assert all(upi_unknown['actions_hi']), upi_unknown['actions_hi']
+print('mobile.check runs with only NumPy installed (including UPI QR payloads)')

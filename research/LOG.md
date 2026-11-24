@@ -616,3 +616,17 @@ mismatch predates this round. The r3, r4 injection and r4 SMS suites respectivel
 22/24 and 57/58; the other three suites scored 21/21, 30/30 and 40/40.
 
 - 2026-11-21 controller: PR #28 hit the 3-round review cap with reviewer-found false-safes in the report and per-clause association paths. Conservative fix (`fix/report-path-conservative`): report framing never clears a credential demand; a private channel anywhere receives a non-official document request; a link or payment-verb number in the sentence after a payment belongs to it; threat + "call <mobile>" is a private destination. Reviewer adversarial suite (20 scams / 10 benign): main 12/20 caught, 2/10 flagged; PR #28 head 15/20, 1/10; this fix 20/20, 2/10 (both flagged items are news-style warnings that quote a demand, accepted). Eval 2 runs: 86.29, D 0.8674, I 0.8394, E 0.9332; stress, fixtures, ratchet (0 downgraded) pass; BEST hash b9e16a6e…. Sealed holdout not rerun (already used twice).
+
+- 2026-11-23 fp-fix (PR #48, branch fp-fix-neon): SMS false alarms. Root cause: model-only flags on
+  Indian messages with nothing to act on, and harm words inside negated warnings. Fix: contact gate
+  plus negated-warning clearing (secret/app/QR/collect only, no contact anywhere). New independent
+  validation set research/fpfix/fp_val_v1 (240, written blind by a Codex delegate). Three review
+  rounds (gpt-6.1-terra xhigh, GLM 5.4 max, CodeRabbit) found false-safes in broader warning rules
+  (self-check, handover, hypothetical), which were removed. Sealed-holdout use, disclosed: (1) the
+  task allowed reading false positives, so the sealed SMS false-positive texts from the stored main
+  prediction file (final-main-best.json) were read for the category breakdown, without rerunning;
+  (2) an earlier draft validation set written by the first agent on this thread near-duplicated
+  sealed items (token Jaccard up to 1.0) and was discarded unused; (3) the new set's maximum Jaccard
+  against the sealed set (0.289) was computed, numbers only; (4) the sealed set was scored once, at
+  80cc558, after review: SMS FPR 0.402 -> 0.322, recall 0.926 unchanged, SMS F1 0.759 -> 0.792,
+  combined F1 0.784 -> 0.813. bin/eval was not rerun.

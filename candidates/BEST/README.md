@@ -13,9 +13,15 @@ Bharat AI-SoC Challenge 2026, PS3 entry. It checks pasted SMS/WhatsApp-style mes
    three high-precision intrusion signatures on top.
 2. **Advisory layer:** Llama 3.2 1B Instruct (INT4 QLoRA, ExecuTorch `.pte`) turns the verdict, type
    and top evidence phrase into a short explanation. The compact prompt neutralises live links,
-   forces a verdict-first sentence and asks for the evidence phrase verbatim; a heuristic filter
-   attempts to remove sentences that contradict the verdict, and a refusal falls back to an
-   evidence-only prompt. Fixed remediation steps (1930 helpline,
+   forces a verdict-first sentence, asks for the evidence phrase verbatim and grounds the model's
+   own sentence in one vetted key fact for that kind of scam (or benign reading); a heuristic filter
+   attempts to remove sentences that contradict the verdict, an honesty validator drops generated
+   sentences the item does not support (a link, number or domain that is not there, an
+   unsupported OTP/payment claim, hedges against a NO RISK verdict, first-person or overclaiming
+   lines) and, when that would not let fixed text outweigh the model's own tokens, puts the fact in their place (`llm.validator`, `llm.replaced`), and a refusal falls
+   back to an evidence-only prompt. `bin/explain` also returns `summary_hi`, a fixed-text Hindi
+   summary built from the detector result (not model text; the 1B model cannot write reliable
+   Hindi). Fixed remediation steps (1930 helpline,
    cybercrime.gov.in) are added. The model treats the input as untrusted data, which defends against
    prompt injection.
 
@@ -96,3 +102,11 @@ promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0
 table, generalisation checks and limitations.
 
 Network descriptions in the UI and demo use text rules; the trained flow model accepts NSL-KDD feature records through `bin/predict --task flow` as dataset replay. Packet capture is not implemented; `bin/monitor` summarises live connections from the kernel's socket table and counters instead. The explanation flow independently classifies text and can disagree with the trained model. See `../../docs/phase1/report.md`.
+
+## Call Guard (preview, behind a flag)
+
+`bin/callguard --demo | --file AUDIO | --transcript TEXT | --record N --consent | --setup-model`
+transcribes a voice note on the device (ExecuTorch Whisper Tiny INT8), checks it with the detector and
+the digital-arrest rules in `triage/callrules.py`, and has Llama write a STOP warning. The web UI
+endpoint `/api/callguard` exists only with `--call-guard` or `PRAHARI_CALL_GUARD=1`. See
+`../../docs/call-guard.md`.
