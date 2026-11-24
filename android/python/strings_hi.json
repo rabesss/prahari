@@ -94,9 +94,9 @@
   "Before you act": "कार्य करने से पहले",
   "Cancel": "रद्द करें",
   "Change to": "बदलें",
-  "Check another · दूसरा जाँचें": "दूसरा जाँचें",
-  "Check on this phone. इस फ़ोन पर जाँचें": "इस फ़ोन पर जाँचें",
-  "Checking": "जाँच हो रही है",
+  "Check another · दूसरा जाँचें": "दूसरा जांचें",
+  "Check on this phone. इस फ़ोन पर जाँचें": "इस फ़ोन पर जांचें",
+  "Checking": "जांच हो रही है",
   "Clear": "साफ़ करें",
   "Clear text": "टेक्स्ट साफ़ करें",
   "DANGEROUS": "खतरनाक",
@@ -111,16 +111,16 @@
   "Result": "नतीजा",
   "SMS": "एसएमएस",
   "SUSPICIOUS": "संदिग्ध",
-  "Still verify · फिर भी जाँच लें": "फिर भी जाँच लें",
+  "Still verify · फिर भी जाँच लें": "फिर भी जांच लें",
   "That is not a guarantee it is safe.": "इसका मतलब यह नहीं कि यह सुरक्षित है।",
-  "That text is too long to check.": "यह टेक्स्ट जाँच के लिए बहुत लंबा है।",
+  "That text is too long to check.": "यह टेक्स्ट जांच के लिए बहुत लंबा है।",
   "Type": "प्रकार",
-  "checked on this phone": "इस फ़ोन पर जाँचा गया",
+  "checked on this phone": "इस फ़ोन पर जांचा गया",
   "signal": "संकेत",
   "signals": "संकेत",
-  "Nothing to check.": "जाँचने के लिए कुछ नहीं है।",
-  "प्रहरी · scam & threat check": "प्रहरी · ठगी और खतरे की जाँच",
-  "टैप करने से पहले जाँचें · works with no internet": "टैप करने से पहले जाँचें · इंटरनेट के बिना चलता है",
+  "Nothing to check.": "जांचने के लिए कुछ नहीं है।",
+  "प्रहरी · scam & threat check": "प्रहरी · ठगी और खतरे की जांच",
+  "टैप करने से पहले जाँचें · works with no internet": "टैप करने से पहले जांचें · इंटरनेट के बिना चलता है",
   "The model files are not on this phone, so Llama did not write an explanation. The verdict and the steps above are complete.": "मॉडल फ़ाइलें इस फ़ोन पर नहीं हैं, इसलिए Llama ने व्याख्या नहीं लिखी। ऊपर का फैसला और कदम पूरे हैं।",
   "Llama could not be loaded on this phone. The verdict and the steps above are complete.": "Llama इस फ़ोन पर लोड नहीं हो सका। ऊपर का फैसला और कदम पूरे हैं।",
   "Explanation unavailable on this phone. The verdict and the steps above are complete.": "इस फ़ोन पर व्याख्या उपलब्ध नहीं। ऊपर का फैसला और कदम पूरे हैं।",
@@ -219,7 +219,7 @@
   "Sends money from your account": "आपके खाते से पैसे भेजता है",
   "Collect payment request (debits your account)": "कलेक्ट पेमेंट रिक्वेस्ट (आपके खाते से पैसे काटती है)",
   "Recurring UPI AutoPay mandate": "बार-बार कटने वाला UPI AutoPay मैंडेट",
-  "Checked safely — no UPI app was opened": "सुरक्षित रूप से जाँचा गया — कोई UPI ऐप नहीं खोला गया",
+  "Checked safely — no UPI app was opened": "सुरक्षित रूप से जांचा गया — कोई UPI ऐप नहीं खोला गया",
   "a UPI refund or receive-money QR scam": "UPI रिफ़ंड या पैसे पाने के झांसे की QR ठगी",
   "a UPI collect-request QR scam": "UPI कलेक्ट-रिक्वेस्ट QR ठगी",
   "a UPI AutoPay mandate scam": "UPI AutoPay मैंडेट ठगी",
@@ -504,11 +504,11 @@
   },
   "history_empty": {
    "en": "No checks saved on this phone yet.",
-   "hi": "इस फ़ोन पर अभी कोई जाँच सहेजी नहीं है।"
+   "hi": "इस फ़ोन पर अभी कोई जांच सहेजी नहीं है।"
   },
   "history_toggle": {
    "en": "Save recent checks on this phone",
-   "hi": "हाल की जाँच इस फ़ोन पर सहेजें"
+   "hi": "हाल की जांच इस फ़ोन पर सहेजें"
   },
   "link_caveat": {
    "en": "Scammers copy real links. If it asks for money or a code, check in the official app first.",

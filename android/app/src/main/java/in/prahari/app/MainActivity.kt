@@ -2225,7 +2225,7 @@ class MainActivity : Activity() {
         fillStats(data, null, null, null)
         add(body, stats, top = 12)
         val checked = card()
-        add(checked, heading("You checked", "आपने जाँचा"))
+        add(checked, heading("You checked", "आपने जांचा"))
         add(checked, txt(job.value, 14f, T.ink2, 400, 20, raw = true).apply {
             setTextIsSelectable(true)
             if (mode != 0) typeface = Typeface.MONOSPACE
