@@ -352,18 +352,22 @@ _FLOW_GUESS = 'traffic that looks like a routine update or a scheduled backup'
 _FLOW_CLEAR = 'No risk found for this network event: the detector found no attack pattern in it'
 
 
-_OPEN_MARK = 'Start your answer with exactly: "'
-_OPEN_END = '." Then write one more sentence'
-
-
-def _opening(prompt):
-    """The prompt's required opening. llm._forced_sentence stops at the first double quote, so an
-    evidence line that quotes a payee name ("Support") would lose the verdict; read up to the fixed
-    text that follows the opening instead."""
-    tail = prompt.rsplit(_OPEN_MARK, 1)
-    if len(tail) == 2 and _OPEN_END in tail[1]:
-        return tail[1].split(_OPEN_END, 1)[0].rstrip(' .')
-    return llm._forced_sentence(prompt).rstrip(' .')
+def _opening(ctx):
+    """The prompt's required opening, rebuilt from the prompt context (llm._CTX) instead of parsed
+    out of the prompt text, which carries attacker-controlled evidence such as a payee name. Same
+    rule as llm.Explainer.prompt."""
+    what = {'sms': 'message', 'injection': 'message', 'url': 'link', 'flow': 'network event',
+            'upi': 'UPI payment QR'}.get(ctx.get('kind'), 'item')
+    verdict = ctx.get('verdict')
+    ev = ctx.get('evidence') or []
+    first = {1: f'This {what} is DANGEROUS', 0: f'No risk found for this {what}'}.get(verdict, f'This {what} needs a check')
+    if ev:
+        return f'{first}: {ev[0]}'.rstrip(' .')
+    if verdict == 1:
+        return f'This {what} was flagged as risky; check it carefully before acting'
+    if verdict == 'uncertain':
+        return f'This {what} needs a check; review it carefully before acting'
+    return f'This {what} was checked; review it carefully before acting'
 
 
 def detector_text(kind, text, lab, ev):
@@ -374,8 +378,8 @@ def detector_text(kind, text, lab, ev):
     can quote a negated event ("no 200 different ports ...") or guess "routine update or backup".
     """
     prompt = BridgeExplainer(None).prompt(kind, text, lab, ev)
-    opening = _opening(prompt)
     ctx = llm._CTX.get(prompt) or {}
+    opening = _opening(ctx)
     fact = ctx.get('fact') or ''
     if kind == 'flow':
         # The prompt's flow phrase is pattern-matched from the description and blind to negation

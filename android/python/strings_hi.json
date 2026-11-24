@@ -239,7 +239,8 @@
   "Llama skipped: verdict and text from the detector": "Llama नहीं चला: नतीजा और टेक्स्ट डिटेक्टर से",
   "Llama skipped": "Llama नहीं चला",
   "Fixed text from the detector. Llama was not used.": "डिटेक्टर का तय टेक्स्ट। Llama का इस्तेमाल नहीं हुआ।",
-  "Llama is skipped for NO RISK results so they finish faster. Turn it on in About.": "‘कोई खतरा नहीं मिला’ वाले नतीजों पर Llama नहीं चलता, ताकि नतीजा जल्दी आए। इसे ‘Prahari के बारे में’ में चालू करें।"
+  "Llama is skipped for NO RISK results so they finish faster. Turn it on in About.": "‘कोई खतरा नहीं मिला’ वाले नतीजों पर Llama नहीं चलता, ताकि नतीजा जल्दी आए। इसे ‘Prahari के बारे में’ में चालू करें।",
+  "Detector text": "डिटेक्टर टेक्स्ट"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",

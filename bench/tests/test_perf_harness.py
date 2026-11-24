@@ -715,7 +715,109 @@ def test_stats_header_after_failed_explanation():
     old = (Path(__file__).resolve().parents[2] / "evidence" / "galaxy-s23-20261124" / "label-adjusted"
            / "lookalike-link-stats.xml").read_text(encoding="utf-8")
     assert adb_bench.stats_header_state(old) == "pending"
-    fixed = old.replace("244 ms · —", "244 ms · No AI text")
+    fixed = old.replace("244 ms · —", "244 ms · Detector text")
     # Finished, but recorded as a detector fallback, not a completed Llama timing.
     assert adb_bench.stats_header_state(fixed) == "fallback"
+    # An explanation error (missing model, bridge failure) is a different terminal state.
+    assert adb_bench.stats_header_state(old.replace("244 ms · —", "244 ms · No AI text")) == "no-ai-text"
     assert adb_bench.parse_stats_xml(fixed)["detector_ms"] == 244.0
+
+
+def test_parse_dir_keeps_gating_telemetry(tmp_path):
+    cap = tmp_path / "cap"
+    cap.mkdir()
+    (cap / "bill-benign-gated-stats.xml").write_text(GATED_STATS_XML, encoding="utf-8")
+    (cap / "results.json").write_text(json.dumps({"checks": [
+        {"check": "bill-benign-gated", "status": "ok", "gating_mode": "flagged-only",
+         "gating_mode_observed": "flagged-only", "llama_skipped": True, "detector_ms": 7.25, "total_ms": 25.0}]}))
+    out = tmp_path / "out"
+    assert adb_bench.main(["parse-dir", str(cap), "--out-dir", str(out)]) == 0
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert row["gating_mode"] == row["gating_mode_observed"] == "flagged-only"
+    assert row["detector_ms"] == 7.25 and row["llama_skipped"] is True
+
+
+def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None):
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "sample-row.xml").read_text(encoding="utf-8")
+    stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")
+    st = {"screen": "home", "log": [], "session": 0, "seq": 0, "gating": None, "starts": 0}
+
+    def log(rec):
+        st["seq"] += 1
+        rec.update(session=f"s{st['session']}", seq=st["seq"])
+        st["log"].append(json.dumps(rec))
+
+    def fake_adb(serial, *args, check=True, timeout=120):
+        a = list(args)
+        if a[:2] == ["shell", "getprop"]:
+            return "x\n"
+        if a[:3] == ["shell", "am", "start"]:
+            st["starts"] += 1
+            if fail_launch_on == st["starts"]:
+                raise RuntimeError("adb: device offline")
+            st["session"] += 1
+            st["seq"] = 0
+            st["gating"] = a[a.index(adb_bench.GATING_EXTRA) + 1] if adb_bench.GATING_EXTRA in a else None
+            if emit_records:
+                log({"event": "model", "state": "ready", "gating": st["gating"]})
+            return ""
+        if a[:2] == ["logcat", "-d"]:
+            return "\n".join(st["log"]) + "\n"
+        if a[:3] == ["shell", "input", "tap"]:
+            x, y = int(a[3]), int(a[4])
+            if st["screen"] == "home" and (x, y) == (540, 1726):
+                st["screen"] = "result"
+                if emit_records:
+                    log({"event": "result", "gating": st["gating"], "llama_skipped": False, "total_ms": 1200})
+            elif st["screen"] == "result" and y > 2000:
+                st["screen"] = "home"
+        return ""
+
+    class NoPoller:
+        def __init__(self, *a, **k): pass
+        def start(self): pass
+        def stop(self): return {}
+
+    monkeypatch.setattr(adb_bench, "adb_out", fake_adb)
+    monkeypatch.setattr(adb_bench, "dump_ui_xml", lambda s: home if st["screen"] == "home" else stats)
+    monkeypatch.setattr(adb_bench, "MemPoller", NoPoller)
+    monkeypatch.setattr(adb_bench.subprocess, "check_output", lambda *a, **k: b"png")
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    monkeypatch.setattr(adb_bench, "GATING_SAMPLES", [("port-scan", "Port scan", False)])
+    return st
+
+
+def test_gating_run_on_older_apk_is_not_failed(tmp_path, monkeypatch):
+    _fake_device(monkeypatch, emit_records=False)
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert rc == 0 and row["status"] == "ok" and row["gating_mode_observed"] is None
+
+
+def test_failed_pass_launch_keeps_measured_rows(tmp_path, monkeypatch):
+    _fake_device(monkeypatch, fail_launch_on=2)
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "both",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 2
+    assert [(c["check"], c["status"]) for c in rep["checks"]] == [("port-scan", "ok"), ("port-scan-gated", "launch-failed")]
+    assert rep["passes"][1]["error"] == "RuntimeError"
+
+
+def test_deadline_rechecked_after_launch(tmp_path, monkeypatch):
+    _fake_device(monkeypatch)
+    clock = {"t": 0.0}
+
+    def mono():
+        clock["t"] += 3.0  # every call advances the clock; the preload wait crosses the deadline
+        return clock["t"]
+    monkeypatch.setattr(adb_bench.time, "monotonic", mono)
+    out = tmp_path / "out"
+    adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                    "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "50", "--deadline-s", "7"])
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert row["status"] == "skipped-deadline"

@@ -57,7 +57,6 @@ import java.io.File
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -251,10 +250,6 @@ internal object Bridge {
     val netWorker = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "prahari-net").apply { isDaemon = true }
     }
-    /** Stops a generate that runs past [LLAMA_BUDGET_MS]; prefill emits no callback to stop from. */
-    val watchdog = Executors.newSingleThreadScheduledExecutor { runnable ->
-        Thread(runnable, "prahari-watchdog").apply { isDaemon = true }
-    }
     val genLock = ReentrantLock()
     val moduleLock = Any()
     @Volatile var app: Context? = null
@@ -265,8 +260,6 @@ internal object Bridge {
     @Volatile var pythonError: String? = null
     @Volatile var generation = 0
     @Volatile var generating = false
-    /** Bumped under [genLock] each time a generate is armed, so a late watchdog cannot stop the next one. */
-    @Volatile var genSeq = 0
     @Volatile var phase = "idle"
     @Volatile var job: Job? = null
     @Volatile var netId = 0
@@ -635,6 +628,9 @@ class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
                     out.append(result)
                     count++
                     // maxNewTokens is not forwarded by this AAR. Stop from the callback, which is supported.
+                    // The budget is enforced here too: a callback runs inside the native generate, the
+                    // only place stop() is safe. Prefill emits no callback, so a run can overshoot the
+                    // budget by at most one prefill and one token.
                     if (SystemClock.elapsedRealtime() >= deadline) overBudget.set(true)
                     if (count >= 40 || !Bridge.still(id) || overBudget.get()) {
                         try { module.stop() } catch (_: Throwable) {}
@@ -651,39 +647,20 @@ class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
         val seqLen = (prompt.toByteArray(Charsets.UTF_8).size * 3 / 4 + 32 + 40).coerceIn(256, 2048)
         val config = LlmGenerationConfig.create().echo(false).seqLen(seqLen).temperature(0f).maxNewTokens(40).build()
         var armed = false
-        var armedSeq = 0
         var generationFailure: Throwable? = null
         try {
             Bridge.genLock.lock()
             try {
                 if (!Bridge.still(id)) throw Cancelled()
                 Bridge.generating = true
-                Bridge.genSeq += 1
-                armedSeq = Bridge.genSeq
                 armed = true
             } finally {
                 Bridge.genLock.unlock()
             }
-            // stop() is called with genLock held: the worker must take genLock to clear `generating`
-            // after the native call returns, so this generate cannot have been followed by a reset,
-            // close or the next check's generate while stop() runs. genSeq rules out a later generate.
-            val guard = Bridge.watchdog.schedule(Runnable {
-                overBudget.set(true)
-                Bridge.genLock.lock()
-                try {
-                    if (Bridge.generating && Bridge.genSeq == armedSeq && Bridge.still(id)) {
-                        try { module.stop() } catch (_: Throwable) {}
-                    }
-                } finally {
-                    Bridge.genLock.unlock()
-                }
-            }, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             try {
                 module.generate(prompt, config, callback)
             } catch (t: Throwable) {
                 generationFailure = t
-            } finally {
-                guard.cancel(false)
             }
         } finally {
             if (armed) {
@@ -2479,11 +2456,13 @@ class MainActivity : Activity() {
             if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
         // adb_bench.py reads this summary from the header's label: "<detector> · <first token>" when
-        // Llama ran, "<detector> · Llama skipped" when gating skipped it, "<detector> · No AI text" when
-        // the stage ended without a usable Llama reply, and "—" only while Llama is still writing.
+        // Llama ran; "Llama skipped" when gating skipped it; "Detector text" when Llama's replies were
+        // replaced by the detector's fixed text; "No AI text" when there is no explanation at all
+        // (missing model, an error); "—" only while Llama is still writing.
         val second = when {
             skipped -> t("Llama skipped")
-            done && (fallback || firstToken == "—") -> t("No AI text")
+            done && fallback -> t("Detector text")
+            done && firstToken == "—" -> t("No AI text")
             else -> firstToken
         }
         summary.text = "$detector · $second"
@@ -2508,7 +2487,7 @@ class MainActivity : Activity() {
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
             // Stats still finish, so the header (and adb_bench.py) sees the check as done.
-            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped, true)
+            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped, true, result.has("fallback"))
             return
         }
         if (result.has("fallback")) markDetectorText(result.optString("fallback"))
