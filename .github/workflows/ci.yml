@@ -44,8 +44,13 @@ jobs:
               git rev-parse -q --verify origin/main > /dev/null || { echo 'range base unavailable: origin/main missing'; exit 1; }
               base="$(git merge-base origin/main "$head")" || { echo 'range base unavailable: no merge-base with origin/main'; exit 1; }
             fi
-            # A force-push onto main's tip (e.g. to main itself) leaves an empty range and a vacuous audit/ratchet: fail loudly.
-            if [ -n "$forced" ] && [ "$base" = "$head" ]; then echo 'range base unavailable: force-push left an empty range against origin/main'; exit 1; fi
+            # A force-push onto main itself (e.g. a history rewrite) leaves base == head. Audit the tip commit
+            # against its first parent (for a merge, the previous main) so the audit and ratchet still see a
+            # real change; fail only when the tip has no parent and the range would be empty.
+            if [ -n "$forced" ] && [ "$base" = "$head" ]; then
+              base="$(git rev-parse -q --verify "$head^1")" || { echo 'range base unavailable: force-push left an empty range and the tip has no parent'; exit 1; }
+              echo "force-push onto main: auditing $head against its first parent $base"
+            fi
           fi
           git rev-parse --verify "$base^{commit}" > /dev/null; git rev-parse --verify "$head^{commit}" > /dev/null
           echo "RANGE_BASE=$base" >> "$GITHUB_ENV"; echo "RANGE_HEAD=$head" >> "$GITHUB_ENV"
