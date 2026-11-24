@@ -1043,6 +1043,7 @@ class MainActivity : Activity() {
             sharedBanner = it.getBoolean("shared")
             sharedText = it.getString("sharedText") ?: ""
             sharedSource = it.getString("sharedSource") ?: ""
+            checkSource = it.getString("checkSource") ?: ""
             advancedOpen = it.getBoolean("advanced")
         }
         try {
@@ -1090,6 +1091,7 @@ class MainActivity : Activity() {
         out.putBoolean("shared", sharedBanner)
         out.putString("sharedText", sharedText)
         out.putString("sharedSource", sharedSource)
+        out.putString("checkSource", checkSource)
         out.putBoolean("advanced", advancedOpen)
         val job = if (screen == "result") visibleJob else null
         if (job != null) {

@@ -79,8 +79,9 @@ verdict never depends on them, and neither sends anything by itself.
 * **Send to family** (परिवार को बताएं) opens the Android share sheet (`ACTION_SEND`) with a short
   warning in the app language: what the scam is, one safety step, and the link's registered domain
   only (`hxxp://in-verify[.]top` for `http://sbi-kyc.in-verify.top/u?m=...`), defanged. Subdomains,
-  paths and queries are dropped because a scammer can personalise them per victim, and a domain
-  that still carries a number is left out. It never carries the message body, the sender, names or
+  paths and queries are dropped because a scammer can personalise them per victim (IDNA and
+  percent-encoded dots count as dots), and a domain with four digits in a row or six in total, which
+  could be a phone or account number, is left out. A single swapped digit (`amaz0n`) is kept. It never carries the message body, the sender, names or
   numbers. The user picks the app and the person; no contacts
   permission is used, and Prahari is excluded from the chooser.
 

@@ -94,6 +94,11 @@ assert rc.link_origin('http://x.sbl-help.co.in/a') == 'hxxp://sbl-help[.]co[.]in
 assert rc.link_origin('http://x.sbi.co.in/a') == ''  # only official links: nothing to avoid
 assert rc.link_origin('http://98765-43210.top/') == ''  # a number in the registered name itself
 assert rc.link_origin('no link here') == ''
+assert rc.link_origin('https://asha。evil.top/x') == 'hxxps://evil[.]top'  # IDNA dot
+assert rc.link_origin('https://asha%2Eevil.top/x') == 'hxxps://evil[.]top'  # percent-encoded dot
+assert rc.link_origin('https://secure.xn--h2brj9c/verify') == 'hxxps://secure[.]xn--h2brj9c'  # punycode TLD
+assert rc.link_origin('https://pay.evil.com.tr/x') == 'hxxps://evil[.]com[.]tr'
+assert rc.link_origin('https://a.evil.co.th/x') == 'hxxps://evil[.]co[.]th'
 assert rc.link_origin('http://98-765-432-10.evil.top/x') == 'hxxp://evil[.]top'  # numbered subdomain dropped
 assert rc.link_origin('http://98-765-432-10.top/x') == ''  # a number split by hyphens in the name
 assert rc.link_origin('https://secure.भारत/verify') == 'hxxps://secure[.]भारत'  # IDN kept
