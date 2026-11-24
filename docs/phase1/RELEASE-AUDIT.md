@@ -1,6 +1,7 @@
 # Release Audit: Public-Repository Readiness (`rabesss/arm-bharat-ai-soc`)
 
 - **Re-checked 24 Nov 2026 on `main` `28bdb6b` (after PRs #48–#51):** `gitleaks git --log-opts=--all` over all 474 local commits found only the same public-hash false positives; the author-email list is unchanged (one personal-Gmail commit).
+- **PR #44 raw captures (`docs/perf/evidence/`, merged `5498500`):** unedited by design. They include the terminated cloud box's ephemeral hostname (`env.txt`) and the RTL phone's `logcat.txt` (render and system lines; no account, e-mail or serial found). Neither is a secret; trim them only if you want a cleaner public tree.
 - **Audited commit:** `1eb8916` (`docs/phase1-final`, branched from `main`). First pass scanned the 177 commits reachable from `main`; a second `gitleaks git --log-opts=--all` pass on 23 Nov 2026 covered all 197 local commits (every branch, including the parallel feature branches).
 - **Audit date:** 23 November 2026
 - **Scope:** Full Git history (all commits, messages, headers, blobs, tags) and working tree — secrets/credentials, personal information (PII), licences/attributions, large files, hidden/third-party data leakage, and content unsuitable for a public competition repository.

@@ -1,6 +1,6 @@
 # Evidence ledger
 
-Updated: 24 November 2026 (`main` commit `6b5e199`, through PR #45 and #52). Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
+Updated: 24 November 2026 (`main` commit `5498500`, through PR #44, #45 and #52). The fuller performance write-up and the unedited raw captures are in [`docs/perf/`](../perf/README.md); `docs/phase1/evidence/` keeps a smaller copy plus the sealed-holdout scores. **Physical phone unverified on the final build:** the S23 figures come from RTL run 8 on the r1 APK; the re-run on the final APK (`docs/perf/s23-rtl-runbook.md`) is pending. Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
 
 ## Core architecture, datasets, and historical baselines (`[S1]`–`[S7]`)
 
@@ -54,7 +54,7 @@ Measured **23 November 2026** on Debian 12, Linux 6.1.155, `aarch64`, ARM Neover
 | PR #43: Android round-2 UX | Merged (PR #43, merge `1eb8916`) | Share-sheet (`ACTION_SEND`, `ACTION_PROCESS_TEXT`), `EN / Hindi` toggle (`strings_hi.json`, `hindi_steps.json`), offline TTS (`Listen`), quoted evidence spans (defanged links, masked OTPs), safety-filter replacement badge, opt-in redacted local history, pure-Python QR decoder (`android/python/qrdec.py`). Verified on Android 14 x86_64 emulator; pending physical S23 re-test. |
 | Exploratory v1 India challenge SHA-256 | Historical | `135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67` (`bench/challenge/india_challenge_v1.jsonl`); previously exposed, exploratory only. |
 
-## Merged `main` improvements PR #45–#52 (`[S12]`)
+## Merged `main` improvements PR #44–#52 (`[S12]`, `[S13]`)
 
 | Claim | Status | Evidence and qualification |
 |:--|:--|:--|
@@ -65,5 +65,5 @@ Measured **23 November 2026** on Debian 12, Linux 6.1.155, `aarch64`, ARM Neover
 | Test suite on `28bdb6b` | Measured 24 Nov | `pytest candidates/BEST/tests bench/tests/test_llm_safety.py`: 896 passed. |
 | PR #52: repeated opening shown once | Merged (merge `ed0c7a3`) | `_drop_opening_copies` in `triage/llm.py`; 6 doubled-opening cases 1 wrong -> 0; 901 detector and safety tests at merge. No verdict or rule change. |
 | PR #45: Android round 3 | Merged (merge `6b5e199`); **emulator only** | CI green (checks, apk, executorch-aar). Integrator re-test on an Android 14 x86_64 emulator with the `main` APK: parcel scam DANGEROUS (3 reasons), genuine SBI debit alert CHECK THIS ALERT, refund UPI link DANGEROUS (UPI QR), Hindi-mode KYC with Hindi chrome and Hindi summary (Llama sentence English, labelled). Screenshots `docs/phase1/img/app-round3-*.png`. **Physical phone unverified on the final build:** the S23 numbers in `[S9]` are from the r1 APK; TalkBack and memory trace untested. |
-| PR #44: Arm perf harness | **TODO — not merged** | Fill in only after merge; link `docs/perf/`. |
+| PR #44: Arm perf harness and evidence | Merged (merge `5498500`) | [`docs/perf/README.md`](../perf/README.md) (cross-device table), [`methodology.md`](../perf/methodology.md), [`optimisations.md`](../perf/optimisations.md), [`s23-rtl-runbook.md`](../perf/s23-rtl-runbook.md), full unedited captures in [`docs/perf/evidence/`](../perf/evidence/README.md); harness `bench/perf/`, 16 tests. Warm Neoverse-V2 items 2–6 recomputed from `docs/perf/evidence/neoverse-v2/out/threads.csv` (2T 539.6 ms / 46.72 tok/s / 1.265 s; 8T 159.3 ms / 104.31 tok/s / 0.534 s). Disk: `.pte` 1.100 GiB, APK 45.75 MiB, on-phone total 1.147 GiB. |
 

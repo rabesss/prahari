@@ -4,6 +4,7 @@ Prahari is an offline, on-device scam, phishing, and network-anomaly triage assi
 
 - **Final Phase 1 report:** [docs/phase1/report.pdf](docs/phase1/report.pdf) ([Markdown source](docs/phase1/report.md), reproducible build via `python3 docs/phase1/build_report.py`)
 - **2-minute demo script:** [docs/phase1/demo-video.md](docs/phase1/demo-video.md)
+- **Hardware performance write-up & harness:** [docs/perf/README.md](docs/perf/README.md) (raw captures in [docs/perf/evidence/](docs/perf/evidence/README.md), harness in [bench/perf/](bench/perf/README.md))
 - **Evidence ledger & Q&A:** [docs/phase1/EVIDENCE.md](docs/phase1/EVIDENCE.md) (raw logs in [docs/phase1/evidence/](docs/phase1/evidence/)) · [docs/phase1/LIMITATIONS.md](docs/phase1/LIMITATIONS.md) · [docs/phase1/RELEASE-AUDIT.md](docs/phase1/RELEASE-AUDIT.md)
 
 ## Physical Arm hardware & offline results
@@ -13,7 +14,7 @@ Prahari has been measured end to end on three Arm targets (all running the exact
 | Target hardware | Runtime / setup | Warm TTFT | Decode speed | End-to-end / item | Memory | Offline proof |
 |:--|:--|--:|--:|--:|--:|:--|
 | **Samsung Galaxy S23 (`SM-S911B`)** (Snapdragon 8 Gen 2, `arm64-v8a`, Android 14, Samsung RTL) | ExecuTorch Android 1.5.1 XNNPACK, Chaquopy portable detectors | **510 ms** (499–510 ms warm; 657 ms airplane) | **43.4 tok/s** warm (39.0 tok/s airplane) | **1.20 s** warm (**1.42 s** airplane mode) | **1.66 GiB PSS** / 1.78 GiB RSS (`dumpsys meminfo`) | Airplane mode (`airplane_mode_on=1`) + `SecurityException` (no `INTERNET` permission) |
-| **Arm Neoverse-V2 Linux** (8 online vCPUs, Debian 12, `i8mm` + `asimddp`) | ExecuTorch 1.6.0 XNNPACK, Python 3.12 (`perf` profiled) | **922 ms** (2T) / **527 ms** (8T) | **46.7 tok/s** (2T) / **104.6 tok/s** (8T) | **1.73 s** (2T) / **0.98 s** (8T) | **2,392 MiB** runner RSS | OS network namespace cut (`unshare -n`: HTTPS/DNS/TCP fail; 6/6 inference succeeds) |
+| **Arm Neoverse-V2 Linux** (8 online vCPUs, Debian 12, `i8mm` + `asimddp`) | ExecuTorch 1.6.0 XNNPACK, Python 3.12 (`perf` profiled) | **540 ms** (2T) / **159 ms** (8T), warm items; all-item mean 922 / 527 ms | **46.7 tok/s** (2T) / **104.3 tok/s** (8T) | **1.27 s** (2T) / **0.53 s** (8T) warm; all-item mean 1.73 / 0.98 s | **2,392 MiB** runner RSS | OS network namespace cut (`unshare -n`: HTTPS/DNS/TCP fail; 6/6 inference succeeds) |
 | **Oracle Arm Neoverse-N1 VM** (2 vCPUs, Ubuntu 24.04, eval baseline) | ExecuTorch 1.6.0 XNNPACK, Python 3.12 | — | **19.9 tok/s** | **3.84 s** (eval range 3.8–4.8 s) | **2.05 GB** cgroup `memory.peak` | Evaluation import-time network guard |
 
 - **KleidiAI kernel dispatch confirmed (`perf record -F 99 -g`, Neoverse-V2, 2 threads, 2,222 samples, 0 lost):** named `kai_*` leaf functions accounted for **54.17% of sampled whole-process CPU time**, led by `kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm` (**23.27%**, prefill) and `kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod` (**20.57%**, token decode), traced through `xnn_invoke_runtime` to ExecuTorch's XNNPACK delegate.
