@@ -124,7 +124,7 @@ package name, the label (from the archive's resources), requested permissions pl
 and receiver's `android:permission` (Accessibility and device admin are declared there), and the
 signing certificate (`GET_SIGNING_CERTIFICATES`, then legacy `GET_SIGNATURES` as a fallback). A
 certificate that cannot be read is reported as "could not read", not as "unsigned". Nothing
-installs, opens or runs the app. The file is read on the model worker under the check's id, so
+installs, opens or runs the app. The file is read on its own thread under the check's id, so
 Cancel or a newer check stops it.
 
 `android/python/apk_check.py` decides the verdict by rules alone:

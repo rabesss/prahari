@@ -146,7 +146,6 @@ _BRANDS = [
 BRANDS = [(name, re.compile(pat, re.I)) for name, pat in _BRANDS]
 
 _CONTROL = re.compile(r'[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩﻿]')
-_PERM = re.compile(r'^[A-Za-z0-9_.]{1,200}$')
 _PKG = re.compile(r'^[A-Za-z0-9_.]{1,200}$')
 _last = {}
 
@@ -176,7 +175,9 @@ def clean(facts):
     perms = facts.get('permissions') or []
     if not isinstance(perms, list):
         perms = []
-    perms = sorted({p for p in (str(x) for x in perms[:2000]) if _PERM.match(p)})
+    # Only the flagged permissions matter, so they are picked from the whole list: a cap applied
+    # first could push READ_SMS out behind thousands of decoy names.
+    perms = sorted({p for p in (str(x) for x in perms) if p in PERMS})
     try:
         size = max(0, int(facts.get('size_bytes') or 0))
     except (TypeError, ValueError):
@@ -341,14 +342,23 @@ def prompt():
 _UNSAFE = re.compile(r"\b(?:install\w*|download\w*|sideload\w*|allow\w*|grant\w*|enabl\w*|permit\w*|"
                      r"accept\w*|approv\w*|trust\w*|open\w*|run|launch\w*|update\w*|safe|safely|legit\w*|"
                      r"genuine|official|harmless|verified|real|clean)\b", re.I)
-_NEG = re.compile(r"\b(?:not|never|no|don't|dont|do not|avoid|without|before|stop|refuse|isn't|aren't|cannot|can't)\b",
-                  re.I)
+# A negation counts only when it governs the word directly ("do not install", "never trust it"),
+# at most two words before it.
+_NEG_NEAR = re.compile(r"\b(?:not|never|no|don't|dont|avoid|without|stop|refuse|isn't|aren't|cannot|can't)"
+                       r"(?:\s+\w+){0,2}\s*$", re.I)
+# Double negatives turn a warning into a push: "do not hesitate to install", "no reason to avoid
+# installing", "nothing stops you from trusting it". Any of these words makes the clause unsafe.
+_DOUBLE = re.compile(r"\b(?:hesitat\w*|reason|need|needn't|afraid|fear|worr\w*|wait|delay|fail|forget|problem|"
+                     r"issue|wrong|risk-free|fine|okay|ok|stops?|prevents?|harm in)\b", re.I)
 
 
 def _unsafe(sentence):
     for clause in re.split(r"[,;:]|\b(?:and|but|so|then)\b", sentence, flags=re.I):
-        for m in _UNSAFE.finditer(clause):
-            if not _NEG.search(clause[:m.start()]):
+        hits = list(_UNSAFE.finditer(clause))
+        if hits and _DOUBLE.search(clause):
+            return True
+        for m in hits:
+            if not _NEG_NEAR.search(clause[:m.start()]):
                 return True
     return False
 

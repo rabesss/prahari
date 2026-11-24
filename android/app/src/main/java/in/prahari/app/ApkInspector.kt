@@ -27,7 +27,8 @@ import java.util.Locale
  * The app in the file is never installed, opened or run: no installer session, no install intent,
  * no class loader. getPackageArchiveInfo parses the manifest and signing block only, and the
  * label comes from the archive's resource table. No permission is needed: the content URI comes
- * with the sender's or the picker's read grant. Call [read] from the model worker only.
+ * with the sender's or the picker's read grant. [read] runs on its own thread per check
+ * (MainActivity.readApk), never on the UI thread or the model worker.
  */
 internal object ApkInspector {
     const val PICK_REQUEST = 43
@@ -82,7 +83,7 @@ internal object ApkInspector {
         }
     }
 
-    /** Copies left behind by a crash. The worker runs one check at a time, so none is in use. */
+    /** Copies left behind by a crash or a stalled provider. Live copies are minutes younger. */
     private fun sweep(dir: File) {
         val now = System.currentTimeMillis()
         dir.listFiles()?.forEach { old ->

@@ -451,11 +451,9 @@ private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, sourc
 }
 
 /**
- * [payload] is the app file's content URI for [APK_MODE] (read here, on the worker, under this
- * check's generation id) and empty for text checks.
+ * [payload] is the app file's facts JSON for [APK_MODE] (read by [readApk]) and empty for text checks.
  */
-private fun runCheck(id: Int, mode: Int, shown: String, started: Long, source: String, payload: String = "") {
-    var value = shown
+private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: String, payload: String = "") {
     try {
         if (!Bridge.still(id)) return
         if (Bridge.pythonError != null || !Python.isStarted()) {
@@ -464,27 +462,9 @@ private fun runCheck(id: Int, mode: Int, shown: String, started: Long, source: S
         val apk = mode == APK_MODE
         // apk_check has the same verdict / explain / vetted_explanation calls as mobile.
         val bridge = Python.getInstance().getModule(if (apk) "apk_check" else "mobile")
-        val facts = if (apk) {
-            val ctx = Bridge.app ?: throw IllegalStateException("App context is not ready")
-            try {
-                ApkInspector.read(ctx, Uri.parse(payload)) { Bridge.still(id) }
-            } catch (e: ApkInspector.Unreadable) {
-                if (!Bridge.still(id)) return
-                Bridge.fail(id)
-                Bridge.ui { act -> if (Bridge.still(id)) act.apkFailed(e.key) }
-                return
-            } catch (_: ApkInspector.Stopped) {
-                return
-            }
-        } else null
-        if (!Bridge.still(id)) return
-        if (facts != null) {
-            value = facts.display
-            Bridge.pendingValue = value
-        }
         val callStart = SystemClock.elapsedRealtimeNanos()
         val verdict = JSONObject(
-            if (facts != null) bridge.callAttr("verdict", facts.json.toString()).toString()
+            if (apk) bridge.callAttr("verdict", payload).toString()
             else bridge.callAttr("verdict", KINDS[mode], value, source).toString()
         )
         val verdictCallMs = (SystemClock.elapsedRealtimeNanos() - callStart) / 1e6
@@ -557,6 +537,34 @@ private fun runCheck(id: Int, mode: Int, shown: String, started: Long, source: S
             act.failureToast(detail)
         }
     }
+}
+
+/**
+ * Read an app file on its own thread, under check [id], then queue the verdict on the model worker.
+ * A content provider that stalls holds only this thread: Cancel or a newer check moves on, and
+ * the model worker stays free for the next check.
+ */
+private fun readApk(id: Int, uri: Uri, started: Long) {
+    Thread({
+        fun failed(key: String) {
+            if (!Bridge.still(id)) return
+            Bridge.fail(id)
+            Bridge.ui { act -> if (Bridge.still(id)) act.apkFailed(key) }
+        }
+        try {
+            val ctx = Bridge.app ?: throw IllegalStateException("App context is not ready")
+            val facts = ApkInspector.read(ctx, uri) { Bridge.still(id) }
+            if (!Bridge.still(id)) return@Thread
+            Bridge.pendingValue = facts.display
+            enqueueCheck(id, APK_MODE, facts.display, started, "", facts.json.toString())
+        } catch (e: ApkInspector.Unreadable) {
+            failed(e.key)
+        } catch (_: ApkInspector.Stopped) {
+        } catch (t: Throwable) {
+            Log.e(TAG, "app file read failed", t)
+            failed("apk_fail")
+        }
+    }, "prahari-apk").apply { isDaemon = true }.start()
 }
 
 private fun putNum(rec: JSONObject, key: String, value: Double?) {
@@ -1844,8 +1852,8 @@ class MainActivity : Activity() {
     }
 
     /**
-     * The file is read on the model worker under this check's id, so a newer check or Cancel
-     * stops it, and the copy never outlives the check. Home's text and mode are left alone.
+     * The file is read on its own thread under this check's id ([readApk]), so a newer check or
+     * Cancel stops it and the copy never outlives the check. Home's text and mode are left alone.
      */
     private fun beginApkCheck(uri: Uri) {
         sharedBanner = false
@@ -1858,7 +1866,7 @@ class MainActivity : Activity() {
         Bridge.pendingMode = APK_MODE
         Bridge.pendingValue = shown
         showChecking(APK_MODE, shown)
-        enqueueCheck(id, APK_MODE, shown, started, "", uri.toString())
+        readApk(id, uri, started)
     }
 
     /** The app file could not be read: back to Home with the reason. */

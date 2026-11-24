@@ -103,6 +103,9 @@ assert run(with_(permissions=[P + 'READ_CALL_LOG', P + 'REQUEST_INSTALL_PACKAGES
 assert run(with_(permissions=[P + 'REQUEST_INSTALL_PACKAGES']))['level'] == 'warn'
 assert run(with_(label='HDFC Bank', permissions=[P + 'READ_CALL_LOG']))['level'] == 'danger'
 assert run(with_(permissions=['bad perm!', 42, None]))['level'] == 'clear'
+# Thousands of decoy names that sort first must not hide the flagged ones (Terra review, PR #72).
+decoys = [f'a.decoy.P{i:05d}' for i in range(5000)]
+assert run(with_(permissions=decoys + [P + 'READ_SMS', P + 'SYSTEM_ALERT_WINDOW']))['level'] == 'danger'
 # Names: whole words for short or common names, prefixes for long distinctive ones.
 for label, brand in [('SBI Rewards', 'SBI'), ('SBIRewards', 'SBI'), ('Axis Bank KYC', 'Axis Bank'),
                      ('RTO Challan', 'RTO'), ('mParivahan', 'RTO'), ('Aadhar Update', 'Aadhaar'),
@@ -180,6 +183,13 @@ assert res.get('fallback') == 'checks_failed' and 'safe to install' not in res['
 assert res['explanation'] == first + '. ' + ac.FACTS['none']
 res, first, _ = explain(base, ['{O}. Play Store review adds one more layer of checks.'])
 assert 'fallback' not in res and res['explanation'].endswith('one more layer of checks.'), res
+# Double negatives push the reader to install: never kept (Terra review, PR #72).
+for push in ['Do not hesitate to install it.', 'There is no reason to avoid installing this app.',
+             'Nothing stops you from trusting it.', 'You need not worry about installing it.',
+             'It is fine to allow its permissions.']:
+    res, first, _ = explain(base, ['{O}. ' + push + ' Play Store review adds a layer of checks.'])
+    assert push not in res['explanation'], (push, res)
+    assert ac._unsafe(push), push
 # Negated advice is fine.
 res, first, _ = explain(sms_trojan, ['{O}. Do not install it, because it reads your OTP codes.'])
 assert 'Do not install it' in res['explanation'] and 'fallback' not in res, res
