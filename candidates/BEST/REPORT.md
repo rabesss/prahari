@@ -91,7 +91,7 @@ generic app install needs a link, private channel or APK; moving the whole balan
 destination, authority or threat context; and identity papers need a chat or link, not a plain email
 address. Negated safe-account and guaranteed-returns statements do not fire. On the visible tripwire
 suite (`research/stress/benign_tripwires.jsonl`) this removes six false alarms while retaining all
-eight matching scams, with no visible recall change. The explanation wording is BEST's, with the new
+seven scams in it (the file has 9 benign and 7 scam rows), with no visible recall change. The explanation wording is BEST's, with the new
 identity-document evidence entry; the earlier authority/collect phrases that asserted an arrest or a
 UPI PIN the input did not contain were reverted as ungrounded.
 

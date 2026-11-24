@@ -305,8 +305,8 @@ The clear is not evidence-backed and can only add a false-safe, so it is dropped
 {prize_claim, investment}; pay_to_receive is a heavy recall carrier and is left untouched. With the
 danger group split (diag7) one false alarm sits in {secret_request, remote_access, safe_account,
 id_request, impersonation}; the remaining pair members were not re-ablated. Instead I built a visible
-proxy suite (`research/stress/benign_tripwires.jsonl`, eight benign notices and eight matching scams)
-from the visible benign families and measured the candidate rules on it. gen21 marks six of the eight
+proxy suite (`research/stress/benign_tripwires.jsonl`, nine benign notices and seven matching scams; counts corrected 24 Nov when the file was committed)
+from the visible benign families and measured the candidate rules on it. gen21 marks six of the nine
 benign notices malicious: reward-points-in-app (prize_claim), the anti-fraud statements "we/bank never
 ask you to transfer to a safe account" (safe_account, negation not recognised), "download the official
 app" (remote_access generic install), "transfer the entire balance to your own account" (safe_account
