@@ -454,3 +454,29 @@ def test_review_r3_grok_reason_cases(text, raised):
 def test_review_r3_grok_vouching(sent, bad):
     ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
     assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+# Final CodeRabbit pass (minor) regressions.
+@pytest.mark.parametrize("text,ask", [
+    ("KYC updated last month but link Aadhaar now", True),
+    ("KYC not completed", True),
+    ("Do not update KYC", False),
+    ("Do not update KYC, verify PAN, or link Aadhaar for unsolicited callers", False),
+    ("Do not reply. Please update KYC today", True),
+])
+def test_final_kyc_ask_scoping(text, ask):
+    assert sender._kyc_ask(text.lower()) == ask
+
+
+def test_final_courtesy_closing_is_not_chat():
+    text = "Your SBI account XX1234 has been debited Rs 500. Thanks for banking with us"
+    assert sender.reason("sms", text, MOBILE) == "alert"
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("Contact the bank through an official number.", False),
+    ("Please trust this official sender.", True),
+])
+def test_final_generic_contact_advice(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad

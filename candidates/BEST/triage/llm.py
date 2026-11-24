@@ -1295,7 +1295,8 @@ _V_SENDER_RULE = re.compile(r"\b(?:banks?|government|govt|they)\b[\w\s]{0,30}?\b
                             r"[\s,;-]{0,4}(?:and\s+|but\s+)?(?:not|never|instead of)\b(?:(?!\b(?:and|but|so|this|that|it|which|while|though)\b)[\w\s-]){0,30}", re.I)
 
 # Advice is exempt unless it points at this item's sender ("use this verified sender").
-_V_THIS_SENDER = re.compile(r"\b(?:this|the|that|it|a|an)\s+(?:\w+\s+){0,2}(?:sender|number|caller|source|id|header)\b", re.I)
+_V_THIS_SENDER = re.compile(r"\b(?:this|that|it)\s+(?:\w+\s+){0,2}(?:sender|number|caller|source|id|header)\b|"
+                            r"\b(?:the|a|an)\s+(?:\w+\s+){0,2}sender\b", re.I)
 _V_TRUST_WORD = re.compile(r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe|real)\b", re.I)
 _V_TRUST_NEG = re.compile(r"(?:\b(?:not|never|isn't|wasn't|aren't)\b|\bno\b(?!\s+doubt)|n't)\s+"
                           r"(?:(?!(?:and|but|so|yet|or|while|though)\b)\w+\s+){0,3}$", re.I)

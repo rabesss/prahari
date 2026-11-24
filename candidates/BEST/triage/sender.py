@@ -99,7 +99,7 @@ _REQUEST_HARM = {"secret_request", "id_request"}
 _ALERT_MARK = re.compile(r"\b(?:a/?c|acct|account|card)\s*(?:no\.?\s*)?(?:ending\s*)?[x*]{2,}\s*\d{2,6}\b|"
                          r"\b[x*]{2,}\d{3,6}\b|\b(?:avl\.?|available)\s*bal|\b(?:txn|upi ref|ref no|utr)\b", re.I)
 # A first-person or casual chat about the writer's own transaction is not an alert.
-_CHATTY = re.compile(r"\b(?:my|mine|i|i'm|i've|mera|meri|mere|maine|bhai|bhaiya|yaar|yar|bro|dude|thanks|thx|lol)\b|"
+_CHATTY = re.compile(r"\b(?:my|mine|i|i'm|i've|mera|meri|mere|maine|bhai|bhaiya|yaar|yar|bro|dude|lol)\b|"
                      r"मेरा|मेरी|मेरे|मैंने|भाई|यार", re.I)
 _DEBIT = re.compile(r"\b(?:debited|credited|withdrawn)\b", re.I)
 # An institution's notice to the reader: an action, deadline, hold or threat, not a chat.
@@ -110,7 +110,7 @@ _NOTICE_CUE = re.compile(
     r"immediately|within \d+|now|accessed|new device|unusual|suspicious|logged in|shipped|dispatched|"
     r"out for delivery)\b|बंद|काट|रोक|तुरंत|आज|अपडेट|सत्यापित|भुगतान", re.I)
 _CLAUSE = re.compile(r"[.!?।;\n]+")
-_SUBCLAUSE = re.compile(r"[.!?।;,\n]+")
+_SUBCLAUSE = re.compile(r"[.!?।;,\n]+|\b(?:but|lekin|magar)\b|लेकिन|मगर")
 # Hinglish "na" negates only before the verb ("na karein"); "karo na" is a plea.
 _KYC_NEG = re.compile(r"\b(?:never|not|don'?t|do not|doesn'?t|won'?t|kabhi|mat|nahi|nahin)\b|\bno\b(?!\s+doubt)|"
                       r"\bna\s+kar\w*|नहीं|मत|कभी|(?:^|\s)न(?:\s|$)", re.I)
@@ -129,22 +129,35 @@ def _code_for_institution(t):
 _KYC_DONE = re.compile(r"\b(?:kar (?:diya|di|li|liya)|ho gaya|ho gayi|is done|done|completed|updated)\b|कर दिया|हो गया", re.I)
 
 
+_STATUS = re.compile(r"not (?:updated|completed|verified|linked)|incomplete", re.I)
+_LIST_VERB = re.compile(r"^\s*(?:or|and|nor|ya|aur)?\s*(?:update|verify|complete|link|re-?submit|share|submit)\b", re.I)
+
+
 def _kyc_ask(t):
     """A KYC/PAN/Aadhaar update ask aimed at the reader.
 
-    Checked per sub-clause: a negation right before the ask ("never ask you to update KYC"), the
-    writer's own KYC, or a done update ("KYC kar diya", but not "KYC not completed") is no ask.
+    Checked per sub-clause: a negation right before the ask ("never ask you to update KYC", also
+    carried along a list: "do not update KYC, verify PAN, or link Aadhaar"), the writer's own KYC,
+    or a done update in the same sub-clause ("KYC kar diya") is no ask. "KYC not completed" is a
+    pending status, so it counts.
     """
-    for c in _SUBCLAUSE.split(t):
-        m = _KYC_ASK.search(c)
-        if not m or _KYC_OWN.search(c):
-            continue
-        if _KYC_NEG.search(c[max(0, m.start() - 25):m.start()]) or _KYC_NEG.search(m.group(0)):
-            continue
-        done = _KYC_DONE.search(c)
-        if done and not _KYC_NEG.search(c[max(0, done.start() - 8):done.start()]):
-            continue
-        return True
+    for sentence in _CLAUSE.split(t):
+        negated_list = False
+        for c in _SUBCLAUSE.split(sentence):
+            m = _KYC_ASK.search(c)
+            carried = negated_list and _LIST_VERB.search(c)
+            if not m:
+                negated_list = negated_list and bool(carried)
+                continue
+            neg = _KYC_NEG.search(c[max(0, m.start() - 25):m.start()]) or (
+                not _STATUS.search(m.group(0)) and _KYC_NEG.search(m.group(0)))
+            negated_list = bool(neg) or bool(carried)
+            if neg or carried or _KYC_OWN.search(c):
+                continue
+            done = _KYC_DONE.search(c)
+            if done and not _KYC_NEG.search(c[max(0, done.start() - 8):done.start()]):
+                continue
+            return True
     return False
 
 
