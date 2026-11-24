@@ -77,6 +77,10 @@ internal object L10n {
         return if (hindi) pair.second else pair.first
     }
 
+    /** The English or Hindi half of a "new" string regardless of mode (bilingual buttons). */
+    fun en(key: String): String = fresh[key]?.first ?: key
+    fun hi(key: String): String = fresh[key]?.second ?: key
+
     /** True when Hindi mode has a line for this exact English sentence or template. */
     fun translated(english: String): Boolean {
         if (english.isEmpty() || english in skip) return true

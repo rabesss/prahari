@@ -7,6 +7,7 @@ import types
 from pathlib import Path
 import numpy as np
 import portable
+import report_card
 
 # detect imports joblib at module level, but Android never loads pickles: the
 # detectors below use exported portable parameters. Chaquopy ships no joblib,
@@ -256,8 +257,29 @@ def quote_span(evidence, text, limit=48):
     return span if len(span) >= 3 else ''
 
 
-def verdict(kind, text):
-    """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds."""
+def _report_card(kind, text, lab, scam, ev, quotes, actions, source):
+    """The Copy report / Send to family texts, or {} (never fails a check).
+
+    report_card is for a SCAM or SUSPICIOUS result. report_card_raised is only for a bank alert
+    that the app itself raises to SUSPICIOUS because it names its own link or number."""
+    try:
+        card = report_card.card(kind, text, lab, scam, ev, quotes, source)
+        if card:
+            return {'report_card': card}
+        if lab != 1 and (llm.DEBIT_STEP in actions or llm.CHECK_STEP in actions):
+            raised = report_card.card(kind, text, lab, scam, ev, quotes, source, raised=True)
+            if raised:
+                return {'report_card_raised': raised}
+    except Exception:
+        pass  # an aid only: the verdict is shown even if this text cannot be built
+    return {}
+
+
+def verdict(kind, text, source=''):
+    """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds.
+
+    source is where the text came from, as a hint for the report only: 'qr', 'whatsapp', 'sms'
+    or ''. It never reaches the detector."""
     t0 = time.perf_counter()
     is_upi = kind == 'upi' or (kind in ('url', 'sms') and upi.is_upi_payload(text))
     upi_info = None
@@ -298,6 +320,8 @@ def verdict(kind, text):
     report = _report_buttons(eff_kind, lab, scam, actions)
     if report:
         out['report_buttons'] = report
+    source = source if source in ('qr', 'whatsapp', 'sms') else ''
+    out.update(_report_card(eff_kind, text, lab, scam, ev, out['evidence_quotes'], actions or [], source))
     return json.dumps(out, ensure_ascii=False)
 
 
