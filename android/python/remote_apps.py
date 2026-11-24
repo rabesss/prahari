@@ -16,7 +16,7 @@ MONEY_TYPES = {
 }
 # Banks, wallets and UPI apps among the detector's known brands (rules.BRANDS).
 BANK_BRANDS = [b for b in rules.BRANDS if b in {'sbi', 'hdfc', 'icici', 'axis', 'kotak', 'pnb', 'paytm', 'phonepe',
-                                                'gpay', 'bhim', 'npci', 'paypal'}] + ['yono', 'bob', 'canara']
+                                                'gpay', 'bhim', 'npci', 'paypal'}] + ['yono', 'canara']
 # Words that put a bank, KYC, UPI, OTP or support desk in the message itself, plus the bank and
 # wallet names in BANK_BRANDS. Refund wording counts: fake refund desks are the classic route to a
 # screen-sharing app. An electricity or job scam without
@@ -24,7 +24,8 @@ BANK_BRANDS = [b for b in rules.BRANDS if b in {'sbi', 'hdfc', 'icici', 'axis', 
 MONEY_DESK = re.compile(
     r'\b(?:bank\w*|kyc|upi|otp|pin|cvv|mpin|net ?banking|account|a/c|debit|credit card|card|wallet|'
     r'customer (?:care|support|service)|support (?:team|executive|agent)|helpline|refund|'
-    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|बैंक|खाता|कस्टमर केयर', re.I)
+    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|'
+    r'बैंक|खाता|कस्टमर केयर|यूपीआई|केवाईसी|ओटीपी|पिन|रिफंड|रिफ़ंड|डेबिट|कार्ड', re.I)
 
 
 def needs_check(kind, text, lab, scam, actions=()):
@@ -32,10 +33,11 @@ def needs_check(kind, text, lab, scam, actions=()):
     if kind == 'flow':
         return False
     text = str(text or '')
-    if REMOTE_APP.search(text.lower()) and lab != 0:
-        return True
-    if lab == 0 and llm.DEBIT_STEP not in (actions or ()):
+    # NO RISK results never show it: receipts and OTP notes carry the debit step as advice too.
+    if lab == 0:
         return False
+    if REMOTE_APP.search(text.lower()):
+        return True
     scam = str(scam or '')
     if kind == 'upi' or scam.startswith('a UPI ') or scam in MONEY_TYPES or llm.DEBIT_STEP in (actions or ()):
         return True

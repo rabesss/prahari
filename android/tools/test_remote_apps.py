@@ -44,7 +44,10 @@ CASES = [
     (True, 'sms', 'Call Amazon customer care 9876543210 for refund', 'uncertain', 'a scam message', []),
     (True, 'upi', 'upi://pay?pa=refund@ybl&am=4999', 1, 'a UPI refund or receive-money QR scam', []),
     (True, 'sms', 'SBI: Rs 2,450 debited via UPI', 'uncertain', 'a bank debit alert to confirm', [llm.DEBIT_STEP]),
-    (True, 'sms', 'SBI: Rs 2,450 debited via UPI', 0, '', [llm.DEBIT_STEP]),
+    (False, 'sms', 'SBI: Rs 2,450 debited via UPI', 0, '', [llm.DEBIT_STEP]),  # NO RISK: no banner
+    (False, 'sms', 'Delivered: Your order #4412 has been delivered. Thank you for shopping.', 0, '', [llm.DEBIT_STEP]),
+    (True, 'sms', 'यूपीआई से 4999 रुपये भेजें इस नंबर पर 9876543210', 1, 'a payment fraud', []),
+    (False, 'sms', 'Hi Bob, I have your private video, pay or I leak it', 1, 'sextortion or blackmail', []),
     (False, 'sms', 'Part time job, earn Rs 5000 daily liking videos', 1, 'a fake job or task scam', []),
     (True, 'url', 'http://sbi-kyc.top/login', 1, 'a phishing link on a lookalike domain', []),
     (True, 'sms', 'Your SBI bank account has been compromised call 9876543210 immediately', 1, 'a scam message', []),

@@ -2411,9 +2411,8 @@ class MainActivity : Activity() {
             pad(this, 14, 12, 14, 12)
             add(this, icon(R.drawable.ic_triangle_alert, 18, T.warn), 18, 18)
             add(this, txt(message, 14f, T.onWarnC, 600, 20, raw = true), 0, -2, left = 10, weight = 1f)
-            contentDescription = message
             isFocusable = true
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            a11yText(this, message)  // one TalkBack stop: the children are hidden
         }
     }
 

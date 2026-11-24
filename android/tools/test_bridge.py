@@ -482,3 +482,10 @@ broken_ra = json.loads(mobile.verdict('sms', kyc_text))
 mobile.remote_apps.needs_check = _needs
 assert broken_ra['level'] == kyc['level'] and 'remote_app_check' not in broken_ra
 print('remote app flag through mobile.verdict passed')
+for _clear in ('Delivered: Your order #4412 has been delivered. Thank you for shopping.',
+               'Your OTP for login is 123456. Do not share it.'):
+    _out = json.loads(mobile.verdict('sms', _clear))
+    assert _out['level'] != 'danger'
+    if _out['level'] == 'clear':
+        assert 'remote_app_check' not in _out, _clear
+print('no remote-app banner on cleared receipts and OTP notes')
