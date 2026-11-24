@@ -25,15 +25,17 @@ MONEY_DESK = re.compile(
     r'\b(?:bank\w*|kyc|upi|otp|pin|cvv|mpin|net ?banking|account|a/c|debit|credit card|card|wallet|'
     r'customer (?:care|support|service)|support (?:team|executive|agent)|helpline|refund|'
     + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|\bbob[ -]?world\b|bank of baroda|'
-    r'(?<![\u0900-\u097F])(?:बैंक|खाता|कस्टमर केयर|यूपीआई|केवाईसी|ओटीपी|पिन|रिफंड|रिफ़ंड|डेबिट|कार्ड)(?![\u0900-\u097F])',
+    # Suffixes (डेबिटेड, बैंकिंग) and a danda after the word still count; only पिन needs an edge,
+    # so पिनकोड (PIN code of an address) does not match.
+    r'(?:बैंक|खाता|खाते|कस्टमर केयर|यूपीआई|केवाईसी|ओटीपी|रिफंड|रिफ़ंड|डेबिट|कार्ड)|पिन(?![\u0915-\u0939\u0958-\u095F])',
     re.I)
 # For a result the detector cleared but the app still shows as a bank alert (CHECK THIS ALERT or
 # SUSPICIOUS, MainActivity.bankAlertLevel): a bank, UPI, debit, card or account must be named.
 # A bare login OTP note does not qualify.
 BANK_CUE = re.compile(
-    r'\b(?:bank\w*|upi|debit\w*|credit\w*|card|account|a/c|wallet|'
+    r'\b(?:bank\w*|net ?banking|upi|debit\w*|credit\w*|card|account|a/c|wallet|'
     + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|\bbob[ -]?world\b|'
-    r'(?<![\u0900-\u097F])(?:बैंक|खाता|यूपीआई|डेबिट|कार्ड)(?![\u0900-\u097F])', re.I)
+    r'बैंक|खाता|खाते|यूपीआई|डेबिट|कार्ड', re.I)
 # यू.पी.आई., U.P.I.: dots between letters are dropped before matching (the original is matched too).
 _LETTER_DOTS = re.compile(r'(?<=[A-Za-z\u0900-\u097F])\.(?=[A-Za-z\u0900-\u097F])|(?<=[\u0900-\u097F])\.(?=\s|$)')
 
