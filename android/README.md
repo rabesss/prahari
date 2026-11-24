@@ -91,6 +91,25 @@ alert gets no report; an alert the app raises to SUSPICIOUS because it names its
 does. Logic and templates are in `android/python/report_card.py`; tests in
 `android/tools/test_report_card.py` and `android/tools/test_bridge.py`. Pending a Galaxy S23 re-test.
 
+## Screen-sharing app warning
+
+When a result names a bank, wallet, KYC, UPI, OTP, card, refund or customer-care desk (or is a UPI
+item, an OTP/safe-account scam or a debit alert), or the text asks the reader to
+install a remote-control app (the detector's `remote_app` rule in `triage/rules.py`), the result
+screen checks whether one of a fixed list of screen-sharing apps is installed. If one is, an amber
+note says: "A screen-sharing app (X) is installed. Scammers use these to watch your bank app.
+Uninstall it if a 'support agent' asked you to install it." (Hindi in Hindi mode.)
+
+The list is AnyDesk, TeamViewer QuickSupport, TeamViewer Host, TeamViewer, RustDesk, AirDroid,
+AirDroid Remote Support and AirDroid Cast (`RemoteApps.kt`). Each package is named in the
+manifest's `<queries>`, which is Android's narrow package-visibility path. This feature looks up
+only those packages, and the app does not request `QUERY_ALL_PACKAGES` (Android still exposes a few
+system packages to every app automatically). Play IDs were checked
+against their Play listings on 24 Nov 2026; RustDesk is not on Play, so its ID comes from F-Droid
+and its upstream `applicationId`. The installed-app result is shown on screen only: it is never
+logged, stored in History or sent anywhere, and the verdict never depends on it. Tests:
+`android/tools/test_remote_apps.py`. Pending a Galaxy S23 re-test.
+
 ## Known limits
 
 * The Android 1.5.1 and 1.6 `LlmGenerationConfig.maxNewTokens` field is not passed by the Android `generate` overload to the native runner. The bridge stops after 40 UTF-8 callbacks, which can each contain multiple token fragments; this is **not a guaranteed 40-token cap**. The exact budget needs a fixed upstream Android binding or a custom native bridge before claiming parity. TTFT is measured to the first callback, and decode tok/s comes from native stats.

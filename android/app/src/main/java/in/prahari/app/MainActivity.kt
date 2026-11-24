@@ -2201,6 +2201,10 @@ class MainActivity : Activity() {
         val actionsHi = strings(data.optJSONArray("actions_hi"))
         add(b, listenButton(p, speechScript(p, actions, actionsHi, true), speechScript(p, actions, actionsHi, false)), -1, -2, top = 12)
         add(body, b, top = 12)
+        if (job.mode != 2 && data.optBoolean("remote_app_check")) {
+            val apps = try { RemoteApps.installed(packageManager) } catch (_: Throwable) { emptyList() }
+            if (apps.isNotEmpty()) add(body, remoteAppBanner(apps), top = 12)
+        }
         if (announcedJob != job.id) {
             announcedJob = job.id
             val announcement = "${t(p.title)}. $why"
@@ -2600,6 +2604,20 @@ class MainActivity : Activity() {
             "lost_money_1930" -> dial()
             "report_chakshu" -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://sancharsaathi.gov.in")))
             else -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://cybercrime.gov.in")))
+        }
+    }
+
+    /** Amber note naming installed screen-sharing apps. Read by TalkBack as one block. */
+    private fun remoteAppBanner(apps: List<String>): LinearLayout {
+        val message = n("remote_app_banner").replace("{apps}", apps.joinToString(", "))
+        return row().apply {
+            gravity = Gravity.TOP
+            background = shape(T.warnC, 14f, 1, T.warn)
+            pad(this, 14, 12, 14, 12)
+            add(this, icon(R.drawable.ic_triangle_alert, 18, T.warn), 18, 18)
+            add(this, txt(message, 14f, T.onWarnC, 600, 20, raw = true), 0, -2, left = 10, weight = 1f)
+            isFocusable = true
+            a11yText(this, message)  // one TalkBack stop: the children are hidden
         }
     }
 
