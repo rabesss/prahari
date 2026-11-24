@@ -540,3 +540,298 @@ def test_adb_run_loop_recovers_from_errors(tmp_path, monkeypatch):
     assert rep["checks"][1]["note"].startswith("post-check navigation failed")
     assert state["stops"] == 2  # stopped by the error handler for "a", normally for "b"
 
+
+
+GATED_STATS_XML = """\
+<hierarchy>
+  <node content-desc="On-device stats, expanded. 7 ms · Llama skipped" text="" bounds="[0,0][100,100]" />
+  <node text="7 ms · Llama skipped" bounds="[0,0][10,10]" />
+  <node text="7 ms" bounds="[0,0][10,10]" />
+  <node text="Detector" bounds="[0,0][10,10]" />
+  <node text="—" bounds="[0,0][10,10]" />
+  <node text="First token" bounds="[0,0][10,10]" />
+  <node text="—" bounds="[0,0][10,10]" />
+  <node text="Decode speed" bounds="[0,0][10,10]" />
+  <node text="—" bounds="[0,0][10,10]" />
+  <node text="Prompt tokens" bounds="[0,0][10,10]" />
+  <node text="—" bounds="[0,0][10,10]" />
+  <node text="Prefill" bounds="[0,0][10,10]" />
+  <node text="—" bounds="[0,0][10,10]" />
+  <node text="Prefill speed" bounds="[0,0][10,10]" />
+  <node text="Llama skipped: verdict and text from the detector&#10;Total 25 ms · Memory 1690.0 MB&#10;CPU ABI: arm64-v8a" bounds="[0,0][10,10]" />
+</hierarchy>
+"""
+
+LLAMA_STATS_XML = """\
+<hierarchy>
+  <node content-desc="On-device stats, expanded. 6 ms · 510 ms" text="" bounds="[0,0][100,100]" />
+  <node text="6 ms" /><node text="Detector" />
+  <node text="510 ms" /><node text="First token" />
+  <node text="43.4 t/s" /><node text="Decode speed" />
+  <node text="128" /><node text="Prompt tokens" />
+  <node text="455 ms" /><node text="Prefill" />
+  <node text="281.3 t/s" /><node text="Prefill speed" />
+</hierarchy>
+"""
+
+
+def test_stats_xml_gated_and_prefill_tiles():
+    gated = adb_bench.parse_stats_xml(GATED_STATS_XML)
+    assert gated["llama_skipped"] is True and gated["detector_ms"] == 7.0
+    assert gated["first_token_ms"] is None and gated["decode_tps"] is None and gated["total_s"] == 0.025
+    assert adb_bench.stats_header_state(GATED_STATS_XML) == "done"
+    full = adb_bench.parse_stats_xml(LLAMA_STATS_XML)
+    # The prefill speed tile must not overwrite decode speed.
+    assert full["decode_tps"] == 43.4 and full["prefill_tps"] == 281.3
+    assert full["prompt_tokens"] == 128 and full["prefill_ms"] == 455.0 and full["llama_skipped"] is None
+
+
+def test_perf_records_are_correlated_across_restarts():
+    text = "\n".join([
+        "--------- beginning of main",
+        '{"event":"model","session":"a","seq":1,"state":"ready","gating":"all"}',
+        '{"event":"result","session":"a","seq":2,"id":1,"gating":"all","llama_skipped":false,"total_ms":1200}',
+        "not json {",
+    ])
+    before = adb_bench.parse_perf_lines(text)
+    assert [r["seq"] for r in before] == [1, 2]
+    # The app restarted: a new session starts at seq 1 again and must still count as new.
+    after = before + adb_bench.parse_perf_lines(
+        '{"event":"model","session":"b","seq":1,"state":"ready","gating":"flagged-only"}\n'
+        '{"event":"result","session":"b","seq":2,"id":1,"gating":"flagged-only","llama_skipped":true,'
+        '"detector_ms":7.5,"total_ms":31,"prompt_tokens":null,"pss_mb":1690.04}')
+    assert adb_bench.new_perf_record(before, before, "result") is None
+    model = adb_bench.new_perf_record(before, after, "model")
+    assert model["session"] == "b"
+    res = adb_bench.new_perf_record(before, after, "result")
+    row = {"detector_ms": 9.0, "first_token_ms": None}
+    adb_bench.merge_perf(row, res)
+    assert row["llama_skipped"] is True and row["gating_mode_observed"] == "flagged-only"
+    assert row["detector_ms"] == 7.5 and row["total_s"] == 0.031 and row["app_memory_mb"] == 1690.0
+    assert row["prompt_tokens"] is None and row["first_token_ms"] is None
+    empty = {}
+    adb_bench.merge_perf(empty, None)
+    assert all(empty[k] is None for k in adb_bench.PERF_FIELDS)
+
+
+def test_adb_run_gating_both_with_fake_device(tmp_path, monkeypatch):
+    """Two passes: launch extra per mode, -gated ids, perf records merged, mismatch and missing flagged."""
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "sample-row.xml").read_text(encoding="utf-8")
+    stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")
+    state = {"screen": "home", "log": [], "session": 0, "seq": 0, "gating": None, "starts": [], "checks": 0}
+
+    def log(rec):
+        state["seq"] += 1
+        rec.update(session=f"s{state['session']}", seq=state["seq"])
+        state["log"].append(json.dumps(rec))
+
+    def fake_dump(serial):
+        return home if state["screen"] == "home" else stats
+
+    def fake_adb(serial, *args, check=True, timeout=120):
+        a = list(args)
+        if a[:2] == ["shell", "getprop"]:
+            return "x\n"
+        if a[:3] == ["shell", "am", "start"]:
+            state["starts"].append(a)
+            state["session"] += 1
+            state["seq"] = 0
+            if adb_bench.GATING_EXTRA in a:
+                state["gating"] = a[a.index(adb_bench.GATING_EXTRA) + 1]
+            log({"event": "model", "state": "ready", "gating": state["gating"]})
+            return ""
+        if a[:2] == ["logcat", "-d"]:
+            return "\n".join(state["log"]) + "\n"
+        if a[:3] == ["shell", "input", "tap"]:
+            x, y = int(a[3]), int(a[4])
+            if state["screen"] == "home" and (x, y) == (540, 1726):
+                state["screen"] = "result"
+                state["checks"] += 1
+                n = state["checks"]
+                if n == 2:
+                    pass  # no record for this check: telemetry-missing
+                else:
+                    skipped = state["gating"] == "flagged-only"
+                    gating = "all" if n == 3 else state["gating"]  # check 3 reports the wrong mode
+                    log({"event": "result", "id": n, "gating": gating, "llama_skipped": skipped,
+                         "detector_ms": 6.0, "prompt_tokens": None if skipped else 128,
+                         "prefill_ms": None if skipped else 455.0, "prefill_tps": None if skipped else 281.3,
+                         "first_token_ms": None if skipped else 510.0, "decode_tps": None if skipped else 43.4,
+                         "total_ms": 30 if skipped else 1210, "pss_mb": 1700.0, "error": False})
+            elif state["screen"] == "result" and y > 2000:
+                state["screen"] = "home"
+            return ""
+        return ""
+
+    class NoPoller:
+        def __init__(self, *a, **k): pass
+        def start(self): pass
+        def stop(self): return {}
+
+    monkeypatch.setattr(adb_bench, "adb_out", fake_adb)
+    monkeypatch.setattr(adb_bench, "dump_ui_xml", fake_dump)
+    monkeypatch.setattr(adb_bench, "MemPoller", NoPoller)
+    monkeypatch.setattr(adb_bench.subprocess, "check_output", lambda *a, **k: b"png")
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    monkeypatch.setattr(adb_bench, "GATING_SAMPLES", [("port-scan", "Port scan", False), ("port-scan-2", "Port scan", False)])
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "both",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "3"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 2  # two checks incomplete
+    assert [s[-1] for s in state["starts"]] == ["all", "flagged-only"]
+    checks = {c["check"]: c for c in rep["checks"]}
+    assert list(checks) == ["port-scan", "port-scan-2", "port-scan-gated", "port-scan-2-gated"]
+    assert checks["port-scan"]["status"] == "ok" and checks["port-scan"]["prefill_tps"] == 281.3
+    assert checks["port-scan"]["prompt_tokens"] == 128 and checks["port-scan"]["llama_skipped"] is False
+    assert checks["port-scan-2"]["status"] == "telemetry-missing"
+    assert checks["port-scan-gated"]["status"] == "gating-mismatch"
+    gated = checks["port-scan-2-gated"]
+    assert gated["status"] == "ok" and gated["llama_skipped"] is True and gated["total_s"] == 0.03
+    assert gated["gating_mode"] == gated["gating_mode_observed"] == "flagged-only"
+    assert [p["model_event"]["state"] for p in rep["passes"]] == ["ready", "ready"]
+    by = rep["summary"]["by_gating_mode"]
+    assert by["flagged-only"]["llama_skipped"] == 1 and by["all"]["llama_skipped"] == 0
+    md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "| Gating | Checks | Llama skipped |" in md and "Prefill (tok/s)" in md
+    assert "prefill_tps" in (out / "items.csv").read_text(encoding="utf-8").splitlines()[0]
+
+
+def test_adb_run_deadline_records_skipped(tmp_path, monkeypatch):
+    monkeypatch.setattr(adb_bench, "adb_out", lambda *a, **k: "x\n")
+    ticks = iter([0.0] + [1000.0] * 50)
+    monkeypatch.setattr(adb_bench.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--samples", "gating",
+                         "--deadline-s", "10", "--settle-s", "0"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 2 and {c["status"] for c in rep["checks"]} == {"skipped-deadline"}
+    assert len(rep["checks"]) == len(adb_bench.GATING_SAMPLES)
+
+def test_stats_header_after_failed_explanation():
+    """24 Nov S23 lookalike link: the check ended (5.86 s) but the header kept "—", so the run waited 60 s."""
+    old = (Path(__file__).resolve().parents[2] / "evidence" / "galaxy-s23-20261124" / "label-adjusted"
+           / "lookalike-link-stats.xml").read_text(encoding="utf-8")
+    assert adb_bench.stats_header_state(old) == "pending"
+    fixed = old.replace("244 ms · —", "244 ms · Detector text")
+    # Finished, but recorded as a detector fallback, not a completed Llama timing.
+    assert adb_bench.stats_header_state(fixed) == "fallback"
+    # An explanation error (missing model, bridge failure) is a different terminal state.
+    assert adb_bench.stats_header_state(old.replace("244 ms · —", "244 ms · No AI text")) == "no-ai-text"
+    assert adb_bench.parse_stats_xml(fixed)["detector_ms"] == 244.0
+
+
+def test_parse_dir_keeps_gating_telemetry(tmp_path):
+    cap = tmp_path / "cap"
+    cap.mkdir()
+    (cap / "bill-benign-gated-stats.xml").write_text(GATED_STATS_XML, encoding="utf-8")
+    (cap / "results.json").write_text(json.dumps({"checks": [
+        {"check": "bill-benign-gated", "status": "ok", "gating_mode": "flagged-only",
+         "gating_mode_observed": "flagged-only", "llama_skipped": True, "detector_ms": 7.25, "total_ms": 25.0}]}))
+    out = tmp_path / "out"
+    assert adb_bench.main(["parse-dir", str(cap), "--out-dir", str(out)]) == 0
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert row["gating_mode"] == row["gating_mode_observed"] == "flagged-only"
+    assert row["detector_ms"] == 7.25 and row["llama_skipped"] is True
+
+
+def _fake_device(monkeypatch, *, emit_records=True, fail_launch_on=None, emit_model=True, report_gating=None):
+    run8 = Path(__file__).resolve().parents[2] / "docs" / "perf" / "evidence" / "galaxy-s23-rtl-run8"
+    home = (run8 / "sample-row.xml").read_text(encoding="utf-8")
+    stats = (run8 / "kyc-stats.xml").read_text(encoding="utf-8")
+    st = {"screen": "home", "log": [], "session": 0, "seq": 0, "gating": None, "starts": 0}
+
+    def log(rec):
+        st["seq"] += 1
+        rec.update(session=f"s{st['session']}", seq=st["seq"])
+        st["log"].append(json.dumps(rec))
+
+    def fake_adb(serial, *args, check=True, timeout=120):
+        a = list(args)
+        if a[:2] == ["shell", "getprop"]:
+            return "x\n"
+        if a[:3] == ["shell", "am", "start"]:
+            st["starts"] += 1
+            if fail_launch_on == st["starts"]:
+                raise RuntimeError("adb: device offline")
+            st["session"] += 1
+            st["seq"] = 0
+            st["gating"] = a[a.index(adb_bench.GATING_EXTRA) + 1] if adb_bench.GATING_EXTRA in a else None
+            if emit_records and emit_model:
+                log({"event": "model", "state": "ready", "gating": st["gating"]})
+            return ""
+        if a[:2] == ["logcat", "-d"]:
+            return "\n".join(st["log"]) + "\n"
+        if a[:3] == ["shell", "input", "tap"]:
+            x, y = int(a[3]), int(a[4])
+            if st["screen"] == "home" and (x, y) == (540, 1726):
+                st["screen"] = "result"
+                if emit_records:
+                    log({"event": "result", "gating": report_gating or st["gating"], "llama_skipped": False,
+                         "total_ms": 1200})
+            elif st["screen"] == "result" and y > 2000:
+                st["screen"] = "home"
+        return ""
+
+    class NoPoller:
+        def __init__(self, *a, **k): pass
+        def start(self): pass
+        def stop(self): return {}
+
+    monkeypatch.setattr(adb_bench, "adb_out", fake_adb)
+    monkeypatch.setattr(adb_bench, "dump_ui_xml", lambda s: home if st["screen"] == "home" else stats)
+    monkeypatch.setattr(adb_bench, "MemPoller", NoPoller)
+    monkeypatch.setattr(adb_bench.subprocess, "check_output", lambda *a, **k: b"png")
+    monkeypatch.setattr(adb_bench.time, "sleep", lambda s: None)
+    monkeypatch.setattr(adb_bench, "GATING_SAMPLES", [("port-scan", "Port scan", False)])
+    return st
+
+
+def test_gating_run_on_older_apk_is_not_failed(tmp_path, monkeypatch):
+    _fake_device(monkeypatch, emit_records=False)
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    row = rep["checks"][0]
+    assert rc == 0 and row["status"] == "ok" and row["gating_mode_observed"] is None
+    # CodeRabbit r2: never presented as a gating comparison.
+    assert rep["summary"]["by_gating_mode"] == {"unconfirmed": {"checks": 1}}
+
+
+def test_failed_pass_launch_keeps_measured_rows(tmp_path, monkeypatch):
+    _fake_device(monkeypatch, fail_launch_on=2)
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "both",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert rc == 2
+    assert [(c["check"], c["status"]) for c in rep["checks"]] == [("port-scan", "ok"), ("port-scan-gated", "launch-failed")]
+    assert rep["passes"][1]["error"] == "RuntimeError"
+
+
+def test_deadline_rechecked_after_launch(tmp_path, monkeypatch):
+    _fake_device(monkeypatch)
+    clock = {"t": 0.0}
+
+    def mono():
+        clock["t"] += 3.0  # every call advances the clock; the preload wait crosses the deadline
+        return clock["t"]
+    monkeypatch.setattr(adb_bench.time, "monotonic", mono)
+    out = tmp_path / "out"
+    adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                    "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "50", "--deadline-s", "7"])
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert row["status"] == "skipped-deadline"
+
+
+def test_mode_mismatch_caught_without_preload_record(tmp_path, monkeypatch):
+    """Terra r2: a late or unread preload record must not switch off mode validation."""
+    _fake_device(monkeypatch, emit_model=False, report_gating="flagged-only")
+    out = tmp_path / "out"
+    rc = adb_bench.main(["--serial", "fake", "run", "--out-dir", str(out), "--gating-mode", "all",
+                         "--samples", "gating", "--settle-s", "0", "--model-timeout-s", "2"])
+    row = json.loads((out / "results.json").read_text(encoding="utf-8"))["checks"][0]
+    assert rc == 2 and row["status"] == "gating-mismatch"

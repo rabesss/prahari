@@ -123,14 +123,15 @@ def build_arm_perf_chart() -> Path:
     _style_ax(ax2)
     targets = [
         "Oracle N1\n(2 vCPU)",
-        "Galaxy S23\n(Airplane)",
-        "Galaxy S23\n(Warm)",
+        "S23 final build\n(24 Nov, warm)",
+        "S23 r1 APK\n(23 Nov, airplane)",
+        "S23 r1 APK\n(23 Nov, warm)",
         "Neoverse-V2\n(2T)",
         "Neoverse-V2\n(8T)",
     ]
-    tps_vals = [19.9, 39.0, 43.4, 46.7, 104.6]
-    lat_vals = [3.84, 1.42, 1.20, 1.73, 0.98]
-    colors = [SLATE, TEAL, BLUE, INDIGO, "#312E81"]
+    tps_vals = [19.9, 21.5, 39.0, 43.4, 46.7, 104.6]
+    lat_vals = [3.84, 2.90, 1.42, 1.20, 1.73, 0.98]
+    colors = [SLATE, AMBER, TEAL, BLUE, INDIGO, "#312E81"]
     y = np.arange(len(targets))
 
     ax2.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
@@ -140,7 +141,7 @@ def build_arm_perf_chart() -> Path:
     ax2.set_yticklabels(targets, fontsize=8.8)
     ax2.set_xlabel("Llama 3.2 1B INT4 decode speed (tok/s)", fontsize=9.5, color=SLATE)
     ax2.set_xlim(0, 165)
-    ax2.set_ylim(-0.65, 4.55)
+    ax2.set_ylim(-0.65, 5.55)
     ax2.tick_params(axis="x", labelsize=9)
     for b, tps, lat in zip(hbars, tps_vals, lat_vals):
         ax2.text(
@@ -190,7 +191,7 @@ def build_eval_and_mem_chart() -> Path:
         "v4 held-\nback\nn=79",
         "Sealed\n\nn=184",
     ]
-    # Project sets: last bin/eval after PR #42. Holdouts/validation: main 28bdb6b (after PR #48).
+    # Project sets: last bin/eval after PR #42. Holdouts/validation: main 105f7e6 (after PR #48).
     f1_vals = [0.925, 0.994, 0.969, 0.850, 0.970, 0.909, 0.816, 0.813]
     # Post-PR #42 SMS dev-set FPR was not recorded, so it is plotted as "n/r" rather than guessed.
     fpr_vals = [float("nan"), 0.000, 0.031, 0.030, 0.000, 0.120, 0.277, 0.300]  # SMS-route sealed FPR=0.322 annotated

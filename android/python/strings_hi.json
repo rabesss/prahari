@@ -226,7 +226,21 @@
   "a UPI KYC or impersonation QR scam": "UPI KYC या नकली पहचान QR ठगी",
   "a UPI QR payment scam": "UPI QR पेमेंट ठगी",
   "a UPI AutoPay mandate to review": "जांचने योग्य UPI AutoPay मैंडेट",
-  "a UPI payment QR worth checking": "जांचने योग्य UPI पेमेंट QR"
+  "a UPI payment QR worth checking": "जांचने योग्य UPI पेमेंट QR",
+  "No AI text": "AI टेक्स्ट नहीं",
+  "Llama took too long, so this is the detector's fixed text.": "Llama को ज़्यादा समय लगा, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
+  "Llama's reply did not pass the checks, so this is the detector's fixed text.": "Llama का जवाब जांच में पास नहीं हुआ, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
+  "Fixed text from the detector, not written by AI.": "यह डिटेक्टर का तय टेक्स्ट है, AI ने नहीं लिखा।",
+  "Explain NO RISK results with Llama": "‘कोई खतरा नहीं मिला’ पर भी Llama से समझाएं",
+  "Prompt tokens": "प्रॉम्प्ट टोकन",
+  "Prefill": "प्रीफ़िल",
+  "Prefill speed": "प्रीफ़िल रफ़्तार",
+  "Llama skipped: verdict and text from the detector": "Llama नहीं चला: नतीजा और टेक्स्ट डिटेक्टर से",
+  "Llama skipped": "Llama नहीं चला",
+  "Fixed text from the detector. Llama was not used.": "डिटेक्टर का तय टेक्स्ट। Llama का इस्तेमाल नहीं हुआ।",
+  "Llama is skipped for NO RISK results so they finish faster. Turn it on in About.": "‘कोई खतरा नहीं मिला’ वाले नतीजों पर Llama नहीं चलता, ताकि नतीजा जल्दी आए। इसे ‘Prahari के बारे में’ में चालू करें।",
+  "Detector text": "डिटेक्टर टेक्स्ट",
+  "Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.": "बंद हो तो ‘कोई खतरा नहीं मिला’ वाले नतीजों में डिटेक्टर का तय टेक्स्ट दिखता है और Llama नहीं चलता, इसलिए नतीजा जल्दी आता है। खतरनाक, संदिग्ध और ‘अलर्ट जांचें’ वाले नतीजों में Llama हमेशा चलता है।"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
@@ -570,6 +584,10 @@
   "sender_note": {
    "en": "The name or number shown at the top of the SMS. A sender ID never proves a message is real.",
    "hi": "SMS में सबसे ऊपर दिखने वाला नाम या नंबर। सेंडर ID से यह साबित नहीं होता कि मैसेज असली है।"
+  },
+  "detector_english": {
+   "en": "Fixed detector text, in English. Not written by AI.",
+   "hi": "डिटेक्टर का तय टेक्स्ट, अंग्रेज़ी में। इसे AI ने नहीं लिखा।"
   }
  },
  "templates": [

@@ -2,8 +2,8 @@
 
 Emulator: Android 14, x86_64, on a cloud box (instabox `android` template). Timings and memory on x86 are
 not Arm numbers; the physical Galaxy S23 run of this build is pending (owner, Samsung Remote Test Lab,
-docs/perf/s23-rtl-runbook.md). Builds: CI emulator APK from main 6b5e199 (round-3 app plus #46-#52), and
-cursor/app-r3 at 365ecb2 for the font-scale and share-preview captures.
+docs/perf/s23-rtl-runbook.md). Builds: CI emulator APK from main 82fe61d (round-3 app plus #46-#52), and
+cursor/app-r3 at e60233a for the font-scale and share-preview captures.
 
 | Check | Result | File |
 |---|---|---|
