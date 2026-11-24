@@ -1,0 +1,11 @@
+--- bench/perf/adb_bench.py
++++ temporary/adb_bench_scroll.py
+@@ -833,6 +833,8 @@
+                          "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+             return
+         time.sleep(0.5)
++        adb_out(serial, "shell", "input", "swipe", "540", "1900", "540", "1100", "350")
++        time.sleep(0.5)
+         xml = dump_ui_xml(serial)
+ 
+         if not find_bounds_center(xml, desc_contains=CHECK_BUTTON_DESC):

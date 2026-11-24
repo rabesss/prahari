@@ -1,0 +1,45 @@
+[adb_bench] pass gating=all model=ready
+[adb_bench] kyc-cold: gating=all skipped=False det=424.521ms prompt=145tok prefill=1057.0ms/137.181tok/s ttft=1057.0ms decode=34.356tok/s total=2.953s pss=1701.7MB polled_peak_pss=1795.3MiB
+[adb_bench] kyc-warm-1: gating=all skipped=False det=15.848ms prompt=145tok prefill=879.0ms/164.96tok/s ttft=879.0ms decode=31.927tok/s total=1.877s pss=1711.9MB polled_peak_pss=1715.9MiB
+[adb_bench] kyc-warm-2: gating=all skipped=False det=12.386ms prompt=145tok prefill=879.0ms/164.96tok/s ttft=879.0ms decode=32.98tok/s total=1.836s pss=1713.4MB polled_peak_pss=1718.5MiB
+[adb_bench] bill-benign: gating=all skipped=False det=63.267ms prompt=140tok prefill=906.0ms/154.525tok/s ttft=906.0ms decode=32.941tok/s total=1.914s pss=1714.7MB polled_peak_pss=1718.3MiB
+[adb_bench] official-link: gating=all skipped=False det=210.709ms prompt=129tok prefill=830.0ms/155.422tok/s ttft=830.0ms decode=30.43tok/s total=2.053s pss=1747.4MB polled_peak_pss=1756.7MiB
+[adb_bench] WARNING: lookalike-link finished with the detector's fixed text (no usable Llama reply)
+[adb_bench] lookalike-link: gating=all skipped=False det=0.926ms prompt=63tok prefill=438.0ms/143.836tok/s ttft=438.0ms decode=33.973tok/s total=5.001s pss=1750.1MB polled_peak_pss=1754.0MiB
+[adb_bench] pass gating=flagged-only model=ready
+[adb_bench] kyc-cold-gated: gating=flagged-only skipped=False det=511.252ms prompt=145tok prefill=1731.0ms/83.767tok/s ttft=1731.0ms decode=23.333tok/s total=4.104s pss=1691.7MB polled_peak_pss=1699.3MiB
+[adb_bench] kyc-warm-1-gated: gating=flagged-only skipped=False det=15.944ms prompt=145tok prefill=1299.0ms/111.624tok/s ttft=1299.0ms decode=25.045tok/s total=2.573s pss=1706.2MB polled_peak_pss=1711.1MiB
+[adb_bench] kyc-warm-2-gated: gating=flagged-only skipped=False det=15.911ms prompt=145tok prefill=1251.0ms/115.907tok/s ttft=1251.0ms decode=22.709tok/s total=2.648s pss=1705.7MB polled_peak_pss=1709.3MiB
+[adb_bench] bill-benign-gated: gating=flagged-only skipped=True det=84.612ms prompt=Nonetok prefill=Nonems/Nonetok/s ttft=Nonems decode=Nonetok/s total=0.186s pss=1706.7MB polled_peak_pss=1709.8MiB
+[adb_bench] official-link-gated: gating=flagged-only skipped=True det=253.768ms prompt=Nonetok prefill=Nonems/Nonetok/s ttft=Nonems decode=Nonetok/s total=0.312s pss=1755.1MB polled_peak_pss=1755.5MiB
+[adb_bench] WARNING: lookalike-link-gated finished with the detector's fixed text (no usable Llama reply)
+[adb_bench] lookalike-link-gated: gating=flagged-only skipped=False det=1.207ms prompt=63tok prefill=551.0ms/114.338tok/s ttft=551.0ms decode=27.414tok/s total=6.399s pss=1739.7MB polled_peak_pss=1744.0MiB
+[adb_bench] 2 check(s) incomplete: lookalike-link, lookalike-link-gated
+# Prahari Android Device Benchmark Summary
+
+- **Device:** `samsung SM-S911B` (SoC `SM8550`, Android `14`, ABI `arm64-v8a,armeabi-v7a,armeabi`)
+- **Arm ISA flags:** `asimd, asimddp, asimdhp, bf16, fphp, i8mm`
+- **Source:** Live adb benchmark run
+- **dumpsys meminfo snapshot:** TOTAL PSS `1,783,754 KiB` (1741.9 MiB), TOTAL RSS `1,892,276 KiB` (1847.9 MiB), Native Heap PSS `1,572,176 KiB`
+
+| Check | Status | Airplane | Gating | Llama skipped | Detector (ms) | Prompt tokens | Prefill (ms) | Prefill (tok/s) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Highest sampled PSS (MiB) |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `kyc-cold` | ok | no | all | no | 424.521 | 145 | 1057.0 | 137.181 | 1057.0 | 34.356 | 2.953 | 1701.7 | 1795.3 |
+| `kyc-warm-1` | ok | no | all | no | 15.848 | 145 | 879.0 | 164.96 | 879.0 | 31.927 | 1.877 | 1711.9 | 1715.9 |
+| `kyc-warm-2` | ok | no | all | no | 12.386 | 145 | 879.0 | 164.96 | 879.0 | 32.98 | 1.836 | 1713.4 | 1718.5 |
+| `bill-benign` | ok | no | all | no | 63.267 | 140 | 906.0 | 154.525 | 906.0 | 32.941 | 1.914 | 1714.7 | 1718.3 |
+| `official-link` | ok | no | all | no | 210.709 | 129 | 830.0 | 155.422 | 830.0 | 30.43 | 2.053 | 1747.4 | 1756.7 |
+| `lookalike-link` | detector-fallback | no | all | no | 0.926 | 63 | 438.0 | 143.836 | 438.0 | 33.973 | 5.001 | 1750.1 | 1754.0 |
+| `kyc-cold-gated` | ok | no | flagged-only | no | 511.252 | 145 | 1731.0 | 83.767 | 1731.0 | 23.333 | 4.104 | 1691.7 | 1699.3 |
+| `kyc-warm-1-gated` | ok | no | flagged-only | no | 15.944 | 145 | 1299.0 | 111.624 | 1299.0 | 25.045 | 2.573 | 1706.2 | 1711.1 |
+| `kyc-warm-2-gated` | ok | no | flagged-only | no | 15.911 | 145 | 1251.0 | 115.907 | 1251.0 | 22.709 | 2.648 | 1705.7 | 1709.3 |
+| `bill-benign-gated` | ok | no | flagged-only | yes | 84.612 | — | — | — | — | — | 0.186 | 1706.7 | 1709.8 |
+| `official-link-gated` | ok | no | flagged-only | yes | 253.768 | — | — | — | — | — | 0.312 | 1755.1 | 1755.5 |
+| `lookalike-link-gated` | detector-fallback | no | flagged-only | no | 1.207 | 63 | 551.0 | 114.338 | 551.0 | 27.414 | 6.399 | 1739.7 | 1744.0 |
+
+| Gating | Checks | Llama skipped | Median total, skipped (s) | Median total, Llama ran (s) |
+|---|---:|---:|---:|---:|
+| `all` | 5 | 0 | — | 1.914 |
+| `flagged-only` | 5 | 2 | 0.249 | 2.648 |
+
+[adb_bench] outputs written to /var/tmp/prahari-s23-gating-20261124/retry
