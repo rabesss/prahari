@@ -44,12 +44,20 @@ jobs:
               git rev-parse -q --verify origin/main > /dev/null || { echo 'range base unavailable: origin/main missing'; exit 1; }
               base="$(git merge-base origin/main "$head")" || { echo 'range base unavailable: no merge-base with origin/main'; exit 1; }
             fi
-            # A force-push onto main itself (e.g. a history rewrite) leaves base == head. Audit the tip commit
-            # against its first parent (for a merge, the previous main) so the audit and ratchet still see a
-            # real change; fail only when the tip has no parent and the range would be empty.
+            # A force-push whose fallback base equals the tip (e.g. a history rewrite of main) would leave an empty,
+            # vacuous audit/ratchet range. Audit every commit the rewrite changed instead: fetch the old tip and use
+            # its merge-base with the new tip. If the old tip cannot be fetched, or the histories share no commit,
+            # fail loudly as before so someone looks.
             if [ -n "$forced" ] && [ "$base" = "$head" ]; then
-              base="$(git rev-parse -q --verify "$head^1")" || { echo 'range base unavailable: force-push left an empty range and the tip has no parent'; exit 1; }
-              echo "force-push onto main: auditing $head against its first parent $base"
+              mb=
+              if [ -n "$PUSH_BASE" ] && git fetch -q --no-tags origin "$PUSH_BASE" 2> /dev/null; then
+                mb="$(git merge-base "$PUSH_BASE" "$head" 2> /dev/null)" || mb=
+              fi
+              if [ -z "$mb" ] || [ "$mb" = "$head" ]; then
+                echo 'range base unavailable: force-push left an empty range and the old tip is unavailable or unrelated'; exit 1
+              fi
+              base="$mb"
+              echo "::warning::force-push to $GITHUB_REF: auditing every commit since $base (merge-base of the old tip $PUSH_BASE and $head)"
             fi
           fi
           git rev-parse --verify "$base^{commit}" > /dev/null; git rev-parse --verify "$head^{commit}" > /dev/null
