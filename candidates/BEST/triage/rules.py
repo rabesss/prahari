@@ -68,7 +68,9 @@ def url_indicators(url):
     if not host:
         return ev
     reg = registrable(host)
-    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_listed_site(host)
+    # A pasted link has no message around it that could claim another organisation, so every listed
+    # official domain and its subdomains count as official here. The SMS rules keep their own list.
+    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_official(host)
     if "xn--" in host:
         ev.append(("punycode", f"the domain {host} uses punycode, which can hide a lookalike name"))
     if any(ord(c) > 127 for c in host):

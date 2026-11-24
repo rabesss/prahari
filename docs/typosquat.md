@@ -33,11 +33,11 @@ the organisation's page or redirected to its `.bank.in` site; a few bank sites (
 Bank of Maharashtra, South Indian, Bank of India, NPCI) answered with a bot block or timed out, but their
 names resolved and they are the domains those organisations publish. Domains that no longer resolve or
 have changed hands were left out (`psbindia.com` now serves a gambling page), because a lapsed domain on
-an allow list would clear a scam link. The new list also counts as official in the existing URL, SMS
-and Indian-text rules, subdomains included (`login.irctc.com`, `help.cred.club`), except a subdomain
-whose own labels name a different brand (`sbi-login.ecomexpress.in`: SBI on a courier's domain), so an
-unrelated organisation's domain cannot clear a message that imitates a bank. The typosquat check
-itself never flags any subdomain of a listed domain.
+an allow list would clear a scam link. In the URL route (a pasted link, with no message around it that could
+claim another organisation) the list and its subdomains also count as official. The SMS and
+Indian-text rules keep their existing official list: widening it let an OTP message pointing at a
+listed courier's subdomain pass as an official channel. The typosquat check itself never flags any
+subdomain of a listed domain.
 
 ## False-positive check
 The thresholds were set against the Tranco top-1M list (24 Nov 2026). The first draft matched 52
