@@ -94,6 +94,27 @@ _KYC_ASK = re.compile(
     r"\b(?:update|verify|complete|link)\b[^.;!?।\n]{0,20}\b(?:kyc|e-?kyc|pan|aadhaa?r)\b|"
     r"(?:केवाईसी|आधार|पैन)[^.;!?।\n]{0,30}(?:अपडेट|सत्यापित|लिंक|पूरा|बंद)", re.I)
 _REQUEST_HARM = {"secret_request", "id_request"}
+# Bank-alert markers: a masked account or card number, a balance, a transaction reference.
+_ALERT_MARK = re.compile(r"\b(?:a/?c|acct|account|card)\s*(?:no\.?\s*)?(?:ending\s*)?[x*]{2,}\s*\d{2,6}\b|"
+                         r"\b[x*]{2,}\d{3,6}\b|\b(?:avl\.?|available)\s*bal|\b(?:txn|upi ref|ref no|utr)\b", re.I)
+_DEBIT = re.compile(r"\b(?:debited|credited|withdrawn|spent)\b", re.I)
+# An institution's notice to the reader: an action, deadline, hold or threat, not a chat.
+_NOTICE_CUE = re.compile(
+    r"\b(?:block\w*|suspend\w*|deactivat\w*|disconnect\w*|expir\w*|freez\w*|frozen|terminat\w*|"
+    r"held|on hold|pending|due|overdue|update|verify|verification|re-?kyc|link|pay|click|call|"
+    r"penalty|fine|seized|cancel\w*|kat (?:jayega|jaega|jayegi)|band (?:ho|kar)\w*|turant|today|tonight|"
+    r"immediately|within \d+)\b|बंद|काट|रोक|तुरंत|आज|अपडेट|सत्यापित|भुगतान", re.I)
+_CLAUSE = re.compile(r"[.!?।;\n]+")
+_KYC_NEG = re.compile(r"\b(?:never|not|no|don'?t|do not|doesn'?t|won'?t|kabhi|mat|nahi|nahin|na)\b|नहीं|मत|कभी|(?:^|\s)न(?:\s|$)", re.I)
+# The writer's own KYC ("my KYC is pending", "KYC kar diya") is news, not an ask.
+_KYC_OWN = re.compile(r"\b(?:my|mine|i|i'm|i've|mera|meri|mere|maine|hamara|humara)\b|मेरा|मेरी|मेरे|मैंने|हमारा|"
+                      r"\b(?:kar (?:diya|di|li|liya)|ho gaya|ho gayi|done|completed|updated)\b|कर दिया|हो गया", re.I)
+
+
+def _kyc_ask(t):
+    """A KYC/PAN/Aadhaar update ask aimed at the reader, in a clause with no negation."""
+    return any(_KYC_ASK.search(c) and not _KYC_NEG.search(c) and not _KYC_OWN.search(c)
+               for c in _CLAUSE.split(t))
 _OTP_WORD = re.compile(r"\b(?:otp|one[- ]time (?:password|code|pin)|verification code|login code|security code)\b|ओटीपी", re.I)
 
 
@@ -114,16 +135,15 @@ def reason(kind, text, sender):
     harm = {n for n, _ in a["harm"]}
     t = a["text"]
     # The OTP word itself is required: mech's OTP-note reading also covers "the door code is 1234".
-    if (a["otp_note"] and _OTP_WORD.search(t)) or (a["receipt"] and (_YOUR_ACCOUNT.search(t) or _DEAR.search(t))):
+    if (a["otp_note"] and (_OTP_WORD.search(t) or _INSTITUTION.search(t))) or \
+            ((a["receipt"] or _DEBIT.search(t)) and (_ALERT_MARK.search(t) or _DEAR.search(t))):
         return "alert"
-    if harm & _REQUEST_HARM:
+    if harm & _REQUEST_HARM or _kyc_ask(t):
         return "request"
     advisory = not harm and (a["protective"] or a.get("awareness") or a.get("report") or a.get("advice"))
     if advisory:
         return None
-    if _KYC_ASK.search(t):
-        return "request"
-    if _INSTITUTION.search(t) and (_DEAR.search(t) or _YOUR_ACCOUNT.search(t)):
+    if _INSTITUTION.search(t) and (_DEAR.search(t) or (_YOUR_ACCOUNT.search(t) and _NOTICE_CUE.search(t))):
         return "identity"
     return None
 
@@ -147,7 +167,7 @@ def apply(label, score, evidence, why):
 
 _CALL_BANK = re.compile(
     r"\b(?:bank|sbi|hdfc|icici|axis|kotak|pnb|canara|baroda|rbi|reserve bank|credit card|debit card|"
-    r"net ?banking|customer care)\b|बैंक|कार्ड", re.I)
+    r"net ?banking)\b|बैंक", re.I)
 
 
 def call_note(transcript):

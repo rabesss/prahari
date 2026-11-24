@@ -9,9 +9,9 @@ Prahari can take the SMS sender as an optional second input. A personal mobile n
   - `AX-HDFCBK-S` style headers are **registered-looking sender IDs**. The format is an optional 2-letter prefix, 6 characters, and an optional `-S`/`-T`/`-P`/`-G` category suffix. A bare 6-letter ID like `HDFCBK` counts too.
   - `1600xxxxxx` is the **1600 series**. Anything else is **other**.
 - **Raise.** A text message from a personal mobile number is raised to at least **SUSPICIOUS** when it does one of these:
-  - it reads like a debit or OTP alert;
-  - it asks for an OTP, PIN or KYC details;
-  - it claims a bank, government, courier or telecom identity to the reader (a "Dear customer" greeting, or "your account / card / parcel / SIM / connection ...").
+  - it reads like a debit or OTP alert (an OTP word or an institution name, or a masked account number, balance or transaction reference);
+  - it asks for an OTP, PIN or KYC details (a KYC ask aimed at the reader, in a clause with no negation; "my KYC is done" does not count);
+  - it claims a bank, government, courier or telecom identity to the reader (a "Dear customer" greeting, or "your account / card / parcel / SIM / connection ..." together with a notice cue such as block, expire, held, update or pay).
 
   The first evidence line is then the vetted sentence *"Banks and government send SMS from registered sender IDs like XX-ABCDEF, not personal mobile numbers"* (Hindi: *"बैंक और सरकारी विभाग SMS रजिस्टर्ड सेंडर ID (जैसे XX-ABCDEF) से भेजते हैं, निजी मोबाइल नंबर से नहीं"*). A DANGEROUS verdict stays DANGEROUS.
 - **No raise.** These are left as they are:

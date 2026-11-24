@@ -326,3 +326,73 @@ def test_review_r1_reason_cases(text, why):
 def test_review_r1_negation_does_not_hide_vouching(sent, bad):
     ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
     assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+# Round-2 review (gpt-6.1-terra) regressions.
+@pytest.mark.parametrize("text,why", [
+    ("Your code is 123456 for SBI login", "alert"),
+    ("Please complete KYC today. Never share OTP.", "request"),
+    ("My KYC is pending, will do it tomorrow", None),
+    ("KYC update kar diya bhai, thanks", None),
+    ("मेरा केवाईसी अपडेट हो गया", None),
+])
+def test_review_r2_reason_cases(text, why):
+    assert sender.reason("sms", text, MOBILE) == why
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("The sender is not suspicious and is verified.", True),
+    ("The number is not verified.", False),
+    ("It did not come from a registered sender.", False),
+])
+def test_review_r2_negation_stops_at_conjunction(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+@pytest.mark.parametrize("sent,bad", [
+    # CodeRabbit round 2: over-drops of correct warnings
+    ("This message was not sent from your bank.", False),
+    ("The sender is not verified and banks use registered IDs.", False),
+    ("This was sent from your bank.", True),
+])
+def test_review_r2_coderabbit_scoping(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+# Round-2 review (Grok 4.7) regressions.
+@pytest.mark.parametrize("text,why", [
+    ("Dear customer, your KYC has expired. Do not share OTP with anyone.", "request"),
+    ("Rs.500.00 has been debited from a/c XX1234 on 24Nov. Avl Bal Rs.9000.", "alert"),
+    ("Your password is 482910 for HDFC net banking login", "alert"),
+    ("bhai aapka refund aa gaya SBI se", None),
+    ("आपका पार्सल आ गया?", None),
+    ("did your bank card work at the store", None),
+    ("bhai tumhara SBI loan kab tak hai", None),
+    ("My PAN card update is done", None),
+])
+def test_review_r2_grok_reason_cases(text, why):
+    assert sender.reason("sms", text, MOBILE) == why
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("The sender is absolutely and fully verified.", True),
+    ("The sender of this particular message is verified.", True),
+    ("You can trust this sender.", True),
+    ("This sender can be trusted.", True),
+    ("This came straight from the bank.", True),
+    ("You should use this verified sender.", True),
+    ("Please trust the official sender.", True),
+    ("The real risk is the sender asking for an OTP.", False),
+    ("Check the official bank app before acting.", False),
+    ("Do not trust this sender.", False),
+])
+def test_review_r2_grok_vouching(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+def test_call_note_needs_a_bank_not_any_card():
+    assert sender.call_note("Your SIM card will be blocked, press 9") is None
+    assert sender.call_note("This is HDFC Bank calling about your card") == sender.NOTE_1600
