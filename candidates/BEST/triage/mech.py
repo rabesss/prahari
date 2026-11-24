@@ -1361,6 +1361,11 @@ def decide(p_model, a, gate=0.85):
             # An OTP delivered to the reader with "do not share it", or an alert that says what to
             # do "if you did not request this", is the sender's own protection, not a demand.
             return (1 if p_model >= gate and _actionable(a) else 0), p_model, a
+        if (a["receipt"] or a["otp_note"]) and a["risky"]:
+            # A copied debit or OTP alert that sends the reader to a lookalike or throwaway domain
+            # ("Not you? Visit sbi-refund-help.dev") is not a record; genuine alerts name the
+            # bank's own app, site or toll-free line. The reader is told to check, not that it is safe.
+            return "uncertain", max(min(p_model, 0.6), 0.5), a
         if a["receipt"] or a["otp_note"]:
             # A completed transaction or an OTP notification is a record, not a request.
             return 0, min(p_model, 0.35), a

@@ -613,6 +613,7 @@ class MainActivity : Activity() {
     private var utteranceSeq = 0
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
+    private var aiFootSlot: View? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
@@ -660,6 +661,7 @@ class MainActivity : Activity() {
             .replace("this phone", "this emulator")
             .replace("इसी फ़ोन", "इसी एम्युलेटर")
             .replace("इस फ़ोन", "इस एम्युलेटर")
+            .replace("फ़ोन पर", "एम्युलेटर पर")
     }
 
     private fun t(english: String): String = onDevice(L10n.t(english))
@@ -2199,7 +2201,9 @@ class MainActivity : Activity() {
             }
         }
         add(llama, explainRow, top = 12)
-        add(llama, iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true), top = 12)
+        val aiFoot = iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true)
+        add(llama, aiFoot, top = 12)
+        aiFootSlot = aiFoot
         if (L10n.hindi) add(llama, txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true), top = 6)
         add(body, llama, top = 12)
         val stats = card()
@@ -2299,6 +2303,7 @@ class MainActivity : Activity() {
         // Llama wrote for the detector's NO RISK reading, so its text would contradict the banner.
         if (bankAlertLevel(job.verdict, job.value) == "warn" && job.verdict.optString("level") == "clear") {
             replacedSlot?.visibility = View.GONE
+            aiFootSlot?.visibility = View.GONE  // the note is the app's text, not the AI's
             view.text = t(RAISED_NOTE)
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
