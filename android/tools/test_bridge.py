@@ -448,6 +448,67 @@ assert upi_unknown['verdict'] == 'SUSPICIOUS' and upi_unknown['level'] == 'warn'
 assert all(upi_unknown['actions_hi']), upi_unknown['actions_hi']
 print('mobile.check runs with only NumPy installed (including UPI QR payloads)')
 
+# Flagged-only gating: a NO RISK result gets the detector's fixed text and no Llama call.
+class NoModel:
+    def generate(self, prompt):
+        raise AssertionError('gated NO RISK items must not call the model')
+_clear_cases = [
+    ('sms', 'Your electricity bill of Rs 1,240 is due on 15 Dec. Pay through the mahadiscom app; no link is attached.'),
+    ('sms', 'Your OTP for login is 482910. Do not share it with anyone.'),
+    ('url', 'https://www.irctc.co.in/nget/train-search'),
+    ('url', 'upi://pay?pa=sharma.kirana@okicici&pn=Sharma%20Kirana%20Store&mc=5411&cu=INR&tn=Grocery%20bill'),
+    ('injection', 'Hi Ravi, see you at lunch tomorrow?'),
+    ('flow', 'nightly backup to 10.0.0.9 over ssh, 2 GB'),
+    ('flow', '{"duration": 0, "src_bytes": 200, "dst_bytes": 300}'),
+    ('flow', 'there was no update or backup, just connections'),
+]
+for kind, text in _clear_cases:
+    v = json.loads(mobile.verdict(kind, text))
+    assert v['level'] == 'clear', (kind, text, v['level'])
+    out = json.loads(mobile.vetted_explanation())
+    assert out['llama_skipped'] is True and out['llm'] is None and out['source'] == 'detector_template'
+    body = out['explanation']
+    assert body.startswith('No risk found for this '), body
+    # Never claims safety, never the flow guess, always ends on the vetted fact.
+    assert not re.search(r'(?i)\bsafe\b|legitimate|genuine', body), body
+    assert 'routine update or a scheduled backup' not in body, body
+    p = mobile.BridgeExplainer(NoModel()).prompt(mobile._last['kind'], text, mobile._last['lab'], mobile._last['ev'])
+    assert body.endswith(mobile.llm._CTX[p]['fact']), (body, mobile.llm._CTX[p]['fact'])
+    # Same grounding check the Llama text goes through leaves it unchanged.
+    fact = mobile.llm._CTX[p]['fact']
+    checked, _ = mobile.llm.validate(body, body[:body.rindex(fact)].rstrip(' .'), mobile.llm._CTX[p], vetted=[fact])
+    assert checked.strip() == body, (checked, body)
+# A copied bank alert never comes back NO RISK from the detector, so gating never touches it.
+assert json.loads(mobile.verdict('sms', bank))['level'] != 'clear'
+
+# Flagged items take the unchanged Llama path: the same prompt and the same text with gating on
+# or off (gating only decides whether explain() is called, in MainActivity.runCheck).
+class Record:
+    def __init__(self): self.prompts = []
+    def generate(self, prompt):
+        self.prompts.append(prompt)
+        return json.dumps({'text': 'This message is DANGEROUS: a lookalike link. Do not open it.', 'stats': {}})
+for kind, text in [('sms', kyc), ('url', 'http://amaz0n-refund-help.top/claim?id=8812')]:
+    a, b = Record(), Record()
+    va = json.loads(mobile.verdict(kind, text)); ea = mobile.explain(a)
+    vb = json.loads(mobile.verdict(kind, text)); eb = mobile.explain(b)
+    va.pop('detector_ms'); vb.pop('detector_ms')
+    assert va == vb and ea == eb and a.prompts == b.prompts and a.prompts
+    assert va['level'] != 'clear'
+
+# Kotlin wiring (no Gradle here; CI builds the APK): the gate, its default and the perf record.
+assert 'val skipLlama = !Bridge.explainCleared && level == "clear" && bankAlertLevel(verdict, value) == null' in _kt
+assert 'prefs.getBoolean(PREF_EXPLAIN_CLEARED, false)' in _kt
+assert 'skipLlama -> JSONObject(bridge.callAttr("vetted_explanation").toString())' in _kt
+assert 'if (savedInstanceState == null) applyGatingExtra(intent)' in _kt
+assert 'FLAG_DEBUGGABLE' in _kt and 'module.resetContext()' in _kt
+_perf = _kt[_kt.index('private fun logPerf('):_kt.index('private fun enqueueNet(')]
+assert 'job.value' not in _perf and '"explanation"' not in _perf, 'perf log must not carry user text'
+for _key in ('"session"', '"seq"', '"gating"', '"llama_skipped"', '"prompt_tokens"', '"prefill_ms"',
+             '"prefill_tps"', '"first_token_ms"', '"decode_tps"', '"total_ms"', '"detector_ms"'):
+    assert _key in _perf, _key
+print('flagged-only gating: detector text for NO RISK, unchanged Llama path for flagged items')
+
 # Lookalike-link "hang" on the 24 Nov S23 run (evidence/galaxy-s23-20261124/*/lookalike-link-stats.xml):
 # the check ended in 5.9 s with "ValueError: explanation contained no supported model sentence" after the
 # refusal ladder, and the stats header stayed "—" so the harness waited 60 s. Replies below are the real
@@ -502,7 +563,7 @@ assert 'internal const val LLAMA_BUDGET_MS = 15_000L' in _kt
 assert 'if (overBudget.get()) return timedOut(stats)' in _kt and 'watchdog' not in _kt
 assert 'if (SystemClock.elapsedRealtime() >= deadline) overBudget.set(true)' in _kt
 assert 'Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)' in _kt
-assert 'fillStats(job.verdict, result.optJSONObject("llm"), total, pss, true, result.has("fallback"))' in _kt
+assert 'fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true, result.has("fallback"))' in _kt
 assert 'if (result.has("fallback")) markDetectorText(result.optString("fallback"))' in _kt
 # Review round 1 (Terra): a dangerous flow's fixed text uses the detector's own evidence, never the
 # negation-blind port phrase; a quoted UPI payee keeps the verdict; a broken bridge reply is not

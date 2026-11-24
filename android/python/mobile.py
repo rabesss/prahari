@@ -427,6 +427,17 @@ def explain(runner):
     return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 
+def vetted_explanation():
+    """Stage 2 without Llama, for a NO RISK item when flagged-only gating is on.
+
+    The detector's fixed text for the item from the last verdict() call (detector_text: the prompt's
+    required opening plus its vetted key fact, through llm.validate()). No model call.
+    """
+    text = detector_text(_last['kind'], _last['text'], _last['lab'], _last['ev'])
+    return json.dumps({'explanation': text, 'llm': None, 'replaced': False,
+                       'llama_skipped': True, 'source': 'detector_template'}, ensure_ascii=False)
+
+
 def check(kind, text, runner):
     """Both stages in one call (tests and the command line)."""
     out = json.loads(verdict(kind, text))

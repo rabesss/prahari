@@ -5,6 +5,7 @@ import android.app.Dialog
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -57,6 +58,7 @@ import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
@@ -137,6 +139,11 @@ private const val TAG = "Prahari"
  * text. A warm check takes about 1.2 s on a cool Galaxy S23 and about 3 s when it is hot.
  */
 internal const val LLAMA_BUDGET_MS = 15_000L
+/** One JSON line per finished check, numbers only (no checked text, no explanation). adb_bench.py reads it. */
+private const val PERF_TAG = "PrahariPerf"
+/** Debug builds only: "all" or "flagged-only", so the adb harness can set the gating mode at launch. */
+internal const val GATING_EXTRA = "in.prahari.app.extra.GATING"
+internal const val PREF_EXPLAIN_CLEARED = "explain_cleared"
 private const val QR_REQUEST = 41
 
 private class Cancelled : RuntimeException("Check cancelled")
@@ -232,6 +239,7 @@ internal object Bridge {
         @Volatile var explanation: JSONObject? = null
         @Volatile var totalMs: Long = -1L
         @Volatile var pssMb: Double = Double.NaN
+        @Volatile var verdictCallMs: Double = Double.NaN
     }
 
     class Net(val id: Int, val code: String, val message: String, val elapsed: Long, val done: Boolean)
@@ -258,6 +266,16 @@ internal object Bridge {
     @Volatile var net: Net? = null
     /** 0 verdict still running, 1 verdict back (Llama writing), 2 explanation back. */
     @Volatile var checkStage = 0
+    /**
+     * False (the default) is flagged-only gating: a result shown as NO RISK gets the detector's
+     * fixed text and no Llama call. DANGEROUS and SUSPICIOUS results always get Llama.
+     */
+    @Volatile var explainCleared = false
+    val perfSeq = AtomicInteger(0)
+    /** Distinguishes this process's PrahariPerf lines from an earlier run's still in logcat. */
+    val perfSession: String = java.lang.Long.toHexString(System.nanoTime() xor System.currentTimeMillis())
+
+    fun gatingName() = if (explainCleared) "all" else "flagged-only"
 
     fun still(id: Int) = id == generation
 
@@ -388,6 +406,7 @@ private fun requestModel(force: Boolean) {
                 Bridge.module == null && (force || Bridge.loadError == null)
             if (shouldLoad) {
                 if (force) Bridge.loadError = null
+                val loadStart = SystemClock.elapsedRealtime()
                 try {
                     ensureLoaded()
                     Bridge.loadError = null
@@ -395,6 +414,9 @@ private fun requestModel(force: Boolean) {
                     Bridge.loadError = errorText(t)
                     Log.e(TAG, "model load failed", t)
                 }
+                logModel(SystemClock.elapsedRealtime() - loadStart)
+            } else {
+                logModel(null)
             }
         } catch (t: Throwable) {
             Bridge.loadError = errorText(t)
@@ -421,13 +443,20 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
             throw IllegalStateException(Bridge.pythonError ?: "Python is not running")
         }
         val bridge = Python.getInstance().getModule("mobile")
+        val callStart = SystemClock.elapsedRealtimeNanos()
         val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value).toString())
+        val verdictCallMs = (SystemClock.elapsedRealtimeNanos() - callStart) / 1e6
         val level = verdict.optString("level")
         if (level != "danger" && level != "warn" && level != "clear") {
             throw IllegalStateException("Invalid detector verdict")
         }
         if (!Bridge.still(id)) return
         val job = Bridge.Job(id, mode, value, started, verdict)
+        job.verdictCallMs = verdictCallMs
+        // Flagged-only gating: only a result the screen shows as NO RISK skips Llama. A bank alert
+        // the app relabels (CHECK THIS ALERT or SUSPICIOUS) is not NO RISK, so it keeps Llama.
+        val gating = Bridge.gatingName()
+        val skipLlama = !Bridge.explainCleared && level == "clear" && bankAlertLevel(verdict, value) == null
         if (!Bridge.publish(id, job)) return
         Bridge.app?.let { ctx ->
             try {
@@ -445,9 +474,10 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         }
         if (!Bridge.still(id)) return
         val explanation = try {
-            val missing = missingMessage()
-            Bridge.missing = missing
+            val missing = if (skipLlama) null else missingMessage()
+            if (!skipLlama) Bridge.missing = missing
             when {
+                skipLlama -> JSONObject(bridge.callAttr("vetted_explanation").toString())
                 missing != null -> JSONObject().put("error", missing)
                 Bridge.pythonError != null -> JSONObject().put("error", Bridge.pythonError)
                 else -> JSONObject(bridge.callAttr("explain", Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)).toString())
@@ -461,6 +491,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         job.explanation = explanation
         job.totalMs = SystemClock.elapsedRealtime() - started
         job.pssMb = try { Debug.getPss() / 1024.0 } catch (_: Throwable) { Double.NaN }
+        logPerf(job, gating)
         Bridge.checkStage = 2
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
@@ -481,6 +512,60 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
             act.showHome()
             act.failureToast(detail)
         }
+    }
+}
+
+private fun putNum(rec: JSONObject, key: String, value: Double?) {
+    rec.put(key, if (value != null && value.isFinite() && value >= 0) value else JSONObject.NULL)
+}
+
+/** The preload finished (or was not needed). The harness waits for this before its first check. */
+private fun logModel(loadMs: Long?) {
+    try {
+        val state = when {
+            Bridge.module != null -> "ready"
+            Bridge.missing != null -> "missing"
+            else -> "error"
+        }
+        val rec = JSONObject().put("event", "model").put("session", Bridge.perfSession)
+            .put("seq", Bridge.perfSeq.incrementAndGet()).put("state", state).put("gating", Bridge.gatingName())
+        putNum(rec, "load_ms", loadMs?.toDouble())
+        Log.i(PERF_TAG, rec.toString())
+    } catch (_: Throwable) {}
+}
+
+/** One line per finished check for the adb harness. Numbers and labels only; never the checked text. */
+private fun logPerf(job: Bridge.Job, gating: String) {
+    try {
+        val ex = job.explanation
+        val llm = ex?.optJSONObject("llm")
+        fun num(key: String) = llm?.optDouble(key, Double.NaN)
+        val rec = JSONObject()
+            .put("event", "result")
+            .put("session", Bridge.perfSession)
+            .put("seq", Bridge.perfSeq.incrementAndGet())
+            .put("id", job.id)
+            .put("kind", KINDS.getOrElse(job.mode) { "?" })
+            .put("level", job.verdict.optString("level"))
+            .put("gating", gating)
+            .put("llama_skipped", ex?.optBoolean("llama_skipped") == true)
+            .put("fallback", ex?.optString("fallback")?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
+            .put("error", ex == null || ex.has("error"))
+        putNum(rec, "detector_ms", job.verdict.optDouble("detector_ms", Double.NaN))
+        putNum(rec, "verdict_call_ms", job.verdictCallMs)
+        putNum(rec, "prompt_tokens", num("prompt_tokens"))
+        putNum(rec, "prefill_ms", num("prefill_ms"))
+        putNum(rec, "prefill_tps", num("prefill_tps"))
+        putNum(rec, "first_token_ms", num("first_token_ms"))
+        putNum(rec, "decode_tps", num("decode_tps"))
+        putNum(rec, "generated_tokens", num("generated_tokens"))
+        putNum(rec, "gen_wall_ms", num("gen_wall_ms"))
+        putNum(rec, "total_ms", job.totalMs.toDouble())
+        putNum(rec, "pss_mb", job.pssMb)
+        rec.put("retried", llm?.optBoolean("retried") == true)
+        Log.i(PERF_TAG, rec.toString())
+    } catch (t: Throwable) {
+        Log.e(TAG, "perf log failed", t)
     }
 }
 
@@ -584,6 +669,7 @@ class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
             }
             try { module.resetContext() } catch (_: Throwable) {}
         }
+        val end = SystemClock.elapsedRealtime()
         if (!Bridge.still(id)) throw Cancelled()
         val stats = JSONObject().put("backend", "executorch")
         first?.let { stats.put("first_token_ms", it - start) }
@@ -597,9 +683,28 @@ class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
             stats.put("raw", nativeStats)
             if (nativeStats.has("generated_tokens")) stats.put("generated_tokens", nativeStats.optInt("generated_tokens"))
             if (nativeStats.has("decode_token_per_sec")) stats.put("decode_tps", nativeStats.optDouble("decode_token_per_sec"))
+            prefillStats(nativeStats, stats)
         } catch (_: Throwable) {}
+        stats.put("gen_wall_ms", end - start)
         return JSONObject().put("text", out.toString()).put("stats", stats).toString()
     }
+}
+
+/**
+ * Prompt tokens and prefill from ExecuTorch's native Stats JSON. Prefill time runs from
+ * inference_start_ms to prompt_eval_end_ms, so it includes tokenizing the prompt. A missing, zero
+ * or non-finite value is left out, and the UI and harness show it as unavailable.
+ */
+internal fun prefillStats(native: JSONObject, stats: JSONObject) {
+    fun pos(key: String): Double? = native.optDouble(key, Double.NaN).takeIf { it.isFinite() && it > 0 }
+    val tokens = pos("prompt_tokens")
+    val start = pos("inference_start_ms")
+    val end = pos("prompt_eval_end_ms")
+    val ms = if (start != null && end != null && end > start) end - start else null
+    val tps = pos("prefill_token_per_sec") ?: if (tokens != null && ms != null) tokens * 1000.0 / ms else null
+    tokens?.let { stats.put("prompt_tokens", it.toInt()) }
+    (ms ?: if (tokens != null && tps != null) tokens * 1000.0 / tps else null)?.let { stats.put("prefill_ms", it) }
+    tps?.let { stats.put("prefill_tps", it) }
 }
 
 class MainActivity : Activity() {
@@ -980,6 +1085,7 @@ class MainActivity : Activity() {
     private fun loadStrings() {
         val prefs = getSharedPreferences("prahari", MODE_PRIVATE)
         L10n.hindi = prefs.getString("lang", "en") == "hi"
+        Bridge.explainCleared = prefs.getBoolean(PREF_EXPLAIN_CLEARED, false)
         if (!Python.isStarted()) return
         try {
             val raw = Python.getInstance().getModule("intake").callAttr("strings_json").toString()
@@ -987,6 +1093,25 @@ class MainActivity : Activity() {
         } catch (t: Throwable) {
             Log.e(TAG, "strings load failed", t)
         }
+    }
+
+    private fun setExplainCleared(on: Boolean) {
+        Bridge.explainCleared = on
+        getSharedPreferences("prahari", MODE_PRIVATE).edit().putBoolean(PREF_EXPLAIN_CLEARED, on).apply()
+    }
+
+    /**
+     * Debug builds only: the adb harness launches with GATING_EXTRA set to "all" or "flagged-only".
+     * Read on a fresh launch and on a new intent, never on recreation, so a later switch change wins.
+     */
+    private fun applyGatingExtra(source: Intent?) {
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) return
+        when (source?.getStringExtra(GATING_EXTRA)) {
+            "all" -> setExplainCleared(true)
+            "flagged-only" -> setExplainCleared(false)
+            else -> return
+        }
+        source?.removeExtra(GATING_EXTRA)
     }
 
     private fun rememberLanguage() {
@@ -1063,6 +1188,7 @@ class MainActivity : Activity() {
             Log.e(TAG, "Python start failed", t)
         }
         loadStrings()
+        if (savedInstanceState == null) applyGatingExtra(intent)
         installBack()
         // A share intent stays on the activity across rotation. Only the first create fills the box.
         val shared = if (savedInstanceState == null) readShare(intent) else null
@@ -1459,6 +1585,7 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        applyGatingExtra(intent)
         val shared = readShare(intent) ?: return
         openShared(shared)
     }
@@ -2255,7 +2382,7 @@ class MainActivity : Activity() {
             chevron.rotation = if (open) 180f else 0f
             describeStats(open)
         }
-        fillStats(data, null, null, null, false)
+        fillStats(data, null, null, null, false, false)
         add(body, stats, top = 12)
         val checked = card()
         add(checked, heading("You checked", "आपने जांचा"))
@@ -2293,40 +2420,52 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 30) header.stateDescription = t(if (expanded) "Expanded" else "Collapsed")
     }
 
-    /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
-    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, done: Boolean, fallback: Boolean = false) {
-        val details = statsDetails ?: return
-        val summary = statsSummary ?: return
-        details.removeAllViews()
+    private fun tileRow(labels: List<String>, values: List<String>): LinearLayout {
         val tiles = row()
-        val values = listOf(
-            formatMs(data.optDouble("detector_ms", Double.NaN)),
-            formatMs(llm?.optDouble("first_token_ms", Double.NaN) ?: Double.NaN),
-            llm?.optDouble("decode_tps", Double.NaN)?.takeIf { it.isFinite() }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
-        )
-        listOf("Detector", "First token", "Decode speed").forEachIndexed { i, label ->
+        labels.forEachIndexed { i, label ->
             val tile = col().apply { background = shape(T.surface2, 12f); pad(this, 10, 10, 10, 10) }
             add(tile, txt(values[i], 17f, T.ink, 700))
             add(tile, txt(label, 11f, T.ink2, 500), top = 4)
             add(tiles, tile, 0, -2, left = if (i == 0) 0 else 8, weight = 1f)
         }
         stackWhenTight(tiles, 8)
-        add(details, tiles, top = 4)
+        return tiles
+    }
+
+    private fun tps(value: Double?): String =
+        value?.takeIf { it.isFinite() && it > 0 }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
+
+    /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
+    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean, done: Boolean, fallback: Boolean = false) {
+        val details = statsDetails ?: return
+        val summary = statsSummary ?: return
+        details.removeAllViews()
+        fun d(key: String) = llm?.optDouble(key, Double.NaN) ?: Double.NaN
+        val detector = formatMs(data.optDouble("detector_ms", Double.NaN))
+        val firstToken = formatMs(d("first_token_ms"))
+        add(details, tileRow(listOf("Detector", "First token", "Decode speed"),
+            listOf(detector, firstToken, tps(d("decode_tps")))), top = 4)
+        val tokens = d("prompt_tokens").takeIf { it.isFinite() && it > 0 }?.let { "${it.toInt()}" } ?: "—"
+        add(details, tileRow(listOf("Prompt tokens", "Prefill", "Prefill speed"),
+            listOf(tokens, formatMs(d("prefill_ms")), tps(d("prefill_tps")))), top = 8)
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "—"
-        val foot = t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
+        val skippedLine = if (skipped) t("Llama skipped: verdict and text from the detector") + "\n" else ""
+        val foot = skippedLine + t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
             t("Memory") + " ${pss?.let { String.format(Locale.US, "%.1f MB", it) } ?: "—"}\n" +
             "Llama 3.2 1B INT4 · ExecuTorch · XNNPACK\nCPU ABI: $abi" +
             if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
-        // adb_bench.py reads this from the header's label: "—" means Llama is still writing.
-        // "Detector text": Llama's replies were replaced by the detector's fixed text. "No AI text": no
-        // explanation at all (missing model, an error). Either way the stage has ended.
+        // adb_bench.py reads this summary from the header's label: "<detector> · <first token>" when
+        // Llama ran; "Llama skipped" when gating skipped it; "Detector text" when Llama's replies were
+        // replaced by the detector's fixed text; "No AI text" when there is no explanation at all
+        // (missing model, an error); "—" only while Llama is still writing.
         val second = when {
+            skipped -> t("Llama skipped")
             done && fallback -> t("Detector text")
-            done && values[1] == "—" -> t("No AI text")
-            else -> values[1]
+            done && firstToken == "—" -> t("No AI text")
+            else -> firstToken
         }
-        summary.text = "${values[0]} · $second"
+        summary.text = "$detector · $second"
         describeStats(details.visibility == View.VISIBLE)
     }
 
@@ -2336,7 +2475,9 @@ class MainActivity : Activity() {
         val result = job.explanation ?: return
         val error = result.optString("error", "")
         val explanation = result.optString("explanation", "").trim()
+        val skipped = result.optBoolean("llama_skipped")
         replacedSlot?.visibility = if (result.optBoolean("replaced")) View.VISIBLE else View.GONE
+        if (skipped) markDetectorText("gated")
         // The app raised a cleared bank alert to SUSPICIOUS because it names its own link or number.
         // Llama wrote for the detector's NO RISK reading, so its text would contradict the banner.
         if (bankAlertLevel(job.verdict, job.value) == "warn" && job.verdict.optString("level") == "clear") {
@@ -2345,7 +2486,8 @@ class MainActivity : Activity() {
             view.text = t(RAISED_NOTE)
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
-            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, true, result.has("fallback"))
+            // Stats still finish, so the header (and adb_bench.py) sees the check as done.
+            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped, true, result.has("fallback"))
             return
         }
         if (result.has("fallback")) markDetectorText(result.optString("fallback"))
@@ -2372,23 +2514,28 @@ class MainActivity : Activity() {
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
         // A detector-text fallback reads "No AI text" even when a refused reply had a first token.
-        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, true, result.has("fallback"))
+        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true, result.has("fallback"))
         metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
     }
 
     /**
-     * Llama's replies all failed the explanation checks, or its time budget ran out: the text shown
-     * is the detector's fixed text, and the card says so instead of claiming it is AI-written.
+     * The text shown is the detector's fixed text, not Llama's: gating skipped Llama ("gated"), every
+     * reply failed the explanation checks ("checks_failed"), or the time budget ran out ("timeout").
+     * The card says so instead of claiming it is AI-written.
      */
     private fun markDetectorText(reason: String) {
         llamaHeadSlot?.let { head ->
             (head.getChildAt(0) as? ImageView)?.setImageResource(R.drawable.ic_shield_check)
-            (head.getChildAt(1) as? TextView)?.text =
-                if (reason == "timeout") t("Llama took too long, so this is the detector's fixed text.")
-                else t("Llama's reply did not pass the checks, so this is the detector's fixed text.")
+            (head.getChildAt(1) as? TextView)?.text = when (reason) {
+                "gated" -> t("Fixed text from the detector. Llama was not used.")
+                "timeout" -> t("Llama took too long, so this is the detector's fixed text.")
+                else -> t("Llama's reply did not pass the checks, so this is the detector's fixed text.")
+            }
         }
         (aiFootSlot as? LinearLayout)?.let { foot ->
-            (foot.getChildAt(1) as? TextView)?.text = t("Fixed text from the detector, not written by AI.")
+            (foot.getChildAt(1) as? TextView)?.text =
+                if (reason == "gated") t("Llama is skipped for NO RISK results so they finish faster. Turn it on in About.")
+                else t("Fixed text from the detector, not written by AI.")
         }
         aiEnglishSlot?.text = n("detector_english")
     }
@@ -2841,6 +2988,23 @@ class MainActivity : Activity() {
             add(line, text, 0, -2, left = 14, weight = 1f)
             add(sheet, line)
         }
+        divider(sheet)
+        val gateRow = row().apply { pad(this, 0, 11, 0, 11); minimumHeight = dp(48) }
+        val gateText = col()
+        add(gateText, txt("Explain NO RISK results with Llama", 15f, T.ink, 600, 20))
+        add(gateText, txt("Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.", 13f, T.ink2, 400, 18), top = 2)
+        add(gateRow, gateText, 0, -2, weight = 1f)
+        val gateSwitch = Switch(this).apply {
+            isChecked = Bridge.explainCleared
+            minimumHeight = dp(48)
+            minimumWidth = dp(48)
+            contentDescription = t("Explain NO RISK results with Llama")
+            setOnCheckedChangeListener { _, on -> setExplainCleared(on) }
+        }
+        add(gateRow, gateSwitch, -2, -2, left = 12)
+        // The whole row toggles, so the target is not only the small switch.
+        gateRow.setOnClickListener { gateSwitch.toggle() }
+        add(sheet, gateRow)
         add(sheet, button("Got it") { dialog.dismiss() }.apply { minimumHeight = dp(56) }, -1, -2, top = 8)
         add(sheet, txt("Built for the Arm Bharat AI-SoC Challenge 2026", 12f, T.ink3, 400, 16).apply { gravity = Gravity.CENTER }, top = 12)
         val column = col()
