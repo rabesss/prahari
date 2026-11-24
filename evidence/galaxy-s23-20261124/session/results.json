@@ -1,0 +1,189 @@
+{
+  "schema": "prahari-android-bench-v1",
+  "device_class": "android-arm64",
+  "source_note": "Live adb benchmark run",
+  "device": {
+    "model": "SM-S911B",
+    "manufacturer": "samsung",
+    "android_release": "14",
+    "sdk": "34",
+    "abilist": "arm64-v8a,armeabi-v7a,armeabi",
+    "soc_model": "SM8550",
+    "soc_manufacturer": "QTI",
+    "cpu_parts": [
+      "0xd46",
+      "0xd4d",
+      "0xd47"
+    ],
+    "isa_arm_features": [
+      "asimd",
+      "asimddp",
+      "asimdhp",
+      "bf16",
+      "fphp",
+      "i8mm"
+    ]
+  },
+  "dumpsys_meminfo": {
+    "total_pss_kb": 1394613,
+    "total_rss_kb": 1505168,
+    "total_swap_pss_kb": 46,
+    "total_pss_mib": 1361.9,
+    "total_rss_mib": 1469.9,
+    "native_heap_pss_kb": 1344796,
+    "native_heap_rss_kb": 1347848,
+    "native_heap_pss_mib": 1313.3,
+    "java_heap_pss_kb": 9704,
+    "graphics_pss_kb": 5152
+  },
+  "summary": {
+    "checks_total": 10,
+    "checks_incomplete": [
+      "kyc-cold",
+      "kyc-warm-1",
+      "kyc-warm-2",
+      "kyc-warm-3",
+      "bill-benign",
+      "bank-debit",
+      "lookalike-link",
+      "official-link",
+      "port-scan",
+      "kyc-airplane"
+    ],
+    "checks_full_stats": 0,
+    "detector_ms_min_max": null,
+    "ttft_ms_median": null,
+    "ttft_ms_min_max": null,
+    "decode_tps_median": null,
+    "decode_tps_min_max": null,
+    "total_s_median": null,
+    "total_s_min_max": null,
+    "app_pss_mb_min_max": null,
+    "app_pss_growth_mb": 0.0,
+    "warm_kyc_ttft_ms_median": null,
+    "warm_kyc_decode_tps_median": null,
+    "warm_kyc_total_s_median": null
+  },
+  "checks": [
+    {
+      "check": "kyc-cold",
+      "sample_label": "KYC scam SMS",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-1",
+      "sample_label": "KYC scam SMS",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-2",
+      "sample_label": "KYC scam SMS",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-3",
+      "sample_label": "KYC scam SMS",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "bill-benign",
+      "sample_label": "Bill reminder",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "bank-debit",
+      "sample_label": "Bank debit alert",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "lookalike-link",
+      "sample_label": "Lookalike link",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "official-link",
+      "sample_label": "Official link",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "port-scan",
+      "sample_label": "Port scan",
+      "status": "no-sample-chip",
+      "airplane_mode": false,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-airplane",
+      "sample_label": "KYC scam SMS",
+      "status": "no-sample-chip",
+      "airplane_mode": true,
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    }
+  ]
+}
