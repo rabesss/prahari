@@ -709,3 +709,12 @@ def test_adb_run_deadline_records_skipped(tmp_path, monkeypatch):
     rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
     assert rc == 2 and {c["status"] for c in rep["checks"]} == {"skipped-deadline"}
     assert len(rep["checks"]) == len(adb_bench.GATING_SAMPLES)
+
+def test_stats_header_after_failed_explanation():
+    """24 Nov S23 lookalike link: the check ended (5.86 s) but the header kept "—", so the run waited 60 s."""
+    old = (Path(__file__).resolve().parents[2] / "evidence" / "galaxy-s23-20261124" / "label-adjusted"
+           / "lookalike-link-stats.xml").read_text(encoding="utf-8")
+    assert adb_bench.stats_header_state(old) == "pending"
+    fixed = old.replace("244 ms · —", "244 ms · No AI text")
+    assert adb_bench.stats_header_state(fixed) == "done"
+    assert adb_bench.parse_stats_xml(fixed)["detector_ms"] == 244.0

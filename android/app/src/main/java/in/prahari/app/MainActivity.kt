@@ -57,6 +57,8 @@ import java.io.File
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
@@ -132,6 +134,12 @@ private const val OWN_CONTACT_LINE = "Sends you to its own link or number; real 
 private const val RAISED_NOTE = "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown."
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
+/**
+ * Wall-clock budget for the whole Llama stage of one check (every retry included), from the moment
+ * the verdict is on screen. Past it, generation is stopped and the reader gets the detector's fixed
+ * text. A warm check takes about 1.2 s on a cool Galaxy S23 and about 3 s when it is hot.
+ */
+internal const val LLAMA_BUDGET_MS = 15_000L
 /** One JSON line per finished check, numbers only (no checked text, no explanation). adb_bench.py reads it. */
 private const val PERF_TAG = "PrahariPerf"
 /** Debug builds only: "all" or "flagged-only", so the adb harness can set the gating mode at launch. */
@@ -242,6 +250,10 @@ internal object Bridge {
     }
     val netWorker = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "prahari-net").apply { isDaemon = true }
+    }
+    /** Stops a generate that runs past [LLAMA_BUDGET_MS]; prefill emits no callback to stop from. */
+    val watchdog = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "prahari-watchdog").apply { isDaemon = true }
     }
     val genLock = ReentrantLock()
     val moduleLock = Any()
@@ -473,7 +485,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
                 skipLlama -> JSONObject(bridge.callAttr("vetted_explanation").toString())
                 missing != null -> JSONObject().put("error", missing)
                 Bridge.pythonError != null -> JSONObject().put("error", Bridge.pythonError)
-                else -> JSONObject(bridge.callAttr("explain", Runner(id)).toString())
+                else -> JSONObject(bridge.callAttr("explain", Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)).toString())
             }
         } catch (t: Throwable) {
             if (!Bridge.still(id)) return
@@ -594,14 +606,20 @@ private fun enqueueNet(id: Int) {
  * Chaquopy calls [generate] on the model worker. Do not touch views from here, and do not
  * call load, reset, or close from [LlmCallback] — the native generate holds the module lock.
  */
-class Runner(private val id: Int) {
+class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
+    private fun timedOut(stats: JSONObject = JSONObject()): String =
+        JSONObject().put("text", "").put("stats", stats.put("timed_out", true)).put("timed_out", true).toString()
+
     fun generate(prompt: String): String {
         if (!Bridge.still(id)) throw Cancelled()
         val module = ensureLoaded()
         if (!Bridge.still(id)) throw Cancelled()
         module.resetContext()
         if (!Bridge.still(id)) throw Cancelled()
+        // A retry that would start after the budget is not started at all.
+        if (SystemClock.elapsedRealtime() >= deadline) return timedOut()
         val start = SystemClock.elapsedRealtime()
+        val overBudget = AtomicBoolean(false)
         var first: Long? = null
         var count = 0
         val out = StringBuilder()
@@ -614,7 +632,8 @@ class Runner(private val id: Int) {
                     out.append(result)
                     count++
                     // maxNewTokens is not forwarded by this AAR. Stop from the callback, which is supported.
-                    if (count >= 40 || !Bridge.still(id)) {
+                    if (SystemClock.elapsedRealtime() >= deadline) overBudget.set(true)
+                    if (count >= 40 || !Bridge.still(id) || overBudget.get()) {
                         try { module.stop() } catch (_: Throwable) {}
                     }
                 } catch (_: Throwable) {}
@@ -639,10 +658,20 @@ class Runner(private val id: Int) {
             } finally {
                 Bridge.genLock.unlock()
             }
+            // Same pattern as Bridge.begin(): stop() only while this check's generate is running.
+            val guard = Bridge.watchdog.schedule(Runnable {
+                overBudget.set(true)
+                val stopNow: Boolean
+                Bridge.genLock.lock()
+                try { stopNow = Bridge.generating && Bridge.still(id) } finally { Bridge.genLock.unlock() }
+                if (stopNow) try { module.stop() } catch (_: Throwable) {}
+            }, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             try {
                 module.generate(prompt, config, callback)
             } catch (t: Throwable) {
                 generationFailure = t
+            } finally {
+                guard.cancel(false)
             }
         } finally {
             if (armed) {
@@ -653,9 +682,13 @@ class Runner(private val id: Int) {
         }
         val end = SystemClock.elapsedRealtime()
         if (!Bridge.still(id)) throw Cancelled()
+        val stats = JSONObject().put("backend", "executorch")
+        first?.let { stats.put("first_token_ms", it - start) }
+        // Over budget: report a timeout (mobile.explain then shows the detector's fixed text), not the
+        // partial reply, and not an error from the stopped native call.
+        if (overBudget.get()) return timedOut(stats)
         callbackError.get()?.let { throw IllegalStateException(it, generationFailure) }
         generationFailure?.let { throw it }
-        val stats = JSONObject().put("backend", "executorch")
         try {
             val nativeStats = JSONObject(if (rawStats.isBlank()) "{}" else rawStats)
             stats.put("raw", nativeStats)
@@ -663,7 +696,6 @@ class Runner(private val id: Int) {
             if (nativeStats.has("decode_token_per_sec")) stats.put("decode_tps", nativeStats.optDouble("decode_token_per_sec"))
             prefillStats(nativeStats, stats)
         } catch (_: Throwable) {}
-        first?.let { stats.put("first_token_ms", it - start) }
         stats.put("gen_wall_ms", end - start)
         return JSONObject().put("text", out.toString()).put("stats", stats).toString()
     }
@@ -2361,7 +2393,7 @@ class MainActivity : Activity() {
             chevron.rotation = if (open) 180f else 0f
             describeStats(open)
         }
-        fillStats(data, null, null, null, false)
+        fillStats(data, null, null, null, false, false)
         add(body, stats, top = 12)
         val checked = card()
         add(checked, heading("You checked", "आपने जांचा"))
@@ -2414,7 +2446,8 @@ class MainActivity : Activity() {
     private fun tps(value: Double?): String =
         value?.takeIf { it.isFinite() && it > 0 }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
 
-    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean) {
+    /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
+    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean, done: Boolean) {
         val details = statsDetails ?: return
         val summary = statsSummary ?: return
         details.removeAllViews()
@@ -2434,8 +2467,14 @@ class MainActivity : Activity() {
             if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
         // adb_bench.py reads this summary from the header's label: "<detector> · <first token>" when
-        // Llama ran, "<detector> · Llama skipped" when gating skipped it, "—" while Llama is writing.
-        summary.text = "$detector · ${if (skipped) t("Llama skipped") else firstToken}"
+        // Llama ran, "<detector> · Llama skipped" when gating skipped it, "<detector> · No AI text" when
+        // the stage ended without a first token, and "—" only while Llama is still writing.
+        val second = when {
+            skipped -> t("Llama skipped")
+            done && firstToken == "—" -> t("No AI text")
+            else -> firstToken
+        }
+        summary.text = "$detector · $second"
         describeStats(details.visibility == View.VISIBLE)
     }
 
@@ -2447,7 +2486,7 @@ class MainActivity : Activity() {
         val explanation = result.optString("explanation", "").trim()
         val skipped = result.optBoolean("llama_skipped")
         replacedSlot?.visibility = if (result.optBoolean("replaced")) View.VISIBLE else View.GONE
-        if (skipped) markDetectorText()
+        if (skipped) markDetectorText("gated")
         // The app raised a cleared bank alert to SUSPICIOUS because it names its own link or number.
         // Llama wrote for the detector's NO RISK reading, so its text would contradict the banner.
         if (bankAlertLevel(job.verdict, job.value) == "warn" && job.verdict.optString("level") == "clear") {
@@ -2457,9 +2496,10 @@ class MainActivity : Activity() {
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
             // Stats still finish, so the header (and adb_bench.py) sees the check as done.
-            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped)
+            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped, true)
             return
         }
+        if (result.has("fallback")) markDetectorText(result.optString("fallback"))
         if (error.isNotEmpty() || explanation.isEmpty()) {
             val lead = when {
                 error.contains("Model files are missing", ignoreCase = true) ->
@@ -2482,18 +2522,28 @@ class MainActivity : Activity() {
         }
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
-        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped)
+        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true)
         metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
     }
 
-    /** Flagged-only gating skipped Llama: the card says the text is the detector's, not the AI's. */
-    private fun markDetectorText() {
+    /**
+     * The text shown is the detector's fixed text, not Llama's: gating skipped Llama ("gated"), every
+     * reply failed the explanation checks ("checks_failed"), or the time budget ran out ("timeout").
+     * The card says so instead of claiming it is AI-written.
+     */
+    private fun markDetectorText(reason: String) {
         llamaHeadSlot?.let { head ->
             (head.getChildAt(0) as? ImageView)?.setImageResource(R.drawable.ic_shield_check)
-            (head.getChildAt(1) as? TextView)?.text = t("Fixed text from the detector. Llama was not used.")
+            (head.getChildAt(1) as? TextView)?.text = when (reason) {
+                "gated" -> t("Fixed text from the detector. Llama was not used.")
+                "timeout" -> t("Llama took too long, so this is the detector's fixed text.")
+                else -> t("Llama's reply did not pass the checks, so this is the detector's fixed text.")
+            }
         }
         (aiFootSlot as? LinearLayout)?.let { foot ->
-            (foot.getChildAt(1) as? TextView)?.text = t("Llama is skipped for NO RISK results so they finish faster. Turn it on in About.")
+            (foot.getChildAt(1) as? TextView)?.text =
+                if (reason == "gated") t("Llama is skipped for NO RISK results so they finish faster. Turn it on in About.")
+                else t("Fixed text from the detector, not written by AI.")
         }
         aiEnglishSlot?.text = n("detector_english")
     }
