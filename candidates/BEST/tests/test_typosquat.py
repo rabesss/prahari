@@ -20,6 +20,10 @@ HITS = {
     "sbionline.com": "sbi.co.in", "sbi-online-in.com": "sbi.co.in", "irctcrefund.com": "irctc.co.in",
     "irctc-refund.in": "irctc.co.in", "incometax-gov.in": "incometax.gov.in", "hdfcbank-kyc.com": "hdfcbank.com",
     "hdfcbnk-online.com": "hdfcbank.com", "epfo-claim.in": "epfindia.gov.in", "secure.sbionline.co": "sbi.co.in",
+    # tenants of free hosting platforms and multi-label country endings
+    "hfdcbank.github.io": "hdfcbank.com", "icicibnak.vercel.app": "icicibank.com",
+    "sbionline.web.app": "sbi.co.in", "unionbankofindla.com.br": "unionbankofindia.co.in",
+    "hfdcbank.com.br": "hdfcbank.com",
 }
 NON_HITS = [
     # official sites, their subdomains and restricted registries
@@ -51,11 +55,21 @@ def test_typosquat_non_hits(host):
 
 @pytest.mark.parametrize("reg", sorted(typosquat.OFFICIAL))
 def test_official_domains_never_flagged(reg):
-    for host in (reg, "www." + reg, "login." + reg):
+    for host in (reg, "www." + reg):
         assert typosquat.match(host) is None
         names = [n for n, _ in rules.url_indicators("https://" + host + "/")]
         assert "typosquat" not in names and "brand_lookalike" not in names and "official_domain" in names
         assert not mech.host_risk(host) and indicrules.host_risk(host) is None
+    for host in ("login." + reg, "netbanking.secure." + reg):
+        assert typosquat.match(host) is None
+        assert "typosquat" not in [n for n, _ in rules.url_indicators("https://" + host + "/")]
+
+
+def test_unrelated_official_subdomain_does_not_clear_a_phish():
+    # Terra on #70: a deeper subdomain of a listed courier must not clear an OTP phish naming SBI.
+    assert detect.predict_text(["SBI customer, enter OTP at https://sbi-login.ecomexpress.in/verify"])[0][0] != 0
+    assert not typosquat.is_listed_site("sbi-login.ecomexpress.in")
+    assert typosquat.is_listed_site("www.irctc.com") and typosquat.is_listed_site("myvi.in")
 
 
 def test_distance():

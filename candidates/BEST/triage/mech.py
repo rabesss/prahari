@@ -598,7 +598,7 @@ def hosts(t):
 
 def is_official(h):
     return h in OFFICIAL_DOMAINS or h.endswith(OFFICIAL_SUFFIXES) or any(
-        h.endswith("." + d) for d in OFFICIAL_DOMAINS) or typosquat.is_official(h)
+        h.endswith("." + d) for d in OFFICIAL_DOMAINS) or typosquat.is_listed_site(h)
 
 
 def host_risk(h):

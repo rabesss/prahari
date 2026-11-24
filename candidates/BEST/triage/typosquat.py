@@ -82,10 +82,15 @@ NEAR_WORDS = {"delivery", "kotka"}
 # already treat them, and this check leaves them alone.
 RESERVED_TLDS = {"example", "test", "invalid", "localhost", "local"}
 RESTRICTED = (".gov.in", ".nic.in", ".bank.in", ".ac.in", ".edu.in", ".mil.in", ".res.in")
-# Second-level public suffixes this list needs ("hdfcbank.co.in" registers under "co.in").
-SECOND_LEVEL = {"in": {"co", "gov", "nic", "org", "net", "ac", "edu", "bank", "firm", "gen", "ind", "res", "mil"},
-                "uk": {"co", "org", "ac", "gov"}, "au": {"com", "net", "org"}, "sg": {"com"},
-                "bd": {"com"}, "pk": {"com"}, "np": {"com"}, "lk": {"com"}}
+# Second-level public suffixes ("hdfcbank.co.in" registers under "co.in", "x.com.br" under "com.br").
+# With these the top-1M check matches two domains (fecharge.ir, pnbonline.com.br).
+SECOND_LEVEL = {"in": {"co", "gov", "nic", "org", "net", "ac", "edu", "bank", "firm", "gen", "ind", "res", "mil"}}
+CC_SECOND = {"com", "co", "net", "org", "gov", "edu", "ac"}  # under any two-letter country ending
+# Free hosting platforms: each tenant is its own site ("hfdcbank.github.io" is the "hfdcbank" site).
+PLATFORMS = ("github.io", "vercel.app", "netlify.app", "pages.dev", "workers.dev", "web.app",
+             "firebaseapp.com", "herokuapp.com", "onrender.com", "glitch.me", "blogspot.com", "wixsite.com",
+             "weebly.com", "000webhostapp.com", "appspot.com", "azurewebsites.net", "replit.app", "ngrok.io",
+             "ngrok-free.app", "duckdns.org", "godaddysites.com", "square.site", "webflow.io", "framer.website")
 
 _OFFICIAL_LABELS = {}
 for _reg in OFFICIAL:
@@ -94,15 +99,30 @@ for _reg in OFFICIAL:
 
 def registrable(host):
     """The registrable domain of a host, using a tiny bundled public-suffix list."""
-    parts = host.lower().strip(".").split(".")
-    if len(parts) >= 3 and parts[-2] in SECOND_LEVEL.get(parts[-1], ()):
+    host = host.lower().strip(".")
+    parts = host.split(".")
+    for suffix in PLATFORMS:
+        if host.endswith("." + suffix):
+            return ".".join(parts[-(suffix.count(".") + 2):])
+    if len(parts) >= 3 and (parts[-2] in SECOND_LEVEL.get(parts[-1], ()) or
+                            (len(parts[-1]) == 2 and parts[-1] != "in" and parts[-2] in CC_SECOND)):
         return ".".join(parts[-3:])
     return ".".join(parts[-2:])
 
 
 def is_official(host):
+    """An official domain, any subdomain of one, or a restricted-registry host: never a typosquat."""
     host = host.lower().strip(".")
     return host.endswith(RESTRICTED) or any(host == d or host.endswith("." + d) for d in OFFICIAL)
+
+
+def is_listed_site(host):
+    """The bare official domain or its www host. The other rules count only these as official:
+    a deeper subdomain of an unrelated organisation ("sbi-login.ecomexpress.in") must not clear a
+    message that imitates a bank."""
+    host = host.lower().strip(".")
+    host = host[4:] if host.startswith("www.") else host
+    return host in OFFICIAL
 
 
 def distance(a, b, cap=3, sub_cost=1):

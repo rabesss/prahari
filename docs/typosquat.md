@@ -6,7 +6,8 @@ Indian-text rules already know how to weigh.
 
 ## What it flags
 - **Typos of an official name**, compared on the registrable domain (a small bundled suffix list, since
-  the repo has no public-suffix list): one dropped, doubled or swapped letter for names of seven to nine
+  the repo has no public-suffix list; it knows the `.in` second levels, `com.br`-style country endings
+  and free hosting platforms such as `github.io` and `vercel.app`, whose tenants are separate sites): one dropped, doubled or swapped letter for names of seven to nine
   letters (`hdfcbnk.com`, `icicibnak.com`, `delhivry.com`), two such edits for ten letters or more
   (`unionbankofindla.co.in`), and only two neighbouring letters swapped for five- or six-letter names
   (`patym.com`). The first letter must match. A changed letter counts as two edits, except `l` for `i`
@@ -32,13 +33,15 @@ the organisation's page or redirected to its `.bank.in` site; a few bank sites (
 Bank of Maharashtra, South Indian, Bank of India, NPCI) answered with a bot block or timed out, but their
 names resolved and they are the domains those organisations publish. Domains that no longer resolve or
 have changed hands were left out (`psbindia.com` now serves a gambling page), because a lapsed domain on
-an allow list would clear a scam link. The verified list also counts as official in the existing
-URL, SMS and Indian-text rules.
+an allow list would clear a scam link. In the existing URL, SMS and Indian-text rules the new list
+counts as official only for the bare domain and its `www.` host: a deeper subdomain of an unrelated
+organisation (`sbi-login.ecomexpress.in`) must not clear a message that imitates a bank. The typosquat
+check itself never flags any subdomain of a listed domain.
 
 ## False-positive check
 The thresholds were set against the Tranco top-1M list (24 Nov 2026). The first draft matched 52
 domains, mostly the brands' own sister domains and other banks one letter away (ecobank, rbcbank,
-axosbank, idfcbank). The rules above match one (`fecharge.ir`). The URL evaluation set (F1 0.994,
+axosbank, idfcbank). The rules above match two (`fecharge.ir`, `pnbonline.com.br`). The URL evaluation set (F1 0.994,
 FPR 0) is unchanged: neither signal fires on it.
 
 ## Wiring

@@ -272,7 +272,7 @@ RISKY_TLDS = {"top", "xyz", "club", "online", "site", "live", "icu", "buzz", "in
 
 
 def is_official(host):
-    if host in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_official(host):
+    if host in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_listed_site(host):
         return True
     return any(host.endswith("." + d) for d in OFFICIAL_DOMAINS)
 
