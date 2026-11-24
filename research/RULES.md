@@ -2,7 +2,7 @@
 
 Checked 9 Nov 2026. Tags: **[S]** sourced (quoted, linked), **[I]** inferred, **[U]** unknown publicly.
 Primary source: the official page https://arm-education.github.io/Arm-Developer-Labs/Bharat_AI_SoC_2026_27.html
-(snapshot in `docs/challenge-brief.md`). Full research notes with every quote: `research/sources/research-A-rules.md`
+(summary in `docs/challenge-brief.md`). Full research notes with every quote: `research/sources/research-A-rules.md`
 (rules, timeline, IP), `research/sources/research-B-judging.md` (judging), `research/sources/research-C-approaches.md`
 (approaches, datasets, ExecuTorch practice).
 

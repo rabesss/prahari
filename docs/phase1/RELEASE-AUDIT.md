@@ -5,6 +5,7 @@
 Owner decisions of 24 Nov applied in the tree:
 
 - **Licence:** root `LICENSE` is MIT for the project's own code, docs and original data. `THIRD_PARTY_NOTICES.md` lists the models, datasets and frameworks that keep their own licences (Llama 3.2 Community License, Apache-2.0 / MIT for Whisper, CC BY 4.0 and others for the datasets).
+- **Challenge page:** `docs/challenge-brief.md` was a verbatim scrape of Arm's challenge page, which is under the Arm Education EULA. It is now a short summary in our own words with a link to the page.
 - **Internal notes removed from the tree** and ignored in `.gitignore`: `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`, `research/BRIEF.md`, `research/INFRA_ISSUES.md`, `research/explain-quality-plan.md`.
 - **Local paths:** the absolute checkout path in `research/evals/*/summary.json` and `research/evals/ledger.jsonl` is now relative (`candidates/...`).
 - **Call Guard:** using Whisper for speech-to-text is allowed; the earlier "open question to the organisers" caveat is removed from the docs.
@@ -107,6 +108,7 @@ author/committer headers and the internal notes from older commits needs `git fi
 
 - **Identities:** maps the personal address, `rabesss@users.noreply.github.com` and the `rabess` spelling to `rabesss <26330469+rabesss@users.noreply.github.com>`.
 - **Paths removed from every commit:** `AGENTS.md`, `CLAUDE.md`, `docs/BRAINSTORM.md`, `docs/design/COMPETE.md`, `docs/design/RATING-r1.md`, `research/BRIEF.md`, `research/INFRA_ISSUES.md`, `research/QUESTIONS.md`, `research/explain-quality-plan.md`, `scratch/`.
+- **Challenge page copy:** every older version of `docs/challenge-brief.md` (a verbatim scrape of Arm's challenge page, whose terms do not allow public redistribution) is replaced with the current own-words summary.
 - **Text replaced in every blob and commit message:** absolute home-directory paths (made relative), the partly masked e-mail, the name of an unrelated local project, and the cloud box hostname.
 
 It changes every commit SHA. Open PRs, local branches and worktrees then point at the old history, and

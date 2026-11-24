@@ -5,7 +5,7 @@
 | UCI SMS Spam Collection | train/test (SMS) | CC BY 4.0 | https://archive.ics.uci.edu/dataset/228/sms+spam+collection |
 | Mendeley SMS Phishing Dataset (5,971 msgs) | train/test (SMS) | CC BY 4.0 | https://data.mendeley.com/datasets/f45bkkt8pr |
 | PhiUSIIL Phishing URL Dataset | train/test (URLs) | CC BY 4.0 | https://archive.ics.uci.edu/dataset/967 |
-| NSL-KDD | train/test (flows) | research use (UNB); not redistributed | https://www.unb.ca/cic/datasets/nsl.html |
+| NSL-KDD | train/test (flows) | redistribution allowed with citation (UNB CIC); not redistributed here | https://www.unb.ca/cic/datasets/nsl.html |
 | HF Indian Multilingual Scam Message Dataset (karanverma19) | seed rows in `train/indic_seed.jsonl` | Apache-2.0 | https://huggingface.co/datasets/karanverma19/Indian_Multilingual_Scam_Message_Dataset |
 | HF Hinglish & English Financial Scam/Fraud Text Dataset (bolewara) | seed rows in `train/indic_seed.jsonl` | CC BY 4.0 | https://huggingface.co/datasets/bolewara/hinglish-scam-text-dataset |
 | Indian-context synthetic messages | Project-generated Indian-context messages used in training/development and a separate synthetic generator run for evaluation; see split and generator documentation | original work (this project) | generated for this project |
