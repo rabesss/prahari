@@ -1285,22 +1285,23 @@ _V_SENDER_TRUST = re.compile(
     r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe)\b[^.;!?]{0,30}?"
     r"\b(?:number|sender|source|id|header|bank|caller)\b|"
     r"\b(?:number|sender|source|id|header)\b[^.;!?]{0,40}?\b(?:is|was|looks|seems|appears|can be|should be|must be)\b[^.;!?]{0,40}?"
-    r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe)\b|"
+    r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe|real)\b|"
     r"\b(?:trust\w*)\b[^.;!?]{0,20}\b(?:number|sender|source|caller|message)\b|"
-    r"\b(?:sent|came|comes|is|was) (?:directly |straight |really )?from (?:the|your|a real|the real|an official) bank\b", re.I)
+    r"\breal\s+(?:bank\s+)?(?:sender|number|bank|caller|id|source)\b|"
+    r"\b(?:sent|came|comes|is|was|it'?s) (?:directly |straight |really |right )?from (?:the|your|a real|the real|an official) bank\b", re.I)
 
 # The general rule itself ("Banks use registered sender IDs, not mobile numbers") is a paraphrase.
 _V_SENDER_RULE = re.compile(r"\b(?:banks?|government|govt|they)\b[\w\s]{0,30}?\bregistered sender ids?\b"
                             r"[\s,;-]{0,4}(?:and\s+|but\s+)?(?:not|never|instead of)\b(?:(?!\b(?:and|but|so|this|that|it|which|while|though)\b)[\w\s-]){0,30}", re.I)
 
 # Advice is exempt unless it points at this item's sender ("use this verified sender").
-_V_THIS_SENDER = re.compile(r"\b(?:this|the|that)\s+(?:\w+\s+)?(?:sender|number|caller|source|id|header)\b", re.I)
-_V_TRUST_WORD = re.compile(r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe)\b", re.I)
-_V_TRUST_NEG = re.compile(r"(?:\b(?:not|never|no|isn't|wasn't|aren't)\b|n't)\s+"
+_V_THIS_SENDER = re.compile(r"\b(?:this|the|that|it|a|an)\s+(?:\w+\s+){0,2}(?:sender|number|caller|source|id|header)\b", re.I)
+_V_TRUST_WORD = re.compile(r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe|real)\b", re.I)
+_V_TRUST_NEG = re.compile(r"(?:\b(?:not|never|isn't|wasn't|aren't)\b|\bno\b(?!\s+doubt)|n't)\s+"
                           r"(?:(?!(?:and|but|so|yet|or|while|though)\b)\w+\s+){0,3}$", re.I)
 
 
-_V_BANK_ORIGIN = re.compile(r"\b(?:sent|came|comes|is|was) (?:directly |straight |really )?from (?:the|your|a real|the real|an official) bank\b", re.I)
+_V_BANK_ORIGIN = re.compile(r"\b(?:sent|came|comes|is|was|it'?s) (?:directly |straight |really |right )?from (?:the|your|a real|the real|an official) bank\b", re.I)
 
 
 def _vouches(clause):

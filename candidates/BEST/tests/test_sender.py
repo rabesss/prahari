@@ -84,7 +84,7 @@ RAISE = [
     ("Your parcel is held at customs, pay Rs 49 at http://indiapost-fee.example", "identity"),
     ("प्रिय ग्राहक, आपका खाता बंद हो जाएगा, केवाईसी अपडेट करें", "request"),
     ("Aapka bijli connection aaj raat kat jayega, turant call karein", "identity"),
-    ("Dear customer your SBI KYC is expiring, update now or the account will be blocked", "request"),
+    ("Dear customer your SBI KYC is expiring, update now or the account will be blocked", "identity"),
 ]
 NO_RAISE = [
     "Papa I paid the bank EMI today, will call later",
@@ -396,3 +396,61 @@ def test_review_r2_grok_vouching(sent, bad):
 def test_call_note_needs_a_bank_not_any_card():
     assert sender.call_note("Your SIM card will be blocked, press 9") is None
     assert sender.call_note("This is HDFC Bank calling about your card") == sender.NOTE_1600
+
+
+# Round-3 review (gpt-6.1-terra) regressions.
+@pytest.mark.parametrize("text,why", [
+    ("Your SBI account has been debited Rs 5000", "alert"),
+    ("Please update KYC, I am from SBI", "request"),
+    ("KYC not completed, please update KYC immediately", "request"),
+    ("My account was debited Rs 500, txn was successful, thanks bhai", None),
+])
+def test_review_r3_reason_cases(text, why):
+    assert sender.reason("sms", text, MOBILE) == why
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("This is the real bank sender.", True),
+    ("This is not the real bank number.", False),
+])
+def test_review_r3_real_sender(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad
+
+
+# Round-3 review (Grok 4.7) regressions. Raising cases only assert that the item is raised.
+@pytest.mark.parametrize("text,raised", [
+    ("Rs.500.00 has been debited from your SBI account", True),
+    ("Your ICICI Bank account was debited for Rs 2500 on 24Nov", True),
+    ("The door code is 1234. Parcel aa gaya", False),
+    ("wifi password is 12345678, I'm at the SBI branch", False),
+    ("The door code is 1234. My KYC is pending, will do it tomorrow", False),
+    ("Dear madam, we spent the evening at home", False),
+    ("Dear sir, I spent 500 on groceries", False),
+    ("bhai spent 200, txn was smooth", False),
+    ("KYC update karo na", True),
+    ("Complete KYC today na", True),
+    ("Aadhaar link karo na", True),
+    ("Your KYC is not updated, complete it now", True),
+    ("Hi I am from SBI please complete your KYC now", True),
+    ("KYC update na karein, fraud hai", False),
+    ("Your HDFC account was accessed from a new device", True),
+    ("Alert: unusual transaction on your ICICI account", True),
+    ("Your parcel has been shipped via Delhivery", True),
+])
+def test_review_r3_grok_reason_cases(text, raised):
+    assert (sender.reason("sms", text, MOBILE) is not None) == raised
+
+
+@pytest.mark.parametrize("sent,bad", [
+    ("The sender is real.", True),
+    ("It's straight from the bank.", True),
+    ("Came right from the bank.", True),
+    ("The sender is no doubt verified.", True),
+    ("Please consider it a verified sender.", True),
+    ("Please trust it as an official sender.", True),
+    ("Verify it in the official app, not through this number.", False),
+])
+def test_review_r3_grok_vouching(sent, bad):
+    ctx = {"kind": "sms", "input": "x", "verdict": "uncertain", "fact": "", "evidence": [], "sender_raised": "alert"}
+    assert (llm.unsupported(sent, ctx) == "sender_contradiction") == bad

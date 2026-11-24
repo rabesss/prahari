@@ -92,29 +92,62 @@ _KYC_ASK = re.compile(
     r"\b(?:kyc|e-?kyc|pan|aadhaa?r)\b[^.;!?।\n]{0,30}\b(?:update|verify|complete|link|re-?submit|expire|"
     r"expired|pending|suspend\w*|block\w*|karein|karo|kare)\b|"
     r"\b(?:update|verify|complete|link)\b[^.;!?।\n]{0,20}\b(?:kyc|e-?kyc|pan|aadhaa?r)\b|"
+    r"\b(?:kyc|e-?kyc|pan|aadhaa?r)\b[^.;!?।\n]{0,20}\b(?:not (?:updated|completed|verified|linked)|incomplete)\b|"
     r"(?:केवाईसी|आधार|पैन)[^.;!?।\n]{0,30}(?:अपडेट|सत्यापित|लिंक|पूरा|बंद)", re.I)
 _REQUEST_HARM = {"secret_request", "id_request"}
 # Bank-alert markers: a masked account or card number, a balance, a transaction reference.
 _ALERT_MARK = re.compile(r"\b(?:a/?c|acct|account|card)\s*(?:no\.?\s*)?(?:ending\s*)?[x*]{2,}\s*\d{2,6}\b|"
                          r"\b[x*]{2,}\d{3,6}\b|\b(?:avl\.?|available)\s*bal|\b(?:txn|upi ref|ref no|utr)\b", re.I)
-_DEBIT = re.compile(r"\b(?:debited|credited|withdrawn|spent)\b", re.I)
+# A first-person or casual chat about the writer's own transaction is not an alert.
+_CHATTY = re.compile(r"\b(?:my|mine|i|i'm|i've|mera|meri|mere|maine|bhai|bhaiya|yaar|yar|bro|dude|thanks|thx|lol)\b|"
+                     r"मेरा|मेरी|मेरे|मैंने|भाई|यार", re.I)
+_DEBIT = re.compile(r"\b(?:debited|credited|withdrawn)\b", re.I)
 # An institution's notice to the reader: an action, deadline, hold or threat, not a chat.
 _NOTICE_CUE = re.compile(
     r"\b(?:block\w*|suspend\w*|deactivat\w*|disconnect\w*|expir\w*|freez\w*|frozen|terminat\w*|"
     r"held|on hold|pending|due|overdue|update|verify|verification|re-?kyc|link|pay|click|call|"
     r"penalty|fine|seized|cancel\w*|kat (?:jayega|jaega|jayegi)|band (?:ho|kar)\w*|turant|today|tonight|"
-    r"immediately|within \d+)\b|बंद|काट|रोक|तुरंत|आज|अपडेट|सत्यापित|भुगतान", re.I)
+    r"immediately|within \d+|now|accessed|new device|unusual|suspicious|logged in|shipped|dispatched|"
+    r"out for delivery)\b|बंद|काट|रोक|तुरंत|आज|अपडेट|सत्यापित|भुगतान", re.I)
 _CLAUSE = re.compile(r"[.!?।;\n]+")
-_KYC_NEG = re.compile(r"\b(?:never|not|no|don'?t|do not|doesn'?t|won'?t|kabhi|mat|nahi|nahin|na)\b|नहीं|मत|कभी|(?:^|\s)न(?:\s|$)", re.I)
-# The writer's own KYC ("my KYC is pending", "KYC kar diya") is news, not an ask.
-_KYC_OWN = re.compile(r"\b(?:my|mine|i|i'm|i've|mera|meri|mere|maine|hamara|humara)\b|मेरा|मेरी|मेरे|मैंने|हमारा|"
-                      r"\b(?:kar (?:diya|di|li|liya)|ho gaya|ho gayi|done|completed|updated)\b|कर दिया|हो गया", re.I)
+_SUBCLAUSE = re.compile(r"[.!?।;,\n]+")
+# Hinglish "na" negates only before the verb ("na karein"); "karo na" is a plea.
+_KYC_NEG = re.compile(r"\b(?:never|not|don'?t|do not|doesn'?t|won'?t|kabhi|mat|nahi|nahin)\b|\bno\b(?!\s+doubt)|"
+                      r"\bna\s+kar\w*|नहीं|मत|कभी|(?:^|\s)न(?:\s|$)", re.I)
+# The writer's own KYC ("my KYC is pending", "KYC kar diya", "मेरा केवाईसी") is news, not an ask.
+_KYC_OWN = re.compile(r"\b(?:my|mera|meri|mere|hamara|humara|our)\s+(?:\w+\s+)?(?:kyc|e-?kyc|pan|aadhaa?r)\b|"
+                      r"(?:मेरा|मेरी|मेरे|हमारा)\s*(?:\S+\s+)?(?:केवाईसी|पैन|आधार)", re.I)
+_CODE = re.compile(r"\b(?:code|password|passcode|pin)\b", re.I)
+
+
+def _code_for_institution(t):
+    """A code or password named for a bank or service in the same sub-clause ("code ... for SBI
+    login"), not a door or wifi code next to an unrelated mention."""
+    return any(_CODE.search(c) and _INSTITUTION.search(c) and not _CHATTY.search(c) for c in _SUBCLAUSE.split(t))
+
+
+_KYC_DONE = re.compile(r"\b(?:kar (?:diya|di|li|liya)|ho gaya|ho gayi|is done|done|completed|updated)\b|कर दिया|हो गया", re.I)
 
 
 def _kyc_ask(t):
-    """A KYC/PAN/Aadhaar update ask aimed at the reader, in a clause with no negation."""
-    return any(_KYC_ASK.search(c) and not _KYC_NEG.search(c) and not _KYC_OWN.search(c)
-               for c in _CLAUSE.split(t))
+    """A KYC/PAN/Aadhaar update ask aimed at the reader.
+
+    Checked per sub-clause: a negation right before the ask ("never ask you to update KYC"), the
+    writer's own KYC, or a done update ("KYC kar diya", but not "KYC not completed") is no ask.
+    """
+    for c in _SUBCLAUSE.split(t):
+        m = _KYC_ASK.search(c)
+        if not m or _KYC_OWN.search(c):
+            continue
+        if _KYC_NEG.search(c[max(0, m.start() - 25):m.start()]) or _KYC_NEG.search(m.group(0)):
+            continue
+        done = _KYC_DONE.search(c)
+        if done and not _KYC_NEG.search(c[max(0, done.start() - 8):done.start()]):
+            continue
+        return True
+    return False
+
+
 _OTP_WORD = re.compile(r"\b(?:otp|one[- ]time (?:password|code|pin)|verification code|login code|security code)\b|ओटीपी", re.I)
 
 
@@ -135,8 +168,10 @@ def reason(kind, text, sender):
     harm = {n for n, _ in a["harm"]}
     t = a["text"]
     # The OTP word itself is required: mech's OTP-note reading also covers "the door code is 1234".
-    if (a["otp_note"] and (_OTP_WORD.search(t) or _INSTITUTION.search(t))) or \
-            ((a["receipt"] or _DEBIT.search(t)) and (_ALERT_MARK.search(t) or _DEAR.search(t))):
+    if (a["otp_note"] and (_OTP_WORD.search(t) or _code_for_institution(t))) or (
+            (a["receipt"] or _DEBIT.search(t)) and not _CHATTY.search(t) and (
+                _ALERT_MARK.search(t) or _DEAR.search(t) or
+                (_DEBIT.search(t) and _YOUR_ACCOUNT.search(t) and _INSTITUTION.search(t)))):
         return "alert"
     if harm & _REQUEST_HARM or _kyc_ask(t):
         return "request"
