@@ -13,3 +13,16 @@ candidates/*/artifacts/*.joblib
 !candidates/indic1/artifacts/*.joblib
 
 # Final report PDF (docs/phase1/report.pdf) is tracked so judges see it directly in the public repo.
+
+# Local-only agent and planning notes; never publish
+/AGENTS.md
+/CLAUDE.md
+**/CLAUDE.md
+.claude/
+.agents/
+.codex/
+docs/BRAINSTORM.md
+research/QUESTIONS.md
+research/BRIEF.md
+research/INFRA_ISSUES.md
+research/explain-quality-plan.md

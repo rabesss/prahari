@@ -12,7 +12,7 @@ Primary source: the official page https://arm-education.github.io/Arm-Developer-
 - Five problem statements. **One winner per problem statement**, chosen "after the final live virtual demo and jury Q&A". Students
   and professionals "compete on equal terms". [S] "Winner selection is at the sole discretion of the challenge organisers." [S]
 - The entry: the owner, solo (teams of 1-3 are allowed [S]), registered for **PS3** before registration closed on 19 Oct 2026. [S per
-  docs/BRAINSTORM.md] A change of challenge area was allowed only within 15 days of registration, so PS3 is effectively fixed. [I]
+  the registration confirmation] A change of challenge area was allowed only within 15 days of registration, so PS3 is effectively fixed. [I]
 
 ## 2. Timeline (dates only; no cutoff hour or timezone is published [U])
 | Date | Event |
@@ -80,7 +80,7 @@ No extension or deadline change was found after 23 Oct (none found, not proof of
 ## 7. Round-3 proxy and limitations [I]
 
 Round 3 uses `100 × (0.30 D + 0.30 I + 0.25 E + 0.15 P)` with C as a
-fail-closed gate; `research/BRIEF.md` defines the components and promotion gates.
+fail-closed gate; `eval/run_eval.py`, `eval/proxy_v3.py` and `eval/compare_v3.py` define the components and promotion gates.
 Every run has sanity caps of 10.0 s/item and 3.0 GB process-tree peak RSS; missing
 measurements and timeouts fail. In the same interleaved comparison, the candidate's
 median latency must be at most 110% and its median RSS at most 105% of BEST's median
