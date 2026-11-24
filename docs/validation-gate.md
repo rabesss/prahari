@@ -50,3 +50,24 @@ hash does not match fails the gate, and so does a set the baseline scored that i
 
 The explanation audit (20 blind items rated correct / weak / wrong, `research/explain-audit.md`) needs
 Llama and a judge model, so it is not part of this command.
+
+## First use (PR #65, base `89d4e97` → head `75993f1`)
+
+FPR / recall / F1; `uncertain` counts as an error.
+
+| Set | n | before | after |
+|---|---|---|---|
+| fp_val_v1 (blind) | 240 | 0.120 / 1.000 / 0.909 | **0.107** / 1.000 / 0.918 |
+| v4_test (held-back) | 79 | 0.298 / 0.969 / 0.805 | 0.298 / 0.969 / 0.805 |
+| v3_test (held-back) | 81 | 0.000 / 0.941 / 0.970 | 0.000 / 0.941 / 0.970 |
+| v4_tune | 161 | 0.172 / 0.926 / 0.857 | **0.161** / 0.926 / 0.863 |
+| stress_r4_sms | 58 | 0.043 / 1.000 / 0.986 | **0.000** / 1.000 / 1.000 |
+| sealed_v1_1 (scored once per candidate) | 184 | 0.310 / 0.929 / 0.808 | **0.300** / 0.929 / 0.812 |
+| sealed, SMS route | 155 | 0.333 / 0.926 / 0.787 | **0.322** / 0.926 / 0.792 |
+| india_dev_v2, v3_tune, other stress suites, r4_injection | | unchanged | unchanged |
+
+Explanation audit (the 20 audit-3 items from `research/explain-audit.md`, blind A/B, gpt-6.1-terra
+xhigh judge, same rubric): correct / weak / wrong **8 / 2 / 10 → 9 / 4 / 7**, false input claims
+9 → 6, detector evidence judged false 5 → 2. All three gains come from the reserved-domain wording
+(the old line was false and cut off mid-word). Every audit item uses `.example` links, which real SMS
+never do, so this overstates the real-world gain. These items had been judged before (audit 3).
