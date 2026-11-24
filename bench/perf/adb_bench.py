@@ -487,7 +487,8 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
     prior = src / "results.json"
     if prior.is_file():
         try:
-            recorded = {c["check"]: c.get("status", "unknown") for c in json.loads(prior.read_text()).get("checks", [])}
+            # Only explicit statuses count; rows from older reports without one are judged from their XML.
+            recorded = {c["check"]: c["status"] for c in json.loads(prior.read_text()).get("checks", []) if c.get("status")}
         except (ValueError, KeyError, TypeError):
             recorded = {}
     rows = []
@@ -504,7 +505,7 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
     seen = {r["check"] for r in rows}
     for name, status in recorded.items():
         if name not in seen:
-            rows.append({"check": name, "status": status or "unknown", "airplane_mode": "airplane" in name.lower(),
+            rows.append({"check": name, "status": status, "airplane_mode": "airplane" in name.lower(),
                          "detector_ms": None, "first_token_ms": None, "decode_tps": None, "total_s": None,
                          "app_memory_mb": None, "mem_polled": {}})
     report = summarize_android(dev, rows, mem, source_note=f"Parsed UI XML artifacts from {src}", chronological=False)

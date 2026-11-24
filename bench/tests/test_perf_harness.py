@@ -418,14 +418,15 @@ def test_parse_dir_keeps_recorded_timeout_status(tmp_path):
     (cap / "kyc-warm-2-stats.xml").write_text(done_xml, encoding="utf-8")  # late values, but recorded as timeout
     (cap / "results.json").write_text(json.dumps({"checks": [
         {"check": "kyc-warm-1", "status": "ok"}, {"check": "kyc-warm-2", "status": "timeout"},
-        {"check": "port-scan", "status": "no-sample-chip"}]}))
+        {"check": "port-scan", "status": "no-sample-chip"}, {"check": "kyc-legacy"}]}))
+    (cap / "kyc-legacy-stats.xml").write_text(done_xml, encoding="utf-8")  # older report row without status
     (cap / "home-stats.xml").write_text((run8 / "home.xml").read_text(encoding="utf-8"), encoding="utf-8")
     out = tmp_path / "out"
     assert adb_bench.main(["parse-dir", str(cap), "--out-dir", str(out)]) == 0
     rep = json.loads((out / "results.json").read_text(encoding="utf-8"))
     status = {c["check"]: c["status"] for c in rep["checks"]}
     assert status == {"kyc-warm-1": "ok", "kyc-warm-2": "timeout", "home": "incomplete-capture",
-                      "port-scan": "no-sample-chip"}
+                      "port-scan": "no-sample-chip", "kyc-legacy": "ok"}
     assert sorted(rep["summary"]["checks_incomplete"]) == ["home", "kyc-warm-2", "port-scan"]
     assert "status" in (out / "items.csv").read_text(encoding="utf-8").splitlines()[0]
 
