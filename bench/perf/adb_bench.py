@@ -55,8 +55,8 @@ DEFAULT_SAMPLES = [
     ("kyc-airplane", "KYC scam SMS", True),
 ]
 
-# Short matrix for the gating session (docs/perf/s23-rtl-runbook.md §5): two flagged and two NO RISK
-# items after a cold check, run once per gating mode, so the pair fits one short RTL reservation.
+# Short matrix for the gating session (docs/perf/s23-rtl-runbook.md §5): KYC cold, KYC warm ×2 and a
+# lookalike link (flagged) plus two NO RISK items, run once per gating mode, so the pair fits one short RTL reservation.
 GATING_SAMPLES = [
     ("kyc-cold", "KYC scam SMS", False),
     ("kyc-warm-1", "KYC scam SMS", False),

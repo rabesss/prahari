@@ -38,7 +38,7 @@ Reported transparently so judges see measured headroom without overstating what 
 
 1. **Cross-request prompt / KV-cache prefix caching:** **Deliberately disabled.** Both Linux
    (`self.runner.reset()` in `triage/llm.py:575`) and Android (`module.resetContext()` in
-   `MainActivity.kt:456`) clear KV state before every single check. Because inputs are untrusted
+   `Runner.generate` in `MainActivity.kt`, before and after every generate) clear KV state before every single check. Because inputs are untrusted
    SMS/URL strings that may contain prompt-injection attempts, resetting context per item prevents
    cross-message contamination at a small cost (~24 system-prompt tokens ≈ `~32 ms` of prefill at the measured
    751 tok/s on V2 8T, ≈ `~110 ms` at 221.6 tok/s on V2 2T; S23 prefill speed is now logged by the app per check but not yet measured on the phone).

@@ -31,6 +31,9 @@ UNINSTALL_ON_EXIT="${UNINSTALL_ON_EXIT:-1}"
 GATING_MODE="${GATING_MODE:-all}"
 SAMPLES="${SAMPLES:-default}"
 DEADLINE_S="${DEADLINE_S:-0}"
+# RUN_UNTIL: wall-clock end of the run step (e.g. RUN_UNTIL="$(date -d '+18 min' +%s)" when the session
+# starts). Overrides DEADLINE_S once staging is done, keeping 60 s for a check already running.
+RUN_UNTIL="${RUN_UNTIL:-}"
 WITH_AIRPLANE="${WITH_AIRPLANE:-1}"
 
 if [[ -z "$SERIAL" ]]; then
@@ -91,6 +94,14 @@ adb -s "$SERIAL" shell sha256sum \
   /sdcard/Android/data/in.prahari.app/files/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte \
   /sdcard/Android/data/in.prahari.app/files/tokenizer.model > "$OUT_DIR/device-sha256.txt"
 
+if [[ -n "$RUN_UNTIL" ]]; then
+  DEADLINE_S=$(( RUN_UNTIL - $(date +%s) - 60 ))
+  if (( DEADLINE_S < 30 )); then
+    echo "ERROR: RUN_UNTIL leaves ${DEADLINE_S}s after staging; not starting checks." >&2
+    exit 3
+  fi
+  echo "Deadline from RUN_UNTIL: ${DEADLINE_S}s"
+fi
 echo "=== Step 4/5: Run timed checks ($SAMPLES samples, gating $GATING_MODE) ==="
 # Exit code 2 means some checks timed out or were skipped; keep going so logs are still captured.
 RUN_RC=0

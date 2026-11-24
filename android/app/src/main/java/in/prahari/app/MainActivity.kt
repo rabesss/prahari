@@ -2992,7 +2992,7 @@ class MainActivity : Activity() {
         val gateRow = row().apply { pad(this, 0, 11, 0, 11); minimumHeight = dp(48) }
         val gateText = col()
         add(gateText, txt("Explain NO RISK results with Llama", 15f, T.ink, 600, 20))
-        add(gateText, txt("Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS and SUSPICIOUS results always use Llama.", 13f, T.ink2, 400, 18), top = 2)
+        add(gateText, txt("Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.", 13f, T.ink2, 400, 18), top = 2)
         add(gateRow, gateText, 0, -2, weight = 1f)
         val gateSwitch = Switch(this).apply {
             isChecked = Bridge.explainCleared

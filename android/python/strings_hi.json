@@ -232,7 +232,6 @@
   "Llama's reply did not pass the checks, so this is the detector's fixed text.": "Llama का जवाब जांच में पास नहीं हुआ, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
   "Fixed text from the detector, not written by AI.": "यह डिटेक्टर का तय टेक्स्ट है, AI ने नहीं लिखा।",
   "Explain NO RISK results with Llama": "‘कोई खतरा नहीं मिला’ पर भी Llama से समझाएं",
-  "Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS and SUSPICIOUS results always use Llama.": "बंद हो तो ‘कोई खतरा नहीं मिला’ वाले नतीजों में डिटेक्टर का तय टेक्स्ट दिखता है और Llama नहीं चलता, इसलिए नतीजा जल्दी आता है। खतरनाक और संदिग्ध नतीजों में Llama हमेशा चलता है।",
   "Prompt tokens": "प्रॉम्प्ट टोकन",
   "Prefill": "प्रीफ़िल",
   "Prefill speed": "प्रीफ़िल रफ़्तार",
@@ -240,7 +239,8 @@
   "Llama skipped": "Llama नहीं चला",
   "Fixed text from the detector. Llama was not used.": "डिटेक्टर का तय टेक्स्ट। Llama का इस्तेमाल नहीं हुआ।",
   "Llama is skipped for NO RISK results so they finish faster. Turn it on in About.": "‘कोई खतरा नहीं मिला’ वाले नतीजों पर Llama नहीं चलता, ताकि नतीजा जल्दी आए। इसे ‘Prahari के बारे में’ में चालू करें।",
-  "Detector text": "डिटेक्टर टेक्स्ट"
+  "Detector text": "डिटेक्टर टेक्स्ट",
+  "Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.": "बंद हो तो ‘कोई खतरा नहीं मिला’ वाले नतीजों में डिटेक्टर का तय टेक्स्ट दिखता है और Llama नहीं चलता, इसलिए नतीजा जल्दी आता है। खतरनाक, संदिग्ध और ‘अलर्ट जांचें’ वाले नतीजों में Llama हमेशा चलता है।"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
