@@ -93,66 +93,23 @@ Owner decisions of 24 Nov applied in the tree:
 | **C1** | **HIGH (tree fixed)** | `docs/design/COMPETE.md`, `docs/design/RATING-r1.md` (added in commit `ef1e619`, PR #43) | Detailed competitive intelligence teardown naming 13 rival Bharat AI-SoC PS3 entries, their GitHub URLs, and 25 local `/var/tmp/...` paths (`bharat-intel`, `prahari-rivals`, `prahari-compete`). | Removed from the tree on `docs/phase1-final` (`git rm`); still in history, so optionally purge (commands in §5). |
 | **P1** | **MEDIUM** | Commit `721209c7bf8e2b17714010f2078a169a317655e7` (author & committer headers) | Personal Gmail address address appears in the initial hillclimb setup commit; all other 176 commits use GitHub noreply or tool emails. | Optional: rewrite author/committer email to `26330469+rabesss@users.noreply.github.com` before going public (§5). |
 | **C2** | **MEDIUM (tree fixed)** | `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`, `research/BRIEF.md` | Internal agent orchestration and planning notes, with personal context, unrelated local projects and internal host names. | Removed from the tree on `chore/public-release-cleanup`; history purge is part of the prepared rewrite. |
-| **P2** | **LOW** | `research/evals/*/summary.json` (95 files) | Recorded the absolute local checkout path, including the OS username (no secrets). | Acceptable if first name is already public on the submission; otherwise sanitize `~/` -> `<workspace>/` or archive `research/evals/` outside the public repo. |
+| **P2** | **LOW (tree fixed)** | `research/evals/*/summary.json` (94 files), `research/evals/ledger.jsonl` | Recorded the absolute local checkout path, including the OS username (no secrets). | Relativised to `candidates/...` in the tree; older commits are covered by the prepared rewrite. Future `bin/eval` runs still write absolute paths, so relativise new summaries before publishing them. |
 | **C3** | **LOW** | `candidates/BEST_prev_*`, `candidates/gen2`, `candidates/gen7`, `candidates/gen11`, `candidates/indic1` | 8 superseded candidate directories (~5 MB, including a duplicate 1.9 MB `indic1/artifacts/url.joblib`). | Optional cleanup after final freeze; confirm `bench/` and `eval/` tests do not reference them before removing. |
 | **C4** | **LOW** | `models/registry.json`, `candidates/BEST/tests/read_explain.py`, `eval/*.py`, `bench/audit_push.py` | Contains `/var/tmp/arm-bharat-ai-soc-*` measurement-host paths. | Already documented in `README.md`; harmless for public visibility. |
 
 ---
 
-## 5. Exact remediation commands (for owner — run ONLY after all PRs merge and before making repo public)
+## 5. History rewrite (prepared as a dry run; the owner confirms before anything is pushed)
 
-> **Warning:** History rewriting (`git filter-repo`) changes commit SHAs and invalidates open PRs and local worktrees. Run **tree-only cleanup** if you do not need to scrub history, OR run **history rewrite once** on a fresh mirror clone right after the final `main` merge and before switching repository visibility to Public.
+The tree cleanup above does not change older commits. Removing the personal e-mail from one early commit's
+author/committer headers and the internal notes from older commits needs `git filter-repo` on a fresh
+`--mirror` clone, then a force-push. The rewrite does the following:
 
-### Option A — Tree-only cleanup (no history rewrite; fastest and safest)
+- **Identities:** maps the personal address, `rabesss@users.noreply.github.com` and the `rabess` spelling to `rabesss <26330469+rabesss@users.noreply.github.com>`.
+- **Paths removed from every commit:** `AGENTS.md`, `CLAUDE.md`, `docs/BRAINSTORM.md`, `docs/design/COMPETE.md`, `docs/design/RATING-r1.md`, `research/BRIEF.md`, `research/INFRA_ISSUES.md`, `research/QUESTIONS.md`, `research/explain-quality-plan.md`, `scratch/`.
+- **Text replaced in every blob and commit message:** absolute home-directory paths (made relative), the partly masked e-mail, the name of an unrelated local project, and the cloud box hostname.
 
-```sh
-# From main after all parallel feature PRs have merged:
-git checkout main && git pull --ff-only
-# (docs/design/COMPETE.md and RATING-r1.md are already removed by the docs/phase1-final PR)
-# Optional: also remove internal scratch/orchestration notes if not needed by judges
-# git rm AGENTS.md docs/BRAINSTORM.md research/QUESTIONS.md
-
-# Add your chosen root LICENSE file (e.g., MIT or Apache-2.0), then commit:
-git commit -m "chore: remove internal competitive/design scratch files before public release"
-```
-
-### Option B — Full history scrub (removes rival dossier AND replaces personal Gmail in `721209c7bf`)
-
-Requires `git-filter-repo` (`pip install git-filter-repo` or OS package). Run on a **fresh bare/mirror clone** outside your active worktrees:
-
-```sh
-# 1. Create a fresh mirror backup first
-mkdir -p /var/tmp/prahari-public-scrub
-git clone --mirror https://github.com/rabesss/arm-bharat-ai-soc.git /var/tmp/prahari-public-scrub/repo.git
-cp -a /var/tmp/prahari-public-scrub/repo.git /var/tmp/prahari-public-scrub/repo-backup.git
-
-cd /var/tmp/prahari-public-scrub/repo.git
-
-# 2. Prepare mailmap to replace personal Gmail in commit 721209c7bf
-# Replace <PERSONAL_EMAIL> with the address shown by: git show -s --format='%ae' 721209c7bf
-cat > /var/tmp/prahari-public-scrub/mailmap <<'EOF'
-rabesss <26330469+rabesss@users.noreply.github.com> <PERSONAL_EMAIL>
-EOF
-
-# 3. Scrub rival intelligence files + rewrite author/committer email
-git filter-repo \
-  --mailmap /var/tmp/prahari-public-scrub/mailmap \
-  --invert-paths \
-  --path docs/design/COMPETE.md \
-  --path docs/design/RATING-r1.md
-
-# Optional: if you also want to remove AGENTS.md / docs/BRAINSTORM.md / research/QUESTIONS.md from history,
-# add --path AGENTS.md --path docs/BRAINSTORM.md --path research/QUESTIONS.md above.
-
-# 4. Verify zero occurrences remain before force-pushing
-git log --all --format='%an <%ae>' | sort -u
-git log --all --stat -- docs/design/COMPETE.md docs/design/RATING-r1.md
-gitleaks detect --source . --no-banner --redact
-
-# 5. Force-push rewritten history (re-add origin since filter-repo strips it)
-git remote add origin https://github.com/rabesss/arm-bharat-ai-soc.git
-git push --force --all origin
-git push --force --tags origin
-```
-
-> **GitHub note after Option B:** Historical commits may remain cached briefly in merged PR diffs on GitHub until GitHub support clears unreachable commits or the public release is pushed to a fresh public repo. If completely clean public history is desired without GitHub PR cache residue, creating a fresh public repository (or force-pushing an orphan squash commit to a release branch) avoids PR-diff caching entirely — confirm the submitted GitHub URL matches the competition form.
+It changes every commit SHA. Open PRs, local branches and worktrees then point at the old history, and
+GitHub keeps the old commits reachable through `refs/pull/*` until GitHub Support purges them, or until
+the public release uses a fresh repository. The exact commands, the verification scans and the
+force-push command are in the cleanup PR's report to the owner. Nothing has been force-pushed.
