@@ -61,15 +61,21 @@ def test_official_domains_never_flagged(reg):
         assert "typosquat" not in names and "brand_lookalike" not in names and "official_domain" in names
         assert not mech.host_risk(host) and indicrules.host_risk(host) is None
     for host in ("login." + reg, "netbanking.secure." + reg):
+        # Terra on #70 (round 2): subdomains of listed domains stay official in every rule.
         assert typosquat.match(host) is None
-        assert "typosquat" not in [n for n, _ in rules.url_indicators("https://" + host + "/")]
+        names = [n for n, _ in rules.url_indicators("https://" + host + "/")]
+        assert "typosquat" not in names and "brand_lookalike" not in names and "official_domain" in names
+        assert not mech.host_risk(host) and indicrules.host_risk(host) is None
 
 
 def test_unrelated_official_subdomain_does_not_clear_a_phish():
     # Terra on #70: a deeper subdomain of a listed courier must not clear an OTP phish naming SBI.
     assert detect.predict_text(["SBI customer, enter OTP at https://sbi-login.ecomexpress.in/verify"])[0][0] != 0
     assert not typosquat.is_listed_site("sbi-login.ecomexpress.in")
-    assert typosquat.is_listed_site("www.irctc.com") and typosquat.is_listed_site("myvi.in")
+    assert not typosquat.is_listed_site("amazon-refund.delhivery.com")
+    for host in ("www.irctc.com", "myvi.in", "login.irctc.com", "customer.bhimupi.org.in", "help.cred.club",
+                 "retail.onlinesbi.sbi", "sbi.co.in", "pay.paytm.com"):
+        assert typosquat.is_listed_site(host), host
 
 
 def test_distance():

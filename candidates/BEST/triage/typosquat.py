@@ -116,13 +116,27 @@ def is_official(host):
     return host.endswith(RESTRICTED) or any(host == d or host.endswith("." + d) for d in OFFICIAL)
 
 
+# Brands a subdomain may name to borrow another organisation's trust (with STEMS).
+OTHER_BRANDS = ("amazon", "flipkart", "google", "gpay", "apple", "microsoft", "paypal", "netflix",
+                "fedex", "dhl", "whatsapp", "icici", "axis", "kotak", "canara", "baroda", "union")
+
+
 def is_listed_site(host):
-    """The bare official domain or its www host. The other rules count only these as official:
-    a deeper subdomain of an unrelated organisation ("sbi-login.ecomexpress.in") must not clear a
-    message that imitates a bank."""
+    """A listed official domain or a subdomain of one, as the other rules should treat it.
+
+    A subdomain whose own labels name a different brand ("sbi-login.ecomexpress.in": SBI on a
+    courier's domain) is not counted: an unrelated organisation's domain must not clear a message
+    that imitates a bank. "login.irctc.com" and "help.cred.club" are official."""
     host = host.lower().strip(".")
-    host = host[4:] if host.startswith("www.") else host
-    return host in OFFICIAL
+    for reg in OFFICIAL:
+        if host == reg:
+            return True
+        if host.endswith("." + reg):
+            prefix = host[:-len(reg) - 1]
+            own = reg.split(".")[0]
+            others = [b for b in (*STEMS, *OTHER_BRANDS) if STEMS.get(b) != reg and b not in own]
+            return not any(b in prefix for b in others)
+    return False
 
 
 def distance(a, b, cap=3, sub_cost=1):
