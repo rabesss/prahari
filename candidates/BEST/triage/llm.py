@@ -409,6 +409,10 @@ def benign_evidence(kind, inp, evidence, verdict):
     return kept if kept or not mech.indic_context(inp) else _safe_evidence(a, inp)[:5]
 
 
+_POLICE = re.compile(r"\b(police|cbi|ncb|narcotics|court|arrest|warrant|fir|cyber ?cell|crime branch|ed officer|"
+                     r"enforcement directorate|पुलिस|गिरफ्तार)", re.I)
+
+
 def scam_type(kind, inp, verdict):
     """A short, human scam-type phrase derived from the same rules the detector used."""
     if verdict == 0:
@@ -442,6 +446,13 @@ def scam_type(kind, inp, verdict):
         # The most specific mechanism names the scam: a fake-police call that also asks for a
         # transfer to a safe account is a safe-account scam, and a customs parcel fee is an
         # advance-fee scam, not a police threat.
+        # A parcel or customs fee demanded by message, with no police, court or arrest wording, is an
+        # advance-fee scam: the reader should not see "hang up, there is no digital arrest" steps.
+        if "authority_threat" in found and (a.get("fee") or "pay_unverified" in found) and \
+                not _POLICE.search(inp or "") and \
+                not found & {"sextortion", "extortion", "safe_account", "remote_access", "collect_request",
+                             "qr_payment", "pay_to_receive"}:
+            return "an advance-fee scam"
         for n in TYPE_PRIORITY:
             if n in found:
                 return MECH_TYPE[n]

@@ -523,7 +523,8 @@ CHECK_BUTTON_DESC = "Check on this phone"
 _STATS_DESC_RE = re.compile(r'content-desc="On-device stats, (?:collapsed|expanded)\. ([^"]*?) · ([^"]*)"')
 
 
-_SAMPLE_CHIP_RE = re.compile(r'<node\b[^>]*content-desc="[^"]*, (?:SMS|Link|Network) sample"[^>]*>')
+# Sample chips are labelled "<name>, SMS sample" in older builds and "<name>, SMS" in the round-3 app.
+_SAMPLE_CHIP_RE = re.compile(r'<node\b[^>]*content-desc="[^"]*, (?:SMS|Link|Network)(?: sample)?"[^>]*>')
 
 
 def sample_row_y(xml_text: str) -> int | None:
