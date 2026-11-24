@@ -240,7 +240,8 @@
   "Fixed text from the detector. Llama was not used.": "डिटेक्टर का तय टेक्स्ट। Llama का इस्तेमाल नहीं हुआ।",
   "Llama is skipped for NO RISK results so they finish faster. Turn it on in About.": "‘कोई खतरा नहीं मिला’ वाले नतीजों पर Llama नहीं चलता, ताकि नतीजा जल्दी आए। इसे ‘Prahari के बारे में’ में चालू करें।",
   "Detector text": "डिटेक्टर टेक्स्ट",
-  "Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.": "बंद हो तो ‘कोई खतरा नहीं मिला’ वाले नतीजों में डिटेक्टर का तय टेक्स्ट दिखता है और Llama नहीं चलता, इसलिए नतीजा जल्दी आता है। खतरनाक, संदिग्ध और ‘अलर्ट जांचें’ वाले नतीजों में Llama हमेशा चलता है।"
+  "Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.": "बंद हो तो ‘कोई खतरा नहीं मिला’ वाले नतीजों में डिटेक्टर का तय टेक्स्ट दिखता है और Llama नहीं चलता, इसलिए नतीजा जल्दी आता है। खतरनाक, संदिग्ध और ‘अलर्ट जांचें’ वाले नतीजों में Llama हमेशा चलता है।",
+  "App file": "ऐप फ़ाइल"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
@@ -611,6 +612,34 @@
   "detector_english": {
    "en": "Fixed detector text, in English. Not written by AI.",
    "hi": "डिटेक्टर का तय टेक्स्ट, अंग्रेज़ी में। इसे AI ने नहीं लिखा।"
+  },
+  "apk_check": {
+   "en": "Check an app file (.apk)",
+   "hi": "ऐप फ़ाइल (.apk) जाँचें"
+  },
+  "apk_check_sub": {
+   "en": "Reads its details only. Never installs it.",
+   "hi": "सिर्फ़ जानकारी पढ़ता है, इंस्टॉल कभी नहीं करता।"
+  },
+  "apk_reading": {
+   "en": "Reading the app file…",
+   "hi": "ऐप फ़ाइल पढ़ी जा रही है…"
+  },
+  "apk_fail": {
+   "en": "Couldn't read this as an Android app file.",
+   "hi": "इसे Android ऐप फ़ाइल की तरह नहीं पढ़ पाए।"
+  },
+  "apk_big": {
+   "en": "This app file is too big to check (over 200 MB).",
+   "hi": "यह ऐप फ़ाइल जाँचने के लिए बहुत बड़ी है (200 MB से ज़्यादा)।"
+  },
+  "apk_denied": {
+   "en": "Prahari was not allowed to open this file. Share it again, or pick it with Check an app file.",
+   "hi": "प्रहरी को यह फ़ाइल खोलने की अनुमति नहीं मिली। इसे फिर से शेयर करें, या \"ऐप फ़ाइल जाँचें\" से चुनें।"
+  },
+  "apk_note": {
+   "en": "Prahari reads only the file's details: name, permissions and signature. It never installs or opens the app, and it does not check the app's code.",
+   "hi": "प्रहरी सिर्फ़ फ़ाइल की जानकारी पढ़ता है: नाम, अनुमतियाँ और सिग्नेचर। यह ऐप को कभी इंस्टॉल नहीं करता, खोलता नहीं, और उसका कोड नहीं जाँचता।"
   }
  },
  "templates": [

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic test manifest (not a real app): an ordinary calculator. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.calculator">
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <application android:label="Calculator">
+        <activity android:name=".Main" android:exported="true"/>
+    </application>
+</manifest>

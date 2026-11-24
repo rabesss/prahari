@@ -18,6 +18,12 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="text/plain"/>
             </intent-filter>
+            <!-- A shared app file is inspected (ApkInspector.kt), never installed. The sender's read grant is enough. -->
+            <intent-filter android:label="Check app file with Prahari">
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/vnd.android.package-archive"/>
+            </intent-filter>
             <intent-filter android:label="Check with Prahari">
                 <action android:name="android.intent.action.PROCESS_TEXT"/>
                 <category android:name="android.intent.category.DEFAULT"/>
