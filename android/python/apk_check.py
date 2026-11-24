@@ -126,18 +126,19 @@ SCORE = {1: 0.9, 'uncertain': 0.5, 0: 0.05}
 # Bank, UPI and government names. A prefix entry also matches a run-on token ("sbirewards",
 # "pmkisanyojana"); the others need a whole word, since "axis", "bob" or "rto" are common inside
 # other words. Matched against the label, package and file name after splitting on dots,
-# underscores, dashes and camelCase.
+# underscores, dashes and camelCase, so a camelCase name ("PhonePe" -> "phone pe") needs its spaced
+# form in the pattern too.
 _BRANDS = [
     ('SBI', r'\bsbi|\bstate bank\b'), ('YONO', r'\byono'), ('HDFC', r'\bhdfc'), ('ICICI', r'\bicici'),
     ('Axis Bank', r'\baxis ?bank\b'), ('Kotak', r'\bkotak\b'), ('PNB', r'\bpnb\b|\bpunjab national\b'),
     ('Canara Bank', r'\bcanara\b'), ('Bank of Baroda', r'\bbank of baroda\b|\bbob ?world\b|\bbaroda\b'),
-    ('Union Bank', r'\bunion bank\b'), ('IDBI', r'\bidbi\b'), ('IndusInd', r'\bindusind'),
-    ('Paytm', r'\bpaytm'), ('PhonePe', r'\bphonepe'), ('Google Pay', r'\bgoogle ?pay\b|\bgpay\b'),
+    ('Union Bank', r'\bunion bank\b'), ('IDBI', r'\bidbi\b'), ('IndusInd', r'\bindus ?ind'),
+    ('Paytm', r'\bpay ?tm'), ('PhonePe', r'\bphone ?pe'), ('Google Pay', r'\bgoogle ?pay\b|\bgpay\b'),
     ('BHIM', r'\bbhim\b'), ('NPCI', r'\bnpci\b'), ('UPI', r'\bupi\b'),
     ('RBI', r'\brbi\b|\breserve bank\b'), ('Aadhaar', r'\baadhaa?r|\buidai|आधार'),
     ('Income Tax', r'\bincome ?tax\b|आयकर'), ('GST', r'\bgst\b'), ('EPFO', r'\bepfo'),
     ('PM Kisan', r'\bpm ?kisan|किसान'), ('RTO', r'\brto\b|\bparivahan|\be ?challan|\bchallan\b|चालान'),
-    ('DigiLocker', r'\bdigilocker'), ('UMANG', r'\bumang\b'), ('India Post', r'\bindia ?post\b'),
+    ('DigiLocker', r'\bdigi ?locker'), ('UMANG', r'\bumang\b'), ('India Post', r'\bindia ?post\b'),
     ('Customs', r'\bcustoms\b'), ('TRAI', r'\btrai\b'), ('CBI', r'\bcbi\b'),
     ('Police', r'\bpolice\b|\bcyber ?crime\b|पुलिस'), ('Electricity board', r'\belectricity\b|\bbijli\b|बिजली'),
     ('Government', r'\bgovt\b|\bgovernment\b|\bsarkar|सरकार'),

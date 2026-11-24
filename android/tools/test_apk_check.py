@@ -102,6 +102,7 @@ assert run(with_(permissions=[P + 'RECEIVE_SMS', P + 'BIND_DEVICE_ADMIN']))['lev
 assert run(with_(permissions=[P + 'READ_CALL_LOG', P + 'REQUEST_INSTALL_PACKAGES', P + 'SYSTEM_ALERT_WINDOW']))['level'] == 'danger'
 assert run(with_(permissions=[P + 'REQUEST_INSTALL_PACKAGES']))['level'] == 'warn'
 assert run(with_(label='HDFC Bank', permissions=[P + 'READ_CALL_LOG']))['level'] == 'danger'
+assert run(with_(label='PhonePe', package='com.example.app', file_name='x.apk', permissions=[P + 'READ_SMS']))['level'] == 'danger'
 assert run(with_(permissions=['bad perm!', 42, None]))['level'] == 'clear'
 # Thousands of decoy names that sort first must not hide the flagged ones (Terra review, PR #72).
 decoys = [f'a.decoy.P{i:05d}' for i in range(5000)]
@@ -110,7 +111,11 @@ assert run(with_(permissions=decoys + [P + 'READ_SMS', P + 'SYSTEM_ALERT_WINDOW'
 for label, brand in [('SBI Rewards', 'SBI'), ('SBIRewards', 'SBI'), ('Axis Bank KYC', 'Axis Bank'),
                      ('RTO Challan', 'RTO'), ('mParivahan', 'RTO'), ('Aadhar Update', 'Aadhaar'),
                      ('आधार अपडेट', 'Aadhaar'), ('बिजली बिल', 'Electricity board'), ('Income Tax Refund', 'Income Tax'),
-                     ('PMKisan', 'PM Kisan'), ('Customer KYC', 'Bank')]:
+                     ('PMKisan', 'PM Kisan'), ('Customer KYC', 'Bank'),
+                     # camelCase labels split into words (CodeRabbit, PR #72)
+                     ('PhonePe', 'PhonePe'), ('phonepe', 'PhonePe'), ('DigiLocker', 'DigiLocker'),
+                     ('IndusInd Bank', 'IndusInd'), ('PayTM', 'Paytm'), ('GooglePay', 'Google Pay'),
+                     ('HDFCBank', 'HDFC'), ('IncomeTax', 'Income Tax'), ('BOBWorld', 'Bank of Baroda')]:
     got = ac.claimed_brand(ac.clean(with_(label=label, package='com.example.app', file_name='')))
     assert got == brand, (label, got, brand)
 for label, pkg in [('Bankruptcy Calculator', 'com.example.calc'), ('Porto Travel', 'com.porto.travel'),
@@ -217,6 +222,7 @@ for banned in ('PackageInstaller', 'ACTION_INSTALL_PACKAGE', 'DexClassLoader', '
 assert re.search(r'finally \{\s*file\.delete\(\)', kt), 'the cache copy is deleted in finally'
 assert 'if (total > MAX_BYTES) throw Unreadable("apk_big")' in kt
 assert 'uri.scheme != "content"' in kt
+assert 'MATCH_DISABLED_COMPONENTS' in kt  # a disabled Accessibility service still counts (CodeRabbit, PR #72)
 manifest_text = (ROOT / 'android/app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
 manifest = ET.fromstring(manifest_text)
 assert not manifest.findall('./uses-permission'), 'the inspector needs no permission'

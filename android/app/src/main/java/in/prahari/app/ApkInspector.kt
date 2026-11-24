@@ -156,7 +156,10 @@ internal object ApkInspector {
     }
 
     private fun inspect(pm: PackageManager, path: String, fileName: String, size: Long): Facts {
-        val flags = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS
+        // Disabled components count too: an app can declare its Accessibility service disabled and
+        // turn it on after install.
+        val flags = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or
+            PackageManager.MATCH_DISABLED_COMPONENTS
         val info = archiveInfo(pm, path, flags) ?: throw Unreadable("apk_fail")
         // BIND_ACCESSIBILITY_SERVICE and BIND_DEVICE_ADMIN are the android:permission of a service
         // or receiver, not a uses-permission, so component permissions are included.
