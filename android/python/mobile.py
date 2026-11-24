@@ -7,6 +7,7 @@ import types
 from pathlib import Path
 import numpy as np
 import portable
+import remote_apps
 import report_card
 
 # detect imports joblib at module level, but Android never loads pickles: the
@@ -322,6 +323,11 @@ def verdict(kind, text, source=''):
         out['report_buttons'] = report
     source = source if source in ('qr', 'whatsapp', 'sms') else ''
     out.update(_report_card(eff_kind, text, lab, scam, ev, out['evidence_quotes'], actions or [], source))
+    try:
+        if remote_apps.needs_check(eff_kind, text, lab, scam, actions or []):
+            out['remote_app_check'] = True
+    except Exception:
+        pass  # an aid only: the verdict is shown without the banner
     return json.dumps(out, ensure_ascii=False)
 
 

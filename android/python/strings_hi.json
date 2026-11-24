@@ -585,6 +585,10 @@
   "family_chooser": {
    "en": "Warn family or friends",
    "hi": "परिवार या दोस्तों को सावधान करें"
+  },
+  "remote_app_banner": {
+   "en": "A screen-sharing app ({apps}) is installed. Scammers use these to watch your bank app. Uninstall it if a 'support agent' asked you to install it.",
+   "hi": "इस फ़ोन में स्क्रीन शेयर करने वाला ऐप ({apps}) है। ठग इससे आपका बैंक ऐप देख लेते हैं। अगर किसी 'सपोर्ट एजेंट' ने इसे डालने को कहा था, तो इसे हटा दें।"
   }
  },
  "templates": [

@@ -470,3 +470,15 @@ assert broken['level'] == kyc['level'] and broken['evidence'] == kyc['evidence']
 same = {k: v for k, v in kyc.items() if k not in ('report_card', 'report_card_raised', 'detector_ms')}
 assert same == {k: v for k, v in broken.items() if k != 'detector_ms'}
 print('report card through mobile.verdict passed')
+
+# Remote-app banner flag: set for money-desk scams, absent for clear and network results, never fatal.
+assert kyc.get('remote_app_check') is True
+assert json.loads(mobile.verdict('sms', 'Install AnyDesk so our support executive can process your refund')).get('remote_app_check') is True
+assert 'remote_app_check' not in upi_merch
+assert 'remote_app_check' not in json.loads(mobile.verdict('flow', 'many connections to different ports from one host in a few seconds'))
+_needs = mobile.remote_apps.needs_check
+mobile.remote_apps.needs_check = lambda *a, **k: 1 / 0
+broken_ra = json.loads(mobile.verdict('sms', kyc_text))
+mobile.remote_apps.needs_check = _needs
+assert broken_ra['level'] == kyc['level'] and 'remote_app_check' not in broken_ra
+print('remote app flag through mobile.verdict passed')
