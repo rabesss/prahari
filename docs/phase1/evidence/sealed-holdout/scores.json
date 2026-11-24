@@ -221,6 +221,40 @@
     "f1": 0.8125,
     "fpr": 0.3
    }
+  },
+  "main before PR #65 (89d4e97, includes PR #54's copied-alert rule; from docs/validation-gate.md and research/LOG.md)": {
+   "combined": {
+    "recall": 0.929,
+    "f1": 0.808,
+    "fpr": 0.31
+   },
+   "sms": {
+    "recall": 0.926,
+    "f1": 0.787,
+    "fpr": 0.333,
+    "false_alarms": "29/87"
+   },
+   "injection": {
+    "fpr": 0.154
+   }
+  },
+  "PR #65 at 75993f1 (scored once by the validation gate; current detector; from docs/validation-gate.md and research/LOG.md)": {
+   "combined": {
+    "recall": 0.929,
+    "f1": 0.812,
+    "fpr": 0.3
+   },
+   "sms": {
+    "recall": 0.926,
+    "f1": 0.792,
+    "fpr": 0.322,
+    "false_alarms": "28/87"
+   },
+   "injection": {
+    "recall": 0.938,
+    "f1": 0.909,
+    "fpr": 0.154
+   }
   }
  },
  "note_pr48": "The PR #48 entry has aggregate metrics only (source: the fp-fix thread result file); counts: SMS 28/87 false alarms, 63/68 scams caught."

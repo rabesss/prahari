@@ -192,9 +192,9 @@ def build_eval_and_mem_chart() -> Path:
         "Sealed\n\nn=184",
     ]
     # Project sets: last bin/eval after PR #42. Holdouts/validation: main 105f7e6 (after PR #48).
-    f1_vals = [0.925, 0.994, 0.969, 0.850, 0.970, 0.909, 0.816, 0.813]
+    f1_vals = [0.925, 0.994, 0.969, 0.850, 0.970, 0.918, 0.805, 0.812]
     # Post-PR #42 SMS dev-set FPR was not recorded, so it is plotted as "n/r" rather than guessed.
-    fpr_vals = [float("nan"), 0.000, 0.031, 0.030, 0.000, 0.120, 0.277, 0.300]  # SMS-route sealed FPR=0.322 annotated
+    fpr_vals = [float("nan"), 0.000, 0.031, 0.030, 0.000, 0.107, 0.298, 0.300]  # SMS-route sealed FPR=0.322 annotated
 
     x = np.arange(len(labels))
     w = 0.38
@@ -202,7 +202,7 @@ def build_eval_and_mem_chart() -> Path:
     b2 = ax1.bar(x + w / 2, fpr_vals, width=w, color=AMBER, label="False Positive Rate (FPR)", zorder=3)
     ax1.axvline(3.5, color="#94A3B8", linestyle="--", linewidth=0.9, zorder=2)
     ax1.text(1.5, 1.07, "Project sets (after PR #42)", ha="center", fontsize=7.6, color=SLATE, style="italic")
-    ax1.text(5.5, 1.07, "Held-back / validation (after PR #48)", ha="center", fontsize=7.6, color=SLATE, style="italic")
+    ax1.text(5.5, 1.07, "Held-back / validation (current main)", ha="center", fontsize=7.6, color=SLATE, style="italic")
 
     for b, v in zip(b1, f1_vals):
         ax1.text(b.get_x() + b.get_width() / 2, v + 0.018, f"{v:.3f}", ha="center", va="bottom", fontsize=6.6, color=INDIGO, fontweight="bold")
@@ -223,7 +223,7 @@ def build_eval_and_mem_chart() -> Path:
     ax1.set_ylabel("Score / Rate", fontsize=9.5, color=SLATE)
     ax1.tick_params(axis="y", labelsize=9)
     ax1.legend(loc="upper center", ncol=2, frameon=True, facecolor="white", edgecolor=GRID, fontsize=7.6)
-    ax1.set_title("A. Detection F1 vs. FPR (detector after PR #48)", fontsize=10.0, fontweight="bold", color="#0F172A", pad=10)
+    ax1.set_title("A. Detection F1 vs. FPR (main 93ffd9e)", fontsize=10.0, fontweight="bold", color="#0F172A", pad=10)
 
     # Panel B: Galaxy S23 dumpsys meminfo PSS breakdown (KB -> MB)
     _style_ax(ax2)
