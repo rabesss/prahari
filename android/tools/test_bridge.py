@@ -447,3 +447,59 @@ upi_unknown = json.loads(mobile.check(
 assert upi_unknown['verdict'] == 'SUSPICIOUS' and upi_unknown['level'] == 'warn'
 assert all(upi_unknown['actions_hi']), upi_unknown['actions_hi']
 print('mobile.check runs with only NumPy installed (including UPI QR payloads)')
+
+# Lookalike-link "hang" on the 24 Nov S23 run (evidence/galaxy-s23-20261124/*/lookalike-link-stats.xml):
+# the check ended in 5.9 s with "ValueError: explanation contained no supported model sentence" after the
+# refusal ladder, and the stats header stayed "—" so the harness waited 60 s. Replies below are the real
+# Llama 3.2 1B QLoRA replies for this prompt once it starts refusing (reproduced with the pinned .pte).
+look = 'http://amaz0n-refund-help.top/claim?id=8812'
+class Replies:
+    def __init__(self, replies, timed_out_at=None):
+        self.replies = list(replies); self.calls = 0; self.timed_out_at = timed_out_at
+    def generate(self, prompt):
+        self.calls += 1
+        if self.timed_out_at == self.calls:
+            return json.dumps({'text': '', 'stats': {'first_token_ms': 1500, 'timed_out': True}, 'timed_out': True})
+        return json.dumps({'text': self.replies[self.calls - 1], 'stats': {'first_token_ms': 1460 + self.calls, 'decode_tps': 22.0}})
+refusals = ["I can't help with that.",
+            "I can't provide information on how to access harmful or illegal content. Is there anything else I can help you with?",
+            'I cannot provide a note that could be used to harm someone. Is there anything else I can help you with?']
+v = json.loads(mobile.verdict('url', look))
+assert v['level'] == 'danger'
+r = Replies(refusals)
+out = json.loads(mobile.explain(r))  # raised ValueError before the fix
+assert r.calls == 3 and out['fallback'] == 'checks_failed' and out['source'] == 'detector_template', out
+assert out['explanation'].startswith('This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top.'), out
+assert not mobile.llm.REFUSAL.search(out['explanation']) and 'help you with' not in out['explanation']
+assert out['llm']['first_token_ms'] == 1463 and out['llm']['fallback'] == 'checks_failed'
+# The 23 Nov phone reply ("Can I help you with something else?") is still a Llama explanation.
+mobile.verdict('url', look)
+arm = Replies(['This link is DANGEROUS: risky .top lookalike domain amaz0n-refund-help.top. Can I help you with something else?'])
+ok = json.loads(mobile.explain(arm))
+assert arm.calls == 1 and 'fallback' not in ok and 'help you with' not in ok['explanation'], ok
+# Time budget: once the phone reports a timeout, no further retry runs and the detector text is shown.
+mobile.verdict('url', look)
+slow = Replies(refusals, timed_out_at=2)
+late = json.loads(mobile.explain(slow))
+assert slow.calls == 2 and late['fallback'] == 'timeout' and late['explanation'].startswith('This link is DANGEROUS'), late
+# A cancelled check (a Java exception through Chaquopy) is not swallowed by the fallback.
+class Gone:
+    def generate(self, prompt): raise RuntimeError('Check cancelled')
+mobile.verdict('url', look)
+try:
+    mobile.explain(Gone()); raise AssertionError('cancellation must propagate')
+except RuntimeError as e:
+    assert 'cancelled' in str(e)
+# Fixed text never asserts a flow event the description negates, or the "routine backup" guess.
+for flow in ('No 200 different ports on 10.0.0.5', '{"duration": 0, "src_bytes": 200, "dst_bytes": 300}'):
+    fv = json.loads(mobile.verdict('flow', flow))
+    if fv['level'] == 'clear':
+        ft = mobile.detector_text(mobile._last['kind'], flow, mobile._last['lab'], mobile._last['ev'])
+        assert ft.startswith(mobile._FLOW_CLEAR) and '200 different ports' not in ft and 'backup' not in ft, ft
+# Kotlin side: the budget guard, and a finished header after any explanation outcome.
+assert 'internal const val LLAMA_BUDGET_MS = 15_000L' in _kt
+assert 'Bridge.watchdog.schedule(Runnable {' in _kt and 'if (overBudget.get()) return timedOut(stats)' in _kt
+assert 'Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)' in _kt
+assert 'fillStats(job.verdict, result.optJSONObject("llm"), total, pss, true)' in _kt
+assert 'if (result.has("fallback")) markDetectorText(result.optString("fallback"))' in _kt
+print('lookalike-link regression: refusals and timeouts fall back to labelled detector text')

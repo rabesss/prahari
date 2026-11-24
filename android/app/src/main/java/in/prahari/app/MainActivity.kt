@@ -56,6 +56,8 @@ import java.io.File
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
@@ -130,6 +132,12 @@ private const val OWN_CONTACT_LINE = "Sends you to its own link or number; real 
 private const val RAISED_NOTE = "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown."
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
+/**
+ * Wall-clock budget for the whole Llama stage of one check (every retry included), from the moment
+ * the verdict is on screen. Past it, generation is stopped and the reader gets the detector's fixed
+ * text. A warm check takes about 1.2 s on a cool Galaxy S23 and about 3 s when it is hot.
+ */
+internal const val LLAMA_BUDGET_MS = 15_000L
 private const val QR_REQUEST = 41
 
 private class Cancelled : RuntimeException("Check cancelled")
@@ -234,6 +242,10 @@ internal object Bridge {
     }
     val netWorker = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "prahari-net").apply { isDaemon = true }
+    }
+    /** Stops a generate that runs past [LLAMA_BUDGET_MS]; prefill emits no callback to stop from. */
+    val watchdog = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "prahari-watchdog").apply { isDaemon = true }
     }
     val genLock = ReentrantLock()
     val moduleLock = Any()
@@ -443,7 +455,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
             when {
                 missing != null -> JSONObject().put("error", missing)
                 Bridge.pythonError != null -> JSONObject().put("error", Bridge.pythonError)
-                else -> JSONObject(bridge.callAttr("explain", Runner(id)).toString())
+                else -> JSONObject(bridge.callAttr("explain", Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)).toString())
             }
         } catch (t: Throwable) {
             if (!Bridge.still(id)) return
@@ -510,14 +522,20 @@ private fun enqueueNet(id: Int) {
  * Chaquopy calls [generate] on the model worker. Do not touch views from here, and do not
  * call load, reset, or close from [LlmCallback] — the native generate holds the module lock.
  */
-class Runner(private val id: Int) {
+class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
+    private fun timedOut(stats: JSONObject = JSONObject()): String =
+        JSONObject().put("text", "").put("stats", stats.put("timed_out", true)).put("timed_out", true).toString()
+
     fun generate(prompt: String): String {
         if (!Bridge.still(id)) throw Cancelled()
         val module = ensureLoaded()
         if (!Bridge.still(id)) throw Cancelled()
         module.resetContext()
         if (!Bridge.still(id)) throw Cancelled()
+        // A retry that would start after the budget is not started at all.
+        if (SystemClock.elapsedRealtime() >= deadline) return timedOut()
         val start = SystemClock.elapsedRealtime()
+        val overBudget = AtomicBoolean(false)
         var first: Long? = null
         var count = 0
         val out = StringBuilder()
@@ -530,7 +548,8 @@ class Runner(private val id: Int) {
                     out.append(result)
                     count++
                     // maxNewTokens is not forwarded by this AAR. Stop from the callback, which is supported.
-                    if (count >= 40 || !Bridge.still(id)) {
+                    if (SystemClock.elapsedRealtime() >= deadline) overBudget.set(true)
+                    if (count >= 40 || !Bridge.still(id) || overBudget.get()) {
                         try { module.stop() } catch (_: Throwable) {}
                     }
                 } catch (_: Throwable) {}
@@ -555,10 +574,20 @@ class Runner(private val id: Int) {
             } finally {
                 Bridge.genLock.unlock()
             }
+            // Same pattern as Bridge.begin(): stop() only while this check's generate is running.
+            val guard = Bridge.watchdog.schedule(Runnable {
+                overBudget.set(true)
+                val stopNow: Boolean
+                Bridge.genLock.lock()
+                try { stopNow = Bridge.generating && Bridge.still(id) } finally { Bridge.genLock.unlock() }
+                if (stopNow) try { module.stop() } catch (_: Throwable) {}
+            }, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             try {
                 module.generate(prompt, config, callback)
             } catch (t: Throwable) {
                 generationFailure = t
+            } finally {
+                guard.cancel(false)
             }
         } finally {
             if (armed) {
@@ -568,16 +597,19 @@ class Runner(private val id: Int) {
             try { module.resetContext() } catch (_: Throwable) {}
         }
         if (!Bridge.still(id)) throw Cancelled()
+        val stats = JSONObject().put("backend", "executorch")
+        first?.let { stats.put("first_token_ms", it - start) }
+        // Over budget: report a timeout (mobile.explain then shows the detector's fixed text), not the
+        // partial reply, and not an error from the stopped native call.
+        if (overBudget.get()) return timedOut(stats)
         callbackError.get()?.let { throw IllegalStateException(it, generationFailure) }
         generationFailure?.let { throw it }
-        val stats = JSONObject().put("backend", "executorch")
         try {
             val nativeStats = JSONObject(if (rawStats.isBlank()) "{}" else rawStats)
             stats.put("raw", nativeStats)
             if (nativeStats.has("generated_tokens")) stats.put("generated_tokens", nativeStats.optInt("generated_tokens"))
             if (nativeStats.has("decode_token_per_sec")) stats.put("decode_tps", nativeStats.optDouble("decode_token_per_sec"))
         } catch (_: Throwable) {}
-        first?.let { stats.put("first_token_ms", it - start) }
         return JSONObject().put("text", out.toString()).put("stats", stats).toString()
     }
 }
@@ -614,6 +646,8 @@ class MainActivity : Activity() {
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
     private var aiFootSlot: View? = null
+    private var llamaHeadSlot: LinearLayout? = null
+    private var aiEnglishSlot: TextView? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
@@ -2162,7 +2196,9 @@ class MainActivity : Activity() {
             add(body, hiCard, top = 12)
         }
         val llama = card(T.surface2, false)
-        add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
+        val llamaHead = iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true)
+        llamaHeadSlot = llamaHead
+        add(llama, llamaHead)
         val replaced = row().apply {
             visibility = View.GONE
             background = shape(T.brandC, 12f)
@@ -2204,7 +2240,12 @@ class MainActivity : Activity() {
         val aiFoot = iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true)
         add(llama, aiFoot, top = 12)
         aiFootSlot = aiFoot
-        if (L10n.hindi) add(llama, txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true), top = 6)
+        aiEnglishSlot = null
+        if (L10n.hindi) {
+            val note = txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true)
+            aiEnglishSlot = note
+            add(llama, note, top = 6)
+        }
         add(body, llama, top = 12)
         val stats = card()
         val header = row().apply { minimumHeight = dp(48) }
@@ -2226,7 +2267,7 @@ class MainActivity : Activity() {
             chevron.rotation = if (open) 180f else 0f
             describeStats(open)
         }
-        fillStats(data, null, null, null)
+        fillStats(data, null, null, null, false)
         add(body, stats, top = 12)
         val checked = card()
         add(checked, heading("You checked", "आपने जांचा"))
@@ -2264,7 +2305,8 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 30) header.stateDescription = t(if (expanded) "Expanded" else "Collapsed")
     }
 
-    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?) {
+    /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
+    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, done: Boolean) {
         val details = statsDetails ?: return
         val summary = statsSummary ?: return
         details.removeAllViews()
@@ -2288,7 +2330,8 @@ class MainActivity : Activity() {
             "Llama 3.2 1B INT4 · ExecuTorch · XNNPACK\nCPU ABI: $abi" +
             if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
-        summary.text = "${values[0]} · ${values[1]}"
+        // adb_bench.py reads this from the header's label: "—" means Llama is still writing.
+        summary.text = "${values[0]} · ${if (done && values[1] == "—") t("No AI text") else values[1]}"
         describeStats(details.visibility == View.VISIBLE)
     }
 
@@ -2307,8 +2350,10 @@ class MainActivity : Activity() {
             view.text = t(RAISED_NOTE)
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
+            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, true)
             return
         }
+        if (result.has("fallback")) markDetectorText(result.optString("fallback"))
         if (error.isNotEmpty() || explanation.isEmpty()) {
             val lead = when {
                 error.contains("Model files are missing", ignoreCase = true) ->
@@ -2331,8 +2376,25 @@ class MainActivity : Activity() {
         }
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
-        fillStats(job.verdict, result.optJSONObject("llm"), total, pss)
+        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, true)
         metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
+    }
+
+    /**
+     * Llama's replies all failed the explanation checks, or its time budget ran out: the text shown
+     * is the detector's fixed text, and the card says so instead of claiming it is AI-written.
+     */
+    private fun markDetectorText(reason: String) {
+        llamaHeadSlot?.let { head ->
+            (head.getChildAt(0) as? ImageView)?.setImageResource(R.drawable.ic_shield_check)
+            (head.getChildAt(1) as? TextView)?.text =
+                if (reason == "timeout") t("Llama took too long, so this is the detector's fixed text.")
+                else t("Llama's reply did not pass the checks, so this is the detector's fixed text.")
+        }
+        (aiFootSlot as? LinearLayout)?.let { foot ->
+            (foot.getChildAt(1) as? TextView)?.text = t("Fixed text from the detector, not written by AI.")
+        }
+        aiEnglishSlot?.text = n("detector_english")
     }
 
     private fun launch(intent: Intent) {

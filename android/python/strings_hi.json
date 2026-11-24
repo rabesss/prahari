@@ -226,7 +226,11 @@
   "a UPI KYC or impersonation QR scam": "UPI KYC या नकली पहचान QR ठगी",
   "a UPI QR payment scam": "UPI QR पेमेंट ठगी",
   "a UPI AutoPay mandate to review": "जांचने योग्य UPI AutoPay मैंडेट",
-  "a UPI payment QR worth checking": "जांचने योग्य UPI पेमेंट QR"
+  "a UPI payment QR worth checking": "जांचने योग्य UPI पेमेंट QR",
+  "No AI text": "AI टेक्स्ट नहीं",
+  "Llama took too long, so this is the detector's fixed text.": "Llama को ज़्यादा समय लगा, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
+  "Llama's reply did not pass the checks, so this is the detector's fixed text.": "Llama का जवाब जांच में पास नहीं हुआ, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
+  "Fixed text from the detector, not written by AI.": "यह डिटेक्टर का तय टेक्स्ट है, AI ने नहीं लिखा।"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
@@ -557,6 +561,10 @@
   "upi_caveat": {
    "en": "Always verify the payee name and amount in your UPI app before entering your PIN. Receiving money never needs a PIN.",
    "hi": "PIN डालने से पहले अपने UPI ऐप में नाम और राशि ज़रूर जांचें। पैसे पाने के लिए PIN कभी नहीं लगता।"
+  },
+  "detector_english": {
+   "en": "Fixed detector text, in English. Not written by AI.",
+   "hi": "डिटेक्टर का तय टेक्स्ट, अंग्रेज़ी में। इसे AI ने नहीं लिखा।"
   }
  },
  "templates": [
