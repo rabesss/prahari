@@ -698,6 +698,10 @@
   {
    "en": "the domain {host} is not an official site",
    "hi": "डोमेन {host} आधिकारिक साइट नहीं है"
+  },
+  {
+   "en": "an unofficial .{tld} domain",
+   "hi": ".{tld} वाला डोमेन, जो आधिकारिक नहीं है"
   }
  ]
 }

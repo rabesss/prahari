@@ -186,6 +186,11 @@ THREAT_EXPOSE = (
     r"(कॉन्टैक्ट|संपर्क|परिवार)[^।;!?\n]{0,30}(संदेश|भेज|वायरल|पोस्ट)")
 THREAT = THREAT_BLOCK + "|" + THREAT_EXPOSE
 EXPOSE_DESC = "threatens to send or post something about you to your contacts or family"
+# The exposure line is used only with a threat cue ("warna", "or else", "kar dunga", "will post"); "share
+# feedback with friends and family" keeps the base wording.
+EXPOSE_CUE = (r"\b(?:warna|varna|or else|otherwise|unless|nahi to|nahin to|if you don'?t|kar dunga|kar denge|"
+              r"bhej\s*dunga|bhej\s*denge|bhejunga|will (?:send|post|share|leak|publish|message))\b|वरना|नहीं तो|"
+              r"दूंगा|दूँगा|देंगे")
 AUTHORITY = (r"\b(police|cbi|ncb|dri|ed|enforcement directorate|customs|court|magistrate|narcotics|"
              r"cyber ?cell|cyber crime|crime branch|inspector|sub[- ]inspector|\btrai\b|\brbi\b|"
              r"income tax|investigation officer|compliance (desk|officer)|vigilance|digital arrest)\b"
@@ -569,7 +574,9 @@ DIRECT_RAW = (
     r"\b(citizens|customers|people|all)\s+(must|should|need to)\s+"
     r"(pay|transfer|share|deposit|invest|click|install|download)\b")
 DIRECT_SCOPED = (
-    r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)\s*,?\s*)*"
+    # [\s,]* (not \s*,?\s*) keeps the repeated lead-in words linear: "now now now ..." used to backtrack
+    # exponentially.
+    r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)[\s,]*)*"
     r"(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
     r"\b(?:please|kindly|pls)\s+(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
     DEMAND + r"[^.;!?।\n]{0,40}\b(?:your|aapka|आपका)\b[^.;!?।\n]{0,25}" + CREDS)
@@ -948,8 +955,9 @@ def analyze(text):
         a["threat"] = True
         # The harm name stays block_threat (the decision rules are unchanged); only the reader-facing
         # line says which threat it is, so a blackmail message is not described as account blocking.
-        a["harm"].append(("block_threat", "threatens to block, cut or freeze an account, SIM or connection"
-                          if _clause_hit(THREAT_BLOCK, t) else EXPOSE_DESC))
+        exposure = not _clause_hit(THREAT_BLOCK, t) and _any(EXPOSE_CUE, t)
+        a["harm"].append(("block_threat", EXPOSE_DESC if exposure else
+                          "threatens to block, cut or freeze an account, SIM or connection"))
     the_job = _clause_hit(JOB, t) or _clause_hit(LOAN, t)
     # A notice, alert or advisory that hands the reader a contact of its own is the spoofed-advisory
     # pattern: a mobile number, a chat, or a link that imitates or hides its destination. A genuine
@@ -983,7 +991,7 @@ def analyze(text):
         a["harm"].append(("job_offer", "offers easy daily income through a personal chat channel"))
     if _clause_hit(r"(private (recording|video|photo)|intimate|morphed|nude)", t) and \
             _clause_hit(r"(post|publish|leak|share|send to|वायरल|viral kar\w*|"
-                        r"bhej(?:unga|ungi|dunga|dungi|denge|doonga|egi|ega)\b|भेज\s*(?:दूंगा|दूँगा|दूंगी|देंगे))", t):
+                        r"bhej\s*(?:unga|ungi|dunga|dungi|denge|doonga|egi|ega)\b|भेजूं?ँ?गा|भेज\s*(?:दूंगा|दूँगा|दूंगी|देंगे))", t):
         a["sextortion"] = True
         a["harm"].append(("sextortion", "threatens to publish private material unless you pay"))
     if _clause_hit(r"(gift (card|voucher)|voucher|google play|amazon (pay )?card)", t) and \
@@ -1267,10 +1275,13 @@ _VERB_FINAL_NEG = re.compile(
 _ANY_IMPERATIVE = re.compile(
     r"(?:^|\s)(?!(?:में|हमें|उन्हें|तुम्हें|इन्हें|जिन्हें|किन्हें|को|जो|सो|वो|जरिए|ज़रिए|लिए|लिये|किए|किये|दिए|दिये|"
     r"गए|गये|हुए|हुये)(?=[\s,।:]|$))\S+(?:ें|एं|िए|िये|ो)(?=[\s,।:]|$)|कृपया|"
-    r"\b(?:please|kindly|pls|kripya|kholo|khol\w*|dabao|daba\w*|chalao|chala\w*|lo|lijiye|dikhao|dikha\w*|bhejo|"
-    r"karo|karein|karen|kijiye|daalo|bharo|do|dein|dijiye)\b|"
-    r"^\s*(?:open|tap|press|click|go|visit|scan|use|run|start|allow|grant|accept|approve|join|reply|log ?in|"
-    r"sign in|update|verify|complete|type|enter|call|dial|install|download|share|send|pay|give|tell)\b", re.I)
+    # bare stems and the -ना form: "शेयर कर", "पासवर्ड भर", "कर लेना"
+    r"(?:^|\s)(?:कर|खोल|लगा|भर|डाल|भेज|बता|दे|ले|दिखा|चला|दबा|सुना)(?=[\s,।:]|$)|"
+    r"(?:^|\s)(?!(?:अपना|सूचना|योजना|घटना|सामना|जुर्माना|ना)(?=[\s,।:]|$))\S+ना(?=[\s,।:]|$)|"
+    r"\b(?:please|kindly|pls|kripya|kar|kar\w+|lena|dena|kholo|khol\w*|dabao|daba\w*|chalao|chala\w*|lo|lijiye|"
+    r"dikhao|dikha\w*|bhejo|bhej|daalo|daal|bharo|bhar|do|dein|dijiye|"
+    r"open|setup|tap|press|click|visit|scan|run|allow|grant|accept|approve|join|reply|log ?in|sign in|verify|"
+    r"type|enter|call|dial|install|download|share|send|pay|give|tell)\b", re.I)
 
 
 def _inert(seg):
@@ -1297,7 +1308,7 @@ def _verb_final_spans(clause):
     return [(start, segs[-1][1])] if _SEG_PROTECTED.search(c[start:segs[-1][1]]) else []
 
 
-_HYPO_END = re.compile(r",\s|[–—]|\s-\s|\s(?:to|toh|then)\s|\s(?:तो|फिर)\s", re.I)
+_HYPO_END = re.compile(r",\s|[–—]|\s-\s|\s(?:toh|then)\s|\s(?:तो|फिर)\s", re.I)
 
 
 def _hypothetical_spans(clause):
@@ -1356,6 +1367,22 @@ def _request_parts(text):
     return " ".join("".join(out).split()), special
 
 
+# What is left once warnings are blanked must not hand anything over or point at someone to take it.
+# Any hand-over or contact verb (negated or not: "do not delay, share it", "der mat karo, bata do"), a
+# demand ("our officer is asking for it", "humein chahiye") or an exception ("only our officer", "sirf
+# humara officer", "anybody but our executive") means the warning sits next to a request.
+_LEFTOVER_DEMAND = re.compile(
+    DEMAND + r"|\b(?:need|needs|needed|require|requires|chahiye|chahie|zaroorat)\b|चाहिए|ज़रूरत|जरूरत|पूछ\w*|बोल रह\w*|"
+    r"\b(?:share|send|give|tell|pass|hand|forward|message|msg|text|whatsapp|take|collect|provide|dictate|read out|"
+    r"type|enter|bata\w*|bhej\w*|de\s?d[oe]|dena|dijiye|dikha\w*|suna\w*|maang\w*)\b|"
+    r"बता\w*|भेज\w*|दे\s*(?:दो|दें|देना|दीजिए)|दिखा\w*|सुना\w*|मांग\w*|माँग\w*|"
+    r"\b(?:only|alone|besides|apart from|but|except|other than|sirf|keval|siwa)\b|सिर्फ़?|केवल|सिवाय", re.I)
+
+
+def _span_leftover(rest):
+    return bool(_SEG_PROTECTED.search(rest) or _LEFTOVER_DEMAND.search(rest))
+
+
 def request_text(text):
     """The text with warning segments blanked out in place: what the message actually asks of the
     reader. Everything else keeps its original wording and punctuation."""
@@ -1374,12 +1401,13 @@ def _warning_only(a):
     always hands the reader a number, chat handle or link somewhere, so it is never cleared here."""
     if not a["harm"] or a["own_contact"] or a["risky"] or _contact_anywhere(a):
         return False
-    if not {n for n, _ in a["harm"]} <= CLEARABLE or _EXCEPT.search(a.get("text", "")):
+    if not {n for n, _ in a["harm"]} <= CLEARABLE:
         return False
     rest, special = _request_parts(a.get("text", ""))
-    if special and _SEG_PROTECTED.search(rest):
-        # The span rules clear only a message whose every OTP, PIN, app, link or payment word sits
-        # inside the warning itself ("SBI: humein OTP chahiye. If anyone calls asking for it, hang up").
+    if special and (_EXCEPT.search(a.get("text", "")) or _span_leftover(rest)):
+        # The span rules (hypothetical caller, verb-final list) are stricter than PR #48's warning
+        # segments: no exception anywhere, and nothing left over that hands over, demands or names
+        # a secret. PR #48's own path is unchanged.
         return False
     if _ordered(rest):
         # Something outside the warnings still tells the reader to hand over, pay, send or install
@@ -1412,12 +1440,16 @@ def _actionable(a):
     text = a.get("text", "")
     # Warning segments and hypothetical-caller warnings are blanked first: "phone kaat dena" protects
     # the reader, and a request cue inside "कृपया ओटीपी किसी से साझा न करें" asks nothing.
-    rest = request_text(text)
+    rest, special = _request_parts(text)
     if (a["own_contact"] or _clause_hit(BLOCK_FUTURE, text) or _contact_anywhere(a) or
             _clause_hit(PAY_COMMAND, text) or _ordered(rest, threat=False) or _EXCEPT.search(text)):
         return True
     if not (a["request_cues"] or a["reader_direct"]):
         return False
+    # From here a request cue would make the message actionable (as before this change); it is
+    # discounted only when every cue sat inside a warning and nothing left over hands over or demands.
+    if rest != " ".join(text.split()) and _LEFTOVER_DEMAND.search(rest):
+        return True
     if rest == " ".join(text.split()):
         return True
     if not rest.strip():

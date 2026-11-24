@@ -42,3 +42,11 @@ def test_unknown_only_name_is_rejected():
     with pytest.raises(SystemExit) as e:
         validate.main(["--no-tests", "--only", "fp_val_vl"])
     assert "unknown set names" in str(e.value)
+
+
+def test_route_regressions_are_reported():
+    base = {"s": {"status": "ok", "recall": 1.0, "fpr": 0.0,
+                  "by_route": {"injection": {"recall": 1.0, "fpr": 0.0}}}}
+    now = {"s": {"status": "ok", "recall": 1.0, "fpr": 0.0,
+                 "by_route": {"injection": {"recall": 0.9, "fpr": 0.0}}}}
+    assert validate.regressions(now, base) == ["s/injection: recall 1.0 -> 0.9"]

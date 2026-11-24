@@ -150,6 +150,8 @@ def test_account_block_threat_keeps_its_phrase():
     "क्यूआर कोड स्कैन करें और ₹2000 का भुगतान स्वीकार करें, बैंक ओटीपी नहीं मांगता",
     "Never share your OTP with anyone except our verified executive. If anyone calls asking for the OTP, do not share it with anyone.",
     "SBI: humein OTP chahiye. If anyone calls asking for the OTP, hang up.",
+    "SBI: अगर कोई ओटीपी मांगे तो फोन काट देना, our officer is asking for it.",
+    "Agar koi OTP maange to phone kaat dena, hamare agent ko chahiye.",
 ])
 def test_demands_next_to_warning_spans_stay_flagged(text):
     assert verdict(text) == 1
@@ -174,3 +176,38 @@ def test_reserved_tld_outside_the_risky_list_keeps_its_decision():
 def test_long_reserved_host_phrase_fits_the_budget():
     host = "a-very-long-parcel-redelivery-confirmation-portal-for-customers.example"
     assert len(llm._risky_short(mech.host_risk(host))) <= 78
+
+
+# Review round 2 (gpt-6.1-terra, GLM 5.4): leftovers that hand over, demand or make an exception.
+@pytest.mark.parametrize("text", [
+    "SBI सपोर्ट: स्क्रीन शेयर कर लेना, बैंक ओटीपी नहीं मांगता।",
+    "SBI: AnyDesk open kar, bank OTP nahi maangta.",
+    "SBI सपोर्ट: पासवर्ड भर, बैंक ओटीपी नहीं मांगता।",
+    "If anyone calls asking for the OTP, hang up, do not delay, share it with our officer.",
+    "When someone calls asking for the OTP, hang up and pass it to me.",
+    "If anyone calls asking for the OTP, hang up. Message me the same.",
+    "Agar koi OTP maange to phone kaat dena, der mat karo, humein bata do.",
+    "SBI: If anyone calls asking for your OTP, do not share it. Only our verified officer will ask for it.",
+    "If anyone calls asking for the OTP, do not share it with anybody but our executive.",
+    "Agar koi OTP maange to phone kaat dena. Sirf humara hi officer maangega.",
+])
+def test_leftover_handover_demand_or_exception_stays_flagged(text):
+    assert verdict(text) == 1
+
+
+def test_lead_in_words_do_not_backtrack():
+    import time
+    t = time.time()
+    mech.analyze("now " * 40 + "pay")
+    assert time.time() - t < 1.0
+
+
+def test_feedback_invitation_is_not_called_an_exposure_threat():
+    a = mech.analyze("HDFC Bank: Your family savings account is credited with Rs 5000. "
+                     "Share feedback with friends and family on 18002663360.")
+    assert all(d != mech.EXPOSE_DESC for _, d in a["harm"])
+
+
+def test_spaced_hinglish_sextortion_is_recognised():
+    a = mech.analyze("Tumhari private video sab contacts ko bhej dunga. Abhi 20,000 bhejo.")
+    assert "sextortion" in {n for n, _ in a["harm"]}

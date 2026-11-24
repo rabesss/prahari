@@ -172,6 +172,14 @@ def regressions(results, base):
             bad.append(f"{name}: recall {b['recall']} -> {r['recall']}")
         if r["fpr"] is not None and b["fpr"] is not None and r["fpr"] > b["fpr"]:
             bad.append(f"{name}: FPR {b['fpr']} -> {r['fpr']}")
+        for route, m in r.get("by_route", {}).items():
+            bm = b.get("by_route", {}).get(route)
+            if not bm:
+                continue
+            if m["recall"] is not None and bm["recall"] is not None and m["recall"] < bm["recall"]:
+                bad.append(f"{name}/{route}: recall {bm['recall']} -> {m['recall']}")
+            if m["fpr"] is not None and bm["fpr"] is not None and m["fpr"] > bm["fpr"]:
+                bad.append(f"{name}/{route}: FPR {bm['fpr']} -> {m['fpr']}")
     return bad
 
 
@@ -227,14 +235,20 @@ def main(argv=None):
     if a.only:
         want = {s.strip() for s in a.only.split(",") if s.strip()}
         unknown = want - {s[0] for s in sets}
-        if unknown or not want:
+        if not want:
+            sys.exit("--only: no set names given")
+        if unknown:
             sys.exit(f"--only: unknown set names {sorted(unknown)} (with --sealed for sealed_v1_1)")
         sets = [s for s in sets if s[0] in want]
     if a.sealed:
         print("NOTE: sealed holdout scored; record this use in research/LOG.md. No tuning on it.")
     cand = Path(a.candidate).resolve()
     results = score_sets(cand, sets, {s.strip() for s in a.errors.split(",") if s.strip()})
-    base = json.loads(a.baseline.read_text())["sets"] if a.baseline else None
+    base = None
+    if a.baseline:
+        base = json.loads(a.baseline.read_text()).get("sets")
+        if not isinstance(base, dict):
+            sys.exit(f"--baseline {a.baseline}: not a bin/validate --json file (no 'sets')")
     print_table(results, base)
     rc = 0
     if a.json:
@@ -266,8 +280,20 @@ def main(argv=None):
         # A changed holdout file is never skipped quietly.
         print("FAIL: SHA-256 mismatch for", ", ".join(tampered))
         rc = 1
-    partial = f" (partial: {len(SKIPPED)} suites skipped, {len(missing)} sets not scored)" \
-        if SKIPPED or missing else ""
+    notes = []
+    if a.no_tests:
+        notes.append("tests not run")
+    if SKIPPED:
+        notes.append(f"{len(SKIPPED)} suites skipped")
+    if missing:
+        notes.append(f"{len(missing)} sets not scored")
+    if a.only:
+        notes.append(f"only {len(results)} of {len(SETS) + bool(a.sealed)} sets selected")
+    if base:
+        unselected = sorted(set(base) - set(results))
+        if unselected:
+            notes.append("baseline sets not compared: " + ", ".join(unselected))
+    partial = f" (partial: {'; '.join(notes)})" if notes else ""
     print("GATE", "FAIL" if rc else "PASS" + partial)
     return 1 if rc else 0
 
