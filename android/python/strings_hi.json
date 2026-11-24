@@ -431,7 +431,8 @@
   "no request for a payment or link in the link": "इस लिंक में पैसे या लिंक की कोई मांग नहीं है",
   "no request for a secret or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या लिंक की कोई मांग नहीं है",
   "no request for a secret or payment in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या पैसे की कोई मांग नहीं है",
-  "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है"
+  "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है",
+  "the link points straight to an Android app file (.apk), which installs outside the Play Store": "यह लिंक सीधे Android ऐप फ़ाइल (.apk) देता है, जो Play Store के बाहर से इंस्टॉल होती है"
  },
  "skip": [
   "$label · $hi",
@@ -691,6 +692,10 @@
   {
    "en": "mentions {things} and the branch",
    "hi": "{things} और शाखा का ज़िक्र करता है"
+  },
+  {
+   "en": "the domain {host} is a lookalike of the official {official}",
+   "hi": "डोमेन {host}, असली {official} जैसा दिखने वाला नकली डोमेन है"
   }
  ]
 }

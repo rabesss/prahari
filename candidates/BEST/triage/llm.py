@@ -116,13 +116,15 @@ TYPE_PRIORITY = ["sextortion", "extortion", "safe_account", "remote_access", "co
                  "phish_link", "pay_unverified", "payment_request_private"]
 _POWER = re.compile(r"electricity|power cut|bijli|बिजली|meter|discom|connection (?:will be )?(?:cut|kat)", re.I)
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
-              "at_sign", "no_https", "official_domain"}
+              "at_sign", "no_https", "official_domain", "typosquat"}
 # A NO RISK verdict never quotes a finding it overruled. A link sign that hides the destination,
 # imitates a name or replaces it with a raw address is a mechanism: when the verdict dismisses
 # one and no benign reading exists, nothing is claimed. A weak sign alone (a risky TLD, no HTTPS,
 # a long name) leaves the neutral phrase true.
 HIDDEN_LINK = {"brand_lookalike", "digit_swap", "ip_host", "shortener", "at_sign", "punycode",
-               "homoglyph", "hidden_chars"}
+               "homoglyph", "hidden_chars", "typosquat", "apk_download"}
+LOOKALIKE = ("brand_lookalike", "digit_swap", "typosquat")
+APK_SHORT = "a direct .apk app download"
 WEAK_LINK = {"risky_tld", "no_https", "complex_host"}
 PROTECTIVE_NAMES = frozenset(n for n, _, _ in indicrules.PROTECTIVE) | {"official_domain"}
 # Words whose presence makes an absence claim false: a secret, a payment and a link are the three
@@ -156,7 +158,7 @@ def _short_host(name, desc):
     host = _host_from(desc)
     if name == "official_domain":
         return f"official domain {host}".strip()
-    if name in ("brand_lookalike", "digit_swap"):
+    if name in LOOKALIKE:
         return f"lookalike domain {host}".strip()
     if name == "risky_tld":
         tld = host.rsplit(".", 1)[-1] if host else ""
@@ -297,7 +299,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             elif set(names) & HIDDEN_LINK:
                 dismissed = True
         else:
-            if any(n in ("brand_lookalike", "digit_swap") for n in names):
+            if any(n in LOOKALIKE for n in names):
                 tld = host.rsplit(".", 1)[-1] if "." in host else ""
                 out.append(f"risky .{tld} lookalike domain {host}" if tld else f"lookalike domain {host}")
             elif "ip_host" in names:
@@ -306,6 +308,8 @@ def compact_evidence(kind, inp, fallback, verdict=None):
                 out.append(f"URL shortener {host}")
             elif "risky_tld" in names:
                 out.append(f"unofficial domain {host} (.{host.rsplit('.', 1)[-1]})")
+            if "apk_download" in names:
+                out.append(APK_SHORT)
             if "no_https" in names:
                 out.append("no HTTPS")
             if "official_domain" in names:
@@ -423,7 +427,7 @@ def scam_type(kind, inp, verdict):
         return upi.scam_type_for(inp, verdict)
     if kind == "url":
         names = {n for n, _ in rules.url_indicators(inp)}
-        if names & {"brand_lookalike", "digit_swap"}:
+        if names & set(LOOKALIKE):
             return "a phishing link on a lookalike domain"
         if "shortener" in names:
             return "a shortened link that hides its destination"

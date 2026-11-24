@@ -15,6 +15,8 @@ import re
 import unicodedata
 from urllib.parse import urlparse
 
+from . import typosquat
+
 SPLIT = ".!?।;\n"
 NEG = re.compile(
     r"\b(no|not|never|without|n't|dont|don't|doesn't|does not|will not|won't|avoid|"
@@ -596,7 +598,7 @@ def hosts(t):
 
 def is_official(h):
     return h in OFFICIAL_DOMAINS or h.endswith(OFFICIAL_SUFFIXES) or any(
-        h.endswith("." + d) for d in OFFICIAL_DOMAINS)
+        h.endswith("." + d) for d in OFFICIAL_DOMAINS) or typosquat.is_official(h)
 
 
 def host_risk(h):
@@ -619,6 +621,9 @@ def host_risk(h):
         return f"the domain {h} swaps letters for digits to imitate a brand"
     if h.count("-") >= 2 or h.count(".") >= 4:
         return f"the domain {h} is unusually long or hyphenated"
+    target = typosquat.match(h)
+    if target:
+        return typosquat.describe(h, target)
     return ""
 
 

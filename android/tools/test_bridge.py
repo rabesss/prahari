@@ -216,6 +216,8 @@ _samples = [
     "lookalike domain sbi-kyc.top",
     "risky .top lookalike domain sbi-kyc.top",
     "URL shortener bit.ly",
+    "the domain icicibnak.com is a lookalike of the official icicibank.com",
+    "the link points straight to an Android app file (.apk), which installs outside the Play Store",
 ]
 for _sample in _samples:
     _got = hindi_line(_sample)

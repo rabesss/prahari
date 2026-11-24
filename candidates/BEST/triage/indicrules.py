@@ -9,6 +9,8 @@ decision stays explainable.
 import re
 from urllib.parse import urlparse
 
+from . import typosquat
+
 NEG = re.compile(r"\b(no|not|never|without|n't|don't|doesn't|nahi|nahin|mat|bina)\b"
                  r"|(?:^|[\s;,:])(न|मत|बिना|कोई नहीं)(?:[\s;,:]|$)", re.I)
 
@@ -270,7 +272,7 @@ RISKY_TLDS = {"top", "xyz", "club", "online", "site", "live", "icu", "buzz", "in
 
 
 def is_official(host):
-    if host in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES):
+    if host in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_official(host):
         return True
     return any(host.endswith("." + d) for d in OFFICIAL_DOMAINS)
 
@@ -293,4 +295,7 @@ def host_risk(host):
         return ("risky_tld", f"the domain ends in .{tld}, common for scam sites")
     if re.search(r"\d", label) and any(b in label.replace("0", "o") for b in BRANDS):
         return ("digit_swap", f"the domain {host} swaps letters for digits to imitate a brand")
+    target = typosquat.match(host)
+    if target:
+        return ("typosquat", typosquat.describe(host, target))
     return None
