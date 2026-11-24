@@ -200,7 +200,7 @@ def build_eval_and_mem_chart() -> Path:
     b2 = ax1.bar(x + w / 2, fpr_vals, width=w, color=AMBER, label="False Positive Rate (FPR)", zorder=3)
     ax1.axvline(3.5, color="#94A3B8", linestyle="--", linewidth=0.9, zorder=2)
     ax1.text(1.5, 1.07, "Project sets (after PR #42)", ha="center", fontsize=7.6, color=SLATE, style="italic")
-    ax1.text(5.0, 1.07, "Holdouts (after PR #48)", ha="center", fontsize=7.6, color=SLATE, style="italic")
+    ax1.text(5.0, 1.07, "Held-back / validation (after PR #48)", ha="center", fontsize=7.6, color=SLATE, style="italic")
 
     for b, v in zip(b1, f1_vals):
         ax1.text(b.get_x() + b.get_width() / 2, v + 0.018, f"{v:.3f}", ha="center", va="bottom", fontsize=7.3, color=INDIGO, fontweight="bold")
