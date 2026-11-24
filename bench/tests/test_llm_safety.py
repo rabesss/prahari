@@ -1,4 +1,5 @@
 """Unsafe Llama advice is removed from risky explanations; warnings and the opening are kept."""
+import pytest
 import sys
 from pathlib import Path
 
@@ -612,3 +613,27 @@ def test_generated_question_is_replaced_by_the_vetted_step():
     tail = llm.ACTIONS[1][0]
     out = llm._consistent(opening + ". Have you received other suspicious emails?", 1, opening, tail)
     assert "?" not in out and out.endswith(tail)
+
+
+# The generic opening (no evidence line) has a semicolon; the model sometimes writes it twice, and
+# on the phone a copy without its full stop was shown twice. Each shape must leave one copy.
+GENERIC = "This message was flagged as risky; check it carefully before acting"
+
+
+@pytest.mark.parametrize("copy", [
+    GENERIC + ". ",                                   # exact copy
+    GENERIC + " ",                                    # copy without its full stop
+    "This message was flagged as risky; ",            # its first clause only
+    "this message was flagged as risky check it carefully before acting, ",  # case and punctuation
+])
+def test_opening_is_shown_once(copy):
+    text = GENERIC + ". " + copy + "Never share your OTP with anyone."
+    out = llm._consistent(text, 1, GENERIC, "Do not click the link or reply to the message.")
+    assert out.lower().count("flagged as risky") == 1, out
+    assert out.startswith(GENERIC + ".")
+    assert "OTP" in out
+
+
+def test_opening_copy_without_stop_keeps_the_next_sentence():
+    text = GENERIC + ". " + GENERIC + " Be careful with links from unknown senders."
+    assert llm._drop_opening_copies(text, GENERIC) == GENERIC + ". Be careful with links from unknown senders."
