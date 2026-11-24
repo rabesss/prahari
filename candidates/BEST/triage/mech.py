@@ -16,6 +16,10 @@ import unicodedata
 from urllib.parse import urlparse
 
 SPLIT = ".!?।;\n"
+# Hindi perfective forms ("जमा किए गए हैं", "भुगतान हो गया", "ट्रांसफर की गई") report money that already
+# moved; only the bare or imperative verb ("जमा करें", "भुगतान करें") asks the reader to pay.
+_NOT_PERFECTIVE = (r"(?!\s*(?:हो\s*(?:गए|गई|गया|गये|चुके|चुकी|चुका)|हुए|हुई|हुआ|हुये|"
+                   r"(?:किए|किये|की|किया|कर\s*दिए|कर\s*दी|कर\s*दिया)\s*(?:गए|गई|गया|गये|जा\s*चुके)))")
 NEG = re.compile(
     r"\b(no|not|never|without|n't|dont|don't|doesn't|does not|will not|won't|avoid|"
     r"nahi|nahin|mat|bina|na)\b"
@@ -68,7 +72,7 @@ DEMAND = (r"(\b(ask|asks|asked|asking|demand|demands|demanded|demanding|want|wan
           r"bolta hai|bol rah\w*|keh rah\w*|कहा है|कहते हैं|maang\w*|maang rah\w*)")
 PAY = (r"\b(pay|paid|paying|send|sends|sending|transfer|transfers|deposit|deposits|remit|fund|"
        r"approve|approves|authori[sz]e|scan|buy|purchase|top[- ]?up|recharge|bhar\w*)\b"
-       r"|(bhej\w*|jama\w*|daal\w*)|भुगतान|भेजें|भेजो|भेजने|जमा|भरें|भरो|स्वीकार|टॉप ?अप|"
+       r"|(bhej\w*|jama\w*|daal\w*)|भुगतान|भेजें|भेजो|भेजने|जमा" + _NOT_PERFECTIVE + r"|भरें|भरो|स्वीकार|टॉप ?अप|"
        r"ट्रांसफर\s*(करें|करो|कर दें|कीजिए|करना)")
 AMOUNT = (r"(rs\.?|inr|₹|rupees|रुपये|राशि|amount|money|balance|bill|invoice|dues|शुल्क|फीस|"
           r"पैसा|पैसे|पेमेंट|भुगतान)")
@@ -158,7 +162,7 @@ REMOTE = (r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen[- ]shar\w*|remote
           r"\b(install|download)\b[^.;!?।\n]{0,30}\b(app|application|apk|software|tool)\b|"
           r"grant (contacts|sms|access|permissions)|"
           r"ऐप (लगाकर|इंस्टॉल)|ऐप डाउनलोड|रिमोट (ऐप|सॉफ्टवेयर)|स्क्रीन (साझा|शेयर)")
-THREAT = (
+THREAT_BLOCK = (
     # Hindi: "खाता बंद हो जाएगा / ब्लॉक हो रहा है" (the account will be closed or is being blocked)
     r"\b(account|sim|card|connection|number|service|upi|banking|खाता|सिम|कार्ड|सेवा|नंबर|यूपीआई)\b"
     r"[^.;!?।\n]{0,50}\b(बंद|ब्लॉक|निलंबित|फ्रीज|काट|डिएक्टिवेट)\s+हो\s*"
@@ -173,9 +177,14 @@ THREAT = (
     r"[^.;!?।\n]{0,60}\b(will be|ho gaya|ho jayega|हो जाएगा|हो गया|हो सकता|हो गई|कर दिया|काट दिया|बंद|निलंबित|फ्रीज)"
     r"[^.;!?।\n]{0,40}\b(block|blocked|cut|suspend|deactiv\w*|disconnect\w*|closed|reject\w*|forfeit\w*|बंद|निलंबित|फ्रीज)"
     r"|\b(block|blocked|band|बंद|ब्लॉक|निलंबित|फ्रीज)\b[^.;!?।\n]{0,40}\b(account|card|sim|number|खाता|कार्ड|सिम)"
-    r"|(contacts?|family|friends|photos?|videos?)\s*(ko|to)?\s*(message|post|publish|share|leak|bhej\w*)|"
+)
+# A threat to expose the reader to their contacts or family ("sab contacts ko bhej dunga").
+THREAT_EXPOSE = (
+    r"(contacts?|family|friends|photos?|videos?)\s*(ko|to)?\s*(message|post|publish|share|leak|bhej\w*)|"
     r"(message|post|publish|share|leak)\b[^.;!?।\n]{0,30}(contacts?|family|friends)|"
     r"(कॉन्टैक्ट|संपर्क|परिवार)[^।;!?\n]{0,30}(संदेश|भेज|वायरल|पोस्ट)")
+THREAT = THREAT_BLOCK + "|" + THREAT_EXPOSE
+EXPOSE_DESC = "threatens to send or post something about you to your contacts or family"
 AUTHORITY = (r"\b(police|cbi|ncb|dri|ed|enforcement directorate|customs|court|magistrate|narcotics|"
              r"cyber ?cell|cyber crime|crime branch|inspector|sub[- ]inspector|\btrai\b|\brbi\b|"
              r"income tax|investigation officer|compliance (desk|officer)|vigilance|digital arrest)\b"
@@ -305,6 +314,7 @@ RISKY_BRANDS = ("sbi", "hdfc", "icici", "axis", "kotak", "pnb", "paytm", "phonep
 RISKY_TLDS = {"top", "xyz", "club", "online", "site", "live", "icu", "buzz", "info", "click", "link",
               "work", "rest", "fit", "tk", "ml", "ga", "cf", "gq", "shop", "vip", "cc", "win", "loan",
               "example"}
+RESERVED_TLDS = {"example", "test", "invalid", "localhost"}
 OFFICIAL_SUFFIXES = (".gov.in", ".nic.in", ".bank.in", ".ac.in", ".edu.in")
 OFFICIAL_DOMAINS = {"sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com", "axisbank.com",
                     "kotak.com", "pnbindia.in", "paytm.com", "phonepe.com", "npci.org.in",
@@ -613,6 +623,10 @@ def host_risk(h):
         return f"the domain {h} imitates '{brand}' on .{tld}"
     if brand and any("-" in p and brand in p for p in parts):
         return f"the domain {h} is a hyphenated lookalike of '{brand}'"
+    if tld in RESERVED_TLDS:
+        # RFC 2606 reserves these names: no real site, scam or genuine, uses them, so "common for
+        # throwaway scam sites" would be a false claim. The link is still unverified.
+        return f"the domain {h} is not an official site"
     if tld in RISKY_TLDS:
         return f"the domain {h} uses .{tld}, common for throwaway scam sites"
     if re.search(r"\d", label) and any(b in label.replace("0", "o") for b in RISKY_BRANDS):
@@ -931,7 +945,10 @@ def analyze(text):
         a["harm"].append(("authority_threat", "poses as police, customs or a regulator and demands action"))
     if _clause_hit(THREAT, t):
         a["threat"] = True
-        a["harm"].append(("block_threat", "threatens to block, cut or freeze an account, SIM or connection"))
+        # The harm name stays block_threat (the decision rules are unchanged); only the reader-facing
+        # line says which threat it is, so a blackmail message is not described as account blocking.
+        a["harm"].append(("block_threat", "threatens to block, cut or freeze an account, SIM or connection"
+                          if _clause_hit(THREAT_BLOCK, t) else EXPOSE_DESC))
     the_job = _clause_hit(JOB, t) or _clause_hit(LOAN, t)
     # A notice, alert or advisory that hands the reader a contact of its own is the spoofed-advisory
     # pattern: a mobile number, a chat, or a link that imitates or hides its destination. A genuine
@@ -964,7 +981,7 @@ def analyze(text):
         a["job_upfront"] = True
         a["harm"].append(("job_offer", "offers easy daily income through a personal chat channel"))
     if _clause_hit(r"(private (recording|video|photo)|intimate|morphed|nude)", t) and \
-            _clause_hit(r"(post|publish|leak|share|send to|वायरल)", t):
+            _clause_hit(r"(post|publish|leak|share|send to|viral|bhej\w*|भेज|वायरल)", t):
         a["sextortion"] = True
         a["harm"].append(("sextortion", "threatens to publish private material unless you pay"))
     if _clause_hit(r"(gift (card|voucher)|voucher|google play|amazon (pay )?card)", t) and \
@@ -1031,7 +1048,7 @@ def analyze(text):
         ((_clause_hit(r"\b(buy|purchase|send|share|forward|provide)\b", t) or
           _clause_hit(DEMAND + r"|\b(?:require|requires|need|needs)\b", t)) and
          _any(r"\b(gift cards?|vouchers?|codes?)\b", t)) or
-        _clause_hit(r"\b(pay|transfer|deposit|remit|recharge)\b|भुगतान|जमा|ट्रांसफर", t) or
+        _clause_hit(r"\b(pay|transfer|deposit|remit|recharge)\b|(?:भुगतान|जमा|ट्रांसफर)" + _NOT_PERFECTIVE, t) or
         (pay and (_any(MONEY, t) or _any(AMOUNT, t))) or
         a["secret"] or share_hit or enter_hit or
         _clause_hit(ENTER + sep + CRED, t) or _clause_hit(CRED + sep + ENTER, t) or
@@ -1090,9 +1107,9 @@ def _self_block(text):
 # conditional threat ("agar payment nahi hua toh..."). A segment that orders the reader, threatens
 # them or makes an exception ("except our executive") is never a warning. Segments are clauses split
 # at ", ", dashes, contrast words and connectors before an order, so a negation reaches only its own
-# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Hypothetical callers,
-# self-check lead-ins and doorstep handovers were tried and dropped: they added little and each
-# opened ways to hide a demand (PR #48 review). A report that quotes what fraudsters asked for is not
+# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Self-check lead-ins and
+# doorstep handovers were tried and dropped: they added little and each opened ways to hide a demand
+# (PR #48 review). Hypothetical callers came back later in a narrow form (_hypothetical_warning). A report that quotes what fraudsters asked for is not
 # a warning segment: by controller decision a quoted credential demand stays flagged.
 SEG_SPLIT = re.compile(r",\s|:\s|[–—]|\s-\s|\b(?:but|instead|just|however|lekin|balki|bas|sirf)\b|"
                        r"(?:^|\s)(?:लेकिन|बल्कि|बस|सिर्फ़|सिर्फ)(?=\s|$)", re.I)
@@ -1114,7 +1131,7 @@ _RISKY_COMMAND = re.compile(
     r"approve|accept|authori[sz]e|scan|enter|type|reply|upload|dictate|read|provide|fill|buy|purchase|"
     r"hand(?:ing)? over|bhej\w*|bata\w*|de\s?d[oe]|de\s+(?:dijiye|dein|dena|do)|dijiye|dijiyega|dena hoga|dena hai|daal\w*|"
     r"bhar(?:o|ein|en|iye|dein|do)|jama)\b|भेजें|भेजो|भेजिए|भेजिये|भेज दें|बताएं|बताओ|बता दें|बता देना|बताइए|"
-    r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा|रिचार्ज|इंस्टॉल", re.I)
+    r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा" + _NOT_PERFECTIVE + r"|रिचार्ज|इंस्टॉल", re.I)
 # A verb in its oblique infinitive ("scan karne ki zaroorat nahi", "bhejne se pehle") names an action;
 # it does not order one.
 _INFINITIVE_AFTER = re.compile(r"^\s*(?:kar(?:ne|na)|करने|करना)\b|^(?:ne|na)\b", re.I)
@@ -1205,11 +1222,80 @@ def _segments(clause):
     return spans
 
 
+# A family or friend warning about a hypothetical caller: "if anyone calls asking for an OTP, hang up",
+# "agar koi OTP maange to phone kaat dena", "अगर कोई ओटीपी मांगे तो फोन काट देना". PR #48 dropped a
+# broad version of this because a demand could hide behind the condition. This one is narrow: the
+# condition names an unknown third party (anyone, someone, koi, कोई), and the same clause tells the
+# reader to protect themselves (hang up, disconnect, ignore, block or report the caller, or not to
+# share). The clause is never a warning if, once the protective words are removed, it still orders the
+# reader to hand over, pay, send or install, names a channel to contact, threatens after the
+# condition, or makes an exception. A contact anywhere in the message still blocks clearing
+# (_warning_only), so "hang up and call me on 98..." stays flagged.
+_HYPO_CALLER = re.compile(
+    r"\b(?:if|in case|whenever|when)\s+(?:any(?:one|body)|some(?:one|body)|a (?:stranger|caller)|"
+    r"any (?:caller|person|stranger|unknown (?:caller|number|person)))\b|"
+    r"\b(?:agar|jab|yadi)\s+(?:koi|kisi)\b|(?:^|\s)(?:अगर|यदि|जब)\s+(?:कोई|किसी)(?=\s|$)", re.I)
+_HYPO_PROTECT = re.compile(
+    r"\b(?:hang up|disconnect\w*|cut the call|end the call|put the phone down|ignore (?:it|them|the call|"
+    r"the message|such calls)|block (?:the|that) (?:number|caller)|report (?:it|them|the number)|"
+    r"(?:do not|don't|never) (?:share|give|tell|say|reply|answer|send)\b[^.;!?।\n]{0,30}|"
+    r"phone (?:kaat|rakh) (?:do|dena|dein|dijiye)|call (?:kaat|cut) (?:do|dena|kar do|kar dena)|"
+    r"kuch (?:bhi )?mat (?:batana|bolna|dena)|mat (?:batana|dena|bolna|bhejna)|ignore kar\w*|block kar\w*)\b|"
+    r"(?:फोन|फ़ोन|कॉल)\s*(?:तुरंत\s*)?(?:काट|रख)\s*(?:देना|दें|दीजिए|दो)|कुछ\s*(?:भी\s*)?मत\s*(?:बताना|बोलना|देना)|"
+    r"मत\s*(?:बताना|देना|भेजना)|(?:न|ना)\s*(?:बताएं|बताना|दें|देना|भेजें)|मना\s*कर\s*(?:देना|दें|दो)|"
+    r"नंबर\s*ब्लॉक", re.I)
+_HYPO_CONTACT = re.compile(r"\b(?:call|contact|visit|click|open|message|whatsapp|reach|dial|tap|go to)\b|"
+                           r"संपर्क|कॉल\s*कर|फोन\s*कर|क्लिक", re.I)
+
+
+# Hindi and Hinglish put the verb last, so one negated ask-verb at the end covers the whole list before
+# it: "एसबीआई कभी भी कॉल, एसएमएस या लिंक के जरिए केवाईसी, ओटीपी, सीवीवी या यूपीआई पिन नहीं मांगता",
+# "bank kabhi OTP, PIN ya CVV nahi maangta". Splitting at the commas would leave the list items outside
+# the negation. Such a clause is one warning segment when it also passes _warning_segment's tests.
+_VERB_FINAL_NEG = re.compile(
+    r"(?:नहीं|कभी\s+नहीं|न)\s*(?:मांग|माँग|पूछ)(?:ता|ती|ते|ेगा|ेगी|ेंगे|े)\s*(?:है|हैं|था|थे)?\s*$|"
+    r"\b(?:nahi|nahin|kabhi nahi|na)\s+(?:maang|mang|pooch|puchh?)(?:ta|ti|te|ega|egi|enge|e)\s*(?:hai|hain)?\s*$",
+    re.I)
+
+
+def _verb_final_warning(clause):
+    c = clause.strip().rstrip("।.!")
+    return bool(_VERB_FINAL_NEG.search(c) and _SEG_PROTECTED.search(c) and not _EXCEPT.search(c)
+                and not _AFFIRM.search(c) and not _SEG_CONDITION.search(c) and not _ordered(c))
+
+
+def _hypothetical_warning(clause):
+    m = _HYPO_CALLER.search(clause)
+    if not m or _EXCEPT.search(clause) or _AFFIRM.search(clause):
+        return False
+    after = clause[m.end():]
+    prot = list(_HYPO_PROTECT.finditer(after))
+    if not prot:
+        return False
+    # "don't disconnect, give them the code" negates the protection itself: never a warning. An earlier
+    # protective phrase ("kuch mat batana, phone kaat dena") is not a negation of the next one.
+    if any(_NEG_NEAR_BEFORE.search(_HYPO_PROTECT.sub(" ", after[:p.start()])) for p in prot):
+        return False
+    # Words after the first protective phrase are the reader's instruction: nothing there may name a
+    # channel or threaten, and nothing may order the reader to hand over, pay, send or install. The
+    # condition describes the caller ("asking for", "sending a link"), so its -ing forms are not
+    # orders, but a bare order there ("if anyone calls, share the OTP") still counts.
+    tail = _HYPO_PROTECT.sub(" ", after[prot[0].start():])
+    if _HYPO_CONTACT.search(tail) or _threatens(tail):
+        return False
+    parts = re.split(r"(,\s|[–—]|\s-\s)", after[:prot[0].start()], maxsplit=1)
+    condition = re.sub(r"\b[a-z]+ing\b", " ", parts[0], flags=re.I) + "".join(parts[1:])
+    return not _ordered(" ".join((clause[:m.start()], condition, tail)), threat=False)
+
+
 def request_text(text):
     """The text with warning segments blanked out in place: what the message actually asks of the
     reader. Everything else keeps its original wording and punctuation."""
     drop = []
     for off, clause in clauses(text):
+        if _hypothetical_warning(clause) or _verb_final_warning(clause):
+            drop.append((off, off + len(clause)))
+            continue
         for a, b in _segments(clause):
             if _warning_segment(clause[a:b]):
                 drop.append((off + a, off + b))
@@ -1265,10 +1351,20 @@ def _actionable(a):
     request. Genuine bank, OTP, bill and notice messages often score high on vocabulary alone, but
     with no destination and no request a scam has no way to reach its victim."""
     text = a.get("text", "")
-    return bool(a["own_contact"] or a["request_cues"] or a["reader_direct"] or
-                _clause_hit(BLOCK_FUTURE, text) or
-                _contact_anywhere(a) or _clause_hit(PAY_COMMAND, text) or _ordered(text, threat=False) or
-                bool(_EXCEPT.search(text)))
+    # Warning segments and hypothetical-caller warnings are blanked first: "phone kaat dena" protects
+    # the reader, and a request cue inside "कृपया ओटीपी किसी से साझा न करें" asks nothing.
+    rest = request_text(text)
+    if (a["own_contact"] or _clause_hit(BLOCK_FUTURE, text) or _contact_anywhere(a) or
+            _clause_hit(PAY_COMMAND, text) or _ordered(rest, threat=False) or _EXCEPT.search(text)):
+        return True
+    if not (a["request_cues"] or a["reader_direct"]):
+        return False
+    if rest == " ".join(text.split()):
+        return True
+    if not rest.strip():
+        return False
+    b = analyze(rest)
+    return bool(b["request_cues"] or b["reader_direct"])
 
 
 _HANDLE = re.compile(r"@\w|wa\.me|\bt\.me\b|\(at\)|\[\.\]", re.I)
