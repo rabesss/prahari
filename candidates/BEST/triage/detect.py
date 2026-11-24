@@ -87,7 +87,7 @@ def predict_text(texts):
     for i, (t, p) in enumerate(zip(texts, ps)):
         if i in pi:
             a = ana[i]
-            lab, s, _ = mech.decide(float(pi[i]), a)
+            lab, s, a = mech.decide(float(pi[i]), a)
             ev = mech.evidence(a) or [d for _, d in rules.text_indicators(t)]
             out.append((lab, s, ev[:6]))
             continue
