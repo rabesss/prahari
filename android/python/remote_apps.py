@@ -24,8 +24,22 @@ BANK_BRANDS = [b for b in rules.BRANDS if b in {'sbi', 'hdfc', 'icici', 'axis', 
 MONEY_DESK = re.compile(
     r'\b(?:bank\w*|kyc|upi|otp|pin|cvv|mpin|net ?banking|account|a/c|debit|credit card|card|wallet|'
     r'customer (?:care|support|service)|support (?:team|executive|agent)|helpline|refund|'
-    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|'
-    r'बैंक|खाता|कस्टमर केयर|यूपीआई|केवाईसी|ओटीपी|पिन|रिफंड|रिफ़ंड|डेबिट|कार्ड', re.I)
+    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|\bbob[ -]?world\b|bank of baroda|'
+    r'(?<![\u0900-\u097F])(?:बैंक|खाता|कस्टमर केयर|यूपीआई|केवाईसी|ओटीपी|पिन|रिफंड|रिफ़ंड|डेबिट|कार्ड)(?![\u0900-\u097F])',
+    re.I)
+# For a result the detector cleared but the app still shows as a bank alert (CHECK THIS ALERT or
+# SUSPICIOUS, MainActivity.bankAlertLevel): a bank, UPI, debit, card or account must be named.
+# A bare login OTP note does not qualify.
+BANK_CUE = re.compile(
+    r'\b(?:bank\w*|upi|debit\w*|credit\w*|card|account|a/c|wallet|'
+    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|\bbob[ -]?world\b|'
+    r'(?<![\u0900-\u097F])(?:बैंक|खाता|यूपीआई|डेबिट|कार्ड)(?![\u0900-\u097F])', re.I)
+# यू.पी.आई., U.P.I.: dots between letters are dropped before matching (the original is matched too).
+_LETTER_DOTS = re.compile(r'(?<=[A-Za-z\u0900-\u097F])\.(?=[A-Za-z\u0900-\u097F])|(?<=[\u0900-\u097F])\.(?=\s|$)')
+
+
+def _cue(pattern, text):
+    return bool(pattern.search(text) or pattern.search(_LETTER_DOTS.sub('', text)))
 
 
 def needs_check(kind, text, lab, scam, actions=()):
@@ -33,12 +47,14 @@ def needs_check(kind, text, lab, scam, actions=()):
     if kind == 'flow':
         return False
     text = str(text or '')
-    # NO RISK results never show it: receipts and OTP notes carry the debit step as advice too.
+    # A NO RISK result shows it only as a bank alert the app still flags: receipts and OTP notes
+    # carry the debit or check step as advice too, so a bank cue in the text is required.
     if lab == 0:
-        return False
+        steps = set(actions or ())
+        return bool(steps & {llm.DEBIT_STEP, llm.CHECK_STEP}) and _cue(BANK_CUE, text)
     if REMOTE_APP.search(text.lower()):
         return True
     scam = str(scam or '')
     if kind == 'upi' or scam.startswith('a UPI ') or scam in MONEY_TYPES or llm.DEBIT_STEP in (actions or ()):
         return True
-    return bool(MONEY_DESK.search(text)) or report_card.category(kind, text, scam) == 'customer_care'
+    return _cue(MONEY_DESK, text) or report_card.category(kind, text, scam) == 'customer_care'

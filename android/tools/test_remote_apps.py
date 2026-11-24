@@ -44,7 +44,14 @@ CASES = [
     (True, 'sms', 'Call Amazon customer care 9876543210 for refund', 'uncertain', 'a scam message', []),
     (True, 'upi', 'upi://pay?pa=refund@ybl&am=4999', 1, 'a UPI refund or receive-money QR scam', []),
     (True, 'sms', 'SBI: Rs 2,450 debited via UPI', 'uncertain', 'a bank debit alert to confirm', [llm.DEBIT_STEP]),
-    (False, 'sms', 'SBI: Rs 2,450 debited via UPI', 0, '', [llm.DEBIT_STEP]),  # NO RISK: no banner
+    (True, 'sms', 'SBI: Rs 2,450 debited via UPI. If not you call 9876543210', 0, '', [llm.DEBIT_STEP]),  # shown as an alert
+    (True, 'sms', 'Your OTP for SBI login is 482910. Do not share it with anyone.', 0, '', [llm.CHECK_STEP]),
+    (False, 'sms', 'Your OTP for login is 123456. Do not share it.', 0, '', [llm.DEBIT_STEP]),  # no bank named
+    (False, 'sms', 'SBI: Rs 2,450 debited via UPI', 0, '', []),  # NO RISK without the alert step
+    (False, 'sms', 'I have your private video, pay or I leak it. पिनकोड 110001', 1, 'sextortion or blackmail', []),
+    (True, 'sms', 'Login to bob World now http://bob-world-verify.top/login', 1, 'a scam message', []),
+    (True, 'sms', 'यू.पी.आई. से 4999 भेजो इस नंबर पर 9876543210', 1, 'a payment fraud', []),
+    (True, 'sms', 'ओ.टी.पी. साझा करो 9876543210', 1, 'a scam message', []),
     (False, 'sms', 'Delivered: Your order #4412 has been delivered. Thank you for shopping.', 0, '', [llm.DEBIT_STEP]),
     (True, 'sms', 'यूपीआई से 4999 रुपये भेजें इस नंबर पर 9876543210', 1, 'a payment fraud', []),
     (False, 'sms', 'Hi Bob, I have your private video, pay or I leak it', 1, 'sextortion or blackmail', []),
