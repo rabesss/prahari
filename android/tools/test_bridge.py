@@ -614,3 +614,26 @@ for kind, text in [('sms', kyc), ('url', look), ('url', 'https://www.irctc.co.in
     pr = mobile.BridgeExplainer(None).prompt(kind, text, lab_, ev_)
     assert mobile._opening(mobile.llm._CTX[pr]) == mobile.llm._forced_sentence(pr).rstrip(' .'), kind
 print('lookalike-link regression: refusals and timeouts fall back to labelled detector text')
+
+# Report card: present for SCAM and SUSPICIOUS, absent for NO RISK, network and a plain debit alert;
+# a failure building it never fails the verdict.
+kyc_text = 'Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked'
+kyc_out = json.loads(mobile.verdict('sms', kyc_text, 'whatsapp'))
+assert kyc_out['level'] == 'danger' and kyc_out['report_card']['category'] == 'kyc_payment', kyc_out.get('report_card')
+assert 'Medium: WhatsApp' in kyc_out['report_card']['report_en']
+assert 'hxxp://in-verify[.]top' in kyc_out['report_card']['family_en']
+assert json.loads(mobile.verdict('sms', kyc_text))['report_card']['category'] == 'kyc_payment'
+assert 'Medium: SMS or WhatsApp message' in json.loads(mobile.verdict('sms', kyc_text, 'bogus'))['report_card']['report_en']
+assert 'report_card' not in upi_merch and 'report_card' in upi_scam and 'report_card' in upi_unknown
+assert 'report_card' not in json.loads(mobile.verdict('flow', 'many connections to different ports from one host in a few seconds'))
+debit = json.loads(mobile.verdict('sms', 'SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app.'))
+assert 'report_card' not in debit, debit.get('report_card')
+_card = mobile.report_card.card
+mobile.report_card.card = lambda *a, **k: 1 / 0
+broken = json.loads(mobile.verdict('sms', kyc_text))
+mobile.report_card.card = _card
+assert broken['level'] == kyc_out['level'] and broken['evidence'] == kyc_out['evidence'] and 'report_card' not in broken
+# The report card never changes the verdict fields.
+same = {k: v for k, v in kyc_out.items() if k not in ('report_card', 'report_card_raised', 'detector_ms')}
+assert same == {k: v for k, v in broken.items() if k != 'detector_ms'}
+print('report card through mobile.verdict passed')

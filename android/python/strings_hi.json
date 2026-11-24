@@ -575,6 +575,34 @@
    "en": "Always verify the payee name and amount in your UPI app before entering your PIN. Receiving money never needs a PIN.",
    "hi": "PIN डालने से पहले अपने UPI ऐप में नाम और राशि ज़रूर जांचें। पैसे पाने के लिए PIN कभी नहीं लगता।"
   },
+  "report_copy": {
+   "en": "Copy report",
+   "hi": "रिपोर्ट कॉपी करें"
+  },
+  "report_copy_desc": {
+   "en": "Copies a short report to paste into Sanchar Saathi Chakshu. Nothing is sent.",
+   "hi": "Sanchar Saathi Chakshu में पेस्ट करने के लिए छोटी रिपोर्ट कॉपी करता है। कुछ भी भेजा नहीं जाता।"
+  },
+  "report_copied": {
+   "en": "Report copied. Paste it in the Chakshu form.",
+   "hi": "रिपोर्ट कॉपी हो गई। इसे Chakshu फ़ॉर्म में पेस्ट करें।"
+  },
+  "report_copy_fail": {
+   "en": "Couldn't copy the report.",
+   "hi": "रिपोर्ट कॉपी नहीं हो सकी।"
+  },
+  "family_send": {
+   "en": "Send to family",
+   "hi": "परिवार को बताएं"
+  },
+  "family_send_desc": {
+   "en": "Opens the share menu with a short warning. You choose who gets it. Your message is not included.",
+   "hi": "छोटी चेतावनी के साथ शेयर मेनू खोलता है। किसे भेजना है, आप चुनते हैं। आपका मैसेज इसमें नहीं जाता।"
+  },
+  "family_chooser": {
+   "en": "Warn family or friends",
+   "hi": "परिवार या दोस्तों को सावधान करें"
+  },
   "detector_english": {
    "en": "Fixed detector text, in English. Not written by AI.",
    "hi": "डिटेक्टर का तय टेक्स्ट, अंग्रेज़ी में। इसे AI ने नहीं लिखा।"

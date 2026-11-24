@@ -63,6 +63,34 @@ The joblib pickles record scikit-learn 1.9.1. Chaquopy's [Android wheel index](h
 7. Only if the phone is stable, run a small benchmark: the 28 chosen visible prompts, one repeat, recording each detector time, TTFT, runtime decode tok/s, total and sampled peak PSS. The hidden 28-item evaluation set is not in this repository; use a fixed visible set and label the result as such, not as the original benchmark. `bench/perf/adb_bench.py run` automates the built-in samples (see `docs/perf/s23-rtl-runbook.md`).
 8. If generation fails on 1.5.1, try the separately built 1.6 AAR APK only after its CI build succeeds; repeat the generation, memory and stability checks. Report the exact AAR and APK used.
 
+## Report card and send to family
+
+A DANGEROUS or SUSPICIOUS message or link result shows two more buttons under the report row. The
+verdict never depends on them, and neither sends anything by itself.
+
+* **Copy report** puts a short plain-text report on the clipboard for the Sanchar Saathi Chakshu form:
+  the medium, the Chakshu category, the sender (only when the shared text names it), the date, up to
+  three evidence lines with short quotes (4+ digit runs masked, links defanged as `hxxp://` and
+  `[.]`; the clipboard entry is marked sensitive so Android hides its preview), and
+  "Already lost money? Call 1930 / cybercrime.gov.in". The category is one of the 11 in the
+  [Sanchar Saathi FAQ](https://sancharsaathi.gov.in/) and comes from the detector's scam type, with
+  text cues only to name the impersonated party; a mechanism that does not fix a category maps to
+  "Any Other Suspected Fraud". Nothing is submitted.
+* **Send to family** (परिवार को बताएं) opens the Android share sheet (`ACTION_SEND`) with a short
+  warning in the app language: what the scam is, one safety step, and the link's registered domain
+  only (`hxxp://in-verify[.]top` for `http://sbi-kyc.in-verify.top/u?m=...`), defanged. Subdomains,
+  paths and queries are dropped because a scammer can personalise them per victim (IDNA and
+  percent-encoded dots count as dots), and a domain with four digits in a row or six in total, which
+  could be a phone or account number, is left out. A single swapped digit (`amaz0n`) is kept. It never carries the message body, the sender, names or
+  numbers. The user picks the app and the person; no contacts
+  permission is used, and Prahari is excluded from the chooser.
+
+The medium is a hint only: QR scan, or the sharing app reported by the optional Android referrer
+(WhatsApp, Google or Samsung Messages); otherwise "SMS or WhatsApp message". An ordinary bank debit
+alert gets no report; an alert the app raises to SUSPICIOUS because it names its own link or number
+does. Logic and templates are in `android/python/report_card.py`; tests in
+`android/tools/test_report_card.py` and `android/tools/test_bridge.py`. Pending a Galaxy S23 re-test.
+
 ## Known limits
 
 * The Android 1.5.1 and 1.6 `LlmGenerationConfig.maxNewTokens` field is not passed by the Android `generate` overload to the native runner. The bridge stops after 40 UTF-8 callbacks, which can each contain multiple token fragments; this is **not a guaranteed 40-token cap**. The exact budget needs a fixed upstream Android binding or a custom native bridge before claiming parity. TTFT is measured to the first callback, and decode tok/s comes from native stats.
