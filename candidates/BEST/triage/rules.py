@@ -2,6 +2,8 @@
 import re
 from urllib.parse import urlparse
 
+from . import typosquat
+
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "rb.gy", "shorturl.at", "tiny.cc", "ow.ly"}
 BRANDS = ["sbi", "hdfc", "icici", "axis", "paytm", "phonepe", "gpay", "amazon", "flipkart", "irctc", "uidai",
           "aadhaar", "incometax", "epfo", "npci", "bhim", "airtel", "jio", "vodafone", "bsnl", "indiapost",
@@ -66,7 +68,9 @@ def url_indicators(url):
     if not host:
         return ev
     reg = registrable(host)
-    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES)
+    # A pasted link has no message around it that could claim another organisation, so every listed
+    # official domain and its subdomains count as official here. The SMS rules keep their own list.
+    official = reg in OFFICIAL_DOMAINS or host.endswith(OFFICIAL_SUFFIXES) or typosquat.is_listed(host)
     if "xn--" in host:
         ev.append(("punycode", f"the domain {host} uses punycode, which can hide a lookalike name"))
     if any(ord(c) > 127 for c in host):
@@ -78,7 +82,7 @@ def url_indicators(url):
     if reg in SHORTENERS:
         ev.append(("shortener", f"the link uses a URL shortener ({reg}) that hides the real destination"))
     tld = host.rsplit(".", 1)[-1]
-    if tld in RISKY_TLDS:
+    if tld in RISKY_TLDS and not official:  # cred.club is official despite .club
         ev.append(("risky_tld", f"the domain ends in .{tld}, common for throwaway scam sites"))
     for b in BRANDS:
         if b in host and not official:
@@ -88,6 +92,14 @@ def url_indicators(url):
         ev.append(("complex_host", f"the domain {host} is unusually long or hyphenated"))
     if re.search(r"[0-9]", reg.split(".")[0]) and any(b in re.sub(r"0", "o", reg) for b in BRANDS):
         ev.append(("digit_swap", f"the domain {host} swaps letters for digits to imitate a brand"))
+    if not official and not any(n in ("brand_lookalike", "digit_swap") for n, _ in ev):
+        # A near copy of an official name that has no brand substring or digit ("icicibnak.com",
+        # "hfdcbank.com"); a host the brand rules already caught is not counted twice.
+        target = typosquat.match(host)
+        if target:
+            ev.append(("typosquat", typosquat.describe(host, target)))
+    if not official and typosquat.apk_download(url):
+        ev.append(("apk_download", typosquat.APK_DESC))
     if "@" in url:
         ev.append(("at_sign", "the link contains an @ sign that can hide the real destination"))
     if url.lower().startswith("http://") and not official:

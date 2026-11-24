@@ -11,7 +11,7 @@ _cache = {}
 
 FLOW_CAT = ("protocol_type", "service", "flag")
 STRONG = {"credential_request", "kyc_threat", "authority_threat", "remote_app", "brand_lookalike",
-          "digit_swap", "ip_host", "payment_request"}
+          "digit_swap", "ip_host", "payment_request", "typosquat", "apk_download"}
 
 
 def _model(name):

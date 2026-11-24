@@ -15,6 +15,8 @@ import re
 import unicodedata
 from urllib.parse import urlparse
 
+from . import typosquat
+
 SPLIT = ".!?।;\n"
 # Hindi perfective forms ("जमा किए गए हैं", "भुगतान हो गया", "ट्रांसफर की गई") report money that already
 # moved; only the bare or imperative verb ("जमा करें", "भुगतान करें") asks the reader to pay. Used after
@@ -643,6 +645,9 @@ def host_risk(h):
         return f"the domain {h} swaps letters for digits to imitate a brand"
     if h.count("-") >= 2 or h.count(".") >= 4:
         return f"the domain {h} is unusually long or hyphenated"
+    target = typosquat.match(h)
+    if target:
+        return typosquat.describe(h, target)
     return ""
 
 

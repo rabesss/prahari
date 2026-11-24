@@ -448,7 +448,8 @@
   "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है",
   "threatens to send or post something about you to your contacts or family": "आपके बारे में कुछ आपके संपर्कों या परिवार को भेजने या पोस्ट करने की धमकी देता है",
   "threatens to send something about you to your contacts or family": "आपके बारे में कुछ आपके संपर्कों या परिवार को भेजने की धमकी देता है",
-  "threatens you or your family to force a payment": "पैसे ऐंठने के लिए आपको या आपके परिवार को धमकी देता है"
+  "threatens you or your family to force a payment": "पैसे ऐंठने के लिए आपको या आपके परिवार को धमकी देता है",
+  "the link points straight to an Android app file (.apk), which installs outside the Play Store": "यह लिंक सीधे Android ऐप फ़ाइल (.apk) देता है, जो Play Store के बाहर से इंस्टॉल होती है"
  },
  "skip": [
   "$label · $hi",
@@ -752,6 +753,10 @@
   {
    "en": "an unofficial .{tld} domain",
    "hi": ".{tld} वाला डोमेन, जो आधिकारिक नहीं है"
+  },
+  {
+   "en": "the domain {host} is a lookalike of the official {official}",
+   "hi": "डोमेन {host}, असली {official} जैसा दिखने वाला नकली डोमेन है"
   }
  ]
 }
