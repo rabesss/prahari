@@ -30,11 +30,24 @@ class Linear:
 detect._model = lambda name: Linear(name)
 detect.indic_model = lambda: None
 
+class ExplainTimeout(Exception):
+    """The phone ran out of its Llama time budget (MainActivity.Runner stopped generation)."""
+
+
 class BridgeExplainer(llm.Explainer):
     def __init__(self, runner):
         self.runner = runner
+        self.last_stats = None
     def _run(self, prompt):
-        data = json.loads(str(self.runner.generate(prompt)))
+        raw = str(self.runner.generate(prompt))
+        try:
+            data = json.loads(raw)
+        except ValueError as exc:
+            # Not a model-text failure: keep it out of explain()'s detector-text fallback.
+            raise RuntimeError('unreadable reply from the Android runner') from exc
+        self.last_stats = data.get('stats') or {}
+        if data.get('timed_out'):
+            raise ExplainTimeout('Llama time budget used up')
         text = llm.tidy(re.sub(r'<\|[^|]*\|>', '', data['text']).strip())
         return text, data['stats']
 
@@ -335,10 +348,78 @@ def ends_with_replacement(explanation, kind, lab, text):
     return any(body.endswith(sent) for sent in _replacement_pool(kind, lab, text))
 
 
+_FLOW_GUESS = 'traffic that looks like a routine update or a scheduled backup'
+_FLOW_CLEAR = 'No risk found for this network event'
+
+
+def _opening(ctx):
+    """The prompt's required opening, rebuilt from the prompt context (llm._CTX) instead of parsed
+    out of the prompt text, which carries attacker-controlled evidence such as a payee name. Same
+    rule as llm.Explainer.prompt."""
+    what = {'sms': 'message', 'injection': 'message', 'url': 'link', 'flow': 'network event',
+            'upi': 'UPI payment QR'}.get(ctx.get('kind'), 'item')
+    verdict = ctx.get('verdict')
+    ev = ctx.get('evidence') or []
+    first = {1: f'This {what} is DANGEROUS', 0: f'No risk found for this {what}'}.get(verdict, f'This {what} needs a check')
+    if ev:
+        return f'{first}: {ev[0]}'.rstrip(' .')
+    if verdict == 1:
+        return f'This {what} was flagged as risky; check it carefully before acting'
+    if verdict == 'uncertain':
+        return f'This {what} needs a check; review it carefully before acting'
+    return f'This {what} was checked; review it carefully before acting'
+
+
+def detector_text(kind, text, lab, ev):
+    """Fixed text from the detector alone: the prompt's required opening plus its vetted key fact.
+
+    Built without a model call, and checked by llm.validate() like the Llama text. A cleared network
+    event gets a neutral opening: its evidence phrase is pattern-matched from the description, so it
+    can quote a negated event ("no 200 different ports ...") or guess "routine update or backup".
+    """
+    prompt = BridgeExplainer(None).prompt(kind, text, lab, ev)
+    ctx = llm._CTX.get(prompt) or {}
+    opening = _opening(ctx)
+    fact = ctx.get('fact') or ''
+    if kind == 'flow':
+        # The prompt's flow phrase is pattern-matched from the description and blind to negation
+        # ("No 200 different ports ..."). Fixed text uses the detector's own first evidence line,
+        # which the screen already shows, or a neutral line.
+        head = {1: 'This network event is DANGEROUS', 'uncertain': 'This network event needs a check'}.get(lab)
+        lead = str(ev[0]).strip().rstrip('.') if ev else ''
+        opening = _FLOW_CLEAR if head is None else (f'{head}: {lead}' if lead else head)
+    elif kind == 'upi' or ctx.get('kind') == 'upi':
+        # UPI evidence quotes the QR's own payee name and note, which the sender chose ("Safe account,
+        # genuine seller"). Text labelled as the detector's carries only the verdict; the parsed
+        # fields stay in the evidence and UPI cards above, shown as data.
+        opening = {1: 'This UPI payment QR is DANGEROUS', 0: 'No risk found for this UPI payment QR'}.get(
+            lab, 'This UPI payment QR needs a check')
+    out = opening + '.' + (' ' + fact if fact else '')
+    try:
+        checked, _report = llm.validate(out, opening, ctx, vetted=[fact] if fact else [])
+    except ValueError:
+        checked = opening + '.'
+    return (checked or out).strip()
+
+
 def explain(runner):
-    """Stage 2: the on-device Llama explanation for the item from the last verdict() call."""
+    """Stage 2: the on-device Llama explanation for the item from the last verdict() call.
+
+    When every reply fails the explanation checks (repeated refusals or unsupported claims, as the
+    1B model does on some lookalike links) or the phone's Llama time budget runs out, the reader
+    gets the detector's fixed text, labelled as such, instead of an error. The verdict and the
+    vetted steps never depended on this stage.
+    """
     ex = BridgeExplainer(runner)
-    text, stats = ex.generate(ex.prompt(_last['kind'], _last['text'], _last['lab'], _last['ev']))
+    kind, src, lab, ev = _last['kind'], _last['text'], _last['lab'], _last['ev']
+    try:
+        text, stats = ex.generate(ex.prompt(kind, src, lab, ev))
+    except (ValueError, ExplainTimeout) as exc:
+        stats = dict(ex.last_stats or {})
+        reason = 'timeout' if isinstance(exc, ExplainTimeout) else 'checks_failed'
+        stats['fallback'] = reason
+        return json.dumps({'explanation': detector_text(kind, src, lab, ev), 'llm': stats, 'replaced': False,
+                           'fallback': reason, 'source': 'detector_template'}, ensure_ascii=False)
     # The explainer reports replacement explicitly; suffix matching is the fallback for old stats.
     replaced = stats.get('replaced')
     if replaced is None:
