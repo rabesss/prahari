@@ -189,7 +189,9 @@ EXPOSE_DESC = "threatens to send or post something about you to your contacts or
 # The exposure line is used only with a threat cue ("warna", "or else", "kar dunga", "will post"); "share
 # feedback with friends and family" keeps the base wording.
 EXPOSE_CUE = (r"\b(?:warna|varna|or else|otherwise|unless|nahi to|nahin to|if you don'?t|kar dunga|kar denge|"
-              r"bhej\s*dunga|bhej\s*denge|bhejunga|will (?:send|post|share|leak|publish|message))\b|वरना|नहीं तो|"
+              r"bhej\s*dunga|bhej\s*denge|bhejunga|"
+              r"(?:i|we|i'?ll|we'?ll|i will|we will|gonna)\s*(?:will\s+)?(?:send|post|share|leak|publish|message|"
+              r"show|forward|upload)|will (?:send|post|share|leak|publish|message))\b|वरना|नहीं तो|"
               r"दूंगा|दूँगा|देंगे")
 AUTHORITY = (r"\b(police|cbi|ncb|dri|ed|enforcement directorate|customs|court|magistrate|narcotics|"
              r"cyber ?cell|cyber crime|crime branch|inspector|sub[- ]inspector|\btrai\b|\brbi\b|"
@@ -1119,7 +1121,8 @@ def _self_block(text):
 # at ", ", dashes, contrast words and connectors before an order, so a negation reaches only its own
 # segment ("don't panic, just share the OTP" keeps "just share the OTP"). Self-check lead-ins and
 # doorstep handovers were tried and dropped: they added little and each opened ways to hide a demand
-# (PR #48 review). Hypothetical callers came back later in a narrow form (_hypothetical_warning). A report that quotes what fraudsters asked for is not
+# (PR #48 review). So were hypothetical callers; a narrow span-based version was tried again in the
+# validation-gate PR and dropped after three review rounds kept finding demands it cleared. A report that quotes what fraudsters asked for is not
 # a warning segment: by controller decision a quoted credential demand stays flagged.
 SEG_SPLIT = re.compile(r",\s|:\s|[–—]|\s-\s|\b(?:but|instead|just|however|lekin|balki|bas|sirf)\b|"
                        r"(?:^|\s)(?:लेकिन|बल्कि|बस|सिर्फ़|सिर्फ)(?=\s|$)", re.I)
@@ -1232,145 +1235,8 @@ def _segments(clause):
     return spans
 
 
-# A family or friend warning about a hypothetical caller: "if anyone calls asking for an OTP, hang up",
-# "agar koi OTP maange to phone kaat dena", "अगर कोई ओटीपी मांगे तो फोन काट देना". PR #48 dropped a
-# broad version of this because a demand could hide behind the condition. This one is narrow: the
-# condition names an unknown third party (anyone, someone, koi, कोई), and the same clause tells the
-# reader to protect themselves (hang up, disconnect, ignore, block or report the caller, or not to
-# share). The clause is never a warning if, once the protective words are removed, it still orders the
-# reader to hand over, pay, send or install, names a channel to contact, threatens after the
-# condition, or makes an exception. A contact anywhere in the message still blocks clearing
-# (_warning_only), so "hang up and call me on 98..." stays flagged.
-_HYPO_CALLER = re.compile(
-    r"\b(?:if|in case|whenever|when)\s+(?:any(?:one|body)|some(?:one|body)|a (?:stranger|caller)|"
-    r"any (?:caller|person|stranger|unknown (?:caller|number|person)))\b|"
-    r"\b(?:agar|jab|yadi)\s+(?:koi|kisi)\b|(?:^|\s)(?:अगर|यदि|जब)\s+(?:कोई|किसी)(?=\s|$)", re.I)
-_HYPO_PROTECT = re.compile(
-    r"\b(?:hang up|disconnect\w*|cut the call|end the call|put the phone down|ignore (?:it|them|the call|"
-    r"the message|such calls)|block (?:the|that) (?:number|caller)|report (?:it|them|the number)|"
-    r"(?:do not|don't|never) (?:share|give|tell|say|reply|answer|send)(?: (?:it|them|anything|that|this|"
-    r"the (?:otp|pin|code|cvv|password)|your (?:otp|pin|code|cvv|password)))?(?: to (?:them|anyone|him|her))?|"
-    r"phone (?:kaat|rakh) (?:do|dena|dein|dijiye)|call (?:kaat|cut) (?:do|dena|kar do|kar dena)|"
-    r"kuch (?:bhi )?mat (?:batana|bolna|dena)|mat (?:batana|dena|bolna|bhejna)|ignore kar\w*|block kar\w*)\b|"
-    r"(?:फोन|फ़ोन|कॉल)\s*(?:तुरंत\s*)?(?:काट|रख)\s*(?:देना|दें|दीजिए|दो)|कुछ\s*(?:भी\s*)?मत\s*(?:बताना|बोलना|देना)|"
-    r"मत\s*(?:बताना|देना|भेजना)|(?:न|ना)\s*(?:बताएं|बताना|दें|देना|भेजें)|मना\s*कर\s*(?:देना|दें|दो)|"
-    r"नंबर\s*ब्लॉक", re.I)
-_HYPO_CONTACT = re.compile(r"\b(?:call|contact|visit|click|open|message|whatsapp|reach|dial|tap|go to)\b|"
-                           r"संपर्क|कॉल\s*कर|फोन\s*कर|क्लिक", re.I)
-
-
-# Hindi and Hinglish put the verb last, so one negated ask-verb at the end covers the whole list before
-# it: "एसबीआई कभी भी कॉल, एसएमएस या लिंक के जरिए केवाईसी, ओटीपी, सीवीवी या यूपीआई पिन नहीं मांगता",
-# "bank kabhi OTP, PIN ya CVV nahi maangta". Splitting at the commas would leave the list items outside
-# the negation. Such a clause is one warning segment when it also passes _warning_segment's tests.
-_VERB_FINAL_NEG = re.compile(
-    r"(?:नहीं|कभी\s+नहीं|न)\s*(?:मांग|माँग|पूछ)(?:ता|ती|ते|ेगा|ेगी|ेंगे|े)\s*(?:है|हैं|था|थे)?\s*$|"
-    r"\b(?:nahi|nahin|kabhi nahi|na)\s+(?:maang|mang|pooch|puchh?)(?:ta|ti|te|ega|egi|enge|e)\s*(?:hai|hain)?\s*$",
-    re.I)
-
-
-# Any imperative or polite request form: Hindi verbs in -ें/-एं/-िए/-ो ("खोलें", "चलाएं", "कीजिए",
-# "करो"; postpositions and participles excluded), Hinglish imperatives, English bare commands and
-# "please". A list item in a negated list is a noun phrase and has none of these.
-_ANY_IMPERATIVE = re.compile(
-    r"(?:^|\s)(?!(?:में|हमें|उन्हें|तुम्हें|इन्हें|जिन्हें|किन्हें|को|जो|सो|वो|जरिए|ज़रिए|लिए|लिये|किए|किये|दिए|दिये|"
-    r"गए|गये|हुए|हुये)(?=[\s,।:]|$))\S+(?:ें|एं|िए|िये|ो)(?=[\s,।:]|$)|कृपया|"
-    # bare stems and the -ना form: "शेयर कर", "पासवर्ड भर", "कर लेना"
-    r"(?:^|\s)(?:कर|खोल|लगा|भर|डाल|भेज|बता|दे|ले|दिखा|चला|दबा|सुना)(?=[\s,।:]|$)|"
-    r"(?:^|\s)(?!(?:अपना|सूचना|योजना|घटना|सामना|जुर्माना|ना)(?=[\s,।:]|$))\S+ना(?=[\s,।:]|$)|"
-    r"\b(?:please|kindly|pls|kripya|kar|kar\w+|lena|dena|kholo|khol\w*|dabao|daba\w*|chalao|chala\w*|lo|lijiye|"
-    r"dikhao|dikha\w*|bhejo|bhej|daalo|daal|bharo|bhar|do|dein|dijiye|"
-    r"open|setup|tap|press|click|visit|scan|run|allow|grant|accept|approve|join|reply|log ?in|sign in|verify|"
-    r"type|enter|call|dial|install|download|share|send|pay|give|tell)\b", re.I)
-
-
-def _inert(seg):
-    """A segment that asks, orders or threatens nothing: no command verb, order, request or threat."""
-    return not (_SEG_COMMAND.search(seg) or _ordered(seg) or _directs(seg) or _AFFIRM.search(seg)
-                or _EXCEPT.search(seg) or _ANY_IMPERATIVE.search(seg.strip(" ,:;")) or _threatens(seg))
-
-
-def _verb_final_spans(clause):
-    """(start, end) of the negated list a verb-final negation covers, or []. Only the final segment and
-    the inert list segments right before it are covered; a segment with an order of its own
-    ("कृपया स्क्रीन शेयर करें, बैंक ओटीपी नहीं मांगता") stays in the request text."""
-    c = clause.rstrip().rstrip("।.!")
-    if not _VERB_FINAL_NEG.search(c) or _SEG_CONDITION.search(c):
-        return []
-    segs = _segments(c)
-    if not segs or not _inert(c[segs[-1][0]:segs[-1][1]]):
-        return []
-    start = segs[-1][0]
-    for a, b in reversed(segs[:-1]):
-        if not _inert(c[a:b]):
-            break
-        start = a
-    return [(start, segs[-1][1])] if _SEG_PROTECTED.search(c[start:segs[-1][1]]) else []
-
-
-_HYPO_END = re.compile(r",\s|[–—]|\s-\s|\s(?:toh|then)\s|\s(?:तो|फिर)\s", re.I)
-
-
-def _hypothetical_spans(clause):
-    """(start, end) spans of a hypothetical-caller warning: the condition ("if anyone calls asking for
-    an OTP") and each protective phrase ("hang up", "phone kaat dena"). Everything else in the clause
-    stays in the request text and is analysed again, so a demand next to the warning is still seen."""
-    m = _HYPO_CALLER.search(clause)
-    if not m or _EXCEPT.search(clause) or _AFFIRM.search(clause):
-        return []
-    after = clause[m.end():]
-    prot = list(_HYPO_PROTECT.finditer(after))
-    if not prot:
-        return []
-    # "don't disconnect, give them the code" negates the protection itself: never a warning. An earlier
-    # protective phrase ("kuch mat batana, phone kaat dena") is not a negation of the next one.
-    if any(_NEG_NEAR_BEFORE.search(_HYPO_PROTECT.sub(" ", after[:p.start()])) for p in prot):
-        return []
-    # The condition runs to the first segment break or the first protective phrase. It describes the
-    # caller ("asking for", "sending a link"), so its -ing forms are not orders; any other order in it
-    # means it is not a plain condition.
-    end = prot[0].start()
-    brk = _HYPO_END.search(after[:end])
-    if brk:
-        end = brk.start()
-    condition = re.sub(r"\b[a-z]+ing\b", " ", after[:end], flags=re.I)
-    if _ordered(condition, threat=False) or _SEG_COMMAND.search(condition) or _threatens(condition, imperative=False):
-        return []
-    # After the first protective phrase nothing may name a channel to contact or threaten.
-    tail = _HYPO_PROTECT.sub(" ", after[prot[0].start():])
-    if _HYPO_CONTACT.search(tail) or _threatens(tail):
-        return []
-    off = m.end()
-    return [(m.start(), off + end)] + [(off + p.start(), off + p.end()) for p in prot]
-
-
-def _hypothetical_warning(clause):
-    return bool(_hypothetical_spans(clause))
-
-
-def _request_parts(text):
-    """(request text, used_span_rule): the text with warning spans blanked, and whether a
-    hypothetical-caller or verb-final span was among them."""
-    drop, special = [], False
-    for off, clause in clauses(text):
-        spans = _hypothetical_spans(clause) + _verb_final_spans(clause)
-        special = special or bool(spans)
-        spans += [(a, b) for a, b in _segments(clause) if _warning_segment(clause[a:b])]
-        drop += [(off + a, off + b) for a, b in spans]
-    out, last = [], 0
-    for a, b in sorted(drop):
-        if b <= last:
-            continue
-        out.append(text[last:max(a, last)])
-        last = b
-    out.append(text[last:])
-    return " ".join("".join(out).split()), special
-
-
-# What is left once warnings are blanked must not hand anything over or point at someone to take it.
-# Any hand-over or contact verb (negated or not: "do not delay, share it", "der mat karo, bata do"), a
-# demand ("our officer is asking for it", "humein chahiye") or an exception ("only our officer", "sirf
-# humara officer", "anybody but our executive") means the warning sits next to a request.
+# Left over once warning segments are blanked, a hand-over or contact verb, a demand or an exception
+# means a request cue may still be live ("do not share it with anyone else, give it to our officer").
 _LEFTOVER_DEMAND = re.compile(
     DEMAND + r"|\b(?:need|needs|needed|require|requires|chahiye|chahie|zaroorat)\b|चाहिए|ज़रूरत|जरूरत|पूछ\w*|बोल रह\w*|"
     r"\b(?:share|send|give|tell|pass|hand|forward|message|msg|text|whatsapp|take|collect|provide|dictate|read out|"
@@ -1379,14 +1245,20 @@ _LEFTOVER_DEMAND = re.compile(
     r"\b(?:only|alone|besides|apart from|but|except|other than|sirf|keval|siwa)\b|सिर्फ़?|केवल|सिवाय", re.I)
 
 
-def _span_leftover(rest):
-    return bool(_SEG_PROTECTED.search(rest) or _LEFTOVER_DEMAND.search(rest))
-
-
 def request_text(text):
     """The text with warning segments blanked out in place: what the message actually asks of the
     reader. Everything else keeps its original wording and punctuation."""
-    return _request_parts(text)[0]
+    drop = []
+    for off, clause in clauses(text):
+        for a, b in _segments(clause):
+            if _warning_segment(clause[a:b]):
+                drop.append((off + a, off + b))
+    out, last = [], 0
+    for a, b in drop:
+        out.append(text[last:a])
+        last = b
+    out.append(text[last:])
+    return " ".join("".join(out).split())
 
 
 # Only these mechanisms can be explained away by warning context: they are what genuine OTP messages
@@ -1403,12 +1275,7 @@ def _warning_only(a):
         return False
     if not {n for n, _ in a["harm"]} <= CLEARABLE:
         return False
-    rest, special = _request_parts(a.get("text", ""))
-    if special and (_EXCEPT.search(a.get("text", "")) or _span_leftover(rest)):
-        # The span rules (hypothetical caller, verb-final list) are stricter than PR #48's warning
-        # segments: no exception anywhere, and nothing left over that hands over, demands or names
-        # a secret. PR #48's own path is unchanged.
-        return False
+    rest = request_text(a.get("text", ""))
     if _ordered(rest):
         # Something outside the warnings still tells the reader to hand over, pay, send or install
         # ("Never share your PIN. Share it with our officer"): never cleared, whatever re-analysis says.
@@ -1438,19 +1305,16 @@ def _actionable(a):
     request. Genuine bank, OTP, bill and notice messages often score high on vocabulary alone, but
     with no destination and no request a scam has no way to reach its victim."""
     text = a.get("text", "")
-    # Warning segments and hypothetical-caller warnings are blanked first: "phone kaat dena" protects
-    # the reader, and a request cue inside "कृपया ओटीपी किसी से साझा न करें" asks nothing.
-    rest, special = _request_parts(text)
     if (a["own_contact"] or _clause_hit(BLOCK_FUTURE, text) or _contact_anywhere(a) or
-            _clause_hit(PAY_COMMAND, text) or _ordered(rest, threat=False) or _EXCEPT.search(text)):
+            _clause_hit(PAY_COMMAND, text) or _ordered(text, threat=False) or _EXCEPT.search(text)):
         return True
     if not (a["request_cues"] or a["reader_direct"]):
         return False
-    # From here a request cue would make the message actionable (as before this change); it is
-    # discounted only when every cue sat inside a warning and nothing left over hands over or demands.
-    if rest != " ".join(text.split()) and _LEFTOVER_DEMAND.search(rest):
-        return True
-    if rest == " ".join(text.split()):
+    # A request cue made the message actionable before this change, and still does, unless every cue
+    # sits inside a negated warning ("कृपया ओटीपी किसी से साझा न करें", "never share your PIN") and
+    # nothing left over hands over, demands or makes an exception.
+    rest = request_text(text)
+    if rest == " ".join(text.split()) or _LEFTOVER_DEMAND.search(rest):
         return True
     if not rest.strip():
         return False

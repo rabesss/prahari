@@ -17,21 +17,9 @@ def verdict(text):
     return detect.predict_text([text])[0][0]
 
 
-# 1. Family or friend warnings about a hypothetical caller, with a protective instruction.
-@pytest.mark.parametrize("text", [
-    "Bhai, agar koi bank se bolke OTP maange to phone kaat dena, kuch mat batana.",
-    "दादी, अगर कोई केवाईसी के नाम पर ओटीपी या पिन मांगे तो कुछ मत बताना, फोन काट देना।",
-    "Nani, if someone calls from SBI asking for your OTP or sending a KYC link, hang up right away.",
-    "Beta, if anyone calls saying your pension will stop and asks for the UPI PIN, just disconnect. "
-    "We will go to the branch on Monday.",
-])
-def test_hypothetical_caller_warnings_are_not_flagged(text):
-    assert verdict(text) != 1
-    a = mech.analyze(text)
-    for p in (0.5, 0.9, 0.99):
-        assert mech.decide(p, a)[0] != 1, (p, text)
-
-
+# 1. Hypothetical-caller warnings ("if anyone calls asking for an OTP, hang up") are NOT cleared: a
+#    narrow rule was tried and dropped after review kept finding demands it cleared. These scams
+#    around the same wording must stay flagged.
 @pytest.mark.parametrize("text", [
     "Mom, if anyone calls asking for the OTP, just share it, it is our bank agent.",
     "Papa, agar koi OTP maange to de dena, bank wale hain.",
@@ -56,22 +44,11 @@ def test_demands_behind_a_hypothetical_caller_stay_flagged(text):
     assert verdict(text) == 1
 
 
-def test_hypothetical_warning_needs_an_unknown_caller_and_protection():
-    assert mech._hypothetical_warning("agar koi OTP maange to phone kaat dena")
-    assert not mech._hypothetical_warning("agar koi OTP maange to de dena")       # order, not protection
-    assert not mech._hypothetical_warning("if the officer asks for the OTP, hang up")  # not an unknown caller
-    assert not mech._hypothetical_warning("if anyone asks for the OTP, don't hang up")  # protection negated
-
-
 # 2. Negated warnings: a request cue that sits only inside "do not share" is not a request, and a
 #    Hindi completed credit ("जमा किए गए हैं") is a record, not an order to deposit.
 @pytest.mark.parametrize("text", [
     "आपके खाते में ₹1,500 जमा हो गए हैं। कृपया ओटीपी किसी को न बताएं।",
     "आपके पंजाब नेशनल बैंक खाते XX4410 में ₹8,000.00 एनईएफटी द्वारा जमा किए गए हैं। उपलब्ध शेष ₹21,300 है।",
-    "बैंक कभी भी फोन पर ओटीपी, पिन या सीवीवी नहीं मांगता। किसी को भी ये जानकारी न दें।",
-    "Bank kabhi bhi call par OTP, PIN ya CVV nahi maangta. Kisi ko mat batana.",
-    "बैंक जनहित सूचना: बैंक कभी भी कॉल, एसएमएस या लिंक के जरिए केवाईसी, ओटीपी, सीवीवी या यूपीआई पिन नहीं "
-    "मांगता। शिकायत 1930 या cybercrime.gov.in पर करें।",
 ])
 def test_negated_warnings_and_credit_records_are_not_flagged(text):
     assert verdict(text) != 1
@@ -136,7 +113,7 @@ def test_account_block_threat_keeps_its_phrase():
     assert ("block_threat", "threatens to block, cut or freeze an account, SIM or connection") in a["harm"]
 
 
-# Review round 1 (GLM 5.4): demands next to a warning span are analysed again, not blanked with it.
+# Review round 1 (GLM 5.4): demands next to a warning stay flagged.
 @pytest.mark.parametrize("text", [
     "If anyone calls asking for the OTP, do not share it, SBI: Apna OTP dijiye.",
     "If someone from SBI asks for your PIN, never say it out loud, type it in the AnyDesk chat.",
@@ -178,7 +155,7 @@ def test_long_reserved_host_phrase_fits_the_budget():
     assert len(llm._risky_short(mech.host_risk(host))) <= 78
 
 
-# Review round 2 (gpt-6.1-terra, GLM 5.4): leftovers that hand over, demand or make an exception.
+# Review rounds 2-3 (gpt-6.1-terra, GLM 5.4): leftovers that hand over, demand or make an exception.
 @pytest.mark.parametrize("text", [
     "SBI सपोर्ट: स्क्रीन शेयर कर लेना, बैंक ओटीपी नहीं मांगता।",
     "SBI: AnyDesk open kar, bank OTP nahi maangta.",
@@ -190,6 +167,10 @@ def test_long_reserved_host_phrase_fits_the_budget():
     "SBI: If anyone calls asking for your OTP, do not share it. Only our verified officer will ask for it.",
     "If anyone calls asking for the OTP, do not share it with anybody but our executive.",
     "Agar koi OTP maange to phone kaat dena. Sirf humara hi officer maangega.",
+    "SBI: If anyone calls asking for your OTP, hang up. You must disclose it to our officer.",
+    "If anyone calls asking for the OTP, hang up, then reveal the same to our desk.",
+    "Agar koi OTP maange to phone kaat dena. Ise hamare officer ko batana hai.",
+    "If anyone calls asking for your PIN, hang up. Our officer needs the same, type it in the app he sends.",
 ])
 def test_leftover_handover_demand_or_exception_stays_flagged(text):
     assert verdict(text) == 1
@@ -211,3 +192,23 @@ def test_feedback_invitation_is_not_called_an_exposure_threat():
 def test_spaced_hinglish_sextortion_is_recognised():
     a = mech.analyze("Tumhari private video sab contacts ko bhej dunga. Abhi 20,000 bhejo.")
     assert "sextortion" in {n for n, _ in a["harm"]}
+
+
+def test_first_person_leak_threat_uses_the_exposure_line():
+    a = mech.analyze("Pay Rs 20000 now. I'll leak your photos to your family.")
+    assert ("block_threat", mech.EXPOSE_DESC) in a["harm"]
+
+
+# Review round 3 (GLM 5.4) strings: with the span rules removed these stay flagged as at base.
+@pytest.mark.parametrize("text", [
+    "Agar koi OTP maange to mujhe de, phone kaat dena.",
+    "अगर कोई ओटीपी मांगे तो हमें दे, फोन काट देना।",
+    "Agar koi OTP maange to AnyDesk laga lo, phone kaat dena.",
+    "If anyone calls asking for the OTP, hang up, repeat it to me.",
+    "SBI: verification ke liye AnyDesk app chahiye, bank OTP nahi maangta.",
+    "HDFC: KYC update ke liye OTP chahiye, bank kabhi OTP nahi maangta.",
+    "SBI सपोर्ट: AnyDesk लगाओ, बैंक ओटीपी नहीं मांगता।",
+    "If anyone calls asking for the OTP and asks you to open the link sent by SMS, hang up.",
+])
+def test_round3_strings_stay_flagged(text):
+    assert verdict(text) == 1
