@@ -19,7 +19,7 @@ from triage import mech
 textmodel = types.ModuleType('triage.textmodel')
 textmodel.prob = lambda bundle, texts: np.array([portable.probability('indic', t) for t in texts])
 sys.modules['triage.textmodel'] = textmodel
-from triage import detect, explain_hi, llm, upi
+from triage import detect, explain_hi, llm, sender, upi
 detect.textmodel = textmodel
 # The report card and the remote-app flag are aids: a broken module must not stop checks.
 try:
@@ -298,11 +298,14 @@ def _report_card(kind, text, lab, scam, ev, quotes, actions, source):
     return {}
 
 
-def verdict(kind, text, source=''):
+def verdict(kind, text, source='', sender_id=''):
     """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds.
 
     source is where the text came from, as a hint for the report only: 'qr', 'whatsapp', 'sms'
-    or ''. It never reaches the detector."""
+    or ''. It never reaches the detector.
+
+    sender_id is the optional sender typed on the check screen. It can only raise a text message
+    to SUSPICIOUS (sender.py); with none the output is exactly what it was without the field."""
     t0 = time.perf_counter()
     is_upi = kind == 'upi' or (kind in ('url', 'sms') and upi.is_upi_payload(text))
     upi_info = None
@@ -315,12 +318,16 @@ def verdict(kind, text, source=''):
         lab, score, ev = _flow_json(text)
     else:
         lab, score, ev = detect.classify_any(kind, text)
+    why = None if is_upi else sender.reason(kind, text, sender_id)
+    lab, score, _ = sender.apply(lab, score, ev, why)
     if kind == 'url' and not is_upi:
         ev = _promote_link_signals(ev)
     # A cleared item, or a debit alert to confirm, must not show the threat phrase the detector
     # overruled or set aside.
     if lab in (0, 'uncertain'):
         ev = llm.benign_evidence('upi' if is_upi else kind, text, ev, lab)
+    if why:
+        ev = [sender.SENDER_LINE] + [line for line in ev if line != sender.SENDER_LINE]
     ms = (time.perf_counter() - t0) * 1000
     eff_kind = 'upi' if is_upi else kind
     actions = llm.actions_for(eff_kind, lab, text)
@@ -329,10 +336,12 @@ def verdict(kind, text, source=''):
         summary_hi = explain_hi.summary_hi(eff_kind, text, lab, ev)
     except Exception:
         summary_hi = ''  # the Hindi summary is an aid; the verdict never depends on it
-    _last.clear(); _last.update(kind=eff_kind, text=text, lab=lab, ev=ev)
+    if summary_hi and why:
+        summary_hi = f'{summary_hi} {sender.SENDER_LINE_HI}।'
+    _last.clear(); _last.update(kind=eff_kind, text=text, lab=lab, ev=ev, why=why, sender=sender_id if why else None)
     out = {'verdict': VERDICT[lab], 'level': {1: 'danger', 'uncertain': 'warn', 0: 'clear'}[lab],
            'score': score, 'scam_type': scam, 'evidence': ev,
-           'evidence_quotes': [quote_span(line, text) for line in ev],
+           'evidence_quotes': ['' if line == sender.SENDER_LINE else quote_span(line, text) for line in ev],
            'actions': actions, 'actions_hi': _actions_hi(actions),
            'buttons': _HINDI['buttons'], 'detector_ms': ms}
     if summary_hi:
@@ -340,6 +349,8 @@ def verdict(kind, text, source=''):
         out['summary_hi_label'] = explain_hi.label_hi()
     if upi_info:
         out['upi'] = upi_info
+    if why:
+        out['sender_raised'] = why
     report = _report_buttons(eff_kind, lab, scam, actions)
     if report:
         out['report_buttons'] = report
@@ -409,14 +420,15 @@ def _opening(ctx):
     return f'This {what} was checked; review it carefully before acting'
 
 
-def detector_text(kind, text, lab, ev):
+def detector_text(kind, text, lab, ev, **extra):
     """Fixed text from the detector alone: the prompt's required opening plus its vetted key fact.
 
     Built without a model call, and checked by llm.validate() like the Llama text. A cleared network
     event gets a neutral opening: its evidence phrase is pattern-matched from the description, so it
     can quote a negated event ("no 200 different ports ...") or guess "routine update or backup".
     """
-    prompt = BridgeExplainer(None).prompt(kind, text, lab, ev)
+    # extra carries the sender reason when a personal-mobile sender raised the item (sender.py).
+    prompt = BridgeExplainer(None).prompt(kind, text, lab, ev, **extra)
     ctx = llm._CTX.get(prompt) or {}
     opening = _opening(ctx)
     fact = ctx.get('fact') or ''
@@ -451,13 +463,14 @@ def explain(runner):
     """
     ex = BridgeExplainer(runner)
     kind, src, lab, ev = _last['kind'], _last['text'], _last['lab'], _last['ev']
+    extra = {'sender_reason': _last['why'], 'sender_id': _last['sender']} if _last.get('why') else {}
     try:
-        text, stats = ex.generate(ex.prompt(kind, src, lab, ev))
+        text, stats = ex.generate(ex.prompt(kind, src, lab, ev, **extra))
     except (ValueError, ExplainTimeout) as exc:
         stats = dict(ex.last_stats or {})
         reason = 'timeout' if isinstance(exc, ExplainTimeout) else 'checks_failed'
         stats['fallback'] = reason
-        return json.dumps({'explanation': detector_text(kind, src, lab, ev), 'llm': stats, 'replaced': False,
+        return json.dumps({'explanation': detector_text(kind, src, lab, ev, **extra), 'llm': stats, 'replaced': False,
                            'fallback': reason, 'source': 'detector_template'}, ensure_ascii=False)
     # The explainer reports replacement explicitly; suffix matching is the fallback for old stats.
     replaced = stats.get('replaced')
@@ -477,8 +490,8 @@ def vetted_explanation():
                        'llama_skipped': True, 'source': 'detector_template'}, ensure_ascii=False)
 
 
-def check(kind, text, runner):
+def check(kind, text, runner, sender_id=''):
     """Both stages in one call (tests and the command line)."""
-    out = json.loads(verdict(kind, text))
+    out = json.loads(verdict(kind, text, sender_id=sender_id))
     out.update(json.loads(explain(runner)))
     return json.dumps(out, ensure_ascii=False)
