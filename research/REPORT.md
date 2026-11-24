@@ -87,8 +87,8 @@ demoting {collect_request, qr_payment, crypto_transfer, job_upfront} removes non
 pay_to_receive alone removes none, so both are in {prize_claim, investment}. Demoting either whole
 group costs 6-25 points of India recall, so no demotion is promotable; the fix has to be a narrow
 false-safe in the individual mechanisms.
-The audit then moved to visible data (`research/stress/benign_tripwires.jsonl`, eight benign notices
-in the visible benign style plus eight matching scams). On gen21 six benign notices are false alarms:
+The audit then moved to visible data (`research/stress/benign_tripwires.jsonl`, nine benign notices
+in the visible benign style plus seven matching scams). On gen21 six benign notices are false alarms:
 reward points claimed in the app (prize_claim), the anti-fraud statements "we/bank never ask you to
 transfer to a safe account" (safe_account fires despite the negation), "download the official app"
 (remote_access treats any app install as remote access), "transfer the entire balance to your own
