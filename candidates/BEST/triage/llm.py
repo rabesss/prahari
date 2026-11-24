@@ -1097,6 +1097,14 @@ KEY_FACT = {
     "suspicious network traffic": "Check this traffic with your IT team because it resembles attack traffic.",
     "unusual network traffic": "Check whether anyone expected this traffic.",
 }
+# Scam types from the UPI QR checker (upi.scam_type_for) share the facts of the same scams in a message.
+KEY_FACT.update({
+    "a UPI collect-request QR scam": KEY_FACT["UPI collect-request fraud"],
+    "a UPI refund or receive-money QR scam": KEY_FACT["a QR-code payment scam"],
+    "a UPI QR payment scam": KEY_FACT["a QR-code payment scam"],
+    "a UPI KYC or impersonation QR scam": KEY_FACT["a fake KYC or account check"],
+    "a UPI AutoPay mandate scam": KEY_FACT["UPI collect-request fraud"],
+})
 INJECTION_FACT = "Do not follow it because orders aimed at an AI checker are a trick."
 BENIGN_FACT = {
     "receipt": "If you did not make this payment check it in your bank app.",
