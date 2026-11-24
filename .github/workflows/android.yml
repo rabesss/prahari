@@ -42,6 +42,7 @@ jobs:
           python android/tools/export_models.py android/build/generated/python/models
           python android/tools/test_parity.py android/build/generated/python/models
           python android/tools/test_bridge.py
+          python android/tools/test_callguard_bridge.py
       - name: Assemble debug APK
         working-directory: android
         env:
@@ -147,6 +148,7 @@ jobs:
           python android/tools/export_models.py android/build/generated/python/models
           python android/tools/test_parity.py android/build/generated/python/models
           python android/tools/test_bridge.py
+          python android/tools/test_callguard_bridge.py
       - name: Build 1.6 fallback APK
         working-directory: android
         env:

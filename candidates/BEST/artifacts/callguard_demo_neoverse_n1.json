@@ -1,0 +1,272 @@
+[
+  {
+    "label": 1,
+    "verdict": "malicious",
+    "stop_warning": true,
+    "score": 0.99,
+    "category": "a digital arrest scam call",
+    "evidence": [
+      "caller impersonates police, CBI, customs, TRAI, court or RBI",
+      "threatens a 'digital arrest', arrest warrant or criminal case",
+      "claims a parcel with illegal drugs or contraband is linked to your name or Aadhaar",
+      "orders you not to disconnect or hang up the call",
+      "pressures you to stay alone on video call or hide the call from family",
+      "asks you to transfer money to a 'safe' or RBI verification account"
+    ],
+    "call_signals": [
+      "fake_authority_call",
+      "arrest_warrant",
+      "contraband_parcel",
+      "no_disconnect",
+      "video_isolation",
+      "safe_account_verify"
+    ],
+    "is_digital_arrest": true,
+    "actions": [
+      "STOP and hang up immediately; real police, CBI, customs and RBI never conduct 'digital arrests' or keep you on video call.",
+      "Never transfer money to any 'safe' or 'verification' account and never stay isolated — tell a family member right away.",
+      "Report the caller on Sanchar Saathi Chakshu (sancharsaathi.gov.in), file a complaint at cybercrime.gov.in, or call 1930 immediately if money was lost."
+    ],
+    "speech_script": "STOP. Warning: this sounds like a fake digital arrest scam call. Hang up immediately. Report the caller on Sanchar Saathi Chakshu (sancharsaathi.gov.in), file a complaint at cybercrime.gov.in, or call 1930 immediately if money was lost.",
+    "explanation": "STOP — This call is DANGEROUS: it follows a fake 'digital arrest' script. Please hang up immediately and report to authorities. Call 1930 for assistance.",
+    "llm": {
+      "backend": "executorch",
+      "model": "llama32-1b-qlora",
+      "prompt_tokens": 185,
+      "generated_tokens": 36,
+      "prefill_tps": 57.0108,
+      "decode_tps": 20.5011,
+      "first_token_ms": 5806.6,
+      "gen_wall_ms": 7562.3
+    },
+    "explanation_status": "success",
+    "audio_file": "/var/tmp/prahari-call-guard-bench/repo/candidates/BEST/demo/call_guard/digital_arrest_cbi.wav",
+    "transcript": "This is Inspector Rajas Sharma from Mumbai cybercrime and C. B. I. An arrest warrant has been issued in your name, because a parcel with illegal drugs was seized by customs. Do not disconnect this call and stay on video call alone. France for 50,000 rupees to the RBI Safe Verification account immediately, or police will arrest you.",
+    "asr": {
+      "text": "This is Inspector Rajas Sharma from Mumbai cybercrime and C. B. I. An arrest warrant has been issued in your name, because a parcel with illegal drugs was seized by customs. Do not disconnect this call and stay on video call alone. France for 50,000 rupees to the RBI Safe Verification account immediately, or police will arrest you.",
+      "language": "en",
+      "audio_seconds": 17.903,
+      "chunks": 1,
+      "generated_tokens": 74,
+      "stop_reason": "eos",
+      "stop_reasons": [
+        "eos"
+      ],
+      "truncated": false,
+      "complete": true,
+      "backend": "executorch",
+      "model": "whisper-tiny-int8-xnnpack",
+      "load_ms": 235.2,
+      "mel_ms": 18.8,
+      "encode_ms": 700.5,
+      "decode_ms": 3011.7,
+      "total_ms": 3731.0,
+      "rtfx": 4.8,
+      "peak_rss_mb": 925.9
+    },
+    "detector_ms": 1993.05,
+    "total_latency_ms": 13288.6,
+    "peak_rss_mb": 2611.3,
+    "limitation": "Call Guard checks shared voice notes/audio files or consented local speakerphone recordings. Android and Linux apps cannot tap live cellular/VoIP call audio directly.",
+    "id": "call-scam-digital-arrest-cbi",
+    "expected": "malicious",
+    "expected_match": true
+  },
+  {
+    "label": 1,
+    "verdict": "malicious",
+    "stop_warning": true,
+    "score": 0.9999,
+    "category": "a digital arrest scam call",
+    "evidence": [
+      "caller impersonates police, CBI, customs, TRAI, court or RBI",
+      "claims a parcel with illegal drugs or contraband is linked to your name or Aadhaar",
+      "orders you not to disconnect or hang up the call",
+      "pressures you to stay alone on video call or hide the call from family",
+      "threatens imminent mobile/SIM disconnection or uses a press-9 cyber-officer script",
+      "asks for OTP/PIN/bank verification or a remote screen-sharing app during the call"
+    ],
+    "call_signals": [
+      "fake_authority_call",
+      "contraband_parcel",
+      "no_disconnect",
+      "video_isolation",
+      "telecom_ivr_scam",
+      "call_secret_or_remote"
+    ],
+    "is_digital_arrest": true,
+    "actions": [
+      "STOP and hang up immediately; real police, CBI, customs and RBI never conduct 'digital arrests' or keep you on video call.",
+      "Never transfer money to any 'safe' or 'verification' account and never stay isolated — tell a family member right away.",
+      "Report the caller on Sanchar Saathi Chakshu (sancharsaathi.gov.in), file a complaint at cybercrime.gov.in, or call 1930 immediately if money was lost."
+    ],
+    "speech_script": "STOP. Warning: this sounds like a fake digital arrest scam call. Hang up immediately. Report the caller on Sanchar Saathi Chakshu (sancharsaathi.gov.in), file a complaint at cybercrime.gov.in, or call 1930 immediately if money was lost.",
+    "explanation": "STOP — This call is DANGEROUS: it follows a fake 'digital arrest' script. Do not engage, report to authorities immediately, and hang up.",
+    "llm": {
+      "backend": "executorch",
+      "model": "llama32-1b-qlora",
+      "prompt_tokens": 172,
+      "generated_tokens": 33,
+      "prefill_tps": 87.0445,
+      "decode_tps": 20.233,
+      "first_token_ms": 1976.0,
+      "gen_wall_ms": 3607.0
+    },
+    "explanation_status": "success",
+    "audio_file": "/var/tmp/prahari-call-guard-bench/repo/candidates/BEST/demo/call_guard/trai_customs_parcel.wav",
+    "transcript": "Alert from Tri-Telicum Department. Your mobile number will be disconnected within two hours due to an illegal narcotics parcel linked to your at-hard card. Stay on the line and do not tell your family. Press 9 to speak to the cyber officer and verify your bank account.",
+    "asr": {
+      "text": "Alert from Tri-Telicum Department. Your mobile number will be disconnected within two hours due to an illegal narcotics parcel linked to your at-hard card. Stay on the line and do not tell your family. Press 9 to speak to the cyber officer and verify your bank account.",
+      "language": "en",
+      "audio_seconds": 11.633,
+      "chunks": 1,
+      "generated_tokens": 59,
+      "stop_reason": "eos",
+      "stop_reasons": [
+        "eos"
+      ],
+      "truncated": false,
+      "complete": true,
+      "backend": "executorch",
+      "model": "whisper-tiny-int8-xnnpack",
+      "load_ms": 235.2,
+      "mel_ms": 13.1,
+      "encode_ms": 704.9,
+      "decode_ms": 2440.9,
+      "total_ms": 3159.0,
+      "rtfx": 3.68,
+      "peak_rss_mb": 2611.3
+    },
+    "detector_ms": 29.36,
+    "total_latency_ms": 6799.3,
+    "peak_rss_mb": 2611.3,
+    "limitation": "Call Guard checks shared voice notes/audio files or consented local speakerphone recordings. Android and Linux apps cannot tap live cellular/VoIP call audio directly.",
+    "id": "call-scam-trai-parcel",
+    "expected": "malicious",
+    "expected_match": true
+  },
+  {
+    "label": 0,
+    "verdict": "benign",
+    "stop_warning": false,
+    "score": 0.05,
+    "category": "",
+    "evidence": [
+      "reads like a security reminder advising you not to share secrets or pay",
+      "reads like a routine notice or appointment",
+      "points to the official app or channel",
+      "includes a protective statement"
+    ],
+    "call_signals": [],
+    "is_digital_arrest": false,
+    "actions": [
+      "No scam script was detected, but callers can still spoof banks or officials — never share an OTP or PIN on a call.",
+      "If you ever lose money to a fraudulent call, dial 1930 right away."
+    ],
+    "speech_script": "No scam script found in this call. Still verify directly and never share your OTP or PIN.",
+    "explanation": "No risk found in this call: reads like a security reminder advising you not to share secrets or pay. Be cautious of any suspicious calls claiming to be from your bank.",
+    "llm": {
+      "backend": "executorch",
+      "model": "llama32-1b-qlora",
+      "prompt_tokens": 157,
+      "generated_tokens": 34,
+      "prefill_tps": 43.6596,
+      "decode_tps": 10.9184,
+      "first_token_ms": 3596.3,
+      "gen_wall_ms": 6709.7
+    },
+    "explanation_status": "success",
+    "audio_file": "/var/tmp/prahari-call-guard-bench/repo/candidates/BEST/demo/call_guard/legit_bank_alert.wav",
+    "transcript": "Hello, this is a routine security reminder from State Bank of India. Never share your OTP, UPPIN, or password on any phone call. If you did not authorize a card transaction, block your card directly, inside the official Yono app, or visit your home branch.",
+    "asr": {
+      "text": "Hello, this is a routine security reminder from State Bank of India. Never share your OTP, UPPIN, or password on any phone call. If you did not authorize a card transaction, block your card directly, inside the official Yono app, or visit your home branch.",
+      "language": "en",
+      "audio_seconds": 13.526,
+      "chunks": 1,
+      "generated_tokens": 59,
+      "stop_reason": "eos",
+      "stop_reasons": [
+        "eos"
+      ],
+      "truncated": false,
+      "complete": true,
+      "backend": "executorch",
+      "model": "whisper-tiny-int8-xnnpack",
+      "load_ms": 235.2,
+      "mel_ms": 12.9,
+      "encode_ms": 884.9,
+      "decode_ms": 4130.3,
+      "total_ms": 5028.1,
+      "rtfx": 2.69,
+      "peak_rss_mb": 2611.3
+    },
+    "detector_ms": 84.37,
+    "total_latency_ms": 11825.9,
+    "peak_rss_mb": 2611.3,
+    "limitation": "Call Guard checks shared voice notes/audio files or consented local speakerphone recordings. Android and Linux apps cannot tap live cellular/VoIP call audio directly.",
+    "id": "call-benign-bank-reminder",
+    "expected": "benign",
+    "expected_match": true
+  },
+  {
+    "label": 0,
+    "verdict": "benign",
+    "stop_warning": false,
+    "score": 0.05,
+    "category": "",
+    "evidence": [
+      "reads like a routine appointment, delivery or official-app notice with no payment demand",
+      "reads like a routine notice or appointment"
+    ],
+    "call_signals": [],
+    "is_digital_arrest": false,
+    "actions": [
+      "No scam script was detected, but callers can still spoof banks or officials — never share an OTP or PIN on a call.",
+      "If you ever lose money to a fraudulent call, dial 1930 right away."
+    ],
+    "speech_script": "No scam script found in this call. Still verify directly and never share your OTP or PIN.",
+    "explanation": "No risk found in this call: reads like a routine appointment, delivery or official-app notice with no payment demand. Please confirm appointment details and payment method if possible.",
+    "llm": {
+      "backend": "executorch",
+      "model": "llama32-1b-qlora",
+      "prompt_tokens": 156,
+      "generated_tokens": 33,
+      "prefill_tps": 85.8558,
+      "decode_tps": 20.8333,
+      "first_token_ms": 1817.5,
+      "gen_wall_ms": 3401.1
+    },
+    "explanation_status": "success",
+    "audio_file": "/var/tmp/prahari-call-guard-bench/repo/candidates/BEST/demo/call_guard/legit_clinic_courier.wav",
+    "transcript": "Hi, this is Priya from City, dental clinic, calling to confirm your appointment to Marwad 11am. Also, your curry, her delivery, arrived at the building reception desk. No fear payment is required. Please call back whenever it is convenient.",
+    "asr": {
+      "text": "Hi, this is Priya from City, dental clinic, calling to confirm your appointment to Marwad 11am. Also, your curry, her delivery, arrived at the building reception desk. No fear payment is required. Please call back whenever it is convenient.",
+      "language": "en",
+      "audio_seconds": 11.436,
+      "chunks": 1,
+      "generated_tokens": 53,
+      "stop_reason": "eos",
+      "stop_reasons": [
+        "eos"
+      ],
+      "truncated": false,
+      "complete": true,
+      "backend": "executorch",
+      "model": "whisper-tiny-int8-xnnpack",
+      "load_ms": 235.2,
+      "mel_ms": 17.5,
+      "encode_ms": 853.0,
+      "decode_ms": 2489.8,
+      "total_ms": 3360.3,
+      "rtfx": 3.4,
+      "peak_rss_mb": 2611.3
+    },
+    "detector_ms": 36.22,
+    "total_latency_ms": 6802.0,
+    "peak_rss_mb": 2611.3,
+    "limitation": "Call Guard checks shared voice notes/audio files or consented local speakerphone recordings. Android and Linux apps cannot tap live cellular/VoIP call audio directly.",
+    "id": "call-benign-clinic-courier",
+    "expected": "benign",
+    "expected_match": true
+  }
+]

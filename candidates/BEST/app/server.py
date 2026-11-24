@@ -2,6 +2,7 @@
 Binds to 127.0.0.1 only and makes no outbound requests."""
 import argparse
 import json
+import os
 import resource
 import sys
 import time
@@ -96,7 +97,37 @@ class H(BaseHTTPRequestHandler):
         except Exception:
             self._send(400, b'{"error":"Invalid request body"}', "application/json")
             return
+        if self.path.split("?", 1)[0] == "/api/callguard":
+            self._callguard(body)
+            return
         res = triage(body.get("kind", "sms"), body.get("input", ""), bool(body.get("explain")))
+        self._send(200, json.dumps(res).encode(), "application/json")
+
+    def _callguard(self, body):
+        """Call Guard transcript check (preview). Off unless PRAHARI_CALL_GUARD=1, so the core flow is untouched."""
+        if os.environ.get("PRAHARI_CALL_GUARD", "").strip().lower() not in ("1", "true", "yes", "on"):
+            self._send(404, b'{"error":"Call Guard is disabled"}', "application/json")
+            return
+        from triage import callguard
+        transcript = body.get("transcript", "")
+        if not isinstance(transcript, str):
+            self._send(400, b'{"error":"Invalid request body"}', "application/json")
+            return
+        global _ex
+        res = callguard.classify_call(transcript)
+        res["transcript"] = callguard.callrules.normalize_transcript(transcript)
+        res["limitation"] = callguard.LIMITATION_NOTE
+        if body.get("explain"):
+            with _ex_lock:
+                if _ex is None:
+                    try:
+                        from triage.llm import Explainer
+                        _ex = Explainer()
+                    except Exception:
+                        _ex = None
+                res = callguard.explain_call(res["transcript"], res, explainer=_ex) if _ex is not None else dict(
+                    res, explanation_status="failed",
+                    explanation_error="Explanation unavailable. The detector result and safety steps are complete.")
         self._send(200, json.dumps(res).encode(), "application/json")
 
     def _send(self, code, data, ctype):
@@ -115,7 +146,10 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--demo", action="store_true")
     ap.add_argument("--out", default="demo_output.json", help="demo JSON path")
+    ap.add_argument("--call-guard", action="store_true", help="enable the Call Guard preview endpoint (/api/callguard)")
     a = ap.parse_args()
+    if a.call_guard:
+        os.environ["PRAHARI_CALL_GUARD"] = "1"
     if a.demo:
         preset = [("sms", "Dear customer, your electricity connection will be disconnected tonight. Pay Rs 499 now at http://bses-bill-update.top or the meter will be cut."),
                   ("sms", "Rs 2,500 debited from A/c XX1234 at Amazon on 10 Nov. Not you? Call the number on your card; no link needed."),

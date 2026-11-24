@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Offline Call Guard (Preview): WhatsApp voice note / audio file / consented speakerphone check.
+#   bin/callguard --demo | --file AUDIO | --transcript TEXT | --record N --consent | --setup-model
+set -euo pipefail
+C="$(cd "$(dirname "$0")/.." && pwd)"
+PY="${HC_PY:-$C/../../.venv/bin/python}"
+PYTHONPATH="$C${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m triage.callguard "$@"

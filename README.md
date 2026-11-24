@@ -56,6 +56,10 @@ candidates/BEST/bin/app --demo --out .venv/demo-output.json
 
 The demo generates explanations and reports latency and process peak RSS. `candidates/BEST/bin/app --selftest` checks detectors; `candidates/BEST/bin/app --port 8765` serves the UI on loopback. See the [demo script](docs/phase1/demo-script.md) for an offline proof and the separation between network paths. Normal execution does not itself enforce an egress block.
 
+## Call Guard (preview)
+
+`candidates/BEST/bin/callguard` checks a shared voice note or a recording made with consent for the Indian "digital arrest" call script. It transcribes the audio on the device with Arm's INT8 Whisper Tiny through ExecuTorch, applies the existing detector plus call-script rules, and has Llama 3.2 1B write a STOP warning, alongside vetted steps that name 1930 and Sanchar Saathi Chakshu. On the Neoverse-N1 VM, speech-to-text ran 2.7–4.8x faster than real time, and peak RSS was 832 MiB for ASR alone and 2,611 MiB with Llama. Apps cannot tap live call audio. Hindi is not reliable, and the Android hook has not run on a phone. Details, measurements and limits: [docs/call-guard.md](docs/call-guard.md).
+
 ## Repository map
 
 - [Technical report](docs/phase1/report.md), [evidence ledger](docs/phase1/EVIDENCE.md), [jury Q&A](docs/phase1/LIMITATIONS.md) and [shot list](docs/phase1/demo-script.md).

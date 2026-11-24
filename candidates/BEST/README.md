@@ -96,3 +96,11 @@ promotable. SMS F1 0.9015, URL F1 0.9948, indic F1 0.9665 (FPR 1.25%), flow F1 0
 table, generalisation checks and limitations.
 
 Network descriptions in the UI and demo use text rules; the trained flow model accepts NSL-KDD feature records through `bin/predict --task flow` as dataset replay. Packet capture is not implemented; `bin/monitor` summarises live connections from the kernel's socket table and counters instead. The explanation flow independently classifies text and can disagree with the trained model. See `../../docs/phase1/report.md`.
+
+## Call Guard (preview, behind a flag)
+
+`bin/callguard --demo | --file AUDIO | --transcript TEXT | --record N --consent | --setup-model`
+transcribes a voice note on the device (ExecuTorch Whisper Tiny INT8), checks it with the detector and
+the digital-arrest rules in `triage/callrules.py`, and has Llama write a STOP warning. The web UI
+endpoint `/api/callguard` exists only with `--call-guard` or `PRAHARI_CALL_GUARD=1`. See
+`../../docs/call-guard.md`.
