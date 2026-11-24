@@ -446,7 +446,11 @@
   "no request for a secret or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या लिंक की कोई मांग नहीं है",
   "no request for a secret or payment in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी या पैसे की कोई मांग नहीं है",
   "no request for a secret, payment or link in the link": "इस लिंक में OTP-PIN जैसी गुप्त जानकारी, पैसे या लिंक की कोई मांग नहीं है",
-  "Banks and government send SMS from registered sender IDs like XX-ABCDEF, not personal mobile numbers": "बैंक और सरकारी विभाग SMS रजिस्टर्ड सेंडर ID (जैसे XX-ABCDEF) से भेजते हैं, निजी मोबाइल नंबर से नहीं"
+  "Banks and government send SMS from registered sender IDs like XX-ABCDEF, not personal mobile numbers": "बैंक और सरकारी विभाग SMS रजिस्टर्ड सेंडर ID (जैसे XX-ABCDEF) से भेजते हैं, निजी मोबाइल नंबर से नहीं",
+  "threatens to send or post something about you to your contacts or family": "आपके बारे में कुछ आपके संपर्कों या परिवार को भेजने या पोस्ट करने की धमकी देता है",
+  "threatens to send something about you to your contacts or family": "आपके बारे में कुछ आपके संपर्कों या परिवार को भेजने की धमकी देता है",
+  "threatens you or your family to force a payment": "पैसे ऐंठने के लिए आपको या आपके परिवार को धमकी देता है",
+  "the link points straight to an Android app file (.apk), which installs outside the Play Store": "यह लिंक सीधे Android ऐप फ़ाइल (.apk) देता है, जो Play Store के बाहर से इंस्टॉल होती है"
  },
  "skip": [
   "$label · $hi",
@@ -585,6 +589,38 @@
    "en": "The name or number shown at the top of the SMS. A sender ID never proves a message is real.",
    "hi": "SMS में सबसे ऊपर दिखने वाला नाम या नंबर। सेंडर ID से यह साबित नहीं होता कि मैसेज असली है।"
   },
+  "report_copy": {
+   "en": "Copy report",
+   "hi": "रिपोर्ट कॉपी करें"
+  },
+  "report_copy_desc": {
+   "en": "Copies a short report to paste into Sanchar Saathi Chakshu. Nothing is sent.",
+   "hi": "Sanchar Saathi Chakshu में पेस्ट करने के लिए छोटी रिपोर्ट कॉपी करता है। कुछ भी भेजा नहीं जाता।"
+  },
+  "report_copied": {
+   "en": "Report copied. Paste it in the Chakshu form.",
+   "hi": "रिपोर्ट कॉपी हो गई। इसे Chakshu फ़ॉर्म में पेस्ट करें।"
+  },
+  "report_copy_fail": {
+   "en": "Couldn't copy the report.",
+   "hi": "रिपोर्ट कॉपी नहीं हो सकी।"
+  },
+  "family_send": {
+   "en": "Send to family",
+   "hi": "परिवार को बताएं"
+  },
+  "family_send_desc": {
+   "en": "Opens the share menu with a short warning. You choose who gets it. Your message is not included.",
+   "hi": "छोटी चेतावनी के साथ शेयर मेनू खोलता है। किसे भेजना है, आप चुनते हैं। आपका मैसेज इसमें नहीं जाता।"
+  },
+  "family_chooser": {
+   "en": "Warn family or friends",
+   "hi": "परिवार या दोस्तों को सावधान करें"
+  },
+  "remote_app_banner": {
+   "en": "A screen-sharing app ({apps}) is installed. Scammers use these to watch your bank app. Uninstall it if a 'support agent' asked you to install it.",
+   "hi": "इस फ़ोन में स्क्रीन शेयर करने वाला ऐप ({apps}) है। ठग इससे आपका बैंक ऐप देख लेते हैं। अगर किसी 'सपोर्ट एजेंट' ने इसे डालने को कहा था, तो इसे हटा दें।"
+  },
   "detector_english": {
    "en": "Fixed detector text, in English. Not written by AI.",
    "hi": "डिटेक्टर का तय टेक्स्ट, अंग्रेज़ी में। इसे AI ने नहीं लिखा।"
@@ -722,6 +758,18 @@
   {
    "en": "mentions {things} and the branch",
    "hi": "{things} और शाखा का ज़िक्र करता है"
+  },
+  {
+   "en": "the domain {host} is not an official site",
+   "hi": "डोमेन {host} आधिकारिक साइट नहीं है"
+  },
+  {
+   "en": "an unofficial .{tld} domain",
+   "hi": ".{tld} वाला डोमेन, जो आधिकारिक नहीं है"
+  },
+  {
+   "en": "the domain {host} is a lookalike of the official {official}",
+   "hi": "डोमेन {host}, असली {official} जैसा दिखने वाला नकली डोमेन है"
   }
  ]
 }

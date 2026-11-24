@@ -78,6 +78,7 @@ MECH_SHORT = {
     "investment": "promises guaranteed or doubled returns for a deposit",
     "id_request": "asks you to send identity documents to a chat or link",
     "notice_contact": "gives its own number, chat or link to act on",
+    "extortion": "threatens you or your family to force a payment",
 }
 MECH_TYPE = {
     "secret_request": "OTP or PIN theft",
@@ -116,13 +117,15 @@ TYPE_PRIORITY = ["sextortion", "extortion", "safe_account", "remote_access", "co
                  "phish_link", "pay_unverified", "payment_request_private"]
 _POWER = re.compile(r"electricity|power cut|bijli|बिजली|meter|discom|connection (?:will be )?(?:cut|kat)", re.I)
 HOST_NAMES = {"brand_lookalike", "risky_tld", "digit_swap", "ip_host", "shortener", "complex_host",
-              "at_sign", "no_https", "official_domain"}
+              "at_sign", "no_https", "official_domain", "typosquat"}
 # A NO RISK verdict never quotes a finding it overruled. A link sign that hides the destination,
 # imitates a name or replaces it with a raw address is a mechanism: when the verdict dismisses
 # one and no benign reading exists, nothing is claimed. A weak sign alone (a risky TLD, no HTTPS,
 # a long name) leaves the neutral phrase true.
 HIDDEN_LINK = {"brand_lookalike", "digit_swap", "ip_host", "shortener", "at_sign", "punycode",
-               "homoglyph", "hidden_chars"}
+               "homoglyph", "hidden_chars", "typosquat", "apk_download"}
+LOOKALIKE = ("brand_lookalike", "digit_swap", "typosquat")
+APK_SHORT = "a direct .apk app download"
 WEAK_LINK = {"risky_tld", "no_https", "complex_host"}
 PROTECTIVE_NAMES = frozenset(n for n, _, _ in indicrules.PROTECTIVE) | {"official_domain"}
 # Words whose presence makes an absence claim false: a secret, a payment and a link are the three
@@ -156,7 +159,7 @@ def _short_host(name, desc):
     host = _host_from(desc)
     if name == "official_domain":
         return f"official domain {host}".strip()
-    if name in ("brand_lookalike", "digit_swap"):
+    if name in LOOKALIKE:
         return f"lookalike domain {host}".strip()
     if name == "risky_tld":
         tld = host.rsplit(".", 1)[-1] if host else ""
@@ -183,16 +186,58 @@ def _safe_evidence(a, inp):
     return [mech.safe_description(s, inp) for s in SAFE_ORDER if s in a["safe"]]
 
 
+EXPOSE_SHORT = "threatens to send something about you to your contacts or family"
+# "Pay to unlock" is the generic advance-fee reading. When a more specific mechanism already says
+# what the money is for (a trading deposit, a job fee, blackmail), the generic line would tell the
+# reader it is about "a refund, prize or parcel", which the message never mentions.
+SPECIFIC_OVER_FEE = {"investment", "job_upfront", "sextortion", "extortion", "crypto_transfer"}
+
+
+def _harm_names(a):
+    """Harm mechanisms that describe the message, generic readings dropped when a specific one exists."""
+    harm = list(a["harm"])
+    names = {n for n, _ in harm}
+    if names & SPECIFIC_OVER_FEE:
+        harm = [(n, d) for n, d in harm if n != "pay_to_receive"]
+    if "sextortion" in names:
+        harm = [(n, d) for n, d in harm if d != mech.EXPOSE_DESC]
+    return harm
+
+
+def _mech_short(n, d):
+    """The short phrase for one harm: a threat to expose the reader is not called account blocking."""
+    return EXPOSE_SHORT if d == mech.EXPOSE_DESC else MECH_SHORT.get(n)
+
+
+def _risky_short(r):
+    """A host risk line as a short phrase: whole words, no claim about the TLD's reputation."""
+    if "lookalike" in r:
+        return _short_host("brand_lookalike", r)
+    if "URL shortener" in r:
+        return _short_host("shortener", r)
+    host = _host_from(r)
+    if host and ("common for throwaway" in r or "not an official site" in r):
+        return _fit(_short_host("risky_tld", r), host)
+    return r if len(r) <= 70 else r[:70].rsplit(" ", 1)[0]
+
+
+def _fit(phrase, host):
+    """Keep a host phrase inside the 78-character budget by naming the TLD only."""
+    if len(phrase) <= 78 or not host:
+        return phrase
+    return f"an unofficial .{host.rsplit('.', 1)[-1]} domain"
+
+
 def _harm_evidence(a, inp):
     """Mechanism phrases for a scam, most concrete first, then any lookalike host."""
-    out = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT]
+    out = [_mech_short(n, d) for n, d in _harm_names(a) if _mech_short(n, d)]
     # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
     # shortest phrases keeps one copied sentence while covering both, instead of dropping the
     # second mechanism (the model only copies the first phrase).
     if len(out) >= 2 and len(out[0]) + len(out[1]) <= 78:
         out = [f"{out[0]} and {out[1]}"] + out[2:]
     for r in a["risky"]:
-        ph = _short_host("brand_lookalike", r) if "lookalike" in r else r[:70]
+        ph = _risky_short(r)
         if ph not in out:
             out.append(ph)
     return out or _safe_evidence(a, inp)
@@ -297,7 +342,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             elif set(names) & HIDDEN_LINK:
                 dismissed = True
         else:
-            if any(n in ("brand_lookalike", "digit_swap") for n in names):
+            if any(n in LOOKALIKE for n in names):
                 tld = host.rsplit(".", 1)[-1] if "." in host else ""
                 out.append(f"risky .{tld} lookalike domain {host}" if tld else f"lookalike domain {host}")
             elif "ip_host" in names:
@@ -306,6 +351,8 @@ def compact_evidence(kind, inp, fallback, verdict=None):
                 out.append(f"URL shortener {host}")
             elif "risky_tld" in names:
                 out.append(f"unofficial domain {host} (.{host.rsplit('.', 1)[-1]})")
+            if "apk_download" in names:
+                out.append(APK_SHORT)
             if "no_https" in names:
                 out.append("no HTTPS")
             if "official_domain" in names:
@@ -335,7 +382,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             # alert's own "if not you, block your card" is protective advice, not a threat.
             out, dismissed = _cleared_message(kind, inp, fallback, a)
         elif kind == "injection":
-            harm = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:1]
+            harm = [_mech_short(n, d) for n, d in _harm_names(a) if _mech_short(n, d)][:1]
             if rules.injection_indicators(inp):
                 # One phrase carries both the injection and the mechanism, so a copied opening can
                 # satisfy either concept the reader is asked about.
@@ -423,7 +470,7 @@ def scam_type(kind, inp, verdict):
         return upi.scam_type_for(inp, verdict)
     if kind == "url":
         names = {n for n, _ in rules.url_indicators(inp)}
-        if names & {"brand_lookalike", "digit_swap"}:
+        if names & set(LOOKALIKE):
             return "a phishing link on a lookalike domain"
         if "shortener" in names:
             return "a shortened link that hides its destination"
@@ -439,7 +486,7 @@ def scam_type(kind, inp, verdict):
         return "suspicious network traffic" if verdict == 1 else "unusual network traffic"
     if mech.indic_context(inp):
         a = mech.analyze(inp)
-        found = {n for n, _ in a["harm"]}
+        found = {n for n, _ in _harm_names(a)}
         if found & {"block_threat", "pay_unverified"} and _POWER.search(inp) \
                 and not found & {"sextortion", "safe_account", "remote_access", "secret_request"}:
             return "an electricity disconnection scam"
@@ -453,6 +500,11 @@ def scam_type(kind, inp, verdict):
                 not found & {"sextortion", "extortion", "safe_account", "remote_access", "collect_request",
                              "qr_payment", "pay_to_receive"}:
             return "an advance-fee scam"
+        if found == {"block_threat"} or found <= {"block_threat", "pay_unverified", "payment_request_private"}:
+            descs = {d for n, d in a["harm"] if n == "block_threat"}
+            if descs == {mech.EXPOSE_DESC}:
+                # Only the threat to tell contacts or family: blackmail, not an account-blocking notice.
+                return MECH_TYPE["extortion"]
         for n in TYPE_PRIORITY:
             if n in found:
                 return MECH_TYPE[n]

@@ -2,7 +2,10 @@ package `in`.prahari.app
 
 import android.app.Activity
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -238,6 +241,8 @@ internal object Bridge {
         val value: String,
         val started: Long,
         val verdict: JSONObject,
+        /** Where the text came from ('qr', 'whatsapp', 'sms' or ''): a hint for the report only. */
+        val source: String = "",
         /** Optional sender typed for this check (message mode only); never stored in History. */
         val sender: String = ""
     ) {
@@ -431,17 +436,17 @@ private fun requestModel(force: Boolean) {
     }
 }
 
-private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, sender: String) {
+private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String) {
     Bridge.worker.execute {
         try {
-            runCheck(id, mode, value, started, sender)
+            runCheck(id, mode, value, started, source, sender)
         } catch (t: Throwable) {
             Log.e(TAG, "check escaped", t)
         }
     }
 }
 
-private fun runCheck(id: Int, mode: Int, value: String, started: Long, sender: String) {
+private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: String, sender: String) {
     try {
         if (!Bridge.still(id)) return
         if (Bridge.pythonError != null || !Python.isStarted()) {
@@ -449,14 +454,14 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long, sender: S
         }
         val bridge = Python.getInstance().getModule("mobile")
         val callStart = SystemClock.elapsedRealtimeNanos()
-        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value, sender).toString())
+        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value, source, sender).toString())
         val verdictCallMs = (SystemClock.elapsedRealtimeNanos() - callStart) / 1e6
         val level = verdict.optString("level")
         if (level != "danger" && level != "warn" && level != "clear") {
             throw IllegalStateException("Invalid detector verdict")
         }
         if (!Bridge.still(id)) return
-        val job = Bridge.Job(id, mode, value, started, verdict, sender)
+        val job = Bridge.Job(id, mode, value, started, verdict, source, sender)
         job.verdictCallMs = verdictCallMs
         // Flagged-only gating: only a result the screen shows as NO RISK skips Llama. A bank alert
         // the app relabels (CHECK THIS ALERT or SUSPICIOUS) is not NO RISK, so it keeps Llama.
@@ -721,6 +726,11 @@ class MainActivity : Activity() {
     internal var senderValue = ""
     private var senderInput: EditText? = null
     private var sharedBanner = false
+    /** The shared text and its source hint, used only if that exact text is then checked. */
+    private var sharedText = ""
+    private var sharedSource = ""
+    /** Source of the check in flight, so a mode switch on the checking screen keeps it. */
+    private var checkSource = ""
     private var advancedOpen = false
     internal var shownId = Int.MIN_VALUE
     private var visibleJob: Bridge.Job? = null
@@ -1188,6 +1198,9 @@ class MainActivity : Activity() {
             inputValue = it.getString("input") ?: ""
             senderValue = it.getString("sender") ?: ""
             sharedBanner = it.getBoolean("shared")
+            sharedText = it.getString("sharedText") ?: ""
+            sharedSource = it.getString("sharedSource") ?: ""
+            checkSource = it.getString("checkSource") ?: ""
             advancedOpen = it.getBoolean("advanced")
         }
         try {
@@ -1236,11 +1249,15 @@ class MainActivity : Activity() {
         out.putString("sender", senderValue)
         out.putString("screen", screen)
         out.putBoolean("shared", sharedBanner)
+        out.putString("sharedText", sharedText)
+        out.putString("sharedSource", sharedSource)
+        out.putString("checkSource", checkSource)
         out.putBoolean("advanced", advancedOpen)
         val job = if (screen == "result") visibleJob else null
         if (job != null) {
             out.putString("verdict", job.verdict.toString())
             out.putString("value", job.value)
+            out.putString("source", job.source)
             out.putString("jobSender", job.sender)
             out.putInt("jobMode", job.mode)
             out.putLong("started", job.started)
@@ -1260,6 +1277,7 @@ class MainActivity : Activity() {
                 value = state.getString("value") ?: inputValue,
                 started = state.getLong("started", SystemClock.elapsedRealtime()),
                 verdict = JSONObject(raw),
+                source = state.getString("source") ?: "",
                 sender = state.getString("jobSender") ?: ""
             )
             val explanation = state.getString("explanation")
@@ -1648,7 +1666,9 @@ class MainActivity : Activity() {
         setIntent(intent)
         applyGatingExtra(intent)
         val shared = readShare(intent) ?: return
-        openShared(shared)
+        // getReferrer() still names the app that first launched this singleTop activity, so a
+        // later share gets no medium hint rather than a stale one.
+        openShared(shared, trustReferrer = false)
     }
 
     /** ACTION_SEND uses EXTRA_TEXT. ACTION_PROCESS_TEXT uses EXTRA_PROCESS_TEXT. Never log the text. */
@@ -1698,7 +1718,7 @@ class MainActivity : Activity() {
     }
 
     /** Share opens Home with the text filled in. Nothing is checked, and no link is opened, until Check. */
-    private fun openShared(raw: String) {
+    private fun openShared(raw: String, trustReferrer: Boolean = true) {
         stopSpeech()
         Bridge.cancel()
         val text = cleanShare(raw)
@@ -1715,11 +1735,30 @@ class MainActivity : Activity() {
             }
             else -> {
                 sharedBanner = true
+                sharedText = text
+                sharedSource = if (trustReferrer) shareSource() else ""
                 inputValue = text
                 senderValue = ""  // shared text carries no sender
                 selectedMode = detectMode(text)
                 showHome()
             }
+        }
+    }
+
+    /**
+     * The sharing app as a hint for the report's medium line. The referrer is optional and set by
+     * the caller, so it is never trusted for anything else; unknown apps give "".
+     */
+    private fun shareSource(): String {
+        val pkg = try {
+            referrer?.takeIf { it.scheme == "android-app" }?.host.orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+        return when (pkg) {
+            "com.whatsapp", "com.whatsapp.w4b" -> "whatsapp"
+            "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms" -> "sms"
+            else -> ""
         }
     }
 
@@ -1755,7 +1794,7 @@ class MainActivity : Activity() {
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
             }
             add(chip, label, 0, -2, left = 4, weight = 1f)
-            chip.setOnClickListener { if (i != selected) beginCheck(i, value) }
+            chip.setOnClickListener { if (i != selected) beginCheck(i, value, visibleJob?.source ?: checkSource) }
             val modeLabel = t(modeNames[i])
             asButton(chip, if (on) "$modeLabel, ${t("selected")}" else "${t("Change to")} $modeLabel")
             add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
@@ -1766,12 +1805,13 @@ class MainActivity : Activity() {
 
     private fun startCheck() {
         if (!::input.isInitialized) return
+        val text = input.text?.toString() ?: ""
         val sender = if (selectedMode == 0) senderInput?.text?.toString()?.trim().orEmpty() else ""
-        beginCheck(selectedMode, input.text?.toString() ?: "", sender)
+        beginCheck(selectedMode, text, if (text == sharedText) sharedSource else "", sender)
     }
 
     /** [sender] defaults to the current check's sender, so a mode switch re-check keeps it. */
-    private fun beginCheck(mode: Int, value: String, sender: String = senderValue) {
+    private fun beginCheck(mode: Int, value: String, source: String = "", sender: String = senderValue) {
         if (value.isBlank()) {
             toast("Paste a message, link or network event first.")
             return
@@ -1784,12 +1824,13 @@ class MainActivity : Activity() {
         senderValue = sender.take(32)
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
         sharedBanner = false
+        checkSource = source
         stopSpeech()
         hideKeyboard()
         val id = Bridge.begin()
         val started = SystemClock.elapsedRealtime()
         showChecking(selectedMode, value)
-        enqueueCheck(id, selectedMode, value, started, senderValue)
+        enqueueCheck(id, selectedMode, value, started, source, senderValue)
     }
 
     private fun showChecking(mode: Int, value: String) {
@@ -2226,6 +2267,10 @@ class MainActivity : Activity() {
         val actionsHi = strings(data.optJSONArray("actions_hi"))
         add(b, listenButton(p, speechScript(p, actions, actionsHi, true), speechScript(p, actions, actionsHi, false)), -1, -2, top = 12)
         add(body, b, top = 12)
+        if (job.mode != 2 && data.optBoolean("remote_app_check")) {
+            val apps = try { RemoteApps.installed(packageManager) } catch (_: Throwable) { emptyList() }
+            if (apps.isNotEmpty()) add(body, remoteAppBanner(apps), top = 12)
+        }
         if (announcedJob != job.id) {
             announcedJob = job.id
             val announcement = "${t(p.title)}. $why"
@@ -2302,6 +2347,11 @@ class MainActivity : Activity() {
                 add(steps, buttons, top = 14)
             }
         }
+        // Copy report and Send to family: SCAM or SUSPICIOUS message and link results only.
+        val reportCard = if (mode == 2 || level == "clear") null
+            else data.optJSONObject("report_card")
+                ?: if (alertLevel == "warn") data.optJSONObject("report_card_raised") else null
+        if (reportCard != null) add(steps, shareRow(reportCard), top = 10)
         if (clear && mode == 0) {
             divider(steps, 12)
             add(steps, iconText(R.drawable.ic_alert_circle, "Scammers copy real messages. If it asks for money or a code, check in the official app first.", T.ink2, 13f, 16, flex = true).apply {
@@ -2623,6 +2673,76 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Amber note naming installed screen-sharing apps. Read by TalkBack as one block. */
+    private fun remoteAppBanner(apps: List<String>): LinearLayout {
+        val message = n("remote_app_banner").replace("{apps}", apps.joinToString(", "))
+        return row().apply {
+            gravity = Gravity.TOP
+            background = shape(T.warnC, 14f, 1, T.warn)
+            pad(this, 14, 12, 14, 12)
+            add(this, icon(R.drawable.ic_triangle_alert, 18, T.warn), 18, 18)
+            add(this, txt(message, 14f, T.onWarnC, 600, 20, raw = true), 0, -2, left = 10, weight = 1f)
+            isFocusable = true
+            a11yText(this, message)  // one TalkBack stop: the children are hidden
+        }
+    }
+
+    /** Two outlined buttons. Nothing is sent: one copies text, the other opens the share sheet. */
+    private fun shareRow(card: JSONObject): LinearLayout {
+        val buttons = row().apply { gravity = Gravity.TOP }
+        fun place(key: String, descKey: String, iconId: Int, left: Int, action: () -> Unit) {
+            val en = L10n.en(key)
+            val hi = L10n.hi(key)
+            val main = if (L10n.hindi) hi else en
+            val sub = if (L10n.hindi) "" else hi
+            val view = reportButton(
+                main, sub, iconId, T.brand, T.ink, T.ink2, true, n(key) + ". " + n(descKey), action
+            )
+            add(buttons, view, 0, -2, left = left, weight = 1f)
+        }
+        val lang = if (L10n.hindi) "hi" else "en"
+        place("report_copy", "report_copy_desc", R.drawable.ic_clipboard, 0) {
+            copyReport(card.optString("report_$lang").ifBlank { card.optString("report_en") })
+        }
+        place("family_send", "family_send_desc", R.drawable.ic_message, 8) {
+            sendToFamily(card.optString("family_$lang").ifBlank { card.optString("family_en") })
+        }
+        stackWhenTight(buttons, 8)
+        return buttons
+    }
+
+    private fun copyReport(text: String) {
+        if (text.isBlank()) return
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText(n("report_copy"), text)
+            if (Build.VERSION.SDK_INT >= 33) {
+                // Codes are masked, but the report can quote the message: keep it out of the preview.
+                clip.description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            }
+            clipboard.setPrimaryClip(clip)
+            toast(n("report_copied"))
+        } catch (t: Throwable) {
+            Log.e(TAG, "report copy failed", t)
+            toast(n("report_copy_fail"))
+        }
+    }
+
+    /** ACTION_SEND through the chooser. The user picks the app and the person; Prahari is left out. */
+    private fun sendToFamily(text: String) {
+        if (text.isBlank()) return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        val chooser = Intent.createChooser(send, n("family_chooser")).apply {
+            putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this@MainActivity, MainActivity::class.java)))
+        }
+        launch(chooser)
+    }
+
     private fun buttonCopy(data: JSONObject, id: String, fallback: String): Pair<String, String> {
         val item = data.optJSONObject("buttons")?.optJSONObject(id)
         val en = item?.optString("en")?.takeIf { it.isNotBlank() } ?: fallback
@@ -2927,7 +3047,10 @@ class MainActivity : Activity() {
                 }
                 // The decoded text is checked here. It is never opened as a link or a UPI intent.
                 inputValue = text
-                beginCheck(detectMode(text), text, "")
+                // Back to Home and Check again on the same text keeps the QR medium.
+                sharedText = text
+                sharedSource = "qr"
+                beginCheck(detectMode(text), text, "qr", "")
             }
         }, "prahari-qr").start()
     }

@@ -174,7 +174,9 @@
   "threatens to block, cut or freeze an account, SIM or connection": "खाता, SIM या कनेक्शन ब्लॉक, बंद या फ़्रीज़ करने की धमकी देता है",
   "threatens to publish private material": "निजी चीज़ें या जानकारी सार्वजनिक करने की धमकी देता है",
   "threatens to publish private material unless you pay": "पैसे न देने पर निजी जानकारी या सामग्री सार्वजनिक करने की धमकी देता है",
-  "traffic that looks like a routine update or a scheduled backup": "ऐसा ट्रैफ़िक जो सामान्य अपडेट या तय समय पर होने वाले बैकअप जैसा है"
+  "traffic that looks like a routine update or a scheduled backup": "ऐसा ट्रैफ़िक जो सामान्य अपडेट या तय समय पर होने वाले बैकअप जैसा है",
+  "a direct .apk app download": "सीधे डाउनलोड होने वाली .apk ऐप फ़ाइल",
+  "the link points straight to an Android app file (.apk), which installs outside the Play Store": "यह लिंक सीधे Android ऐप फ़ाइल (.apk) देता है, जो Play Store के बाहर से इंस्टॉल होती है"
  },
  "patterns": [
   {
@@ -246,6 +248,11 @@
    "re": "^an instruction aimed at the assistant \\(prompt injection\\) that (?P<inner>.+)$",
    "en": "an instruction aimed at the assistant (prompt injection) that {inner}",
    "hi": "जांच करने वाले AI को दिया गया छिपा निर्देश (prompt injection), जो {inner}"
+  },
+  {
+   "re": "^the domain (?P<host>\\S+) is a lookalike of the official (?P<official>\\S+)$",
+   "en": "the domain {host} is a lookalike of the official {official}",
+   "hi": "डोमेन {host}, असली {official} जैसा दिखने वाला नकली डोमेन है"
   }
  ],
  "facts": {

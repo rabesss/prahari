@@ -216,6 +216,8 @@ _samples = [
     "lookalike domain sbi-kyc.top",
     "risky .top lookalike domain sbi-kyc.top",
     "URL shortener bit.ly",
+    "the domain icicibnak.com is a lookalike of the official icicibank.com",
+    "the link points straight to an Android app file (.apk), which installs outside the Play Store",
 ]
 for _sample in _samples:
     _got = hindi_line(_sample)
@@ -453,9 +455,9 @@ from triage import sender as sender_rules
 alert = 'Dear customer, your SBI a/c XX1234 is debited Rs 5000. Not you? Call 1800111109'
 plain = json.loads(mobile.verdict('sms', alert))
 for hdr in ('', 'AX-SBIINB-S', 'SBIINB', 'VM-123456'):
-    assert json.loads(mobile.verdict('sms', alert, hdr)) | {'detector_ms': 0} == plain | {'detector_ms': 0}, hdr
+    assert json.loads(mobile.verdict('sms', alert, sender_id=hdr)) | {'detector_ms': 0} == plain | {'detector_ms': 0}, hdr
 assert 'sender_raised' not in plain
-raised = json.loads(mobile.verdict('sms', alert, '+91 98765 43210'))
+raised = json.loads(mobile.verdict('sms', alert, sender_id='+91 98765 43210'))
 assert raised['level'] in ('warn', 'danger') and raised['sender_raised'] == 'alert', raised
 assert raised['evidence'][0] == sender_rules.SENDER_LINE and raised['evidence_quotes'][0] == ''
 assert len(raised['evidence']) == len(raised['evidence_quotes'])
@@ -477,8 +479,8 @@ assert both['sender_raised'] == 'alert' and sender_rules.OPENING['alert'] in Cap
 mobile.check('sms', alert, Capture())
 assert sender_rules.OPENING['alert'] not in Capture.prompts[-1]  # the flag never leaks to the next check
 danger = 'Your SBI KYC expires tonight. Send your OTP to 9123456780 now or the account will be blocked.'
-assert json.loads(mobile.verdict('sms', danger, '9876543210'))['level'] == 'danger'
-assert 'sender_raised' not in json.loads(mobile.verdict('url', 'http://sbi-kyc.in-verify.top/login', '9876543210'))
+assert json.loads(mobile.verdict('sms', danger, sender_id='9876543210'))['level'] == 'danger'
+assert 'sender_raised' not in json.loads(mobile.verdict('url', 'http://sbi-kyc.in-verify.top/login', sender_id='9876543210'))
 print('optional sender check passed (raise-only, header never changes the result)')
 
 # Flagged-only gating: a NO RISK result gets the detector's fixed text and no Llama call.
@@ -650,7 +652,7 @@ print('lookalike-link regression: refusals and timeouts fall back to labelled de
 
 # Sender check + labelled fallback (#67 merged with #68): when Llama fails the checks on a
 # sender-raised item, the detector's fixed text still leads with the vetted sender phrase.
-json.loads(mobile.verdict('sms', alert, '9876543210'))
+json.loads(mobile.verdict('sms', alert, sender_id='9876543210'))
 fb = json.loads(mobile.explain(Replies(refusals)))
 assert fb['source'] == 'detector_template' and sender_rules.OPENING['alert'] in fb['explanation'], fb
 assert sender_rules.SENDER_FACT in fb['explanation'], fb
@@ -658,3 +660,45 @@ json.loads(mobile.verdict('sms', alert))
 fb2 = json.loads(mobile.explain(Replies(refusals)))
 assert sender_rules.OPENING['alert'] not in fb2['explanation'], fb2
 print('sender phrase survives the labelled detector-text fallback')
+
+# Report card: present for SCAM and SUSPICIOUS, absent for NO RISK, network and a plain debit alert;
+# a failure building it never fails the verdict.
+kyc_text = 'Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top or the account will be blocked'
+kyc_out = json.loads(mobile.verdict('sms', kyc_text, 'whatsapp'))
+assert kyc_out['level'] == 'danger' and kyc_out['report_card']['category'] == 'kyc_payment', kyc_out.get('report_card')
+assert 'Medium: WhatsApp' in kyc_out['report_card']['report_en']
+assert 'hxxp://in-verify[.]top' in kyc_out['report_card']['family_en']
+assert json.loads(mobile.verdict('sms', kyc_text))['report_card']['category'] == 'kyc_payment'
+assert 'Medium: SMS or WhatsApp message' in json.loads(mobile.verdict('sms', kyc_text, 'bogus'))['report_card']['report_en']
+assert 'report_card' not in upi_merch and 'report_card' in upi_scam and 'report_card' in upi_unknown
+assert 'report_card' not in json.loads(mobile.verdict('flow', 'many connections to different ports from one host in a few seconds'))
+debit = json.loads(mobile.verdict('sms', 'SBI: Rs 2,450 debited via UPI. OTP 482910 kisi se share mat karein. If not you, block card in YONO app.'))
+assert 'report_card' not in debit, debit.get('report_card')
+_card = mobile.report_card.card
+mobile.report_card.card = lambda *a, **k: 1 / 0
+broken = json.loads(mobile.verdict('sms', kyc_text))
+mobile.report_card.card = _card
+assert broken['level'] == kyc_out['level'] and broken['evidence'] == kyc_out['evidence'] and 'report_card' not in broken
+# The report card never changes the verdict fields.
+same = {k: v for k, v in kyc_out.items() if k not in ('report_card', 'report_card_raised', 'detector_ms')}
+assert same == {k: v for k, v in broken.items() if k != 'detector_ms'}
+print('report card through mobile.verdict passed')
+
+# Remote-app banner flag: set for money-desk scams, absent for clear and network results, never fatal.
+assert kyc_out.get('remote_app_check') is True
+assert json.loads(mobile.verdict('sms', 'Install AnyDesk so our support executive can process your refund')).get('remote_app_check') is True
+assert 'remote_app_check' not in upi_merch
+assert 'remote_app_check' not in json.loads(mobile.verdict('flow', 'many connections to different ports from one host in a few seconds'))
+_needs = mobile.remote_apps.needs_check
+mobile.remote_apps.needs_check = lambda *a, **k: 1 / 0
+broken_ra = json.loads(mobile.verdict('sms', kyc_text))
+mobile.remote_apps.needs_check = _needs
+assert broken_ra['level'] == kyc_out['level'] and 'remote_app_check' not in broken_ra
+print('remote app flag through mobile.verdict passed')
+for _clear in ('Delivered: Your order #4412 has been delivered. Thank you for shopping.',
+               'Your OTP for login is 123456. Do not share it.'):
+    _out = json.loads(mobile.verdict('sms', _clear))
+    assert _out['level'] != 'danger'
+    if _out['level'] == 'clear':
+        assert 'remote_app_check' not in _out, _clear
+print('no remote-app banner on cleared receipts and OTP notes')

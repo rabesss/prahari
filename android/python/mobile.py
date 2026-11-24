@@ -21,6 +21,15 @@ textmodel.prob = lambda bundle, texts: np.array([portable.probability('indic', t
 sys.modules['triage.textmodel'] = textmodel
 from triage import detect, explain_hi, llm, sender, upi
 detect.textmodel = textmodel
+# The report card and the remote-app flag are aids: a broken module must not stop checks.
+try:
+    import report_card
+except Exception:
+    report_card = None
+try:
+    import remote_apps
+except Exception:
+    remote_apps = None
 
 class Linear:
     def __init__(self, name): self.name = name
@@ -269,8 +278,31 @@ def quote_span(evidence, text, limit=48):
     return span if len(span) >= 3 else ''
 
 
-def verdict(kind, text, sender_id=''):
+def _report_card(kind, text, lab, scam, ev, quotes, actions, source):
+    """The Copy report / Send to family texts, or {} (never fails a check).
+
+    report_card is for a SCAM or SUSPICIOUS result. report_card_raised is only for a bank alert
+    that the app itself raises to SUSPICIOUS because it names its own link or number."""
+    if report_card is None:
+        return {}
+    try:
+        card = report_card.card(kind, text, lab, scam, ev, quotes, source)
+        if card:
+            return {'report_card': card}
+        if lab != 1 and (llm.DEBIT_STEP in actions or llm.CHECK_STEP in actions):
+            raised = report_card.card(kind, text, lab, scam, ev, quotes, source, raised=True)
+            if raised:
+                return {'report_card_raised': raised}
+    except Exception:
+        pass  # an aid only: the verdict is shown even if this text cannot be built
+    return {}
+
+
+def verdict(kind, text, source='', sender_id=''):
     """Stage 1, no Llama: verdict, scam type, evidence and vetted actions in milliseconds.
+
+    source is where the text came from, as a hint for the report only: 'qr', 'whatsapp', 'sms'
+    or ''. It never reaches the detector.
 
     sender_id is the optional sender typed on the check screen. It can only raise a text message
     to SUSPICIOUS (sender.py); with none the output is exactly what it was without the field."""
@@ -322,6 +354,13 @@ def verdict(kind, text, sender_id=''):
     report = _report_buttons(eff_kind, lab, scam, actions)
     if report:
         out['report_buttons'] = report
+    source = source if source in ('qr', 'whatsapp', 'sms') else ''
+    out.update(_report_card(eff_kind, text, lab, scam, ev, out['evidence_quotes'], actions or [], source))
+    try:
+        if remote_apps is not None and remote_apps.needs_check(eff_kind, text, lab, scam, actions or []):
+            out['remote_app_check'] = True
+    except Exception:
+        pass  # an aid only: the verdict is shown without the banner
     return json.dumps(out, ensure_ascii=False)
 
 
@@ -453,6 +492,6 @@ def vetted_explanation():
 
 def check(kind, text, runner, sender_id=''):
     """Both stages in one call (tests and the command line)."""
-    out = json.loads(verdict(kind, text, sender_id))
+    out = json.loads(verdict(kind, text, sender_id=sender_id))
     out.update(json.loads(explain(runner)))
     return json.dumps(out, ensure_ascii=False)
