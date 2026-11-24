@@ -600,7 +600,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         batt_before = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
         xml = dump_ui_xml(serial)
         found = tap_element(serial, xml, desc_contains=f"{sample_label}, ")
-        for _ in range(5):
+        for _ in range(9):  # nine sample chips on main; Bank debit alert is last
             if found:
                 break
             # Step the horizontal sample-chip row left along its own y (read from the dump). A slow drag

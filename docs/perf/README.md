@@ -15,6 +15,12 @@ All three Arm targets ran the **identical** Llama 3.2 1B Instruct QLoRA INT4 Exe
 `tokenizer.model` (SHA-256 `82e9d319…`, `2.08 MiB`), with local classical ML + mechanism-rule
 detectors running ahead of the language model.
 
+> **Which build was measured:** every number below predates PRs #46–#51 (UPI QR, call guard, Hindi
+> explanations, false-positive fixes). Those PRs add detectors and prompts for new input types but do not
+> change the model, runtime, quantisation or decoding settings, so the existing SMS/URL/flow paths should run
+> at similar speeds. A fresh S23 session on the final APK ([`s23-rtl-runbook.md`](s23-rtl-runbook.md))
+> confirms this for the submitted build.
+
 ## Consolidated Cross-Device Performance Table
 
 | Device & Silicon | OS / Runtime & Threads | Workload & State | Detector Latency | TTFT (first token) | Prefill (tok/s) | Decode (tok/s) | Per-Check Latency | Peak Memory (labelled by method) | Offline Proof |
