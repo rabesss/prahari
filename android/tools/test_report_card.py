@@ -97,8 +97,11 @@ assert rc.link_origin('no link here') == ''
 assert rc.link_origin('https://asha。evil.top/x') == 'hxxps://evil[.]top'  # IDNA dot
 assert rc.link_origin('https://asha%2Eevil.top/x') == 'hxxps://evil[.]top'  # percent-encoded dot
 assert rc.link_origin('https://secure.xn--h2brj9c/verify') == 'hxxps://secure[.]xn--h2brj9c'  # punycode TLD
-assert rc.link_origin('https://pay.evil.com.tr/x') == 'hxxps://evil[.]com[.]tr'
-assert rc.link_origin('https://a.evil.co.th/x') == 'hxxps://evil[.]co[.]th'
+assert rc.link_origin('https://pay.evil.com.tr/x') == ''  # unlisted two-part suffix: left out
+assert rc.link_origin('https://asha.gov.de/x') == ''  # gov.de may be registrable: left out, never asha
+assert rc.link_origin('https://sbi%2Eco%2Ein/ then http://sbi-kyc.top/x') == 'hxxp://sbi-kyc[.]top'  # official after normalising
+assert rc.link_origin('https://sbi\u3002co\u3002in/ then http://sbi-kyc.top/x') == 'hxxp://sbi-kyc[.]top'
+assert rc.link_origin('www.नाम%2Eभारत/x') == 'नाम[.]भारत'  # scheme-less Unicode host has no live dot
 assert rc.link_origin('http://98-765-432-10.evil.top/x') == 'hxxp://evil[.]top'  # numbered subdomain dropped
 assert rc.link_origin('http://98-765-432-10.top/x') == ''  # a number split by hyphens in the name
 assert rc.link_origin('https://secure.भारत/verify') == 'hxxps://secure[.]भारत'  # IDN kept
