@@ -754,6 +754,35 @@ def _dedupe(text):
     return " ".join(part.strip() for part in kept) if dropped else text
 
 
+def _drop_opening_copies(text, opening):
+    """Keep the first copy of the dictated opening and cut every later one.
+
+    The model sometimes writes the opening twice, and the second copy may lack its full stop or
+    run into the next sentence ("... before acting Be careful"), so neither _dedupe nor the
+    sentence split sees a repeat. Copies are found by the opening's words, ignoring punctuation
+    and case; a repeat of only its first clause (before the semicolon) is cut too.
+    """
+    if not text or not opening:
+        return text
+    words = re.findall(r"\w+", opening)
+    if len(words) < 4:
+        return text
+    full = re.compile(r"\W+".join(map(re.escape, words)) + r"[\s.!?;:,]*", re.I)
+    first = full.search(text)
+    if not first:
+        return text
+    head, tail = text[:first.end()].rstrip(), full.sub(" ", text[first.end():])
+    clause = re.findall(r"\w+", opening.split(";")[0])
+    if ";" in opening and len(clause) >= 4:
+        tail = re.sub(r"\W+".join(map(re.escape, clause)) + r"[\s.!?;:,]*", " ", tail, flags=re.I)
+    if head[-1] not in ".!?।":
+        head = head.rstrip(";:, ") + "."
+    tail = re.sub(r"\s+", " ", tail).strip()
+    if not tail:
+        return head
+    return head + " " + tail[0].upper() + tail[1:]
+
+
 def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """Drop a sentence that asserts the opposite of the detector's verdict or urges compliance.
 
@@ -774,7 +803,7 @@ def _consistent(text, verdict, opening=None, safe_tail=None, flow=False):
     """
     if not text:
         return text
-    sents = _split(_dedupe(text), opening)
+    sents = _split(_dedupe(_drop_opening_copies(text, opening)), opening)
     dropped = []
     check = _disruptive_flow_advice if flow else _unsafe_advice
 
