@@ -79,7 +79,7 @@ first scoring its false alarms were read but not tuned on.
 | dev_v2 (96) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 | v3_tune (159) | 0.000 / 1.000 / 1.000 | 0.000 / 1.000 / 1.000 |
 
-### Sealed holdout (india_final_holdout_v1_1, 184 items; scored once, at 80cc558, after review)
+### Sealed holdout (india_final_holdout_v1_1, 184 items; scored once, at e7c1fcd, after review)
 | Route | main FPR / recall / precision / F1 | this PR FPR / recall / precision / F1 |
 |---|---|---|
 | SMS (155) | 0.402 / 0.926 / 0.643 / 0.759 | 0.322 / 0.926 / 0.692 / 0.792 |
