@@ -235,17 +235,25 @@ def registrable(host):
     Subdomains and paths are what a scammer can personalise per victim at no cost; the
     registered name is what the family needs to avoid."""
     labels = [x for x in host.split('.') if x]
-    two = '.'.join(labels[-2:])
-    # com.tr, co.th, org.au...: a generic second level under a country code is a public suffix.
-    suffix2 = two in _SUFFIX2 or (len(labels[-1]) == 2 and labels[-2] in _GENERIC2) if len(labels) >= 2 else False
-    keep = 3 if len(labels) >= 3 and suffix2 else 2
+    keep = 3 if len(labels) >= 3 and '.'.join(labels[-2:]) in _SUFFIX2 else 2
     return '.'.join(labels[-keep:])
+
+
+def _ambiguous(registered):
+    """True when the last two labels may themselves be a public suffix not in _SUFFIX2 (com.tr,
+    gov.de...). Without a full suffix list the safe choice is to leave the link out: showing
+    them could name a shared suffix, and keeping a third label could keep a personal subdomain."""
+    labels = registered.split('.')
+    return (len(labels) == 2 and len(labels[-1]) == 2 and labels[0] in _GENERIC2
+            and registered not in _SUFFIX2)
 
 
 def link_origin(text):
     """First link in the text as scheme and registered domain only, defanged. No subdomain, path
     or query: those can carry the reader's own name, id or number."""
-    for m in re.finditer(r'(?i)\b(https?)://([^\s/?#<>"\']+)|\bwww\.([^\s/?#<>"\']+)', str(text or '')):
+    # Percent-encoded and IDNA dots separate labels too: normalise them before anything reads a host.
+    text = _IDNA_DOTS.sub('.', re.sub(r'%2[eE]', '.', str(text or '')))
+    for m in re.finditer(r'(?i)\b(https?)://([^\s/?#<>"\']+)|\bwww\.([^\s/?#<>"\']+)', text):
         if _official(m.group(0).rstrip('.,);!')):
             continue  # an official link quoted beside the scam one is not what to avoid
         return _origin(m)
@@ -270,7 +278,8 @@ def _origin(m):
     # Percent-encoded and IDNA dots separate labels too, so they cannot hide a subdomain.
     host = _IDNA_DOTS.sub('.', unquote(host)).lower()
     host = registrable(host.rstrip('.,);!').removeprefix('www.'))
-    origin = f'{scheme}://{host}' if scheme else host
+    if _ambiguous(host):
+        return ''
     # A registered name can still carry a number, even split by hyphens; leave such a link out.
     # Internationalised names (secure.भारत) are kept.
     if re.search(r'\d{4,}', host) or len(re.findall(r'\d', host)) >= 6:
@@ -279,7 +288,9 @@ def _origin(m):
     punycode = re.fullmatch(r'xn--[a-z0-9-]{2,59}', tld)
     if not punycode and (len(tld) < 2 or not all(c.isalpha() or unicodedata.category(c) in ('Mn', 'Mc') for c in tld)):
         return ''
-    return defang(origin)
+    # Defanged by hand: defang()'s bare-host pattern is ASCII-only, and a Unicode host must not
+    # keep a live dot.
+    return (('hxxp' + scheme[4:] + '://') if scheme else '') + host.replace('.', '[.]')
 
 
 # [ \t]* keeps both linear on long runs of blank lines. The value must look like a sender ID or
