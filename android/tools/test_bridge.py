@@ -183,5 +183,8 @@ for kind, text in [('sms', 'Dear customer your SBI KYC is expiring, update at ht
                    ('flow', 'many connections to different ports from one host in a few seconds')]:
     out = json.loads(mobile.check(kind, text, Echo()))
     assert out['verdict'] in ('DANGEROUS', 'SUSPICIOUS', 'NO RISK FOUND — still verify'), out
+    # The Hindi summary is built from the detector result with only NumPy and package data.
+    assert out.get('summary_hi') and any('\u0900' <= c <= '\u097F' for c in out['summary_hi']), out
+    assert out.get('summary_hi_label'), out
     print(kind, out['verdict'], out['evidence'][:2])
 print('mobile.check runs with only NumPy installed')

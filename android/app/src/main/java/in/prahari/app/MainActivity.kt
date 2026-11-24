@@ -1780,6 +1780,18 @@ class MainActivity : Activity() {
             }
             add(body, evidenceCard, top = 12)
         }
+        // Hindi mode: the detector's fixed-text Hindi summary leads, labelled as not AI-written.
+        // Llama 3.2 1B cannot write reliable Hindi, so its explanation below stays in English.
+        val summaryHi = data.optString("summary_hi", "")
+        if (L10n.hindi && summaryHi.isNotEmpty()) {
+            val hiCard = card()
+            add(hiCard, txt(data.optString("summary_hi_label", ""), 12f, T.ink3, 600, 16, raw = true))
+            add(hiCard, txt(summaryHi, 15f, T.ink, 400, 24, raw = true).apply {
+                includeFontPadding = true
+                isFallbackLineSpacing = true
+            }, top = 6)
+            add(body, hiCard, top = 12)
+        }
         val llama = card(T.surface2, false)
         add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
         val replaced = row().apply {
