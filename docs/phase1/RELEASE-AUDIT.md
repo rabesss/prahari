@@ -1,7 +1,17 @@
 # Release Audit: Public-Repository Readiness (`rabesss/arm-bharat-ai-soc`)
 
+## Public-release cleanup (24 Nov 2026, `chore/public-release-cleanup`)
+
+Owner decisions of 24 Nov applied in the tree:
+
+- **Licence:** root `LICENSE` is MIT for the project's own code, docs and original data. `THIRD_PARTY_NOTICES.md` lists the models, datasets and frameworks that keep their own licences (Llama 3.2 Community License, Apache-2.0 / MIT for Whisper, CC BY 4.0 and others for the datasets).
+- **Internal notes removed from the tree** and ignored in `.gitignore`: `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`, `research/BRIEF.md`, `research/INFRA_ISSUES.md`, `research/explain-quality-plan.md`.
+- **Local paths:** the absolute checkout path in `research/evals/*/summary.json` and `research/evals/ledger.jsonl` is now relative (`candidates/...`).
+- **Call Guard:** using Whisper for speech-to-text is allowed; the earlier "open question to the organisers" caveat is removed from the docs.
+- **History:** removing the personal e-mail in commit `721209c7bf` and the internal notes from older commits needs a history rewrite and force-push. It is prepared as a dry run and waits for the owner's confirmation; it has not been run.
+
 - **Re-checked 24 Nov 2026 on `main` `28bdb6b` (after PRs #48–#51):** `gitleaks git --log-opts=--all` over all 474 local commits found only the same public-hash false positives; the author-email list is unchanged (one personal-Gmail commit).
-- **PR #44 raw captures (`docs/perf/evidence/`, merged `5498500`):** unedited by design. They include the terminated cloud box's ephemeral hostname (`env.txt`) and the RTL phone's `logcat.txt` (render and system lines; no account, e-mail or serial found). Neither is a secret; trim them only if you want a cleaner public tree.
+- **PR #44 raw captures (`docs/perf/evidence/`, merged `5498500`):** unedited by design except that the terminated cloud box's ephemeral hostname in `env.txt` is now `<box>` (24 Nov). They also include the RTL phone's `logcat.txt` (render and system lines; no account, e-mail or serial found), which is not a secret.
 - **Audited commit:** `1eb8916` (`docs/phase1-final`, branched from `main`). First pass scanned the 177 commits reachable from `main`; a second `gitleaks git --log-opts=--all` pass on 23 Nov 2026 covered all 197 local commits (every branch, including the parallel feature branches).
 - **Audit date:** 23 November 2026
 - **Scope:** Full Git history (all commits, messages, headers, blobs, tags) and working tree — secrets/credentials, personal information (PII), licences/attributions, large files, hidden/third-party data leakage, and content unsuitable for a public competition repository.
@@ -14,14 +24,14 @@
 | **Secrets, tokens & private keys** | **PASS (Safe)** | Zero real secrets in any commit or the working tree. Two `gitleaks` false positives, both public model SHA-256 digests: the tokenizer hash in `README.md` (commit `19038f4c`) and the Whisper model hash in `candidates/BEST/triage/asr.py` (commits `5a4231dd` and `5a12e297`; the latter is on `main` since PR #49). |
 | **Model weights & third-party raw data** | **PASS (Safe)** | Zero `.pte`, `.bin`, `.safetensors`, `.apk`, `.mp4`, or raw third-party datasets in history or tree. |
 | **Large files & repo size** | **PASS (Safe)** | Working tree is 15 MB; largest blob in full history is `1.92 MB` (`url.joblib`). Zero files > 2 MB. |
-| **Licences & attributions** | **ACTION NEEDED (High)** | Llama 3.2 attribution + dataset/runtime licences updated in `README.md` and `docs/phase1/report.md`, **but no root `LICENSE` file exists yet** (owner decision). |
+| **Licences & attributions** | **PASS** | Root `LICENSE` (MIT, code only) and `THIRD_PARTY_NOTICES.md` added; Llama 3.2 weights, the Whisper model and datasets stay under their own licences and are not committed. |
 | **Content fit for public** | **FIXED IN TREE / history optional** | `docs/design/COMPETE.md` (teardown of 13 rival competition entries + local `/var/tmp` paths) and `docs/design/RATING-r1.md` are removed from the tree on this branch; they remain in history (commit `ef1e619`) unless the owner scrubs it (§5). |
-| **Personal info (PII) & local paths** | **REVIEW (Medium)** | One historical commit (`721209c7bf`) uses personal Gmail (`a personal address`) as Git author/committer; 95 `research/evals/*/summary.json` files record `~/...`; `AGENTS.md` mentions unrelated local project `an-unrelated-local-project`. |
+| **Personal info (PII) & local paths** | **FIXED IN TREE / history rewrite pending** | One historical commit (`721209c7bf`) uses a personal Gmail address as Git author/committer (history rewrite prepared, awaiting the owner); the absolute local paths in `research/evals/` are relativised and the internal notes are removed from the tree. |
 
 **Bottom line:** There are **no leaked credentials, API keys, model weights, or hidden evaluation items**, so making the repo public carries **no credential-exposure risk**. However, **before toggling visibility to Public**, the owner should:
 1. Merge this branch (it removes `docs/design/COMPETE.md` and `docs/design/RATING-r1.md` from the tree); optionally scrub them from history.
 2. Add a root `LICENSE` file (e.g., MIT or Apache-2.0, or an explicit copyright notice).
-3. Decide whether to rewrite the single commit `721209c7bf` that carries a personal Gmail address (and optionally strip `~/` paths and internal scratch docs such as `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`).
+3. Decide whether to rewrite the single commit `721209c7bf` that carries a personal Gmail address (and optionally strip absolute home-directory paths and internal scratch docs such as `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`).
 
 ---
 
@@ -81,9 +91,9 @@
 | ID | Severity | Location | Finding | Recommended action |
 |---|---|---|---|---|
 | **C1** | **HIGH (tree fixed)** | `docs/design/COMPETE.md`, `docs/design/RATING-r1.md` (added in commit `ef1e619`, PR #43) | Detailed competitive intelligence teardown naming 13 rival Bharat AI-SoC PS3 entries, their GitHub URLs, and 25 local `/var/tmp/...` paths (`bharat-intel`, `prahari-rivals`, `prahari-compete`). | Removed from the tree on `docs/phase1-final` (`git rm`); still in history, so optionally purge (commands in §5). |
-| **P1** | **MEDIUM** | Commit `721209c7bf8e2b17714010f2078a169a317655e7` (author & committer headers) | Personal Gmail address (`a personal address`) appears in the initial hillclimb setup commit; all other 176 commits use GitHub noreply or tool emails. | Optional: rewrite author/committer email to `26330469+rabesss@users.noreply.github.com` before going public (§5). |
-| **C2** | **MEDIUM** | `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`, `research/BRIEF.md` | Internal agent orchestration notes: `AGENTS.md` mentions unrelated local repo `~/projects/an-unrelated-local-project`; `docs/BRAINSTORM.md` mentions personal Google AI Pro entitlement, BME background, and `"ChatGPT dot"`; `research/QUESTIONS.md` discusses private strategy and internal hosts (`instabox`, `oracle-a1`, `boxd`, `sail`). | Either remove internal scratch files from `main` before going public or edit out personal/unrelated-project lines. |
-| **P2** | **LOW** | `research/evals/*/summary.json` (95 files) | Records `"candidate": "..."` (OS username and local path; no secrets). | Acceptable if first name is already public on the submission; otherwise sanitize `~/` -> `<workspace>/` or archive `research/evals/` outside the public repo. |
+| **P1** | **MEDIUM** | Commit `721209c7bf8e2b17714010f2078a169a317655e7` (author & committer headers) | Personal Gmail address address appears in the initial hillclimb setup commit; all other 176 commits use GitHub noreply or tool emails. | Optional: rewrite author/committer email to `26330469+rabesss@users.noreply.github.com` before going public (§5). |
+| **C2** | **MEDIUM (tree fixed)** | `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`, `research/BRIEF.md` | Internal agent orchestration and planning notes, with personal context, unrelated local projects and internal host names. | Removed from the tree on `chore/public-release-cleanup`; history purge is part of the prepared rewrite. |
+| **P2** | **LOW** | `research/evals/*/summary.json` (95 files) | Recorded the absolute local checkout path, including the OS username (no secrets). | Acceptable if first name is already public on the submission; otherwise sanitize `~/` -> `<workspace>/` or archive `research/evals/` outside the public repo. |
 | **C3** | **LOW** | `candidates/BEST_prev_*`, `candidates/gen2`, `candidates/gen7`, `candidates/gen11`, `candidates/indic1` | 8 superseded candidate directories (~5 MB, including a duplicate 1.9 MB `indic1/artifacts/url.joblib`). | Optional cleanup after final freeze; confirm `bench/` and `eval/` tests do not reference them before removing. |
 | **C4** | **LOW** | `models/registry.json`, `candidates/BEST/tests/read_explain.py`, `eval/*.py`, `bench/audit_push.py` | Contains `/var/tmp/arm-bharat-ai-soc-*` measurement-host paths. | Already documented in `README.md`; harmless for public visibility. |
 

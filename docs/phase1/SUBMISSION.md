@@ -12,8 +12,9 @@
 - [ ] **2. Final docs/report refresh & PDF rebuild:** Rebase `docs/phase1-final` on final `main`, absorb only merged & measured results into `README.md`, `docs/phase1/report.md`, `docs/phase1/EVIDENCE.md`, and `docs/phase1/LIMITATIONS.md`, run `python3 docs/phase1/build_report.py`, visually inspect every page of `docs/phase1/report.pdf`, confirm `< 10 MB` and green CI, and merge into `main`.
 - [ ] **3. Complete release-audit cleanups before making repo public** (see [RELEASE-AUDIT.md](RELEASE-AUDIT.md)):
   - [x] Remove `docs/design/COMPETE.md` and `docs/design/RATING-r1.md` from the tree (done on `docs/phase1-final`); optionally scrub them from history via `git filter-repo` (RELEASE-AUDIT §5).
-  - [ ] Add the root MIT `LICENSE` (decided; done by the public-release cleanup branch).
-  - [ ] Remove the internal notes that are not published and scrub personal e-mail and local absolute paths (decided; done by the public-release cleanup branch), and decide whether to rewrite the one historical commit with a personal author e-mail (RELEASE-AUDIT §5).
+  - [x] Add the root MIT `LICENSE` and `THIRD_PARTY_NOTICES.md` (public-release cleanup PR).
+  - [x] Remove the internal notes from the tree and scrub personal e-mail and local absolute paths (public-release cleanup PR).
+  - [ ] Confirm and run the prepared history rewrite (personal e-mail in one early commit, internal notes in older commits) before flipping visibility (RELEASE-AUDIT §5).
   - [ ] Run `gitleaks detect --source . --no-banner --redact` and confirm zero real secrets.
 - [ ] **4. Verify third-party licences & attributions:** Confirm **Built with Llama** and Llama 3.2 Community License links, CC BY 4.0 dataset citations and the NSL-KDD citation (UNB requires citing the dataset and Tavallaee et al. 2009) in `candidates/BEST/DATA.md`, and zero weights/raw datasets in Git.
 - [ ] **5. Record & verify the 2-minute 1080p 16:9 MP4 demo video** following [demo-video.md](demo-video.md):

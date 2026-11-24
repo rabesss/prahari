@@ -122,10 +122,14 @@ python3 docs/phase1/build_report.py
 - **Application & Android port:** [candidates/BEST/](candidates/BEST/) (detectors, rules, Llama runner, live monitor, web UI, tests) · [android/](android/) (Kotlin + Chaquopy + ExecuTorch Android app).
 - **Provenance & benchmarks:** [candidates/BEST/DATA.md](candidates/BEST/DATA.md) · [bench/README.md](bench/README.md) · [research/stress/README.md](research/stress/README.md) · [docs/challenge-brief.md](docs/challenge-brief.md).
 
+## License
+
+Code is MIT ([LICENSE](LICENSE)). Models and datasets keep their own licences: Llama 3.2 is under the Llama 3.2 Community License (**Built with Llama**), and the weights are not committed or relicensed. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Licences and credits
 
 - **Built with Llama:** Llama 3.2 1B Instruct weights are obtained separately from Hugging Face and governed by Meta's [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/) and [Acceptable Use Policy](https://www.llama.com/llama3_2/use-policy/). No weights or tokenizers are committed to this repository.
 - **Datasets:** All training/evaluation datasets are separately acquired and documented in [candidates/BEST/DATA.md](candidates/BEST/DATA.md): UCI SMS Spam Collection (Almeida et al., 2011; CC BY 4.0), Mendeley SMS Phishing Dataset (Mishra & Soni, 2022; CC BY 4.0), PhiUSIIL Phishing URL Dataset (Prasad & Chandra, 2024; CC BY 4.0), NSL-KDD (Tavallaee et al., 2009; UNB permits redistribution with citation; not redistributed here), `karanverma19/Indian_Multilingual_Scam_Message_Dataset` (Apache-2.0), `bolewara/hinglish-scam-text-dataset` (CC BY 4.0), and original project-generated Indian-context synthetic sets.
 - **Call Guard ASR model (optional, not committed):** Arm `whisper-tiny-int8-xnnpack-executorch` (Apache-2.0), downloaded by `bin/callguard --setup-model` with a pinned SHA-256.
 - **Upstream frameworks:** ExecuTorch and PyTorch (BSD-3-Clause), Arm KleidiAI (Apache-2.0), Chaquopy (MIT), scikit-learn / NumPy / SciPy / pandas / joblib (BSD-3-Clause), Kotlin / Android Gradle Plugin (Apache-2.0). The Android QR decoder (`android/python/qrdec.py`) is original pure-Python project code.
-- **Project licence:** No root open-source `LICENSE` file has been added yet; check with the repository owner before reusing project source or artifacts (see [RELEASE-AUDIT.md](docs/phase1/RELEASE-AUDIT.md)).
+- **Project licence:** Prahari's own source code, tests, documentation and original data are released under the [MIT License](LICENSE). The MIT License does not cover the Llama 3.2 weights, the Whisper model, the datasets or the frameworks above: they remain under their own licences, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

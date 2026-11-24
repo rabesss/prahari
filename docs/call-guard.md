@@ -117,9 +117,8 @@ numbers must not be quoted from these Linux results.
 - A phrase repeated three times ("hello? hello? hello?") trips the decoder's loop guard and ends that
   30 s window early. The transcript is then marked incomplete, so the call can be SUSPICIOUS at worst.
 - `--lang auto` chooses only between English and Hindi.
-- Whisper is a second neural model in the entry. The rules require Llama for the advisory component, and
-  Llama still writes every explanation. Whether an ASR model is allowed is logged in
-  `research/QUESTIONS.md`.
+- Whisper is a second neural model in the entry, used only for speech-to-text. The rules require Llama for
+  the advisory component, and Llama still writes every explanation.
 - Only 2 minutes per file are transcribed (30 s on the Android path, and its notes say so). A longer recording is cut and
   can at best be SUSPICIOUS, never cleared.
 - The model can still word the advice imperfectly ("report to authorities" rather than naming 1930).
