@@ -18,6 +18,11 @@ from urllib.parse import urlparse
 from . import typosquat
 
 SPLIT = ".!?।;\n"
+# Hindi perfective forms ("जमा किए गए हैं", "भुगतान हो गया", "ट्रांसफर की गई") report money that already
+# moved; only the bare or imperative verb ("जमा करें", "भुगतान करें") asks the reader to pay. Used after
+# जमा in PAY and _RISKY_COMMAND, and after भुगतान, जमा and ट्रांसफर in the request cue.
+_NOT_PERFECTIVE = (r"(?!\s*(?:हो\s*(?:गए|गई|गया|गये|चुके|चुकी|चुका)|हुए|हुई|हुआ|हुये|"
+                   r"(?:किए|किये|की|किया|कर\s*दिए|कर\s*दी|कर\s*दिया)\s*(?:गए|गई|गया|गये|जा\s*चुके)))")
 NEG = re.compile(
     r"\b(no|not|never|without|n't|dont|don't|doesn't|does not|will not|won't|avoid|"
     r"nahi|nahin|mat|bina|na)\b"
@@ -70,7 +75,7 @@ DEMAND = (r"(\b(ask|asks|asked|asking|demand|demands|demanded|demanding|want|wan
           r"bolta hai|bol rah\w*|keh rah\w*|कहा है|कहते हैं|maang\w*|maang rah\w*)")
 PAY = (r"\b(pay|paid|paying|send|sends|sending|transfer|transfers|deposit|deposits|remit|fund|"
        r"approve|approves|authori[sz]e|scan|buy|purchase|top[- ]?up|recharge|bhar\w*)\b"
-       r"|(bhej\w*|jama\w*|daal\w*)|भुगतान|भेजें|भेजो|भेजने|जमा|भरें|भरो|स्वीकार|टॉप ?अप|"
+       r"|(bhej\w*|jama\w*|daal\w*)|भुगतान|भेजें|भेजो|भेजने|जमा" + _NOT_PERFECTIVE + r"|भरें|भरो|स्वीकार|टॉप ?अप|"
        r"ट्रांसफर\s*(करें|करो|कर दें|कीजिए|करना)")
 AMOUNT = (r"(rs\.?|inr|₹|rupees|रुपये|राशि|amount|money|balance|bill|invoice|dues|शुल्क|फीस|"
           r"पैसा|पैसे|पेमेंट|भुगतान)")
@@ -160,7 +165,7 @@ REMOTE = (r"\b(anydesk|teamviewer|quicksupport|rustdesk|screen[- ]shar\w*|remote
           r"\b(install|download)\b[^.;!?।\n]{0,30}\b(app|application|apk|software|tool)\b|"
           r"grant (contacts|sms|access|permissions)|"
           r"ऐप (लगाकर|इंस्टॉल)|ऐप डाउनलोड|रिमोट (ऐप|सॉफ्टवेयर)|स्क्रीन (साझा|शेयर)")
-THREAT = (
+THREAT_BLOCK = (
     # Hindi: "खाता बंद हो जाएगा / ब्लॉक हो रहा है" (the account will be closed or is being blocked)
     r"\b(account|sim|card|connection|number|service|upi|banking|खाता|सिम|कार्ड|सेवा|नंबर|यूपीआई)\b"
     r"[^.;!?।\n]{0,50}\b(बंद|ब्लॉक|निलंबित|फ्रीज|काट|डिएक्टिवेट)\s+हो\s*"
@@ -175,9 +180,21 @@ THREAT = (
     r"[^.;!?।\n]{0,60}\b(will be|ho gaya|ho jayega|हो जाएगा|हो गया|हो सकता|हो गई|कर दिया|काट दिया|बंद|निलंबित|फ्रीज)"
     r"[^.;!?।\n]{0,40}\b(block|blocked|cut|suspend|deactiv\w*|disconnect\w*|closed|reject\w*|forfeit\w*|बंद|निलंबित|फ्रीज)"
     r"|\b(block|blocked|band|बंद|ब्लॉक|निलंबित|फ्रीज)\b[^.;!?।\n]{0,40}\b(account|card|sim|number|खाता|कार्ड|सिम)"
-    r"|(contacts?|family|friends|photos?|videos?)\s*(ko|to)?\s*(message|post|publish|share|leak|bhej\w*)|"
+)
+# A threat to expose the reader to their contacts or family ("sab contacts ko bhej dunga").
+THREAT_EXPOSE = (
+    r"(contacts?|family|friends|photos?|videos?)\s*(ko|to)?\s*(message|post|publish|share|leak|bhej\w*)|"
     r"(message|post|publish|share|leak)\b[^.;!?।\n]{0,30}(contacts?|family|friends)|"
     r"(कॉन्टैक्ट|संपर्क|परिवार)[^।;!?\n]{0,30}(संदेश|भेज|वायरल|पोस्ट)")
+THREAT = THREAT_BLOCK + "|" + THREAT_EXPOSE
+EXPOSE_DESC = "threatens to send or post something about you to your contacts or family"
+# The exposure line is used only with a threat cue ("warna", "or else", "kar dunga", "will post"); "share
+# feedback with friends and family" keeps the base wording.
+EXPOSE_CUE = (r"\b(?:warna|varna|or else|otherwise|unless|nahi to|nahin to|if you don'?t|kar dunga|kar denge|"
+              r"bhej\s*dunga|bhej\s*denge|bhejunga|"
+              r"(?:i|we|i'?ll|we'?ll|i will|we will|gonna)\s*(?:will\s+)?(?:send|post|share|leak|publish|message|"
+              r"show|forward|upload)|will (?:send|post|share|leak|publish|message))\b|वरना|नहीं तो|"
+              r"दूंगा|दूँगा|देंगे")
 AUTHORITY = (r"\b(police|cbi|ncb|dri|ed|enforcement directorate|customs|court|magistrate|narcotics|"
              r"cyber ?cell|cyber crime|crime branch|inspector|sub[- ]inspector|\btrai\b|\brbi\b|"
              r"income tax|investigation officer|compliance (desk|officer)|vigilance|digital arrest)\b"
@@ -307,6 +324,7 @@ RISKY_BRANDS = ("sbi", "hdfc", "icici", "axis", "kotak", "pnb", "paytm", "phonep
 RISKY_TLDS = {"top", "xyz", "club", "online", "site", "live", "icu", "buzz", "info", "click", "link",
               "work", "rest", "fit", "tk", "ml", "ga", "cf", "gq", "shop", "vip", "cc", "win", "loan",
               "example"}
+RESERVED_TLDS = {"example", "test", "invalid", "localhost"}
 OFFICIAL_SUFFIXES = (".gov.in", ".nic.in", ".bank.in", ".ac.in", ".edu.in")
 OFFICIAL_DOMAINS = {"sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com", "axisbank.com",
                     "kotak.com", "pnbindia.in", "paytm.com", "phonepe.com", "npci.org.in",
@@ -560,7 +578,9 @@ DIRECT_RAW = (
     r"\b(citizens|customers|people|all)\s+(must|should|need to)\s+"
     r"(pay|transfer|share|deposit|invest|click|install|download)\b")
 DIRECT_SCOPED = (
-    r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)\s*,?\s*)*"
+    # [\s,]* (not \s*,?\s*) keeps the repeated lead-in words linear: "now now now ..." used to backtrack
+    # exponentially.
+    r"(?:^\s*|[,;:]\s*)(?:(?:now|then|please|kindly|pls|request you to|कृपया|ज़रा|जरा)[\s,]*)*"
     r"(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
     r"\b(?:please|kindly|pls)\s+(?:pay|send|transfer|share|tell|give|provide|reply|forward|enter|type|submit|upload|dictate|click|install|download|verify|update|deposit|invest|call)\b",
     DEMAND + r"[^.;!?।\n]{0,40}\b(?:your|aapka|आपका)\b[^.;!?।\n]{0,25}" + CREDS)
@@ -616,6 +636,10 @@ def host_risk(h):
     if brand and any("-" in p and brand in p for p in parts):
         return f"the domain {h} is a hyphenated lookalike of '{brand}'"
     if tld in RISKY_TLDS:
+        if tld in RESERVED_TLDS:
+            # RFC 2606 reserves this name: no real site, scam or genuine, uses it, so "common for
+            # throwaway scam sites" would be a false claim. The link is still unverified (same decision).
+            return f"the domain {h} is not an official site"
         return f"the domain {h} uses .{tld}, common for throwaway scam sites"
     if re.search(r"\d", label) and any(b in label.replace("0", "o") for b in RISKY_BRANDS):
         return f"the domain {h} swaps letters for digits to imitate a brand"
@@ -936,7 +960,11 @@ def analyze(text):
         a["harm"].append(("authority_threat", "poses as police, customs or a regulator and demands action"))
     if _clause_hit(THREAT, t):
         a["threat"] = True
-        a["harm"].append(("block_threat", "threatens to block, cut or freeze an account, SIM or connection"))
+        # The harm name stays block_threat (the decision rules are unchanged); only the reader-facing
+        # line says which threat it is, so a blackmail message is not described as account blocking.
+        exposure = not _clause_hit(THREAT_BLOCK, t) and _any(EXPOSE_CUE, t)
+        a["harm"].append(("block_threat", EXPOSE_DESC if exposure else
+                          "threatens to block, cut or freeze an account, SIM or connection"))
     the_job = _clause_hit(JOB, t) or _clause_hit(LOAN, t)
     # A notice, alert or advisory that hands the reader a contact of its own is the spoofed-advisory
     # pattern: a mobile number, a chat, or a link that imitates or hides its destination. A genuine
@@ -969,7 +997,14 @@ def analyze(text):
         a["job_upfront"] = True
         a["harm"].append(("job_offer", "offers easy daily income through a personal chat channel"))
     if _clause_hit(r"(private (recording|video|photo)|intimate|morphed|nude)", t) and \
-            _clause_hit(r"(post|publish|leak|share|send to|वायरल)", t):
+            (_clause_hit(r"(post|publish|leak|share|send to|वायरल)", t) or
+             # "bhej dunga" / "viral kar dunga" count only aimed at contacts or family, or with
+             # coercion: "main apni private video tumhe bhej dunga" is not a threat.
+             (_clause_hit(r"viral kar\w*|bhej\s*(?:unga|ungi|dunga|dungi|denge|doonga|egi|ega)\b|भेजूं?ँ?गा|"
+                          r"भेज\s*(?:दूंगा|दूँगा|दूंगी|देंगे)", t) and
+              _any(r"\b(?:contacts?|family|friends|sab|sabko|sabhi|everyone|ghar\w*|relatives)\b|सबको|परिवार|"
+                   r"संपर्क|कॉन्टैक्ट|रिश्तेदार|\b(?:warna|varna|or else|otherwise|unless|nahi to|nahin to|"
+                   r"if you don'?t)\b|वरना|नहीं तो", t))):
         a["sextortion"] = True
         a["harm"].append(("sextortion", "threatens to publish private material unless you pay"))
     if _clause_hit(r"(gift (card|voucher)|voucher|google play|amazon (pay )?card)", t) and \
@@ -1036,7 +1071,7 @@ def analyze(text):
         ((_clause_hit(r"\b(buy|purchase|send|share|forward|provide)\b", t) or
           _clause_hit(DEMAND + r"|\b(?:require|requires|need|needs)\b", t)) and
          _any(r"\b(gift cards?|vouchers?|codes?)\b", t)) or
-        _clause_hit(r"\b(pay|transfer|deposit|remit|recharge)\b|भुगतान|जमा|ट्रांसफर", t) or
+        _clause_hit(r"\b(pay|transfer|deposit|remit|recharge)\b|(?:भुगतान|जमा|ट्रांसफर)" + _NOT_PERFECTIVE, t) or
         (pay and (_any(MONEY, t) or _any(AMOUNT, t))) or
         a["secret"] or share_hit or enter_hit or
         _clause_hit(ENTER + sep + CRED, t) or _clause_hit(CRED + sep + ENTER, t) or
@@ -1095,9 +1130,10 @@ def _self_block(text):
 # conditional threat ("agar payment nahi hua toh..."). A segment that orders the reader, threatens
 # them or makes an exception ("except our executive") is never a warning. Segments are clauses split
 # at ", ", dashes, contrast words and connectors before an order, so a negation reaches only its own
-# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Hypothetical callers,
-# self-check lead-ins and doorstep handovers were tried and dropped: they added little and each
-# opened ways to hide a demand (PR #48 review). A report that quotes what fraudsters asked for is not
+# segment ("don't panic, just share the OTP" keeps "just share the OTP"). Self-check lead-ins and
+# doorstep handovers were tried and dropped: they added little and each opened ways to hide a demand
+# (PR #48 review). So were hypothetical callers; a narrow span-based version was tried again in the
+# validation-gate PR and dropped after three review rounds kept finding demands it cleared. A report that quotes what fraudsters asked for is not
 # a warning segment: by controller decision a quoted credential demand stays flagged.
 SEG_SPLIT = re.compile(r",\s|:\s|[–—]|\s-\s|\b(?:but|instead|just|however|lekin|balki|bas|sirf)\b|"
                        r"(?:^|\s)(?:लेकिन|बल्कि|बस|सिर्फ़|सिर्फ)(?=\s|$)", re.I)
@@ -1119,7 +1155,7 @@ _RISKY_COMMAND = re.compile(
     r"approve|accept|authori[sz]e|scan|enter|type|reply|upload|dictate|read|provide|fill|buy|purchase|"
     r"hand(?:ing)? over|bhej\w*|bata\w*|de\s?d[oe]|de\s+(?:dijiye|dein|dena|do)|dijiye|dijiyega|dena hoga|dena hai|daal\w*|"
     r"bhar(?:o|ein|en|iye|dein|do)|jama)\b|भेजें|भेजो|भेजिए|भेजिये|भेज दें|बताएं|बताओ|बता दें|बता देना|बताइए|"
-    r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा|रिचार्ज|इंस्टॉल", re.I)
+    r"दें|दो|दीजिए|दीजिये|दे दें|दे देना|देना होगा|देना|डालें|भरें|भरिए|जमा" + _NOT_PERFECTIVE + r"|रिचार्ज|इंस्टॉल", re.I)
 # A verb in its oblique infinitive ("scan karne ki zaroorat nahi", "bhejne se pehle") names an action;
 # it does not order one.
 _INFINITIVE_AFTER = re.compile(r"^\s*(?:kar(?:ne|na)|करने|करना)\b|^(?:ne|na)\b", re.I)
@@ -1210,6 +1246,16 @@ def _segments(clause):
     return spans
 
 
+# Left over once warning segments are blanked, a hand-over or contact verb, a demand or an exception
+# means a request cue may still be live ("do not share it with anyone else, give it to our officer").
+_LEFTOVER_DEMAND = re.compile(
+    DEMAND + r"|\b(?:need|needs|needed|require|requires|chahiye|chahie|zaroorat)\b|चाहिए|ज़रूरत|जरूरत|पूछ\w*|बोल रह\w*|"
+    r"\b(?:share|send|give|tell|pass|hand|forward|message|msg|text|whatsapp|take|collect|provide|dictate|read out|"
+    r"type|enter|bata\w*|bhej\w*|de\s?d[oe]|dena|dijiye|dikha\w*|suna\w*|maang\w*)\b|"
+    r"बता\w*|भेज\w*|दे\s*(?:दो|दें|देना|दीजिए)|दिखा\w*|सुना\w*|मांग\w*|माँग\w*|"
+    r"\b(?:only|alone|besides|apart from|but|except|other than|sirf|keval|siwa)\b|सिर्फ़?|केवल|सिवाय", re.I)
+
+
 def request_text(text):
     """The text with warning segments blanked out in place: what the message actually asks of the
     reader. Everything else keeps its original wording and punctuation."""
@@ -1270,10 +1316,21 @@ def _actionable(a):
     request. Genuine bank, OTP, bill and notice messages often score high on vocabulary alone, but
     with no destination and no request a scam has no way to reach its victim."""
     text = a.get("text", "")
-    return bool(a["own_contact"] or a["request_cues"] or a["reader_direct"] or
-                _clause_hit(BLOCK_FUTURE, text) or
-                _contact_anywhere(a) or _clause_hit(PAY_COMMAND, text) or _ordered(text, threat=False) or
-                bool(_EXCEPT.search(text)))
+    if (a["own_contact"] or _clause_hit(BLOCK_FUTURE, text) or _contact_anywhere(a) or
+            _clause_hit(PAY_COMMAND, text) or _ordered(text, threat=False) or _EXCEPT.search(text)):
+        return True
+    if not (a["request_cues"] or a["reader_direct"]):
+        return False
+    # A request cue made the message actionable before this change, and still does, unless every cue
+    # sits inside a negated warning ("कृपया ओटीपी किसी से साझा न करें", "never share your PIN") and
+    # nothing left over hands over, demands or makes an exception.
+    rest = request_text(text)
+    if rest == " ".join(text.split()) or _LEFTOVER_DEMAND.search(rest):
+        return True
+    if not rest.strip():
+        return False
+    b = analyze(rest)
+    return bool(b["request_cues"] or b["reader_direct"])
 
 
 _HANDLE = re.compile(r"@\w|wa\.me|\bt\.me\b|\(at\)|\[\.\]", re.I)

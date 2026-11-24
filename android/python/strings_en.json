@@ -247,6 +247,11 @@
   "threatens to cut a service or block an account",
   "threatens to publish private material",
   "threatens to publish private material unless you pay",
-  "tries to inject instructions into the assistant"
+  "tries to inject instructions into the assistant",
+  "threatens to send or post something about you to your contacts or family",
+  "threatens to send something about you to your contacts or family",
+  "threatens you or your family to force a payment",
+  "the domain {host} is not an official site",
+  "an unofficial .{tld} domain"
  ]
 }

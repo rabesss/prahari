@@ -2,9 +2,13 @@ package `in`.prahari.app
 
 import android.app.Activity
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -56,6 +60,8 @@ import java.io.File
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
@@ -130,6 +136,17 @@ private const val OWN_CONTACT_LINE = "Sends you to its own link or number; real 
 private const val RAISED_NOTE = "This alert names its own link or number, so it is marked suspicious. The AI note was written for the first reading, so it is not shown."
 private const val ALERT_LINE = "Looks like a bank alert. Scammers copy these, so check it in your bank app."
 private const val TAG = "Prahari"
+/**
+ * Wall-clock budget for the whole Llama stage of one check (every retry included), from the moment
+ * the verdict is on screen. Past it, generation is stopped and the reader gets the detector's fixed
+ * text. A warm check takes about 1.2 s on a cool Galaxy S23 and about 3 s when it is hot.
+ */
+internal const val LLAMA_BUDGET_MS = 15_000L
+/** One JSON line per finished check, numbers only (no checked text, no explanation). adb_bench.py reads it. */
+private const val PERF_TAG = "PrahariPerf"
+/** Debug builds only: "all" or "flagged-only", so the adb harness can set the gating mode at launch. */
+internal const val GATING_EXTRA = "in.prahari.app.extra.GATING"
+internal const val PREF_EXPLAIN_CLEARED = "explain_cleared"
 private const val QR_REQUEST = 41
 
 private class Cancelled : RuntimeException("Check cancelled")
@@ -220,11 +237,14 @@ internal object Bridge {
         val mode: Int,
         val value: String,
         val started: Long,
-        val verdict: JSONObject
+        val verdict: JSONObject,
+        /** Where the text came from ('qr', 'whatsapp', 'sms' or ''): a hint for the report only. */
+        val source: String = ""
     ) {
         @Volatile var explanation: JSONObject? = null
         @Volatile var totalMs: Long = -1L
         @Volatile var pssMb: Double = Double.NaN
+        @Volatile var verdictCallMs: Double = Double.NaN
     }
 
     class Net(val id: Int, val code: String, val message: String, val elapsed: Long, val done: Boolean)
@@ -251,6 +271,16 @@ internal object Bridge {
     @Volatile var net: Net? = null
     /** 0 verdict still running, 1 verdict back (Llama writing), 2 explanation back. */
     @Volatile var checkStage = 0
+    /**
+     * False (the default) is flagged-only gating: a result shown as NO RISK gets the detector's
+     * fixed text and no Llama call. DANGEROUS and SUSPICIOUS results always get Llama.
+     */
+    @Volatile var explainCleared = false
+    val perfSeq = AtomicInteger(0)
+    /** Distinguishes this process's PrahariPerf lines from an earlier run's still in logcat. */
+    val perfSession: String = java.lang.Long.toHexString(System.nanoTime() xor System.currentTimeMillis())
+
+    fun gatingName() = if (explainCleared) "all" else "flagged-only"
 
     fun still(id: Int) = id == generation
 
@@ -381,6 +411,7 @@ private fun requestModel(force: Boolean) {
                 Bridge.module == null && (force || Bridge.loadError == null)
             if (shouldLoad) {
                 if (force) Bridge.loadError = null
+                val loadStart = SystemClock.elapsedRealtime()
                 try {
                     ensureLoaded()
                     Bridge.loadError = null
@@ -388,6 +419,9 @@ private fun requestModel(force: Boolean) {
                     Bridge.loadError = errorText(t)
                     Log.e(TAG, "model load failed", t)
                 }
+                logModel(SystemClock.elapsedRealtime() - loadStart)
+            } else {
+                logModel(null)
             }
         } catch (t: Throwable) {
             Bridge.loadError = errorText(t)
@@ -397,30 +431,37 @@ private fun requestModel(force: Boolean) {
     }
 }
 
-private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long) {
+private fun enqueueCheck(id: Int, mode: Int, value: String, started: Long, source: String) {
     Bridge.worker.execute {
         try {
-            runCheck(id, mode, value, started)
+            runCheck(id, mode, value, started, source)
         } catch (t: Throwable) {
             Log.e(TAG, "check escaped", t)
         }
     }
 }
 
-private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
+private fun runCheck(id: Int, mode: Int, value: String, started: Long, source: String) {
     try {
         if (!Bridge.still(id)) return
         if (Bridge.pythonError != null || !Python.isStarted()) {
             throw IllegalStateException(Bridge.pythonError ?: "Python is not running")
         }
         val bridge = Python.getInstance().getModule("mobile")
-        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value).toString())
+        val callStart = SystemClock.elapsedRealtimeNanos()
+        val verdict = JSONObject(bridge.callAttr("verdict", KINDS[mode], value, source).toString())
+        val verdictCallMs = (SystemClock.elapsedRealtimeNanos() - callStart) / 1e6
         val level = verdict.optString("level")
         if (level != "danger" && level != "warn" && level != "clear") {
             throw IllegalStateException("Invalid detector verdict")
         }
         if (!Bridge.still(id)) return
-        val job = Bridge.Job(id, mode, value, started, verdict)
+        val job = Bridge.Job(id, mode, value, started, verdict, source)
+        job.verdictCallMs = verdictCallMs
+        // Flagged-only gating: only a result the screen shows as NO RISK skips Llama. A bank alert
+        // the app relabels (CHECK THIS ALERT or SUSPICIOUS) is not NO RISK, so it keeps Llama.
+        val gating = Bridge.gatingName()
+        val skipLlama = !Bridge.explainCleared && level == "clear" && bankAlertLevel(verdict, value) == null
         if (!Bridge.publish(id, job)) return
         Bridge.app?.let { ctx ->
             try {
@@ -438,12 +479,13 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         }
         if (!Bridge.still(id)) return
         val explanation = try {
-            val missing = missingMessage()
-            Bridge.missing = missing
+            val missing = if (skipLlama) null else missingMessage()
+            if (!skipLlama) Bridge.missing = missing
             when {
+                skipLlama -> JSONObject(bridge.callAttr("vetted_explanation").toString())
                 missing != null -> JSONObject().put("error", missing)
                 Bridge.pythonError != null -> JSONObject().put("error", Bridge.pythonError)
-                else -> JSONObject(bridge.callAttr("explain", Runner(id)).toString())
+                else -> JSONObject(bridge.callAttr("explain", Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)).toString())
             }
         } catch (t: Throwable) {
             if (!Bridge.still(id)) return
@@ -454,6 +496,7 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
         job.explanation = explanation
         job.totalMs = SystemClock.elapsedRealtime() - started
         job.pssMb = try { Debug.getPss() / 1024.0 } catch (_: Throwable) { Double.NaN }
+        logPerf(job, gating)
         Bridge.checkStage = 2
         Bridge.ui { act ->
             if (!Bridge.still(id)) return@ui
@@ -474,6 +517,60 @@ private fun runCheck(id: Int, mode: Int, value: String, started: Long) {
             act.showHome()
             act.failureToast(detail)
         }
+    }
+}
+
+private fun putNum(rec: JSONObject, key: String, value: Double?) {
+    rec.put(key, if (value != null && value.isFinite() && value >= 0) value else JSONObject.NULL)
+}
+
+/** The preload finished (or was not needed). The harness waits for this before its first check. */
+private fun logModel(loadMs: Long?) {
+    try {
+        val state = when {
+            Bridge.module != null -> "ready"
+            Bridge.missing != null -> "missing"
+            else -> "error"
+        }
+        val rec = JSONObject().put("event", "model").put("session", Bridge.perfSession)
+            .put("seq", Bridge.perfSeq.incrementAndGet()).put("state", state).put("gating", Bridge.gatingName())
+        putNum(rec, "load_ms", loadMs?.toDouble())
+        Log.i(PERF_TAG, rec.toString())
+    } catch (_: Throwable) {}
+}
+
+/** One line per finished check for the adb harness. Numbers and labels only; never the checked text. */
+private fun logPerf(job: Bridge.Job, gating: String) {
+    try {
+        val ex = job.explanation
+        val llm = ex?.optJSONObject("llm")
+        fun num(key: String) = llm?.optDouble(key, Double.NaN)
+        val rec = JSONObject()
+            .put("event", "result")
+            .put("session", Bridge.perfSession)
+            .put("seq", Bridge.perfSeq.incrementAndGet())
+            .put("id", job.id)
+            .put("kind", KINDS.getOrElse(job.mode) { "?" })
+            .put("level", job.verdict.optString("level"))
+            .put("gating", gating)
+            .put("llama_skipped", ex?.optBoolean("llama_skipped") == true)
+            .put("fallback", ex?.optString("fallback")?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
+            .put("error", ex == null || ex.has("error"))
+        putNum(rec, "detector_ms", job.verdict.optDouble("detector_ms", Double.NaN))
+        putNum(rec, "verdict_call_ms", job.verdictCallMs)
+        putNum(rec, "prompt_tokens", num("prompt_tokens"))
+        putNum(rec, "prefill_ms", num("prefill_ms"))
+        putNum(rec, "prefill_tps", num("prefill_tps"))
+        putNum(rec, "first_token_ms", num("first_token_ms"))
+        putNum(rec, "decode_tps", num("decode_tps"))
+        putNum(rec, "generated_tokens", num("generated_tokens"))
+        putNum(rec, "gen_wall_ms", num("gen_wall_ms"))
+        putNum(rec, "total_ms", job.totalMs.toDouble())
+        putNum(rec, "pss_mb", job.pssMb)
+        rec.put("retried", llm?.optBoolean("retried") == true)
+        Log.i(PERF_TAG, rec.toString())
+    } catch (t: Throwable) {
+        Log.e(TAG, "perf log failed", t)
     }
 }
 
@@ -510,14 +607,20 @@ private fun enqueueNet(id: Int) {
  * Chaquopy calls [generate] on the model worker. Do not touch views from here, and do not
  * call load, reset, or close from [LlmCallback] — the native generate holds the module lock.
  */
-class Runner(private val id: Int) {
+class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
+    private fun timedOut(stats: JSONObject = JSONObject()): String =
+        JSONObject().put("text", "").put("stats", stats.put("timed_out", true)).put("timed_out", true).toString()
+
     fun generate(prompt: String): String {
         if (!Bridge.still(id)) throw Cancelled()
         val module = ensureLoaded()
         if (!Bridge.still(id)) throw Cancelled()
         module.resetContext()
         if (!Bridge.still(id)) throw Cancelled()
+        // A retry that would start after the budget is not started at all.
+        if (SystemClock.elapsedRealtime() >= deadline) return timedOut()
         val start = SystemClock.elapsedRealtime()
+        val overBudget = AtomicBoolean(false)
         var first: Long? = null
         var count = 0
         val out = StringBuilder()
@@ -530,7 +633,11 @@ class Runner(private val id: Int) {
                     out.append(result)
                     count++
                     // maxNewTokens is not forwarded by this AAR. Stop from the callback, which is supported.
-                    if (count >= 40 || !Bridge.still(id)) {
+                    // The budget is enforced here too: a callback runs inside the native generate, the
+                    // only place stop() is safe. Prefill emits no callback, so a run can overshoot the
+                    // budget by at most one prefill and one token.
+                    if (SystemClock.elapsedRealtime() >= deadline) overBudget.set(true)
+                    if (count >= 40 || !Bridge.still(id) || overBudget.get()) {
                         try { module.stop() } catch (_: Throwable) {}
                     }
                 } catch (_: Throwable) {}
@@ -567,19 +674,42 @@ class Runner(private val id: Int) {
             }
             try { module.resetContext() } catch (_: Throwable) {}
         }
+        val end = SystemClock.elapsedRealtime()
         if (!Bridge.still(id)) throw Cancelled()
+        val stats = JSONObject().put("backend", "executorch")
+        first?.let { stats.put("first_token_ms", it - start) }
+        // Over budget: report a timeout (mobile.explain then shows the detector's fixed text), not the
+        // partial reply, and not an error from the stopped native call.
+        if (overBudget.get()) return timedOut(stats)
         callbackError.get()?.let { throw IllegalStateException(it, generationFailure) }
         generationFailure?.let { throw it }
-        val stats = JSONObject().put("backend", "executorch")
         try {
             val nativeStats = JSONObject(if (rawStats.isBlank()) "{}" else rawStats)
             stats.put("raw", nativeStats)
             if (nativeStats.has("generated_tokens")) stats.put("generated_tokens", nativeStats.optInt("generated_tokens"))
             if (nativeStats.has("decode_token_per_sec")) stats.put("decode_tps", nativeStats.optDouble("decode_token_per_sec"))
+            prefillStats(nativeStats, stats)
         } catch (_: Throwable) {}
-        first?.let { stats.put("first_token_ms", it - start) }
+        stats.put("gen_wall_ms", end - start)
         return JSONObject().put("text", out.toString()).put("stats", stats).toString()
     }
+}
+
+/**
+ * Prompt tokens and prefill from ExecuTorch's native Stats JSON. Prefill time runs from
+ * inference_start_ms to prompt_eval_end_ms, so it includes tokenizing the prompt. A missing, zero
+ * or non-finite value is left out, and the UI and harness show it as unavailable.
+ */
+internal fun prefillStats(native: JSONObject, stats: JSONObject) {
+    fun pos(key: String): Double? = native.optDouble(key, Double.NaN).takeIf { it.isFinite() && it > 0 }
+    val tokens = pos("prompt_tokens")
+    val start = pos("inference_start_ms")
+    val end = pos("prompt_eval_end_ms")
+    val ms = if (start != null && end != null && end > start) end - start else null
+    val tps = pos("prefill_token_per_sec") ?: if (tokens != null && ms != null) tokens * 1000.0 / ms else null
+    tokens?.let { stats.put("prompt_tokens", it.toInt()) }
+    (ms ?: if (tokens != null && tps != null) tokens * 1000.0 / tps else null)?.let { stats.put("prefill_ms", it) }
+    tps?.let { stats.put("prefill_tps", it) }
 }
 
 class MainActivity : Activity() {
@@ -587,6 +717,11 @@ class MainActivity : Activity() {
     internal var selectedMode = 0
     internal var inputValue = ""
     private var sharedBanner = false
+    /** The shared text and its source hint, used only if that exact text is then checked. */
+    private var sharedText = ""
+    private var sharedSource = ""
+    /** Source of the check in flight, so a mode switch on the checking screen keeps it. */
+    private var checkSource = ""
     private var advancedOpen = false
     internal var shownId = Int.MIN_VALUE
     private var visibleJob: Bridge.Job? = null
@@ -614,6 +749,8 @@ class MainActivity : Activity() {
     private var listenLabel: TextView? = null
     private var replacedSlot: LinearLayout? = null
     private var aiFootSlot: View? = null
+    private var llamaHeadSlot: LinearLayout? = null
+    private var aiEnglishSlot: TextView? = null
     private var backCallback: OnBackInvokedCallback? = null
     private var ignoreBackUntil = 0L
 
@@ -958,6 +1095,7 @@ class MainActivity : Activity() {
     private fun loadStrings() {
         val prefs = getSharedPreferences("prahari", MODE_PRIVATE)
         L10n.hindi = prefs.getString("lang", "en") == "hi"
+        Bridge.explainCleared = prefs.getBoolean(PREF_EXPLAIN_CLEARED, false)
         if (!Python.isStarted()) return
         try {
             val raw = Python.getInstance().getModule("intake").callAttr("strings_json").toString()
@@ -965,6 +1103,25 @@ class MainActivity : Activity() {
         } catch (t: Throwable) {
             Log.e(TAG, "strings load failed", t)
         }
+    }
+
+    private fun setExplainCleared(on: Boolean) {
+        Bridge.explainCleared = on
+        getSharedPreferences("prahari", MODE_PRIVATE).edit().putBoolean(PREF_EXPLAIN_CLEARED, on).apply()
+    }
+
+    /**
+     * Debug builds only: the adb harness launches with GATING_EXTRA set to "all" or "flagged-only".
+     * Read on a fresh launch and on a new intent, never on recreation, so a later switch change wins.
+     */
+    private fun applyGatingExtra(source: Intent?) {
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) return
+        when (source?.getStringExtra(GATING_EXTRA)) {
+            "all" -> setExplainCleared(true)
+            "flagged-only" -> setExplainCleared(false)
+            else -> return
+        }
+        source?.removeExtra(GATING_EXTRA)
     }
 
     private fun rememberLanguage() {
@@ -1031,6 +1188,9 @@ class MainActivity : Activity() {
             selectedMode = it.getInt("mode", 0).coerceIn(0, KINDS.lastIndex)
             inputValue = it.getString("input") ?: ""
             sharedBanner = it.getBoolean("shared")
+            sharedText = it.getString("sharedText") ?: ""
+            sharedSource = it.getString("sharedSource") ?: ""
+            checkSource = it.getString("checkSource") ?: ""
             advancedOpen = it.getBoolean("advanced")
         }
         try {
@@ -1041,6 +1201,7 @@ class MainActivity : Activity() {
             Log.e(TAG, "Python start failed", t)
         }
         loadStrings()
+        if (savedInstanceState == null) applyGatingExtra(intent)
         installBack()
         // A share intent stays on the activity across rotation. Only the first create fills the box.
         val shared = if (savedInstanceState == null) readShare(intent) else null
@@ -1076,11 +1237,15 @@ class MainActivity : Activity() {
         out.putString("input", inputValue)
         out.putString("screen", screen)
         out.putBoolean("shared", sharedBanner)
+        out.putString("sharedText", sharedText)
+        out.putString("sharedSource", sharedSource)
+        out.putString("checkSource", checkSource)
         out.putBoolean("advanced", advancedOpen)
         val job = if (screen == "result") visibleJob else null
         if (job != null) {
             out.putString("verdict", job.verdict.toString())
             out.putString("value", job.value)
+            out.putString("source", job.source)
             out.putInt("jobMode", job.mode)
             out.putLong("started", job.started)
             job.explanation?.let { out.putString("explanation", it.toString()) }
@@ -1098,7 +1263,8 @@ class MainActivity : Activity() {
                 mode = state.getInt("jobMode", selectedMode),
                 value = state.getString("value") ?: inputValue,
                 started = state.getLong("started", SystemClock.elapsedRealtime()),
-                verdict = JSONObject(raw)
+                verdict = JSONObject(raw),
+                source = state.getString("source") ?: ""
             )
             val explanation = state.getString("explanation")
             job.explanation = if (explanation != null) JSONObject(explanation)
@@ -1437,8 +1603,11 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        applyGatingExtra(intent)
         val shared = readShare(intent) ?: return
-        openShared(shared)
+        // getReferrer() still names the app that first launched this singleTop activity, so a
+        // later share gets no medium hint rather than a stale one.
+        openShared(shared, trustReferrer = false)
     }
 
     /** ACTION_SEND uses EXTRA_TEXT. ACTION_PROCESS_TEXT uses EXTRA_PROCESS_TEXT. Never log the text. */
@@ -1488,7 +1657,7 @@ class MainActivity : Activity() {
     }
 
     /** Share opens Home with the text filled in. Nothing is checked, and no link is opened, until Check. */
-    private fun openShared(raw: String) {
+    private fun openShared(raw: String, trustReferrer: Boolean = true) {
         stopSpeech()
         Bridge.cancel()
         val text = cleanShare(raw)
@@ -1505,10 +1674,29 @@ class MainActivity : Activity() {
             }
             else -> {
                 sharedBanner = true
+                sharedText = text
+                sharedSource = if (trustReferrer) shareSource() else ""
                 inputValue = text
                 selectedMode = detectMode(text)
                 showHome()
             }
+        }
+    }
+
+    /**
+     * The sharing app as a hint for the report's medium line. The referrer is optional and set by
+     * the caller, so it is never trusted for anything else; unknown apps give "".
+     */
+    private fun shareSource(): String {
+        val pkg = try {
+            referrer?.takeIf { it.scheme == "android-app" }?.host.orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+        return when (pkg) {
+            "com.whatsapp", "com.whatsapp.w4b" -> "whatsapp"
+            "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms" -> "sms"
+            else -> ""
         }
     }
 
@@ -1544,7 +1732,7 @@ class MainActivity : Activity() {
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
             }
             add(chip, label, 0, -2, left = 4, weight = 1f)
-            chip.setOnClickListener { if (i != selected) beginCheck(i, value) }
+            chip.setOnClickListener { if (i != selected) beginCheck(i, value, visibleJob?.source ?: checkSource) }
             val modeLabel = t(modeNames[i])
             asButton(chip, if (on) "$modeLabel, ${t("selected")}" else "${t("Change to")} $modeLabel")
             add(seg, chip, 0, -2, left = if (i == 0) 0 else 4, weight = 1f)
@@ -1555,10 +1743,11 @@ class MainActivity : Activity() {
 
     private fun startCheck() {
         if (!::input.isInitialized) return
-        beginCheck(selectedMode, input.text?.toString() ?: "")
+        val text = input.text?.toString() ?: ""
+        beginCheck(selectedMode, text, if (text == sharedText) sharedSource else "")
     }
 
-    private fun beginCheck(mode: Int, value: String) {
+    private fun beginCheck(mode: Int, value: String, source: String = "") {
         if (value.isBlank()) {
             toast("Paste a message, link or network event first.")
             return
@@ -1570,12 +1759,13 @@ class MainActivity : Activity() {
         inputValue = value
         selectedMode = mode.coerceIn(0, KINDS.lastIndex)
         sharedBanner = false
+        checkSource = source
         stopSpeech()
         hideKeyboard()
         val id = Bridge.begin()
         val started = SystemClock.elapsedRealtime()
         showChecking(selectedMode, value)
-        enqueueCheck(id, selectedMode, value, started)
+        enqueueCheck(id, selectedMode, value, started, source)
     }
 
     private fun showChecking(mode: Int, value: String) {
@@ -2011,6 +2201,10 @@ class MainActivity : Activity() {
         val actionsHi = strings(data.optJSONArray("actions_hi"))
         add(b, listenButton(p, speechScript(p, actions, actionsHi, true), speechScript(p, actions, actionsHi, false)), -1, -2, top = 12)
         add(body, b, top = 12)
+        if (job.mode != 2 && data.optBoolean("remote_app_check")) {
+            val apps = try { RemoteApps.installed(packageManager) } catch (_: Throwable) { emptyList() }
+            if (apps.isNotEmpty()) add(body, remoteAppBanner(apps), top = 12)
+        }
         if (announcedJob != job.id) {
             announcedJob = job.id
             val announcement = "${t(p.title)}. $why"
@@ -2087,6 +2281,11 @@ class MainActivity : Activity() {
                 add(steps, buttons, top = 14)
             }
         }
+        // Copy report and Send to family: SCAM or SUSPICIOUS message and link results only.
+        val reportCard = if (mode == 2 || level == "clear") null
+            else data.optJSONObject("report_card")
+                ?: if (alertLevel == "warn") data.optJSONObject("report_card_raised") else null
+        if (reportCard != null) add(steps, shareRow(reportCard), top = 10)
         if (clear && mode == 0) {
             divider(steps, 12)
             add(steps, iconText(R.drawable.ic_alert_circle, "Scammers copy real messages. If it asks for money or a code, check in the official app first.", T.ink2, 13f, 16, flex = true).apply {
@@ -2162,7 +2361,9 @@ class MainActivity : Activity() {
             add(body, hiCard, top = 12)
         }
         val llama = card(T.surface2, false)
-        add(llama, iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true))
+        val llamaHead = iconText(R.drawable.ic_cpu, "Explained on this phone by Llama 3.2", T.ink2, 13f, 18, flex = true)
+        llamaHeadSlot = llamaHead
+        add(llama, llamaHead)
         val replaced = row().apply {
             visibility = View.GONE
             background = shape(T.brandC, 12f)
@@ -2204,7 +2405,12 @@ class MainActivity : Activity() {
         val aiFoot = iconText(R.drawable.ic_info, "AI-written and can be wrong. Follow the steps above.", T.ink2, 12f, 14, flex = true)
         add(llama, aiFoot, top = 12)
         aiFootSlot = aiFoot
-        if (L10n.hindi) add(llama, txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true), top = 6)
+        aiEnglishSlot = null
+        if (L10n.hindi) {
+            val note = txt(n("ai_english"), 12f, T.ink3, 600, 16, raw = true)
+            aiEnglishSlot = note
+            add(llama, note, top = 6)
+        }
         add(body, llama, top = 12)
         val stats = card()
         val header = row().apply { minimumHeight = dp(48) }
@@ -2226,7 +2432,7 @@ class MainActivity : Activity() {
             chevron.rotation = if (open) 180f else 0f
             describeStats(open)
         }
-        fillStats(data, null, null, null)
+        fillStats(data, null, null, null, false, false)
         add(body, stats, top = 12)
         val checked = card()
         add(checked, heading("You checked", "आपने जांचा"))
@@ -2264,31 +2470,52 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 30) header.stateDescription = t(if (expanded) "Expanded" else "Collapsed")
     }
 
-    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?) {
-        val details = statsDetails ?: return
-        val summary = statsSummary ?: return
-        details.removeAllViews()
+    private fun tileRow(labels: List<String>, values: List<String>): LinearLayout {
         val tiles = row()
-        val values = listOf(
-            formatMs(data.optDouble("detector_ms", Double.NaN)),
-            formatMs(llm?.optDouble("first_token_ms", Double.NaN) ?: Double.NaN),
-            llm?.optDouble("decode_tps", Double.NaN)?.takeIf { it.isFinite() }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
-        )
-        listOf("Detector", "First token", "Decode speed").forEachIndexed { i, label ->
+        labels.forEachIndexed { i, label ->
             val tile = col().apply { background = shape(T.surface2, 12f); pad(this, 10, 10, 10, 10) }
             add(tile, txt(values[i], 17f, T.ink, 700))
             add(tile, txt(label, 11f, T.ink2, 500), top = 4)
             add(tiles, tile, 0, -2, left = if (i == 0) 0 else 8, weight = 1f)
         }
         stackWhenTight(tiles, 8)
-        add(details, tiles, top = 4)
+        return tiles
+    }
+
+    private fun tps(value: Double?): String =
+        value?.takeIf { it.isFinite() && it > 0 }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
+
+    /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
+    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean, done: Boolean, fallback: Boolean = false) {
+        val details = statsDetails ?: return
+        val summary = statsSummary ?: return
+        details.removeAllViews()
+        fun d(key: String) = llm?.optDouble(key, Double.NaN) ?: Double.NaN
+        val detector = formatMs(data.optDouble("detector_ms", Double.NaN))
+        val firstToken = formatMs(d("first_token_ms"))
+        add(details, tileRow(listOf("Detector", "First token", "Decode speed"),
+            listOf(detector, firstToken, tps(d("decode_tps")))), top = 4)
+        val tokens = d("prompt_tokens").takeIf { it.isFinite() && it > 0 }?.let { "${it.toInt()}" } ?: "—"
+        add(details, tileRow(listOf("Prompt tokens", "Prefill", "Prefill speed"),
+            listOf(tokens, formatMs(d("prefill_ms")), tps(d("prefill_tps")))), top = 8)
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "—"
-        val foot = t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
+        val skippedLine = if (skipped) t("Llama skipped: verdict and text from the detector") + "\n" else ""
+        val foot = skippedLine + t("Total") + " ${total?.let { formatMs(it.toDouble()) } ?: "—"} · " +
             t("Memory") + " ${pss?.let { String.format(Locale.US, "%.1f MB", it) } ?: "—"}\n" +
             "Llama 3.2 1B INT4 · ExecuTorch · XNNPACK\nCPU ABI: $abi" +
             if (abi.startsWith("x86")) "\n" + t("x86 emulator: not Arm timings") else ""
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
-        summary.text = "${values[0]} · ${values[1]}"
+        // adb_bench.py reads this summary from the header's label: "<detector> · <first token>" when
+        // Llama ran; "Llama skipped" when gating skipped it; "Detector text" when Llama's replies were
+        // replaced by the detector's fixed text; "No AI text" when there is no explanation at all
+        // (missing model, an error); "—" only while Llama is still writing.
+        val second = when {
+            skipped -> t("Llama skipped")
+            done && fallback -> t("Detector text")
+            done && firstToken == "—" -> t("No AI text")
+            else -> firstToken
+        }
+        summary.text = "$detector · $second"
         describeStats(details.visibility == View.VISIBLE)
     }
 
@@ -2298,7 +2525,9 @@ class MainActivity : Activity() {
         val result = job.explanation ?: return
         val error = result.optString("error", "")
         val explanation = result.optString("explanation", "").trim()
+        val skipped = result.optBoolean("llama_skipped")
         replacedSlot?.visibility = if (result.optBoolean("replaced")) View.VISIBLE else View.GONE
+        if (skipped) markDetectorText("gated")
         // The app raised a cleared bank alert to SUSPICIOUS because it names its own link or number.
         // Llama wrote for the detector's NO RISK reading, so its text would contradict the banner.
         if (bankAlertLevel(job.verdict, job.value) == "warn" && job.verdict.optString("level") == "clear") {
@@ -2307,8 +2536,11 @@ class MainActivity : Activity() {
             view.text = t(RAISED_NOTE)
             view.setTextColor(T.ink2)
             view.setTypeface(view.typeface, Typeface.ITALIC)
+            // Stats still finish, so the header (and adb_bench.py) sees the check as done.
+            fillStats(job.verdict, result.optJSONObject("llm"), job.totalMs.takeIf { it >= 0 }, job.pssMb.takeIf { it.isFinite() }, skipped, true, result.has("fallback"))
             return
         }
+        if (result.has("fallback")) markDetectorText(result.optString("fallback"))
         if (error.isNotEmpty() || explanation.isEmpty()) {
             val lead = when {
                 error.contains("Model files are missing", ignoreCase = true) ->
@@ -2331,8 +2563,31 @@ class MainActivity : Activity() {
         }
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
-        fillStats(job.verdict, result.optJSONObject("llm"), total, pss)
+        // A detector-text fallback reads "No AI text" even when a refused reply had a first token.
+        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true, result.has("fallback"))
         metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
+    }
+
+    /**
+     * The text shown is the detector's fixed text, not Llama's: gating skipped Llama ("gated"), every
+     * reply failed the explanation checks ("checks_failed"), or the time budget ran out ("timeout").
+     * The card says so instead of claiming it is AI-written.
+     */
+    private fun markDetectorText(reason: String) {
+        llamaHeadSlot?.let { head ->
+            (head.getChildAt(0) as? ImageView)?.setImageResource(R.drawable.ic_shield_check)
+            (head.getChildAt(1) as? TextView)?.text = when (reason) {
+                "gated" -> t("Fixed text from the detector. Llama was not used.")
+                "timeout" -> t("Llama took too long, so this is the detector's fixed text.")
+                else -> t("Llama's reply did not pass the checks, so this is the detector's fixed text.")
+            }
+        }
+        (aiFootSlot as? LinearLayout)?.let { foot ->
+            (foot.getChildAt(1) as? TextView)?.text =
+                if (reason == "gated") t("Llama is skipped for NO RISK results so they finish faster. Turn it on in About.")
+                else t("Fixed text from the detector, not written by AI.")
+        }
+        aiEnglishSlot?.text = n("detector_english")
     }
 
     private fun launch(intent: Intent) {
@@ -2350,6 +2605,76 @@ class MainActivity : Activity() {
             "report_chakshu" -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://sancharsaathi.gov.in")))
             else -> launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://cybercrime.gov.in")))
         }
+    }
+
+    /** Amber note naming installed screen-sharing apps. Read by TalkBack as one block. */
+    private fun remoteAppBanner(apps: List<String>): LinearLayout {
+        val message = n("remote_app_banner").replace("{apps}", apps.joinToString(", "))
+        return row().apply {
+            gravity = Gravity.TOP
+            background = shape(T.warnC, 14f, 1, T.warn)
+            pad(this, 14, 12, 14, 12)
+            add(this, icon(R.drawable.ic_triangle_alert, 18, T.warn), 18, 18)
+            add(this, txt(message, 14f, T.onWarnC, 600, 20, raw = true), 0, -2, left = 10, weight = 1f)
+            isFocusable = true
+            a11yText(this, message)  // one TalkBack stop: the children are hidden
+        }
+    }
+
+    /** Two outlined buttons. Nothing is sent: one copies text, the other opens the share sheet. */
+    private fun shareRow(card: JSONObject): LinearLayout {
+        val buttons = row().apply { gravity = Gravity.TOP }
+        fun place(key: String, descKey: String, iconId: Int, left: Int, action: () -> Unit) {
+            val en = L10n.en(key)
+            val hi = L10n.hi(key)
+            val main = if (L10n.hindi) hi else en
+            val sub = if (L10n.hindi) "" else hi
+            val view = reportButton(
+                main, sub, iconId, T.brand, T.ink, T.ink2, true, n(key) + ". " + n(descKey), action
+            )
+            add(buttons, view, 0, -2, left = left, weight = 1f)
+        }
+        val lang = if (L10n.hindi) "hi" else "en"
+        place("report_copy", "report_copy_desc", R.drawable.ic_clipboard, 0) {
+            copyReport(card.optString("report_$lang").ifBlank { card.optString("report_en") })
+        }
+        place("family_send", "family_send_desc", R.drawable.ic_message, 8) {
+            sendToFamily(card.optString("family_$lang").ifBlank { card.optString("family_en") })
+        }
+        stackWhenTight(buttons, 8)
+        return buttons
+    }
+
+    private fun copyReport(text: String) {
+        if (text.isBlank()) return
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText(n("report_copy"), text)
+            if (Build.VERSION.SDK_INT >= 33) {
+                // Codes are masked, but the report can quote the message: keep it out of the preview.
+                clip.description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            }
+            clipboard.setPrimaryClip(clip)
+            toast(n("report_copied"))
+        } catch (t: Throwable) {
+            Log.e(TAG, "report copy failed", t)
+            toast(n("report_copy_fail"))
+        }
+    }
+
+    /** ACTION_SEND through the chooser. The user picks the app and the person; Prahari is left out. */
+    private fun sendToFamily(text: String) {
+        if (text.isBlank()) return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        val chooser = Intent.createChooser(send, n("family_chooser")).apply {
+            putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this@MainActivity, MainActivity::class.java)))
+        }
+        launch(chooser)
     }
 
     private fun buttonCopy(data: JSONObject, id: String, fallback: String): Pair<String, String> {
@@ -2656,7 +2981,10 @@ class MainActivity : Activity() {
                 }
                 // The decoded text is checked here. It is never opened as a link or a UPI intent.
                 inputValue = text
-                beginCheck(detectMode(text), text)
+                // Back to Home and Check again on the same text keeps the QR medium.
+                sharedText = text
+                sharedSource = "qr"
+                beginCheck(detectMode(text), text, "qr")
             }
         }, "prahari-qr").start()
     }
@@ -2783,6 +3111,23 @@ class MainActivity : Activity() {
             add(line, text, 0, -2, left = 14, weight = 1f)
             add(sheet, line)
         }
+        divider(sheet)
+        val gateRow = row().apply { pad(this, 0, 11, 0, 11); minimumHeight = dp(48) }
+        val gateText = col()
+        add(gateText, txt("Explain NO RISK results with Llama", 15f, T.ink, 600, 20))
+        add(gateText, txt("Off: NO RISK results show the detector's fixed text and skip Llama, so they finish faster. DANGEROUS, SUSPICIOUS and CHECK THIS ALERT results always use Llama.", 13f, T.ink2, 400, 18), top = 2)
+        add(gateRow, gateText, 0, -2, weight = 1f)
+        val gateSwitch = Switch(this).apply {
+            isChecked = Bridge.explainCleared
+            minimumHeight = dp(48)
+            minimumWidth = dp(48)
+            contentDescription = t("Explain NO RISK results with Llama")
+            setOnCheckedChangeListener { _, on -> setExplainCleared(on) }
+        }
+        add(gateRow, gateSwitch, -2, -2, left = 12)
+        // The whole row toggles, so the target is not only the small switch.
+        gateRow.setOnClickListener { gateSwitch.toggle() }
+        add(sheet, gateRow)
         add(sheet, button("Got it") { dialog.dismiss() }.apply { minimumHeight = dp(56) }, -1, -2, top = 8)
         add(sheet, txt("Built for the Arm Bharat AI-SoC Challenge 2026", 12f, T.ink3, 400, 16).apply { gravity = Gravity.CENTER }, top = 12)
         val column = col()

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# bin/validate [--baseline BEFORE.json] [--json OUT.json] [--no-tests] [--errors SET,...] [--sealed]
+# Validation gate for detector changes: holdout sets (FPR / recall / F1) plus the CI test suites.
+# Uses HC_PY when set, else the project venv, else python3. See eval/validate.py for the sets.
+set -euo pipefail
+P="$(cd "$(dirname "$0")/.." && pwd)"
+PY="${HC_PY:-}"
+if [ -z "$PY" ]; then
+  if [ -x "$P/.venv/bin/python" ]; then PY="$P/.venv/bin/python"; else PY="$(command -v python3)"; fi
+fi
+export HC_PY="$PY"
+exec "$PY" "$P/eval/validate.py" "$@"
