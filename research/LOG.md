@@ -630,3 +630,18 @@ mismatch predates this round. The r3, r4 injection and r4 SMS suites respectivel
   against the sealed set (0.289) was computed, numbers only; (4) the sealed set was scored once, at
   80cc558, after review: SMS FPR 0.402 -> 0.322, recall 0.926 unchanged, SMS F1 0.759 -> 0.792,
   combined F1 0.784 -> 0.813. bin/eval was not rerun.
+
+- 2026-11-24 validation gate (PR #65, branch feat/validation-gate): `bin/validate` scores every
+  holdout set and runs the test suites; `--baseline` fails on any recall drop or FPR rise. Detector:
+  Hindi perfective money verbs ("जमा किए गए हैं") are records, not deposit orders; request cues that
+  sit only inside negated warnings no longer make a message actionable; evidence-phrase fixes (reserved
+  `.example` domains, blackmail vs account blocking, trading deposit vs refund fee). A narrow
+  hypothetical-caller rule and a Hindi verb-final negation rule were built and dropped after three
+  review rounds (gpt-6.1-terra xhigh, GLM 5.4 max, CodeRabbit) each found scam phrasings they cleared.
+  Held-back and sealed use, disclosed: v3_test scored at base, at intermediate heads and at the final
+  head, aggregates only (one intermediate run showed an FPR rise from a leak of the strict check into
+  PR #48's path; that was reverted on principle, not tuned); v4_test scored at base 89d4e97 and at the
+  final head 75993f1, aggregates only. Sealed set: (1) base 89d4e97 (combined FPR 0.310, SMS FPR 0.333,
+  recall 0.929); (2) a round-2 reviewer probe scored it once at 5e47815 by accident, aggregates only,
+  not used; (3) final head 75993f1: combined FPR 0.300, SMS FPR 0.322 (28/87), recall 0.929 unchanged,
+  combined F1 0.808 -> 0.812. Nothing was tuned on held-back or sealed data.
