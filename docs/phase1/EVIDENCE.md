@@ -1,6 +1,6 @@
 # Evidence ledger
 
-Updated: 24 November 2026 (`main` commit `28bdb6b`, through PR #51). Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
+Updated: 24 November 2026 (`main` commit `6b5e199`, through PR #45 and #52). Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
 
 ## Core architecture, datasets, and historical baselines (`[S1]`–`[S7]`)
 
@@ -32,7 +32,7 @@ Measured **23 November 2026** (Asia/Kolkata) on a physical **Samsung Galaxy S23 
 | 8 timed on-device checks across SMS, URL, flow & Airplane Mode | Measured on physical Arm64 handset | App-displayed stats (visible text in `docs/phase1/evidence/galaxy-s23/ui-stats-text.txt`; screenshots in `docs/phase1/img/s23-*.png`): KYC cold 255 ms det / 664 ms TTFT / 42.6 tok/s / 2.00 s / 1,692.4 MB; KYC warm 1: **6 ms / 510 ms / 43.4 tok/s / 1.20 s / 1,708.0 MB**; KYC warm 2: 6 ms / 499 ms (card not expanded); KYC warm 3: 6 ms / 508 ms / 42.9 tok/s / 1.21 s / 1,724.8 MB; Bank debit: 17 ms / 615 ms / 39.8 tok/s / 1.50 s / 1,737.5 MB; Lookalike URL: 183 ms / 594 ms / 39.1 tok/s / 3.53 s / 1,781.2 MB; Port scan: 5 ms / 650 ms / 38.6 tok/s / 1.49 s / 1,772.6 MB; **KYC in Airplane Mode (`airplane_mode_on=1`): 8 ms / 657 ms / 39.0 tok/s / 1.42 s / 1,772.6 MB**. |
 | S23 memory (`dumpsys meminfo in.prahari.app`) | Measured on physical handset | Snapshot after KYC: **TOTAL PSS 1,744,842 KiB (1,704 MiB, 1.66 GiB)**, **TOTAL RSS 1,867,396 KiB (1,824 MiB, 1.78 GiB)**, Native Heap PSS 1,566,097 KiB (89.8%), Graphics 58,676 KiB, Private Other 59,764 KiB, Code 37,420 KiB, Java Heap 11,044 KiB, System 10,566 KiB, Stack 1,316 KiB, SwapPss 23 KiB (`dumpsys` kilobytes are 1,024 bytes). |
 | S23 offline proof & screenshots | Measured on physical handset | `docs/phase1/img/s23-kyc-airplane-top.png`, `s23-kyc-airplane-stats.png`, `s23-kyc-warm1-stats.png`, `s23-prove-offline.png` (`HTTPS GET example.com` -> `Blocked` in 12 ms with `SecurityException: Permission denied (missing INTERNET permission?)`), `s23-bank-top.png`. |
-| Known S23 r1 defects | Observed & addressed | On the r1 APK run on S23, bank debit repeated its opening sentence and lookalike URL appended `"Can I help you with something else?"` — both addressed in PR #41 on `main`, awaiting re-verification on S23 with the unified r2 APK. |
+| Known S23 r1 defects | Observed & addressed | On the r1 APK run on S23, bank debit repeated its opening sentence and lookalike URL appended `"Can I help you with something else?"` — both addressed in PR #41 on `main`; physical phone unverified on the final build (PR #45 APK) until the next S23 session. |
 
 ## Arm Neoverse-V2 benchmark, KleidiAI profiling & `unshare -n` (`[S10]`)
 
@@ -54,7 +54,7 @@ Measured **23 November 2026** on Debian 12, Linux 6.1.155, `aarch64`, ARM Neover
 | PR #43: Android round-2 UX | Merged (PR #43, merge `1eb8916`) | Share-sheet (`ACTION_SEND`, `ACTION_PROCESS_TEXT`), `EN / Hindi` toggle (`strings_hi.json`, `hindi_steps.json`), offline TTS (`Listen`), quoted evidence spans (defanged links, masked OTPs), safety-filter replacement badge, opt-in redacted local history, pure-Python QR decoder (`android/python/qrdec.py`). Verified on Android 14 x86_64 emulator; pending physical S23 re-test. |
 | Exploratory v1 India challenge SHA-256 | Historical | `135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67` (`bench/challenge/india_challenge_v1.jsonl`); previously exposed, exploratory only. |
 
-## Merged `main` improvements PR #46–#51 (`[S12]`)
+## Merged `main` improvements PR #45–#52 (`[S12]`)
 
 | Claim | Status | Evidence and qualification |
 |:--|:--|:--|
@@ -63,5 +63,7 @@ Measured **23 November 2026** on Debian 12, Linux 6.1.155, `aarch64`, ARM Neover
 | PR #50: Grounded explanations, validator, Hindi summary | Merged (merge `e0adb82`) | `triage/llm.py` (`key_fact`, `validate`), `triage/explain_hi.py`; audits in `research/explain-audit.md` (3 × 20 fresh items; EN wrong 3->5, 5->5, 3->5; HI accessibility 4.5->6.3, 3.5->5.45, 4.05->6.4). Latency +12% (interleaved A/B, 57 dev items). |
 | PR #46 via #51: UPI QR checker | Merged (merge `28bdb6b`) | `triage/upi.py`, `tests/test_upi.py`; `bin/predict --task upi`; Linux app and Android hooks. |
 | Test suite on `28bdb6b` | Measured 24 Nov | `pytest candidates/BEST/tests bench/tests/test_llm_safety.py`: 896 passed. |
-| PR #44 (Arm perf harness), PR #45 (Android round 3) | **TODO — not merged** | Fill in only after merge and measurement. |
+| PR #52: repeated opening shown once | Merged (merge `ed0c7a3`) | `_drop_opening_copies` in `triage/llm.py`; 6 doubled-opening cases 1 wrong -> 0; 901 detector and safety tests at merge. No verdict or rule change. |
+| PR #45: Android round 3 | Merged (merge `6b5e199`); **emulator only** | CI green (checks, apk, executorch-aar). Integrator re-test on an Android 14 x86_64 emulator with the `main` APK: parcel scam DANGEROUS (3 reasons), genuine SBI debit alert CHECK THIS ALERT, refund UPI link DANGEROUS (UPI QR), Hindi-mode KYC with Hindi chrome and Hindi summary (Llama sentence English, labelled). Screenshots `docs/phase1/img/app-round3-*.png`. **Physical phone unverified on the final build:** the S23 numbers in `[S9]` are from the r1 APK; TalkBack and memory trace untested. |
+| PR #44: Arm perf harness | **TODO — not merged** | Fill in only after merge; link `docs/perf/`. |
 
