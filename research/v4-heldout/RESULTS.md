@@ -16,8 +16,9 @@ Source for the figure "held-back 79 messages: false-alarm rate 0.340 → 0.277, 
 
 ## Scoring
 `research/v3score.py` from the false-alarm project with the file name changed: `triage.detect.predict_text` on
-each message; label 1 counts as flagged, `uncertain` (SUSPICIOUS) also counts as flagged only when the label is 1
-(false alarm = a genuine message labelled 1). Run on oracle-a1, 24 Nov 2026.
+each message; a message counts as flagged when the detector label is 1 (the scorer would count `uncertain` as not
+flagged, but no message came out `uncertain` in these four runs). False-alarm rate = FP / (FP + TN) over genuine
+messages. Run on oracle-a1, 24 Nov 2026.
 
 | Candidate | Split | F1 | Recall | False-alarm rate | TP | FP | TN | FN |
 |---|---|---|---|---|---|---|---|---|
