@@ -179,7 +179,9 @@ def test_leftover_handover_demand_or_exception_stays_flagged(text):
 def test_lead_in_words_do_not_backtrack():
     import time
     t = time.time()
-    mech.analyze("now " * 40 + "pay")
+    # A failing tail forces the backtracking: at base these took 2 s and over 8 s (GLM 5.4).
+    mech.analyze("now " * 20 + "x")
+    mech.analyze("please " * 24 + "otp")
     assert time.time() - t < 1.0
 
 
@@ -192,6 +194,9 @@ def test_feedback_invitation_is_not_called_an_exposure_threat():
 def test_spaced_hinglish_sextortion_is_recognised():
     a = mech.analyze("Tumhari private video sab contacts ko bhej dunga. Abhi 20,000 bhejo.")
     assert "sextortion" in {n for n, _ in a["harm"]}
+    # Sending one's own video to the reader is not a threat (CodeRabbit).
+    a = mech.analyze("Main apni private video tumhe bhej dunga.")
+    assert "sextortion" not in {n for n, _ in a["harm"]}
 
 
 def test_first_person_leak_threat_uses_the_exposure_line():

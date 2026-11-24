@@ -294,7 +294,7 @@ def main(argv=None):
         if unselected:
             notes.append("baseline sets not compared: " + ", ".join(unselected))
     partial = f" (partial: {'; '.join(notes)})" if notes else ""
-    print("GATE", "FAIL" if rc else "PASS" + partial)
+    print("GATE", ("FAIL" if rc else "PASS") + partial)
     return 1 if rc else 0
 
 

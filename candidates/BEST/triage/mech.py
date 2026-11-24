@@ -992,8 +992,14 @@ def analyze(text):
         a["job_upfront"] = True
         a["harm"].append(("job_offer", "offers easy daily income through a personal chat channel"))
     if _clause_hit(r"(private (recording|video|photo)|intimate|morphed|nude)", t) and \
-            _clause_hit(r"(post|publish|leak|share|send to|वायरल|viral kar\w*|"
-                        r"bhej\s*(?:unga|ungi|dunga|dungi|denge|doonga|egi|ega)\b|भेजूं?ँ?गा|भेज\s*(?:दूंगा|दूँगा|दूंगी|देंगे))", t):
+            (_clause_hit(r"(post|publish|leak|share|send to|वायरल)", t) or
+             # "bhej dunga" / "viral kar dunga" count only aimed at contacts or family, or with
+             # coercion: "main apni private video tumhe bhej dunga" is not a threat.
+             (_clause_hit(r"viral kar\w*|bhej\s*(?:unga|ungi|dunga|dungi|denge|doonga|egi|ega)\b|भेजूं?ँ?गा|"
+                          r"भेज\s*(?:दूंगा|दूँगा|दूंगी|देंगे)", t) and
+              _any(r"\b(?:contacts?|family|friends|sab|sabko|sabhi|everyone|ghar\w*|relatives)\b|सबको|परिवार|"
+                   r"संपर्क|कॉन्टैक्ट|रिश्तेदार|\b(?:warna|varna|or else|otherwise|unless|nahi to|nahin to|"
+                   r"if you don'?t)\b|वरना|नहीं तो", t))):
         a["sextortion"] = True
         a["harm"].append(("sextortion", "threatens to publish private material unless you pay"))
     if _clause_hit(r"(gift (card|voucher)|voucher|google play|amazon (pay )?card)", t) and \
