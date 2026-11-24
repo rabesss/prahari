@@ -14,7 +14,17 @@ REMOTE_APP = re.compile(next(pat for name, pat, _ in rules.TEXT_RULES if name ==
 MONEY_TYPES = {
     'OTP or PIN theft', 'a safe-account transfer scam', 'a remote-access app scam', report_card.DEBIT_ALERT,
 }
-MONEY_CATEGORIES = {'kyc_payment', 'customer_care'}
+# Banks, wallets and UPI apps among the detector's known brands (rules.BRANDS).
+BANK_BRANDS = [b for b in rules.BRANDS if b in {'sbi', 'hdfc', 'icici', 'axis', 'kotak', 'pnb', 'paytm', 'phonepe',
+                                                'gpay', 'bhim', 'npci', 'paypal'}] + ['yono', 'bob', 'canara']
+# Words that put a bank, KYC, UPI, OTP or support desk in the message itself, plus the bank and
+# wallet names in BANK_BRANDS. Refund wording counts: fake refund desks are the classic route to a
+# screen-sharing app. An electricity or job scam without
+# one of these does not show the banner.
+MONEY_DESK = re.compile(
+    r'\b(?:bank\w*|kyc|upi|otp|pin|cvv|mpin|net ?banking|account|a/c|debit|credit card|card|wallet|'
+    r'customer (?:care|support|service)|support (?:team|executive|agent)|helpline|refund|'
+    + '|'.join(re.escape(b) for b in BANK_BRANDS) + r')\b|बैंक|खाता|कस्टमर केयर', re.I)
 
 
 def needs_check(kind, text, lab, scam, actions=()):
@@ -29,4 +39,4 @@ def needs_check(kind, text, lab, scam, actions=()):
     scam = str(scam or '')
     if kind == 'upi' or scam.startswith('a UPI ') or scam in MONEY_TYPES or llm.DEBIT_STEP in (actions or ()):
         return True
-    return report_card.category(kind, text, scam) in MONEY_CATEGORIES
+    return bool(MONEY_DESK.search(text)) or report_card.category(kind, text, scam) == 'customer_care'
