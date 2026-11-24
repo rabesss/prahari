@@ -36,6 +36,15 @@ REPO = CAND.parents[1]
 # Inside the candidate so its tests and --demo work in a staged copy (bin/eval copies only this dir).
 DEMO_DIR = CAND / "demo" / "call_guard"
 
+
+def _record_path(path) -> str:
+    """Audio path for result JSON: repo-relative inside the repo, else the basename (no absolute home paths)."""
+    p = Path(path).resolve()
+    try:
+        return p.relative_to(REPO).as_posix()
+    except ValueError:
+        return p.name
+
 VERDICT = {1: "malicious", 0: "benign", "uncertain": "uncertain"}
 
 DIGITAL_ARREST_ACTIONS = [
@@ -350,7 +359,7 @@ def analyze_audio_file(
     total_ms = round((time.perf_counter() - t0) * 1000, 1)
     rss_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0, 1)
     res.update({
-        "audio_file": str(audio_path),
+        "audio_file": _record_path(audio_path),
         "transcript": asr_res["text"],
         "asr": asr_res,
         "detector_ms": det_ms,

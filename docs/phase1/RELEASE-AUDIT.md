@@ -29,7 +29,7 @@ Owner decisions of 24 Nov applied in the tree:
 | **Content fit for public** | **FIXED IN TREE / history optional** | `docs/design/COMPETE.md` (teardown of 13 rival competition entries + local `/var/tmp` paths) and `docs/design/RATING-r1.md` are removed from the tree on this branch; they remain in history (commit `ef1e619`) unless the owner scrubs it (§5). |
 | **Personal info (PII) & local paths** | **FIXED IN TREE / history rewrite pending** | One historical commit (`721209c7bf`) uses a personal Gmail address as Git author/committer (history rewrite prepared, awaiting the owner); the absolute local paths in `research/evals/` are relativised and the internal notes are removed from the tree. |
 
-**Bottom line:** There are **no leaked credentials, API keys, model weights, or hidden evaluation items**, so making the repo public carries **no credential-exposure risk**. However, **before toggling visibility to Public**, the owner should:
+**Bottom line:** There are **no leaked credentials, API keys, model weights, or hidden evaluation items**, so making the repo public carries **no credential-exposure risk**. However, **before toggling visibility to Public**, the repository owner should:
 1. Merge this branch (it removes `docs/design/COMPETE.md` and `docs/design/RATING-r1.md` from the tree); optionally scrub them from history.
 2. Add a root `LICENSE` file (e.g., MIT or Apache-2.0, or an explicit copyright notice).
 3. Decide whether to rewrite the single commit `721209c7bf` that carries a personal Gmail address (and optionally strip absolute home-directory paths and internal scratch docs such as `AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`).

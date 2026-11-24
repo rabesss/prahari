@@ -11,7 +11,7 @@ Primary source: the official page https://arm-education.github.io/Arm-Developer-
   mentor institute; supported by Meta. [S]
 - Five problem statements. **One winner per problem statement**, chosen "after the final live virtual demo and jury Q&A". Students
   and professionals "compete on equal terms". [S] "Winner selection is at the sole discretion of the challenge organisers." [S]
-- The entry: the owner, solo (teams of 1-3 are allowed [S]), registered for **PS3** before registration closed on 19 Oct 2026. [S per
+- The entry: a solo entrant (teams of 1-3 are allowed [S]), registered for **PS3** before registration closed on 19 Oct 2026. [S per
   the registration confirmation] A change of challenge area was allowed only within 15 days of registration, so PS3 is effectively fixed. [I]
 
 ## 2. Timeline (dates only; no cutoff hour or timezone is published [U])

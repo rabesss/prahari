@@ -31,6 +31,15 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def record_path(path) -> str:
+    """Path as written to evidence JSON: repo-relative inside the repo, else the basename (no absolute home paths)."""
+    q = Path(path).resolve()
+    try:
+        return q.relative_to(ROOT).as_posix()
+    except ValueError:
+        return q.name
 DEFAULT_CANDIDATE = ROOT / "candidates" / "BEST"
 DEFAULT_REGISTRY = ROOT / "models" / "registry.json"
 DEFAULT_FIXTURES_DIR = ROOT / "bench" / "fixtures"
@@ -292,7 +301,7 @@ def collect_disk_footprint(candidate: Path, registry: dict, model_names: list[st
             if p.is_file():
                 sz = p.stat().st_size
                 rec[key] = {
-                    "path": str(p),
+                    "path": record_path(p),
                     "exists": True,
                     "bytes": sz,
                     "mib": round(sz / (1024 * 1024), 2),
@@ -300,11 +309,11 @@ def collect_disk_footprint(candidate: Path, registry: dict, model_names: list[st
                     "sha256": sha256_file(p) if compute_sha else None,
                 }
             else:
-                rec[key] = {"path": str(p), "exists": False}
+                rec[key] = {"path": record_path(p), "exists": False}
         models_info[name] = rec
 
     return {
-        "candidate": str(candidate),
+        "candidate": record_path(candidate),
         "detector_artifacts": artifacts,
         "detector_artifacts_total_bytes": art_total,
         "detector_artifacts_total_mib": round(art_total / (1024 * 1024), 2),
@@ -854,7 +863,7 @@ def main(argv: list[str] | None = None) -> int:
             "offline_unshare": args.offline_unshare,
             "perf_profile": args.perf_profile,
         },
-        "out_dir": str(out_dir),
+        "out_dir": record_path(out_dir),
     }
 
     if args.dry_run:

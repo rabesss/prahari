@@ -43,6 +43,11 @@ def test_mention():
         assert r.mentions({"required_mentions": req}, text) == want, (req, text)
 
 
+def test_record_path_is_repo_relative():
+    assert r.record_path(r.PROJ / "candidates" / "BEST") == "candidates/BEST"
+    assert r.record_path("/nonexistent/elsewhere/cand") == "cand"
+    assert not r.record_path(pathlib.Path.home() / "x").startswith("/")
+
 if __name__ == "__main__":
     test_consistency()
     test_mention()
