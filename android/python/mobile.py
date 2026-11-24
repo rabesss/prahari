@@ -346,6 +346,34 @@ def explain(runner):
     return json.dumps({'explanation': text, 'llm': stats, 'replaced': replaced}, ensure_ascii=False)
 
 
+_FLOW_GUESS = 'traffic that looks like a routine update or a scheduled backup'
+
+
+def vetted_explanation():
+    """Stage 2 without Llama, for a NO RISK item when flagged-only gating is on.
+
+    Builds the prompt the model would get (no model call) and returns its required opening plus
+    the key fact, the same shape llm.validate() gives a reply that adds nothing usable after the
+    opening. Both parts are fixed text from the detector's verdict and evidence, and the result
+    still goes through llm.validate().
+    """
+    kind, src = _last['kind'], _last['text']
+    prompt = BridgeExplainer(None).prompt(kind, src, _last['lab'], _last['ev'])
+    opening = llm._forced_sentence(prompt).rstrip(' .')
+    ctx = llm._CTX.get(prompt) or {}
+    fact = ctx.get('fact') or ''
+    # compact_evidence names a cleared flow with no recognised signal "routine update or scheduled
+    # backup". Llama is told to start with that, but as fixed text it would claim something the flow
+    # record does not establish. Keep only what the verdict itself establishes.
+    if kind == 'flow' and _FLOW_GUESS in opening:
+        opening = 'No risk found for this network event: the detector found no attack pattern in it'
+    text = opening + '.' + (' ' + fact if fact else '')
+    # The same grounding check the Llama text goes through; vetted text normally passes unchanged.
+    checked, _report = llm.validate(text, opening, ctx, vetted=[fact] if fact else [])
+    return json.dumps({'explanation': (checked or text).strip(), 'llm': None, 'replaced': False,
+                       'llama_skipped': True, 'source': 'detector_template'}, ensure_ascii=False)
+
+
 def check(kind, text, runner):
     """Both stages in one call (tests and the command line)."""
     out = json.loads(verdict(kind, text))

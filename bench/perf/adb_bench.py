@@ -6,6 +6,10 @@ Supports four subcommands:
   stage     - Install APK, audit absence of INTERNET permission, push .pte & tokenizer, verify SHA-256.
   run       - Run timed sample checks over adb with continuous `dumpsys meminfo` peak PSS/RSS
               polling, optional airplane-mode check, UI stats XML parsing, and screenshots.
+              `--gating-mode all|flagged-only|both` sets the app's flagged-only gating per pass
+              (debug APK launch extra) and reads the app's per-check `PrahariPerf` logcat record:
+              detector ms, prompt tokens, prefill ms and tok/s, TTFT, decode tok/s, total and
+              whether Llama was skipped.
   parse-dir - Parse an existing Android RTL/adb capture directory (e.g., `*-stats.xml`, `device.txt`,
               `meminfo.txt`) into standardized `results.json`, `items.csv`, and `summary.md`.
 """
@@ -33,6 +37,10 @@ EXPECTED_TOK_NAME = "tokenizer.model"
 EXPECTED_PTE_SHA256 = "ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac"
 EXPECTED_TOK_SHA256 = "82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55"
 
+# MainActivity.kt: debug-only launch extra and the logcat tag of its per-check JSON record.
+GATING_EXTRA = "in.prahari.app.extra.GATING"
+PERF_TAG = "PrahariPerf"
+
 # Built-in sample chips in MainActivity.kt (`samples` list)
 DEFAULT_SAMPLES = [
     ("kyc-cold", "KYC scam SMS", False),
@@ -46,6 +54,21 @@ DEFAULT_SAMPLES = [
     ("port-scan", "Port scan", False),
     ("kyc-airplane", "KYC scam SMS", True),
 ]
+
+# Short matrix for the gating session (docs/perf/s23-rtl-runbook.md §5): two flagged and two NO RISK
+# items after a cold check, run once per gating mode, so the pair fits one short RTL reservation.
+GATING_SAMPLES = [
+    ("kyc-cold", "KYC scam SMS", False),
+    ("kyc-warm-1", "KYC scam SMS", False),
+    ("kyc-warm-2", "KYC scam SMS", False),
+    ("bill-benign", "Bill reminder", False),
+    ("official-link", "Official link", False),
+    ("lookalike-link", "Lookalike link", False),
+]
+
+# Per-check fields that only the app's PrahariPerf record carries (None when absent).
+PERF_FIELDS = ("prompt_tokens", "prefill_ms", "prefill_tps", "llama_skipped", "gating_mode_observed",
+               "verdict_call_ms", "generated_tokens", "total_ms")
 
 
 def adb_cmd(serial: str | None, *args: str) -> list[str]:
@@ -150,9 +173,18 @@ def parse_stats_xml(xml_text: str) -> dict:
         "backend_line": None,
         "cpu_abi": None,
         "stats_expanded": False,
+        "prompt_tokens": None,
+        "prefill_ms": None,
+        "prefill_tps": None,
+        "llama_skipped": None,
     }
 
     for d in descs:
+        m_skip = re.search(r"On-device stats,\s*(expanded|collapsed)\.\s*(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*Llama skipped", d)
+        if m_skip:
+            rec["stats_expanded"] = m_skip.group(1) == "expanded"
+            rec["detector_ms"] = _duration_ms(m_skip.group(2))
+            rec["llama_skipped"] = True
         m_sum = re.search(r"On-device stats,\s*(expanded|collapsed)\.\s*(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*(\d+(?:\.\d+)?\s*(?:ms|s))", d)
         if m_sum:
             rec["stats_expanded"] = m_sum.group(1) == "expanded"
@@ -165,9 +197,20 @@ def parse_stats_xml(xml_text: str) -> dict:
         if m_pair and rec["detector_ms"] is None:
             rec["detector_ms"] = _duration_ms(m_pair.group(1))
             rec["first_token_ms"] = _duration_ms(m_pair.group(2))
+        # Each tile is a value followed by its label. Older builds had one unlabelled speed (decode).
+        nxt = texts[i + 1].strip() if i + 1 < len(texts) else ""
         m_tps = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:t/s|tok/s)", s)
         if m_tps:
-            rec["decode_tps"] = float(m_tps.group(1))
+            if nxt == "Prefill speed":
+                rec["prefill_tps"] = float(m_tps.group(1))
+            elif nxt == "Decode speed" or rec["decode_tps"] is None:
+                rec["decode_tps"] = float(m_tps.group(1))
+        if nxt == "Prompt tokens" and re.fullmatch(r"\d+", s):
+            rec["prompt_tokens"] = int(s)
+        if nxt == "Prefill" and re.fullmatch(r"\d+(?:\.\d+)?\s*(?:ms|s)", s):
+            rec["prefill_ms"] = _duration_ms(s)
+        if s.startswith("Llama skipped:"):
+            rec["llama_skipped"] = True
         m_tot = re.search(r"Total\s+(\d+(?:\.\d+)?\s*(?:ms|s))\s*·\s*Memory\s+(\d+(?:\.\d+)?)\s*MB", s)
         if m_tot:
             rec["total_s"] = round(_duration_ms(m_tot.group(1)) / 1000.0, 3)
@@ -380,7 +423,8 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
     dec_vals = [r["decode_tps"] for r in rows if r.get("decode_tps") is not None]
     tot_vals = [r["total_s"] for r in rows if r.get("total_s") is not None]
     mem_vals = [r["app_memory_mb"] for r in rows if r.get("app_memory_mb") is not None]
-    warm_kyc = [r for r in rows if "warm" in r.get("check", "").lower()]
+    # Warm KYC medians stay comparable with run 8: Llama on for every check (no gating, or "all").
+    warm_kyc = [r for r in rows if "warm" in r.get("check", "").lower() and r.get("gating_mode") in (None, "all")]
     warm_ttft = [r["first_token_ms"] for r in warm_kyc if r.get("first_token_ms") is not None]
     return {
         "schema": "prahari-android-bench-v1",
@@ -405,9 +449,30 @@ def summarize_android(device: dict, rows: list[dict], meminfo: dict | None = Non
             "warm_kyc_ttft_ms_median": round(statistics.median(warm_ttft), 1) if warm_ttft else None,
             "warm_kyc_decode_tps_median": _median([r.get("decode_tps") for r in warm_kyc], 1),
             "warm_kyc_total_s_median": _median([r.get("total_s") for r in warm_kyc], 2),
+            "prompt_tokens_median": _median([r.get("prompt_tokens") for r in rows], 0),
+            "prefill_ms_median": _median([r.get("prefill_ms") for r in rows], 1),
+            "prefill_tps_median": _median([r.get("prefill_tps") for r in rows], 1),
+            "by_gating_mode": _gating_summary(rows),
         },
         "checks": all_rows,
     }
+
+
+def _gating_summary(rows: list[dict]) -> dict:
+    """Per requested gating mode: checks, how many skipped Llama, and median totals for each group."""
+    out: dict = {}
+    for mode in sorted({r.get("gating_mode") for r in rows if r.get("gating_mode")}):
+        group = [r for r in rows if r.get("gating_mode") == mode]
+        skipped = [r for r in group if r.get("llama_skipped")]
+        ran = [r for r in group if not r.get("llama_skipped")]
+        out[mode] = {
+            "checks": len(group),
+            "llama_skipped": len(skipped),
+            "total_s_median_skipped": _median([r.get("total_s") for r in skipped], 3),
+            "total_s_median_llama": _median([r.get("total_s") for r in ran], 3),
+            "detector_ms_median": _median([r.get("detector_ms") for r in group], 1),
+        }
+    return out
 
 
 def render_android_md(report: dict) -> str:
@@ -429,20 +494,32 @@ def render_android_md(report: dict) -> str:
         )
     lines += [
         "",
-        "| Check | Status | Airplane | Detector (ms) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Highest sampled PSS (MiB) |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Check | Status | Airplane | Gating | Llama skipped | Detector (ms) | Prompt tokens | Prefill (ms) | Prefill (tok/s) | TTFT (ms) | Decode (tok/s) | Total (s) | App PSS after check (MB) | Highest sampled PSS (MiB) |",
+        "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
+
+    def cell(v):
+        return "—" if v is None else ("yes" if v is True else "no" if v is False else v)
     for r in report["checks"]:
         polled = r.get("mem_polled", {}).get("peak_pss_mib")
         lines.append(
             f"| `{r['check']}` | {r.get('status', 'unknown')} | {'yes' if r.get('airplane_mode') else 'no'} | "
+            f"{cell(r.get('gating_mode'))} | {cell(r.get('llama_skipped'))} | "
             f"{r['detector_ms'] if r['detector_ms'] is not None else '—'} | "
+            f"{cell(r.get('prompt_tokens'))} | {cell(r.get('prefill_ms'))} | {cell(r.get('prefill_tps'))} | "
             f"{r['first_token_ms'] if r['first_token_ms'] is not None else '—'} | "
             f"{r['decode_tps'] if r['decode_tps'] is not None else '—'} | "
             f"{r['total_s'] if r['total_s'] is not None else '—'} | "
             f"{r['app_memory_mb'] if r['app_memory_mb'] is not None else '—'} | "
             f"{polled if polled is not None else '—'} |"
         )
+    by_mode = (report.get("summary") or {}).get("by_gating_mode") or {}
+    if by_mode:
+        lines += ["", "| Gating | Checks | Llama skipped | Median total, skipped (s) | Median total, Llama ran (s) |",
+                  "|---|---:|---:|---:|---:|"]
+        for mode, g in by_mode.items():
+            lines.append(f"| `{mode}` | {g['checks']} | {g['llama_skipped']} | {cell(g['total_s_median_skipped'])} | "
+                         f"{cell(g['total_s_median_llama'])} |")
     return "\n".join(lines) + "\n"
 
 
@@ -453,6 +530,7 @@ def write_android_outputs(report: dict, out_dir: Path) -> None:
     fields = [
         "check", "status", "airplane_mode", "detector_ms", "first_token_ms", "decode_tps",
         "total_s", "app_memory_mb", "polled_peak_pss_mib", "polled_peak_rss_mib", "cpu_abi",
+        "gating_mode", "gating_mode_observed", "llama_skipped", "prompt_tokens", "prefill_ms", "prefill_tps",
     ]
     with (out_dir / "items.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
@@ -471,6 +549,12 @@ def write_android_outputs(report: dict, out_dir: Path) -> None:
                 "polled_peak_pss_mib": mp.get("peak_pss_mib"),
                 "polled_peak_rss_mib": mp.get("peak_rss_mib"),
                 "cpu_abi": r.get("cpu_abi"),
+                "gating_mode": r.get("gating_mode"),
+                "gating_mode_observed": r.get("gating_mode_observed"),
+                "llama_skipped": r.get("llama_skipped"),
+                "prompt_tokens": r.get("prompt_tokens"),
+                "prefill_ms": r.get("prefill_ms"),
+                "prefill_tps": r.get("prefill_tps"),
             })
 
 
@@ -545,6 +629,87 @@ def stats_header_state(xml_text: str) -> str:
     return "pending" if (not first_token or first_token.startswith("—") or first_token == "…") else "done"
 
 
+def parse_perf_lines(text: str) -> list[dict]:
+    """PrahariPerf JSON records from `logcat -v raw` output (other lines and bad JSON are skipped)."""
+    out = []
+    for line in text.splitlines():
+        start = line.find("{")
+        if start < 0:
+            continue
+        try:
+            rec = json.loads(line[start:])
+        except ValueError:
+            continue
+        if isinstance(rec, dict) and "session" in rec and "seq" in rec and "event" in rec:
+            out.append(rec)
+    return out
+
+
+def read_perf(serial: str | None) -> list[dict]:
+    """Every PrahariPerf record still in the device log. Never clears logcat (other apps share it)."""
+    try:
+        raw = adb_out(serial, "logcat", "-d", "-v", "raw", "-s", f"{PERF_TAG}:I", check=False, timeout=30)
+    except Exception:
+        return []
+    return parse_perf_lines(raw)
+
+
+def _perf_key(rec: dict) -> tuple:
+    return (str(rec.get("session")), rec.get("seq"))
+
+
+def new_perf_record(before: list[dict], after: list[dict], event: str) -> dict | None:
+    """The newest `event` record in `after` that was not already in `before`.
+
+    Records are keyed by (process session, sequence), so a restarted app (sequence back at 1) and
+    records left from an earlier pass are told apart.
+    """
+    seen = {_perf_key(r) for r in before}
+    fresh = [r for r in after if r.get("event") == event and _perf_key(r) not in seen]
+    return fresh[-1] if fresh else None
+
+
+def merge_perf(rec: dict, perf: dict | None) -> None:
+    """Fill a check row from the app's record; the record wins over UI text for the fields it has."""
+    for key in PERF_FIELDS:
+        rec.setdefault(key, None)
+    if not perf:
+        return
+    rec["gating_mode_observed"] = perf.get("gating")
+    rec["llama_skipped"] = bool(perf.get("llama_skipped"))
+    rec["perf_error"] = bool(perf.get("error"))
+    for key in ("detector_ms", "first_token_ms", "decode_tps", "prompt_tokens", "prefill_ms", "prefill_tps",
+                "verdict_call_ms", "generated_tokens", "total_ms"):
+        val = perf.get(key)
+        if val is not None:
+            rec[key] = round(float(val), 3) if key not in ("prompt_tokens", "generated_tokens") else int(val)
+    if perf.get("total_ms") is not None:
+        rec["total_s"] = round(float(perf["total_ms"]) / 1000.0, 3)
+    if perf.get("pss_mb") is not None:
+        rec["app_memory_mb"] = round(float(perf["pss_mb"]), 1)
+
+
+def launch_app(serial: str | None, gating: str | None, model_timeout_s: float, settle_s: float) -> dict:
+    """Restart the app (optionally with a gating mode) and wait for its model-preload record."""
+    before = read_perf(serial)
+    adb_out(serial, "shell", "am", "force-stop", PKG, check=False)
+    cmd = ["shell", "am", "start", "-n", ACTIVITY]
+    if gating:
+        cmd += ["--es", GATING_EXTRA, gating]
+    adb_out(serial, *cmd)
+    model = None
+    if gating:
+        # About one poll a second; counted in polls, not wall time, so a stalled adb cannot loop forever.
+        for _ in range(max(1, int(model_timeout_s))):
+            time.sleep(1.0)
+            model = new_perf_record(before, read_perf(serial), "model")
+            if model:
+                break
+    # Without a gating request (or with an older APK that writes no record) keep the fixed settle time.
+    time.sleep(settle_s if model is None else 1.0)
+    return {"gating_requested": gating, "model_event": model}
+
+
 def _set_airplane(serial: str | None, enabled: bool) -> str:
     mode = "enable" if enabled else "disable"
     adb_out(serial, "shell", "cmd", "connectivity", "airplane-mode", mode, check=False)
@@ -568,16 +733,25 @@ def cmd_run(args: argparse.Namespace) -> int:
     (out_dir / "device.txt").write_text(dev_raw, encoding="utf-8")
     dev = parse_device_txt(dev_raw)
 
-    adb_out(serial, "shell", "am", "force-stop", PKG, check=False)
-    adb_out(serial, "shell", "am", "start", "-n", ACTIVITY)
-    time.sleep(args.settle_s)
+    run_start = time.monotonic()
+    modes: list[str | None] = {"app-default": [None], "both": ["all", "flagged-only"]}.get(
+        args.gating_mode, [args.gating_mode])
+    samples = GATING_SAMPLES if args.samples == "gating" else DEFAULT_SAMPLES
+    passes: list[dict] = []
 
     rows = []
     airplane_active = False
 
     active_poller: dict = {"p": None}
 
-    def one_check(check_id: str, sample_label: str, want_airplane: bool) -> None:
+    def blank_row(check_id: str, sample_label: str, status: str, airplane: bool, gating: str | None) -> dict:
+        row = {"check": check_id, "sample_label": sample_label, "status": status, "airplane_mode": airplane,
+               "gating_mode": gating, "detector_ms": None, "first_token_ms": None, "decode_tps": None,
+               "total_s": None, "app_memory_mb": None, "mem_polled": {}}
+        merge_perf(row, None)
+        return row
+
+    def one_check(check_id: str, sample_label: str, want_airplane: bool, gating: str | None = None) -> None:
         nonlocal airplane_active
         if want_airplane and not args.with_airplane:
             return
@@ -628,6 +802,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                          "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
                          "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
             return
+        perf_before = read_perf(serial)
         poller = MemPoller(serial, interval_s=args.mem_poll_ms / 1000.0)
         active_poller["p"] = poller
         poller.start()
@@ -671,6 +846,18 @@ def cmd_run(args: argparse.Namespace) -> int:
         rec = parse_stats_xml(stats_xml)
         rec["check"] = check_id
         rec["sample_label"] = sample_label
+        rec["gating_mode"] = gating
+        perf = new_perf_record(perf_before, read_perf(serial), "result")
+        merge_perf(rec, perf)
+        if status == "ok" and gating:
+            # A gating pass needs the app's own record for this check, in the requested mode.
+            if perf is None:
+                status = "telemetry-missing"
+            elif perf.get("gating") != gating:
+                status = "gating-mismatch"
+            if status != "ok":
+                print(f"[adb_bench] ERROR: {check_id}: {status} (requested {gating}, "
+                      f"record {perf.get('gating') if perf else None})", file=sys.stderr)
         rec["status"] = status
         rec["airplane_mode"] = want_airplane
         if want_airplane:
@@ -681,7 +868,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         rec["battery_after"] = parse_battery(adb_out(serial, "shell", "dumpsys", "battery", check=False))
         rows.append(rec)
         print(
-            f"[adb_bench] {check_id}: det={rec['detector_ms']}ms ttft={rec['first_token_ms']}ms "
+            f"[adb_bench] {check_id}: gating={gating} skipped={rec.get('llama_skipped')} det={rec['detector_ms']}ms "
+            f"prompt={rec.get('prompt_tokens')}tok prefill={rec.get('prefill_ms')}ms/{rec.get('prefill_tps')}tok/s "
+            f"ttft={rec['first_token_ms']}ms "
             f"decode={rec['decode_tps']}tok/s total={rec['total_s']}s pss={rec['app_memory_mb']}MB "
             f"polled_peak_pss={polled.get('peak_pss_mib')}MiB",
             flush=True,
@@ -692,12 +881,33 @@ def cmd_run(args: argparse.Namespace) -> int:
             adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(1.0)
 
-    try:
-        for check_id, sample_label, want_airplane in DEFAULT_SAMPLES:
+    def out_of_time() -> bool:
+        return args.deadline_s > 0 and time.monotonic() - run_start > args.deadline_s
+
+    plan = []
+    for gating in modes:
+        for check_id, sample_label, want_airplane in samples:
             if want_airplane and not args.with_airplane:
                 continue
+            plan.append((gating, check_id + ("-gated" if gating == "flagged-only" else ""), sample_label, want_airplane))
+
+    try:
+        launched: object = object()  # sentinel: no pass launched yet
+        for gating, check_id, sample_label, want_airplane in plan:
+            if out_of_time():
+                # Deadline reached: record what was not run instead of overrunning the reservation.
+                rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
+                continue
+            if gating != launched:
+                if airplane_active:
+                    _set_airplane(serial, False)
+                    airplane_active = False
+                info = launch_app(serial, gating, args.model_timeout_s, args.settle_s)
+                passes.append(info)
+                launched = gating
+                print(f"[adb_bench] pass gating={gating} model={(info['model_event'] or {}).get('state')}", flush=True)
             try:
-                one_check(check_id, sample_label, want_airplane)
+                one_check(check_id, sample_label, want_airplane, gating)
             except Exception as exc:  # one adb failure must not lose the rest of the session
                 print(f"[adb_bench] ERROR: {check_id} failed: {exc}", file=sys.stderr)
                 if active_poller["p"] is not None:  # never leave dumpsys polling running into later checks
@@ -710,9 +920,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     # The measurement was recorded; only the navigation afterwards failed.
                     rows[-1]["note"] = f"post-check navigation failed: {type(exc).__name__}"
                 else:
-                    rows.append({"check": check_id, "sample_label": sample_label, "status": f"error: {type(exc).__name__}",
-                                 "airplane_mode": want_airplane, "detector_ms": None, "first_token_ms": None,
-                                 "decode_tps": None, "total_s": None, "app_memory_mb": None, "mem_polled": {}})
+                    rows.append(blank_row(check_id, sample_label, f"error: {type(exc).__name__}", want_airplane, gating))
                 try:
                     adb_out(serial, "shell", "input", "keyevent", "KEYCODE_BACK", check=False, timeout=20)
                 except Exception as nav_exc:
@@ -726,6 +934,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             mem_raw = ""
         (out_dir / "meminfo.txt").write_text(mem_raw, encoding="utf-8")
         report = summarize_android(dev, rows, parse_meminfo(mem_raw), source_note="Live adb benchmark run")
+        report["passes"] = passes
+        report["elapsed_s"] = round(time.monotonic() - run_start, 1)
         write_android_outputs(report, out_dir)
         print(render_android_md(report))
         print(f"[adb_bench] outputs written to {out_dir}")
@@ -759,6 +969,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_run.add_argument("--mem-poll-ms", type=int, default=500)
     p_run.add_argument("--settle-s", type=float, default=6.0, help="Seconds to wait for model preload after app launch")
     p_run.add_argument("--check-timeout-s", type=float, default=60.0)
+    p_run.add_argument("--gating-mode", choices=["app-default", "all", "flagged-only", "both"], default="app-default",
+                       help="Set the app's flagged-only gating per pass (debug APK); app-default leaves the setting alone")
+    p_run.add_argument("--samples", choices=["default", "gating"], default="default",
+                       help="default: the 10-check run-8 list; gating: 6 checks per mode for the gating session")
+    p_run.add_argument("--deadline-s", type=float, default=0.0,
+                       help="Stop starting checks after this many seconds (0: no limit); the rest are recorded as skipped")
+    p_run.add_argument("--model-timeout-s", type=float, default=60.0,
+                       help="Polls (about 1 s each) to wait for the app's model-preload record after each launch")
 
     p_parse = sub.add_parser("parse-dir", help="Parse an existing RTL/adb capture directory into JSON/CSV/Markdown")
     p_parse.add_argument("capture_dir", type=Path)
