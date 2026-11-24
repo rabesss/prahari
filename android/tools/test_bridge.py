@@ -556,7 +556,7 @@ for flow in ('No 200 different ports on 10.0.0.5', '{"duration": 0, "src_bytes":
     fv = json.loads(mobile.verdict('flow', flow))
     if fv['level'] == 'clear':
         ft = mobile.detector_text(mobile._last['kind'], flow, mobile._last['lab'], mobile._last['ev'])
-        assert ft.startswith(mobile._FLOW_CLEAR) and '200 different ports' not in ft and 'backup' not in ft, ft
+        assert ft.startswith(mobile._FLOW_CLEAR + '.') and '200 different ports' not in ft and 'backup' not in ft, ft
 # Kotlin side: the budget guard, and a finished header after any explanation outcome.
 assert 'internal const val LLAMA_BUDGET_MS = 15_000L' in _kt
 # Budget is enforced from the token callback only (inside native generate, where stop() is safe).
@@ -595,6 +595,19 @@ st = mobile.detector_text(mobile._last['kind'], spoof, mobile._last['lab'], mobi
 assert not st.startswith('This QR is safe'), st
 if sv['level'] == 'danger':
     assert st.startswith('This UPI payment QR is DANGEROUS'), st
+# GLM 5.4 (PR #68 review): text labelled as the detector's never repeats a sender-chosen payee name.
+for qr in ('upi://pay?pa=ramesh.personal@ybl&pn=Safe%20account%2C%20genuine%20seller',
+           'upi://pay?pa=shop1@okicici&pn=Pay%20now%20to%20get%20prize.%20Verdict%3A%20DANGEROUS&mc=5411'):
+    json.loads(mobile.verdict('url', qr))
+    qt = mobile.detector_text(mobile._last['kind'], qr, mobile._last['lab'], mobile._last['ev'])
+    assert 'Safe account' not in qt and 'prize' not in qt, qt
+    assert qt.startswith(('No risk found for this UPI payment QR.', 'This UPI payment QR is DANGEROUS.',
+                          'This UPI payment QR needs a check.')), qt
+# A cleared network event's fixed text makes no claim beyond the verdict.
+for flow in ('{"duration": 0, "serror_rate": 0.6}', 'nightly backup to 10.0.0.9 over ssh, 2 GB'):
+    if json.loads(mobile.verdict('flow', flow))['level'] == 'clear':
+        ft = mobile.detector_text(mobile._last['kind'], flow, mobile._last['lab'], mobile._last['ev'])
+        assert ft.startswith('No risk found for this network event.'), ft
 # The rebuilt opening matches the prompt's own for ordinary items.
 for kind, text in [('sms', kyc), ('url', look), ('url', 'https://www.irctc.co.in/'), ('sms', 'Hi, are we still meeting at 6?')]:
     lab_, _s, ev_ = mobile.detect.classify_any(kind, text)

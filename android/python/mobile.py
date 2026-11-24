@@ -349,7 +349,7 @@ def ends_with_replacement(explanation, kind, lab, text):
 
 
 _FLOW_GUESS = 'traffic that looks like a routine update or a scheduled backup'
-_FLOW_CLEAR = 'No risk found for this network event: the detector found no attack pattern in it'
+_FLOW_CLEAR = 'No risk found for this network event'
 
 
 def _opening(ctx):
@@ -388,6 +388,12 @@ def detector_text(kind, text, lab, ev):
         head = {1: 'This network event is DANGEROUS', 'uncertain': 'This network event needs a check'}.get(lab)
         lead = str(ev[0]).strip().rstrip('.') if ev else ''
         opening = _FLOW_CLEAR if head is None else (f'{head}: {lead}' if lead else head)
+    elif kind == 'upi' or ctx.get('kind') == 'upi':
+        # UPI evidence quotes the QR's own payee name and note, which the sender chose ("Safe account,
+        # genuine seller"). Text labelled as the detector's carries only the verdict; the parsed
+        # fields stay in the evidence and UPI cards above, shown as data.
+        opening = {1: 'This UPI payment QR is DANGEROUS', 0: 'No risk found for this UPI payment QR'}.get(
+            lab, 'This UPI payment QR needs a check')
     out = opening + '.' + (' ' + fact if fact else '')
     try:
         checked, _report = llm.validate(out, opening, ctx, vetted=[fact] if fact else [])
