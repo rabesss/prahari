@@ -123,7 +123,7 @@ def build_arm_perf_chart() -> Path:
     _style_ax(ax2)
     targets = [
         "Oracle N1\n(2 vCPU)",
-        "S23 final build\n(24 Nov, warm)",
+        "S23 round-3 build\n(24 Nov, warm)",
         "S23 r1 APK\n(23 Nov, airplane)",
         "S23 r1 APK\n(23 Nov, warm)",
         "Neoverse-V2\n(2T)",
@@ -223,7 +223,7 @@ def build_eval_and_mem_chart() -> Path:
     ax1.set_ylabel("Score / Rate", fontsize=9.5, color=SLATE)
     ax1.tick_params(axis="y", labelsize=9)
     ax1.legend(loc="upper center", ncol=2, frameon=True, facecolor="white", edgecolor=GRID, fontsize=7.6)
-    ax1.set_title("A. Detection F1 vs. FPR (main 93ffd9e)", fontsize=10.0, fontweight="bold", color="#0F172A", pad=10)
+    ax1.set_title("A. Detection F1 vs. FPR (main 5683773)", fontsize=10.0, fontweight="bold", color="#0F172A", pad=10)
 
     # Panel B: Galaxy S23 dumpsys meminfo PSS breakdown (KB -> MB)
     _style_ax(ax2)
