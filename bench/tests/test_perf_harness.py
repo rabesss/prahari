@@ -547,7 +547,9 @@ def test_stats_header_after_failed_explanation():
     old = (Path(__file__).resolve().parents[2] / "evidence" / "galaxy-s23-20261124" / "label-adjusted"
            / "lookalike-link-stats.xml").read_text(encoding="utf-8")
     assert adb_bench.stats_header_state(old) == "pending"
-    fixed = old.replace("244 ms · —", "244 ms · No AI text")
+    fixed = old.replace("244 ms · —", "244 ms · Detector text")
     # Finished, but recorded as a detector fallback, not a completed Llama timing.
     assert adb_bench.stats_header_state(fixed) == "fallback"
+    # An explanation error (missing model, bridge failure) is a different terminal state.
+    assert adb_bench.stats_header_state(old.replace("244 ms · —", "244 ms · No AI text")) == "no-ai-text"
     assert adb_bench.parse_stats_xml(fixed)["detector_ms"] == 244.0

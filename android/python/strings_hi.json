@@ -230,7 +230,8 @@
   "No AI text": "AI टेक्स्ट नहीं",
   "Llama took too long, so this is the detector's fixed text.": "Llama को ज़्यादा समय लगा, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
   "Llama's reply did not pass the checks, so this is the detector's fixed text.": "Llama का जवाब जांच में पास नहीं हुआ, इसलिए यह डिटेक्टर का तय टेक्स्ट है।",
-  "Fixed text from the detector, not written by AI.": "यह डिटेक्टर का तय टेक्स्ट है, AI ने नहीं लिखा।"
+  "Fixed text from the detector, not written by AI.": "यह डिटेक्टर का तय टेक्स्ट है, AI ने नहीं लिखा।",
+  "Detector text": "डिटेक्टर टेक्स्ट"
  },
  "evidence": {
   "a burst of connections looks like a flood / denial-of-service attempt": "अचानक बहुत ज़्यादा कनेक्शन आए हैं, जो फ़्लड या सेवा ठप करने (denial-of-service) की कोशिश लगते हैं",
