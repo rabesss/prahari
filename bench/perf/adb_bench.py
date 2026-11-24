@@ -860,6 +860,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         if status == "detector-fallback":
             print(f"[adb_bench] WARNING: {check_id} finished with the detector's fixed text (no usable Llama reply)",
                   file=sys.stderr)
+        elif status == "explanation-error":
+            print(f"[adb_bench] ERROR: {check_id} finished with no explanation (missing model or an error)",
+                  file=sys.stderr)
         elif status != "ok":
             print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
                   f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
