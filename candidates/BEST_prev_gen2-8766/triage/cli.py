@@ -1,4 +1,4 @@
-"""Entry points for bin/predict and bin/explain (contract in the project AGENTS.md)."""
+"""Entry points for bin/predict (task, IN.jsonl -> OUT.jsonl labels) and bin/explain (IN.jsonl -> OUT.jsonl explanations)."""
 import argparse
 import json
 import sys

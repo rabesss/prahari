@@ -1,6 +1,6 @@
 # Samsung Galaxy S23 Remote Test Lab — 30-Minute Session Runbook
 
-This runbook tells the owner (1) what physical-phone evidence is **already captured and verified**
+This runbook tells the team (1) what physical-phone evidence is **already captured and verified**
 from Samsung Remote Test Lab (RTL) run 8 (`2026-11-23`), (2) what exact gaps a **single fresh
 30-minute S23 session** closes, and (3) the turnkey commands to execute it cleanly inside 20 minutes.
 

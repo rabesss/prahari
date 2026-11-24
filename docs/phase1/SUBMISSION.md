@@ -1,6 +1,6 @@
 # Phase 1 Submission Checklist
 
-- **Submission deadline:** **Wednesday, 25 November 2026, 11:59 PM IST**, per the owner's Phase 1 form notes (the older challenge-page snapshot in `docs/challenge-brief.md` says 23 November; trust the live form). ONE submission only — **the owner alone** flips repo visibility and submits the form.
+- **Submission deadline:** **Wednesday, 25 November 2026, 11:59 PM IST**, per the owner's Phase 1 form notes (the older challenge-page snapshot in `docs/challenge-brief.md` says 23 November; trust the live form). ONE submission only — **the repository owner alone** flips repo visibility and submits the form.
 - **Required form deliverables:**
   1. **PUBLIC GitHub repository URL** containing code, documentation, and final report (`https://github.com/rabesss/arm-bharat-ai-soc`).
   2. **PUBLIC 2-minute demo video** (1080p, 16:9, MP4) showcasing real-time on-device operation on target Arm hardware (see [demo-video.md](demo-video.md)).

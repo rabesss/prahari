@@ -80,7 +80,7 @@ candidates/BEST/bin/monitor --seconds 6
 
 ---
 
-## 3. Exact Recording & Post-Production Commands (the owner's Checklist)
+## 3. Exact Recording & Post-Production Commands (Owner's Checklist)
 
 1. **Record screen + voiceover** (OBS Studio set to `1920x1080`, `30 fps`, MKV → remux to MP4, or capture video clips and record clean voiceover separately so timing hits `1:55–1:59` with zero dead air).
 2. **Verify / re-encode to competition-safe 1080p 16:9 MP4** (ensures universal browser/YouTube/VLC compatibility and strict `<= 2:00` duration):

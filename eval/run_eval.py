@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proxy evaluator for the Bharat AI-SoC PS3 entry. Called by bin/eval; see research/BRIEF.md for the formula.
+"""Proxy evaluator for the Bharat AI-SoC PS3 entry. Called by bin/eval; the round-3 score is proxy_v3.total() (eval/proxy_v3.py), with component weights in eval/weights.json.
 
 Last stdout line is a JSON summary. Per-item details that would reveal hidden test content are written only to
 the controller-private dir (/var/tmp/arm-bharat-ai-soc-eval/private/), never under research/evals/.
@@ -37,6 +37,15 @@ INDIA_V2_SHA256 = "532e017843381b23879a92b7559f88bb8cf23dd650df98c00f68ae0224995
 EVROOT = Path("/var/tmp/arm-bharat-ai-soc-eval")
 LOCK = EVROOT / "eval.lock"
 W = json.loads((PROJ / "eval" / "weights.json").read_text())
+
+
+def record_path(path):
+    """Path as written to public records: repo-relative inside the repo, else the basename (never an absolute home path)."""
+    p = Path(path).resolve()
+    try:
+        return p.relative_to(PROJ).as_posix()
+    except ValueError:
+        return p.name
 REGISTRY = PROJ / "models" / "registry.json"
 PY = PROJ / ".venv" / "bin" / "python"
 
@@ -822,7 +831,7 @@ def _run_once(a, run_index, original, scratch, digest, queued, full_start, coold
                 samples.append(sample)
     sampler = threading.Thread(target=sample_host, daemon=True)
     sampler.start()
-    summary = {"label": label, "candidate": str(original), "candidate_hash": digest, "session_id": os.environ.get("PRAHARI_EVAL_SESSION"), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
+    summary = {"label": label, "candidate": record_path(original), "candidate_hash": digest, "session_id": os.environ.get("PRAHARI_EVAL_SESSION"), "stamp": stamp, "artifacts": str(art.relative_to(PROJ)),
                "quick": a.quick, "host_start": host_start,
                "contended": host_start['load_average'][0] > 1.5 if host_start else None, "queued_s": round(queued, 1), "cooldown_s": round(cooldown_s, 1)}
 

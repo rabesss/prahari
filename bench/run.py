@@ -17,7 +17,7 @@ def main():
     data_dir=Path(a.data).resolve()
     if data_dir.name != 'dev': raise ValueError('only a directory named dev is accepted')
     header='development split measurements (visible dev data; indic dev was used for tuning)'
-    report={'title':header,'date':str(date.today()),'environment':'Arm cloud VM (Neoverse-N1)','candidate':str(a.cand),'tasks':{}}
+    report={'title':header,'date':str(date.today()),'environment':'Arm cloud VM (Neoverse-N1)','candidate':(lambda c: c.relative_to(ROOT).as_posix() if c.is_relative_to(ROOT) else c.name)(Path(a.cand).resolve()),'tasks':{}}
     errors={}
     for task in ('sms','url','indic','flow'):
         try:
