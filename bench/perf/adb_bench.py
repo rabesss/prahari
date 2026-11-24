@@ -68,7 +68,7 @@ GATING_SAMPLES = [
 
 # Per-check fields that only the app's PrahariPerf record carries (None when absent).
 PERF_FIELDS = ("prompt_tokens", "prefill_ms", "prefill_tps", "llama_skipped", "gating_mode_observed",
-               "verdict_call_ms", "generated_tokens", "total_ms")
+               "verdict_call_ms", "generated_tokens", "total_ms", "fallback")
 
 
 def adb_cmd(serial: str | None, *args: str) -> list[str]:
@@ -568,13 +568,16 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
     # A live `run` records each check's status in results.json; keep it, so a timed-out check whose XML
     # happens to hold late values is not promoted to a completed one when the captures are reparsed.
     recorded: dict[str, str] = {}
+    live: dict[str, dict] = {}
     prior = src / "results.json"
     if prior.is_file():
         try:
+            prior_rows = json.loads(prior.read_text()).get("checks", [])
             # Only explicit statuses count; rows from older reports without one are judged from their XML.
-            recorded = {c["check"]: c["status"] for c in json.loads(prior.read_text()).get("checks", []) if c.get("status")}
-        except (ValueError, KeyError, TypeError):
-            recorded = {}
+            recorded = {c["check"]: c["status"] for c in prior_rows if c.get("status")}
+            live = {c["check"]: c for c in prior_rows if c.get("check")}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            recorded, live = {}, {}
     rows = []
     for xf in xml_files:
         name = xf.name.removesuffix("-stats.xml")
@@ -584,6 +587,13 @@ def cmd_parse_dir(args: argparse.Namespace) -> int:
         rec["airplane_mode"] = "airplane" in name.lower()
         # Without a recorded status, count a check as complete only if its stats header carries a first-token time.
         rec["status"] = recorded.get(name) or ("ok" if stats_header_state(xml_text) == "done" else "incomplete-capture")
+        # The UI text cannot show the requested gating mode or the app's own PrahariPerf numbers; keep
+        # them from the live run's row, so reparsing a gating capture does not lose them.
+        prev = live.get(name) or {}
+        for key in ("gating_mode",) + PERF_FIELDS + ("detector_ms", "first_token_ms", "decode_tps", "total_s",
+                                                     "app_memory_mb", "mem_polled", "perf_error", "fallback"):
+            if prev.get(key) is not None:
+                rec[key] = prev[key]
         rows.append(rec)
     # Checks the live run recorded as failed before any XML was written still belong in the report.
     seen = {r["check"] for r in rows}
@@ -621,11 +631,14 @@ def sample_row_y(xml_text: str) -> int | None:
 
 
 def stats_header_state(xml_text: str) -> str:
-    """'absent' (header not on screen), 'pending' (Llama still running) or 'done'."""
+    """'absent' (header not on screen), 'pending' (Llama still running), 'fallback' (the stage ended
+    with the detector's fixed text and no usable Llama reply: "No AI text") or 'done'."""
     m = _STATS_DESC_RE.search(xml_text)
     if not m:
         return "absent"
     first_token = m.group(2).strip()
+    if first_token == "No AI text":
+        return "fallback"
     return "pending" if (not first_token or first_token.startswith("—") or first_token == "…") else "done"
 
 
@@ -678,6 +691,7 @@ def merge_perf(rec: dict, perf: dict | None) -> None:
     rec["gating_mode_observed"] = perf.get("gating")
     rec["llama_skipped"] = bool(perf.get("llama_skipped"))
     rec["perf_error"] = bool(perf.get("error"))
+    rec["fallback"] = perf.get("fallback")
     for key in ("detector_ms", "first_token_ms", "decode_tps", "prompt_tokens", "prefill_ms", "prefill_tps",
                 "verdict_call_ms", "generated_tokens", "total_ms"):
         val = perf.get(key)
@@ -689,8 +703,13 @@ def merge_perf(rec: dict, perf: dict | None) -> None:
         rec["app_memory_mb"] = round(float(perf["pss_mb"]), 1)
 
 
-def launch_app(serial: str | None, gating: str | None, model_timeout_s: float, settle_s: float) -> dict:
-    """Restart the app (optionally with a gating mode) and wait for its model-preload record."""
+def launch_app(serial: str | None, gating: str | None, model_timeout_s: float, settle_s: float,
+               until: float | None = None) -> dict:
+    """Restart the app (optionally with a gating mode) and wait for its model-preload record.
+
+    `until` (a time.monotonic() value) also ends the wait, so a launch near the run deadline does not
+    poll past it.
+    """
     before = read_perf(serial)
     adb_out(serial, "shell", "am", "force-stop", PKG, check=False)
     cmd = ["shell", "am", "start", "-n", ACTIVITY]
@@ -701,6 +720,8 @@ def launch_app(serial: str | None, gating: str | None, model_timeout_s: float, s
     if gating:
         # About one poll a second; counted in polls, not wall time, so a stalled adb cannot loop forever.
         for _ in range(max(1, int(model_timeout_s))):
+            if until is not None and time.monotonic() >= until:
+                break
             time.sleep(1.0)
             model = new_perf_record(before, read_perf(serial), "model")
             if model:
@@ -738,6 +759,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         args.gating_mode, [args.gating_mode])
     samples = GATING_SAMPLES if args.samples == "gating" else DEFAULT_SAMPLES
     passes: list[dict] = []
+    launch_failed: set = set()
+    pass_has_telemetry = {"v": False}
 
     rows = []
     airplane_active = False
@@ -818,15 +841,19 @@ def cmd_run(args: argparse.Namespace) -> int:
             time.sleep(1.0)
             stats_xml = dump_ui_xml(serial)
             state = stats_header_state(stats_xml)
-            if state == "done":
+            if state in ("done", "fallback"):
                 break
             if state == "absent" and "Check another" in stats_xml:
                 adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
         wall_s = round(time.monotonic() - t0, 2)
         polled = poller.stop()
         active_poller["p"] = None
-        status = "ok" if state == "done" else "timeout"
-        if status != "ok":
+        # A fallback check finished, but without Llama timing: keep it out of the completed aggregates.
+        status = {"done": "ok", "fallback": "detector-fallback"}.get(state, "timeout")
+        if status == "detector-fallback":
+            print(f"[adb_bench] WARNING: {check_id} finished with the detector's fixed text (no usable Llama reply)",
+                  file=sys.stderr)
+        elif status != "ok":
             print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
                   f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
 
@@ -849,8 +876,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         rec["gating_mode"] = gating
         perf = new_perf_record(perf_before, read_perf(serial), "result")
         merge_perf(rec, perf)
-        if status == "ok" and gating:
-            # A gating pass needs the app's own record for this check, in the requested mode.
+        if status == "ok" and gating and pass_has_telemetry["v"]:
+            # A gating pass on an app that writes PrahariPerf records needs this check's record, in the
+            # requested mode. An older APK writes none (and ignores the launch extra): its rows keep
+            # status ok with gating_mode_observed None.
             if perf is None:
                 status = "telemetry-missing"
             elif perf.get("gating") != gating:
@@ -884,6 +913,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     def out_of_time() -> bool:
         return args.deadline_s > 0 and time.monotonic() - run_start > args.deadline_s
 
+    deadline_at = run_start + args.deadline_s if args.deadline_s > 0 else None
+
     plan = []
     for gating in modes:
         for check_id, sample_label, want_airplane in samples:
@@ -899,13 +930,27 @@ def cmd_run(args: argparse.Namespace) -> int:
                 rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
                 continue
             if gating != launched:
-                if airplane_active:
-                    _set_airplane(serial, False)
-                    airplane_active = False
-                info = launch_app(serial, gating, args.model_timeout_s, args.settle_s)
-                passes.append(info)
                 launched = gating
+                try:
+                    if airplane_active:
+                        _set_airplane(serial, False)
+                        airplane_active = False
+                    info = launch_app(serial, gating, args.model_timeout_s, args.settle_s, until=deadline_at)
+                except Exception as exc:
+                    # Keep the rows already measured; this pass's checks are recorded as not run.
+                    print(f"[adb_bench] ERROR: launching pass gating={gating} failed: {exc}", file=sys.stderr)
+                    info = {"gating_requested": gating, "model_event": None, "error": type(exc).__name__}
+                    launch_failed.add(gating)
+                passes.append(info)
+                pass_has_telemetry["v"] = info.get("model_event") is not None
                 print(f"[adb_bench] pass gating={gating} model={(info['model_event'] or {}).get('state')}", flush=True)
+            if gating in launch_failed:
+                rows.append(blank_row(check_id, sample_label, "launch-failed", want_airplane, gating))
+                continue
+            if out_of_time():
+                # The launch itself crossed the deadline.
+                rows.append(blank_row(check_id, sample_label, "skipped-deadline", want_airplane, gating))
+                continue
             try:
                 one_check(check_id, sample_label, want_airplane, gating)
             except Exception as exc:  # one adb failure must not lose the rest of the session

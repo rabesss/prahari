@@ -265,6 +265,8 @@ internal object Bridge {
     @Volatile var pythonError: String? = null
     @Volatile var generation = 0
     @Volatile var generating = false
+    /** Bumped under [genLock] each time a generate is armed, so a late watchdog cannot stop the next one. */
+    @Volatile var genSeq = 0
     @Volatile var phase = "idle"
     @Volatile var job: Job? = null
     @Volatile var netId = 0
@@ -554,6 +556,7 @@ private fun logPerf(job: Bridge.Job, gating: String) {
             .put("level", job.verdict.optString("level"))
             .put("gating", gating)
             .put("llama_skipped", ex?.optBoolean("llama_skipped") == true)
+            .put("fallback", ex?.optString("fallback")?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
             .put("error", ex == null || ex.has("error"))
         putNum(rec, "detector_ms", job.verdict.optDouble("detector_ms", Double.NaN))
         putNum(rec, "verdict_call_ms", job.verdictCallMs)
@@ -648,23 +651,32 @@ class Runner(private val id: Int, private val deadline: Long = Long.MAX_VALUE) {
         val seqLen = (prompt.toByteArray(Charsets.UTF_8).size * 3 / 4 + 32 + 40).coerceIn(256, 2048)
         val config = LlmGenerationConfig.create().echo(false).seqLen(seqLen).temperature(0f).maxNewTokens(40).build()
         var armed = false
+        var armedSeq = 0
         var generationFailure: Throwable? = null
         try {
             Bridge.genLock.lock()
             try {
                 if (!Bridge.still(id)) throw Cancelled()
                 Bridge.generating = true
+                Bridge.genSeq += 1
+                armedSeq = Bridge.genSeq
                 armed = true
             } finally {
                 Bridge.genLock.unlock()
             }
-            // Same pattern as Bridge.begin(): stop() only while this check's generate is running.
+            // stop() is called with genLock held: the worker must take genLock to clear `generating`
+            // after the native call returns, so this generate cannot have been followed by a reset,
+            // close or the next check's generate while stop() runs. genSeq rules out a later generate.
             val guard = Bridge.watchdog.schedule(Runnable {
                 overBudget.set(true)
-                val stopNow: Boolean
                 Bridge.genLock.lock()
-                try { stopNow = Bridge.generating && Bridge.still(id) } finally { Bridge.genLock.unlock() }
-                if (stopNow) try { module.stop() } catch (_: Throwable) {}
+                try {
+                    if (Bridge.generating && Bridge.genSeq == armedSeq && Bridge.still(id)) {
+                        try { module.stop() } catch (_: Throwable) {}
+                    }
+                } finally {
+                    Bridge.genLock.unlock()
+                }
             }, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             try {
                 module.generate(prompt, config, callback)
@@ -2447,7 +2459,7 @@ class MainActivity : Activity() {
         value?.takeIf { it.isFinite() && it > 0 }?.let { String.format(Locale.US, "%.1f t/s", it) } ?: "—"
 
     /** [done]: the explanation stage has finished, whatever its outcome, so the header never stays "—". */
-    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean, done: Boolean) {
+    private fun fillStats(data: JSONObject, llm: JSONObject?, total: Long?, pss: Double?, skipped: Boolean, done: Boolean, fallback: Boolean = false) {
         val details = statsDetails ?: return
         val summary = statsSummary ?: return
         details.removeAllViews()
@@ -2468,10 +2480,10 @@ class MainActivity : Activity() {
         add(details, txt(foot, 12f, T.ink3, 400, 18, raw = true).apply { typeface = Typeface.MONOSPACE }, top = 12)
         // adb_bench.py reads this summary from the header's label: "<detector> · <first token>" when
         // Llama ran, "<detector> · Llama skipped" when gating skipped it, "<detector> · No AI text" when
-        // the stage ended without a first token, and "—" only while Llama is still writing.
+        // the stage ended without a usable Llama reply, and "—" only while Llama is still writing.
         val second = when {
             skipped -> t("Llama skipped")
-            done && firstToken == "—" -> t("No AI text")
+            done && (fallback || firstToken == "—") -> t("No AI text")
             else -> firstToken
         }
         summary.text = "$detector · $second"
@@ -2522,7 +2534,8 @@ class MainActivity : Activity() {
         }
         val total = job.totalMs.takeIf { it >= 0 }
         val pss = job.pssMb.takeIf { it.isFinite() }
-        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true)
+        // A detector-text fallback reads "No AI text" even when a refused reply had a first token.
+        fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true, result.has("fallback"))
         metaText?.text = checkedMeta(job.mode, (total ?: -1L).toDouble(), job.verdict.has("upi"))
     }
 

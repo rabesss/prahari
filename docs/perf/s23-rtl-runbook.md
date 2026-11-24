@@ -94,9 +94,12 @@ Do §2 (pre-session checklist) first. Use the latest debug APK from the `Android
 | 5:00 – 18:00 | Stage + gating run | `GATING_MODE=both SAMPLES=gating DEADLINE_S=420 WITH_AIRPLANE=0 UNINSTALL_ON_EXIT=1 APK=/path/to/app-debug.apk ./bench/perf/run_s23_rtl.sh` — probes, installs, audits for no `INTERNET`, pushes and hashes the model (≈ 3–5 min), then runs the 12 checks. `DEADLINE_S` counts from the start of the run step: after 420 s no new check starts and the rest are recorded as `skipped-deadline`; a check already running stops at its 60 s timeout. |
 | 18:00 – 20:00 | Close | The script uninstalls the app and restores airplane mode and screen timeout on exit. Delete staged files if the uninstall failed: `adb -s "$ANDROID_SERIAL" shell rm -rf /sdcard/Android/data/in.prahari.app`. **End Session** in RTL, stop `./rdb`. |
 
-If staging runs long (slow push), lower `DEADLINE_S` so the run step ends by minute 18; the
-`flagged-only` pass runs second, so cut to `DEADLINE_S=240` and accept fewer gated checks rather
-than overrunning.
+If staging runs long (slow push), lower `DEADLINE_S` so the run step ends by minute 18. A check
+that starts just before the deadline can run up to its 60 s timeout, so set
+`DEADLINE_S = (seconds left until minute 18) − 60`; e.g. staging done at minute 13 leaves 300 s, so
+`DEADLINE_S=240`. The `flagged-only` pass runs second, so accept fewer gated checks rather than
+overrunning. An older APK without `PrahariPerf` records ignores the launch extra; its rows keep
+status `ok` with `gating_mode_observed` empty and must not be quoted as gating results.
 
 Record from `/var/tmp/prahari-rtl-session-*/`:
 

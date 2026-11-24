@@ -716,5 +716,6 @@ def test_stats_header_after_failed_explanation():
            / "lookalike-link-stats.xml").read_text(encoding="utf-8")
     assert adb_bench.stats_header_state(old) == "pending"
     fixed = old.replace("244 ms · —", "244 ms · No AI text")
-    assert adb_bench.stats_header_state(fixed) == "done"
+    # Finished, but recorded as a detector fallback, not a completed Llama timing.
+    assert adb_bench.stats_header_state(fixed) == "fallback"
     assert adb_bench.parse_stats_xml(fixed)["detector_ms"] == 244.0

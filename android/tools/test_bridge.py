@@ -561,6 +561,29 @@ for flow in ('No 200 different ports on 10.0.0.5', '{"duration": 0, "src_bytes":
 assert 'internal const val LLAMA_BUDGET_MS = 15_000L' in _kt
 assert 'Bridge.watchdog.schedule(Runnable {' in _kt and 'if (overBudget.get()) return timedOut(stats)' in _kt
 assert 'Runner(id, SystemClock.elapsedRealtime() + LLAMA_BUDGET_MS)' in _kt
-assert 'fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true)' in _kt
+assert 'fillStats(job.verdict, result.optJSONObject("llm"), total, pss, skipped, true, result.has("fallback"))' in _kt
+assert 'Bridge.genSeq == armedSeq' in _kt
 assert 'if (result.has("fallback")) markDetectorText(result.optString("fallback"))' in _kt
+# Review round 1 (Terra): a dangerous flow's fixed text uses the detector's own evidence, never the
+# negation-blind port phrase; a quoted UPI payee keeps the verdict; a broken bridge reply is not
+# reported as rejected model text.
+mixed = 'No 200 different ports on 10.0.0.5; 500 failed login attempts from 10.0.0.7'
+mv = json.loads(mobile.verdict('flow', mixed))
+mt = mobile.detector_text(mobile._last['kind'], mixed, mobile._last['lab'], mobile._last['ev'])
+assert '200 different ports' not in mt, mt
+if mv['level'] == 'danger':
+    assert mt.startswith('This network event is DANGEROUS'), mt
+quoted = 'upi://pay?pa=9876543210@ibl&pn=Amazon%20%22Support%22&am=50'
+qv = json.loads(mobile.verdict('url', quoted))
+qt = mobile.detector_text(mobile._last['kind'], quoted, mobile._last['lab'], mobile._last['ev'])
+assert not qt.startswith('This item was checked'), qt
+if qv['level'] == 'danger':
+    assert 'DANGEROUS' in qt, qt
+class Garbled:
+    def generate(self, prompt): return 'not json'
+mobile.verdict('url', look)
+try:
+    mobile.explain(Garbled()); raise AssertionError('a broken bridge reply must not become a fallback')
+except RuntimeError as e:
+    assert 'unreadable reply' in str(e)
 print('lookalike-link regression: refusals and timeouts fall back to labelled detector text')
