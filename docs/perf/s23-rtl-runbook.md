@@ -66,3 +66,48 @@ it after the RTL session finishes.
   ```sh
   python3 bench/perf/summarize.py /var/tmp/prahari-rtl-session-*/results.json
   ```
+
+## 5. Flagged-Only Gating + Prefill: One Session (≤ 20 Minutes)
+
+**Status: pending S23 measurement.** The app now has flagged-only gating (About → *Explain NO RISK
+results with Llama*, off by default): a result shown as NO RISK gets the detector's fixed text
+and no Llama call; DANGEROUS and SUSPICIOUS results, and bank alerts the app relabels, always get
+Llama. Every check writes one `PrahariPerf` logcat line (numbers only, no checked text) with
+detector ms, prompt tokens, prefill ms and tok/s, TTFT, decode tok/s, total, PSS and whether Llama
+was skipped. Prefill ms runs from ExecuTorch's `inference_start_ms` to `prompt_eval_end_ms`, so it
+includes tokenizing the prompt. None of these fields has been read on a phone yet; the times below
+are estimates from run 8, not measurements.
+
+What it measures: 6 checks with Llama on every item (`all`) and the same 6 with gating
+(`flagged-only`, ids ending `-gated`): KYC cold, KYC warm ×2, Bill reminder, Official link,
+Lookalike link. The app is restarted between the two passes with the debug-APK launch extra
+`in.prahari.app.extra.GATING`; the harness waits for the app's model-preload record before the
+first check of each pass and rejects a check whose record is missing or reports the other mode.
+
+Do §2 (pre-session checklist) first. Use the latest debug APK from the `Android spike` run on
+`main` (the launch extra is ignored on a release build).
+
+| Minute | Step | Command / Action |
+|---|---|---|
+| 0:00 – 4:00 | Reserve S23, start RDB | As §3: reserve `SM-S911B`, `./rdb`, **Remote Debug Bridge → Connect**, allow USB debugging. |
+| 4:00 – 5:00 | Serial | `adb devices -l`, then `export ANDROID_SERIAL=localhost:<PORT>` |
+| 5:00 – 18:00 | Stage + gating run | `RUN_UNTIL="$(date -d '+13 min' +%s)" GATING_MODE=both SAMPLES=gating WITH_AIRPLANE=0 UNINSTALL_ON_EXIT=1 APK=/path/to/app-debug.apk ./bench/perf/run_s23_rtl.sh` (start it at minute 5, so `RUN_UNTIL` is minute 18) — probes, installs, audits for no `INTERNET`, pushes and hashes the model (3–9 min: run 8 took about 4 min, the 24 Nov push 520.8 s), then runs the 12 checks. Once staging is done the script sets the deadline to `RUN_UNTIL` minus 60 s for a check already running; after it no new check starts and the rest are recorded as `skipped-deadline`. If staging leaves under 30 s it stops without starting checks. |
+| 18:00 – 20:00 | Close | The script uninstalls the app and restores airplane mode and screen timeout on exit. Delete staged files if the uninstall failed: `adb -s "$ANDROID_SERIAL" shell rm -rf /sdcard/Android/data/in.prahari.app`. **End Session** in RTL, stop `./rdb`. |
+
+With a slow push (as on 24 Nov) the `flagged-only` pass, which runs second, gets fewer checks rather than the session overrunning. To run it first instead, use `GATING_MODE=flagged-only` and a second session for `all`. `DEADLINE_S=<seconds>` still works without `RUN_UNTIL`. An older APK without `PrahariPerf` records ignores the launch extra; its rows keep
+status `ok` with `gating_mode_observed` empty and must not be quoted as gating results.
+
+Record from `/var/tmp/prahari-rtl-session-*/`:
+
+- `summary.md`: per-check table (gating, Llama skipped, detector, prompt tokens, prefill ms and
+  tok/s, TTFT, decode tok/s, total, PSS) and the per-mode table (median total for skipped vs Llama
+  checks).
+- `results.json` (`prahari-android-bench-v1`, new per-check fields are additive) and
+  `prahari-perf.jsonl` (the raw app records).
+- Check before quoting: `bill-benign-gated` and `official-link-gated` show `llama_skipped=yes`;
+  the `kyc-*-gated` and `lookalike-link-gated` rows show Llama ran with numbers close to their
+  `all` rows; every row's status is `ok`.
+
+Known limit: the model still preloads at app start on the single worker thread, so a NO RISK check
+submitted in the first seconds after launch waits for that load. The harness waits for the preload
+record, so the measured gated totals do not include it.

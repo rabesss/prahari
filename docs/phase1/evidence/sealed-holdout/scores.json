@@ -152,7 +152,7 @@
     }
    }
   },
-  "main 1eb8916 (after PR #42), re-scored 23 Nov 2026": {
+  "main 7368067 (after PR #42), re-scored 23 Nov 2026": {
    "combined": {
     "n": 184,
     "positives": 84,
@@ -202,7 +202,7 @@
     }
    }
   },
-  "PR #48 at 80cc558 (scored once by the fp-fix thread after review; detector unchanged through PR #53, before PR #54's copied-alert rule)": {
+  "PR #48 at e7c1fcd (scored once by the fp-fix thread after review; detector unchanged through PR #53, before PR #54's copied-alert rule)": {
    "sms": {
     "precision": 0.6923,
     "recall": 0.9265,

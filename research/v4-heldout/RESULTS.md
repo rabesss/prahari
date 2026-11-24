@@ -22,10 +22,10 @@ messages. Run on oracle-a1, 24 Nov 2026.
 
 | Candidate | Split | F1 | Recall | False-alarm rate | TP | FP | TN | FN |
 |---|---|---|---|---|---|---|---|---|
-| main 1eb8916 (before #48) | tuning 161 | 0.834 | 0.926 | 0.215 | 63 | 20 | 73 | 5 |
-| #48 head 78e1e355 | tuning 161 | 0.857 | 0.926 | 0.172 | 63 | 16 | 77 | 5 |
-| main 1eb8916 (before #48) | **held-back 79** | 0.785 | 0.969 | **0.340** | 31 | 16 | 31 | 1 |
-| #48 head 78e1e355 | **held-back 79** | 0.816 | 0.969 | **0.277** | 31 | 13 | 34 | 1 |
+| main 7368067 (before #48) | tuning 161 | 0.834 | 0.926 | 0.215 | 63 | 20 | 73 | 5 |
+| #48 head a8cb1c93 | tuning 161 | 0.857 | 0.926 | 0.172 | 63 | 16 | 77 | 5 |
+| main 7368067 (before #48) | **held-back 79** | 0.785 | 0.969 | **0.340** | 31 | 16 | 31 | 1 |
+| #48 head a8cb1c93 | **held-back 79** | 0.816 | 0.969 | **0.277** | 31 | 13 | 34 | 1 |
 
 False alarms on the held-back split by category:
 
