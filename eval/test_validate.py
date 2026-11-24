@@ -19,6 +19,15 @@ def test_regressions_flag_recall_drop_and_fpr_rise_only():
            "c": {"status": "missing"}}
     bad = validate.regressions(now, base)
     assert bad == ["b: recall 1.0 -> 0.9", "b: FPR 0.1 -> 0.2"]
+    base["c"] = {"status": "ok", "recall": 1.0, "fpr": 0.0}
+    assert validate.regressions(now, base)[-1] == "c: scored in the baseline but now missing"
+
+
+def test_sha_mismatch_fails_the_gate(tmp_path, monkeypatch):
+    f = tmp_path / "set.jsonl"
+    f.write_text('{"text": "hi", "label": 0}\n')
+    monkeypatch.setattr(validate, "SETS", [("x", f, "sms", "heldback", "0" * 64)])
+    assert validate.main(["--no-tests"]) == 1
 
 
 def test_held_back_and_sealed_sets_are_hash_checked():
@@ -26,3 +35,10 @@ def test_held_back_and_sealed_sets_are_hash_checked():
     for name, (role, sha) in roles.items():
         if role in ("heldback", "sealed", "tune"):
             assert sha and len(sha) == 64, name
+
+
+def test_unknown_only_name_is_rejected():
+    import pytest
+    with pytest.raises(SystemExit) as e:
+        validate.main(["--no-tests", "--only", "fp_val_vl"])
+    assert "unknown set names" in str(e.value)

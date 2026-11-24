@@ -162,6 +162,10 @@ def regressions(results, base):
     bad = []
     for name, r in results.items():
         b = base.get(name)
+        if b and b.get("status") == "ok" and r.get("status") != "ok":
+            # A set the baseline scored must be scored again; dropping it would skip its check.
+            bad.append(f"{name}: scored in the baseline but now {r.get('status')}")
+            continue
         if r.get("status") != "ok" or not b or b.get("status") != "ok":
             continue
         if r["recall"] is not None and b["recall"] is not None and r["recall"] < b["recall"]:
@@ -172,7 +176,7 @@ def regressions(results, base):
 
 
 TESTS = [
-    ["-m", "pytest", "-q", "candidates/BEST/tests"],
+    ["-m", "pytest", "-q", "{candidate}/tests"],
     ["bench/gate.py"],
     ["bench/stress.py"],
     ["eval/test_scorer.py"],
@@ -186,11 +190,18 @@ TESTS = [
 NEEDS_TIME = {"bench/gate.py", "bench/stress.py", "bench/tests"}
 
 
-def run_tests(py):
+SKIPPED = []
+
+
+def run_tests(py, cand):
     failed = []
+    if cand != ROOT / "candidates" / "BEST":
+        print(f"NOTE: tests run on {cand.name}; bench gates and eval tests check candidates/BEST")
     for args in TESTS:
+        args = [x.replace("{candidate}", str(cand)) for x in args]
         if not Path("/usr/bin/time").exists() and NEEDS_TIME & set(args):
             print(f"SKIP  {' '.join(args)}  (needs /usr/bin/time; CI runs it)")
+            SKIPPED.append(" ".join(args))
             continue
         p = subprocess.run([py, *args], cwd=ROOT, capture_output=True, text=True)
         tail = (p.stdout + p.stderr).strip().splitlines()[-1:] or [""]
@@ -214,7 +225,10 @@ def main(argv=None):
     a = ap.parse_args(argv)
     sets = list(SETS) + ([SEALED_SET] if a.sealed else [])
     if a.only:
-        want = {s.strip() for s in a.only.split(",")}
+        want = {s.strip() for s in a.only.split(",") if s.strip()}
+        unknown = want - {s[0] for s in sets}
+        if unknown or not want:
+            sys.exit(f"--only: unknown set names {sorted(unknown)} (with --sealed for sealed_v1_1)")
         sets = [s for s in sets if s[0] in want]
     if a.sealed:
         print("NOTE: sealed holdout scored; record this use in research/LOG.md. No tuning on it.")
@@ -227,8 +241,11 @@ def main(argv=None):
         if a.json.resolve().is_relative_to(ROOT):
             sys.exit("--json must be outside the repository")
         a.json.parent.mkdir(parents=True, exist_ok=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
-                              capture_output=True, text=True).stdout.strip()
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
+                              capture_output=True, text=True).stdout.strip() or "unknown"
+        dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                               capture_output=True, text=True).stdout.strip()
+        head += "-dirty" if dirty else ""
         a.json.write_text(json.dumps({"head": head, "candidate": cand.name, "sets": results},
                                      indent=1) + "\n")
     if base:
@@ -237,11 +254,21 @@ def main(argv=None):
             print("REGRESSION", b)
         rc |= bool(bad)
     if not a.no_tests:
-        rc |= bool(run_tests(os.environ.get("HC_PY", sys.executable)))
+        rc |= bool(run_tests(os.environ.get("HC_PY", sys.executable), cand))
     missing = [n for n, r in results.items() if r["status"] != "ok"]
     if missing:
         print("not scored:", ", ".join(missing))
-    print("GATE", "FAIL" if rc else "PASS")
+    if a.sealed and results.get("sealed_v1_1", {}).get("status") != "ok":
+        print("FAIL: --sealed given but the sealed set was not scored")
+        rc = 1
+    tampered = [n for n, r in results.items() if r["status"] == "sha256 mismatch"]
+    if tampered:
+        # A changed holdout file is never skipped quietly.
+        print("FAIL: SHA-256 mismatch for", ", ".join(tampered))
+        rc = 1
+    partial = f" (partial: {len(SKIPPED)} suites skipped, {len(missing)} sets not scored)" \
+        if SKIPPED or missing else ""
+    print("GATE", "FAIL" if rc else "PASS" + partial)
     return 1 if rc else 0
 
 

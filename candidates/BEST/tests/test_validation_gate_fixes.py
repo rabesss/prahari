@@ -47,6 +47,9 @@ def test_hypothetical_caller_warnings_are_not_flagged(text):
     "If anyone calls asking for the OTP, hang up. Your account will be blocked today, share your PIN to keep it.",
     "If anyone calls asking for OTP hang up and message us on WhatsApp to report.",
     "If anyone calls, share the OTP, then hang up.",
+    "If anyone asks for your OTP, do not share it, give it to me.",
+    "If anyone calls asking for OTP, hang up and never share it, send your PIN.",
+    "Agar koi OTP maange to kuch mat batana, mujhe bhej do.",
     "If anyone calls asking for OTP, sharing it is fine, hang up after.",
 ])
 def test_demands_behind_a_hypothetical_caller_stay_flagged(text):
@@ -113,6 +116,11 @@ def test_blackmail_is_not_described_as_account_blocking():
     assert ("block_threat", mech.EXPOSE_DESC) in a["harm"]
 
 
+def test_past_exposure_is_not_a_sextortion_threat():
+    a = mech.analyze("Your private photos viral ho gaya. Contact me now.")
+    assert "sextortion" not in {n for n, _ in a["harm"]}
+
+
 def test_trading_deposit_is_not_described_as_refund_fee():
     text = "Assured 4% profit daily in our trading group. Deposit Rs 20,000 today to unlock the VIP plan: vip-trade.top"
     lab, _, ev = detect.predict_text([text])[0]
@@ -126,3 +134,43 @@ def test_account_block_threat_keeps_its_phrase():
     text = "Your SBI account will be blocked today. Update KYC at sbi-kyc-help.top now."
     a = mech.analyze(text)
     assert ("block_threat", "threatens to block, cut or freeze an account, SIM or connection") in a["harm"]
+
+
+# Review round 1 (GLM 5.4): demands next to a warning span are analysed again, not blanked with it.
+@pytest.mark.parametrize("text", [
+    "If anyone calls asking for the OTP, do not share it, SBI: Apna OTP dijiye.",
+    "If someone from SBI asks for your PIN, never say it out loud, type it in the AnyDesk chat.",
+    "If anyone asks for the OTP, disconnect and try installing AnyDesk from the Play Store.",
+    "अगर कोई कॉल पर ओटीपी मांगे तो फोन काट देना और कलेक्ट अनुरोध स्वीकार करें",
+    "agar koi OTP maange to phone kaat dena aur OTP ka screenshot lo aur humein dikhao",
+    "SBI KYC: our officer will call you for the OTP, if anyone else calls asking for OTP, hang up.",
+    "SBI सपोर्ट: कृपया स्क्रीन शेयर करें, हम ओटीपी नहीं मांगते।",
+    "SBI: AnyDesk app open karo, bank OTP nahi maangta.",
+    "SBI सपोर्ट: कृपया AnyDesk ऐप खोलें, हम ओटीपी नहीं मांगते।",
+    "क्यूआर कोड स्कैन करें और ₹2000 का भुगतान स्वीकार करें, बैंक ओटीपी नहीं मांगता",
+    "Never share your OTP with anyone except our verified executive. If anyone calls asking for the OTP, do not share it with anyone.",
+    "SBI: humein OTP chahiye. If anyone calls asking for the OTP, hang up.",
+])
+def test_demands_next_to_warning_spans_stay_flagged(text):
+    assert verdict(text) == 1
+
+
+def test_extortion_and_exposure_have_their_own_phrases():
+    text = "We have your son. Pay Rs 5 lakh to get him back safely. Final notice."
+    lab, _, ev = detect.predict_text([text])[0]
+    assert lab == 1
+    assert llm.compact_evidence("sms", text, ev, lab)[0].startswith("threatens you or your family")
+    text = "Abhi ₹15,000 bhejo warna tumhare family ko message kar dunga."
+    lab, _, ev = detect.predict_text([text])[0]
+    assert lab == 1 and llm.scam_type("sms", text, lab) == "an extortion threat"
+    assert not any("block" in p for p in llm.compact_evidence("injection", text, ev, lab))
+
+
+def test_reserved_tld_outside_the_risky_list_keeps_its_decision():
+    assert mech.host_risk("portal.localhost") == ""
+    assert mech.host_risk("rewards.test") == ""
+
+
+def test_long_reserved_host_phrase_fits_the_budget():
+    host = "a-very-long-parcel-redelivery-confirmation-portal-for-customers.example"
+    assert len(llm._risky_short(mech.host_risk(host))) <= 78

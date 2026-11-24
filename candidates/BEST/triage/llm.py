@@ -78,6 +78,7 @@ MECH_SHORT = {
     "investment": "promises guaranteed or doubled returns for a deposit",
     "id_request": "asks you to send identity documents to a chat or link",
     "notice_contact": "gives its own number, chat or link to act on",
+    "extortion": "threatens you or your family to force a payment",
 }
 MECH_TYPE = {
     "secret_request": "OTP or PIN theft",
@@ -201,6 +202,11 @@ def _harm_names(a):
     return harm
 
 
+def _mech_short(n, d):
+    """The short phrase for one harm: a threat to expose the reader is not called account blocking."""
+    return EXPOSE_SHORT if d == mech.EXPOSE_DESC else MECH_SHORT.get(n)
+
+
 def _risky_short(r):
     """A host risk line as a short phrase: whole words, no claim about the TLD's reputation."""
     if "lookalike" in r:
@@ -209,13 +215,20 @@ def _risky_short(r):
         return _short_host("shortener", r)
     host = _host_from(r)
     if host and ("common for throwaway" in r or "not an official site" in r):
-        return _short_host("risky_tld", r)
+        return _fit(_short_host("risky_tld", r), host)
     return r if len(r) <= 70 else r[:70].rsplit(" ", 1)[0]
+
+
+def _fit(phrase, host):
+    """Keep a host phrase inside the 78-character budget by naming the TLD only."""
+    if len(phrase) <= 78 or not host:
+        return phrase
+    return f"an unofficial .{host.rsplit('.', 1)[-1]} domain"
 
 
 def _harm_evidence(a, inp):
     """Mechanism phrases for a scam, most concrete first, then any lookalike host."""
-    out = [EXPOSE_SHORT if d == mech.EXPOSE_DESC else MECH_SHORT[n] for n, d in _harm_names(a) if n in MECH_SHORT]
+    out = [_mech_short(n, d) for n, d in _harm_names(a) if _mech_short(n, d)]
     # A scam that both threatens and asks for a payment names two mechanisms. Joining the two
     # shortest phrases keeps one copied sentence while covering both, instead of dropping the
     # second mechanism (the model only copies the first phrase).
@@ -365,7 +378,7 @@ def compact_evidence(kind, inp, fallback, verdict=None):
             # alert's own "if not you, block your card" is protective advice, not a threat.
             out, dismissed = _cleared_message(kind, inp, fallback, a)
         elif kind == "injection":
-            harm = [MECH_SHORT[n] for n, _ in a["harm"] if n in MECH_SHORT][:1]
+            harm = [_mech_short(n, d) for n, d in _harm_names(a) if _mech_short(n, d)][:1]
             if rules.injection_indicators(inp):
                 # One phrase carries both the injection and the mechanism, so a copied opening can
                 # satisfy either concept the reader is asked about.
@@ -483,6 +496,11 @@ def scam_type(kind, inp, verdict):
                 not found & {"sextortion", "extortion", "safe_account", "remote_access", "collect_request",
                              "qr_payment", "pay_to_receive"}:
             return "an advance-fee scam"
+        if found == {"block_threat"} or found <= {"block_threat", "pay_unverified", "payment_request_private"}:
+            descs = {d for n, d in a["harm"] if n == "block_threat"}
+            if descs == {mech.EXPOSE_DESC}:
+                # Only the threat to tell contacts or family: blackmail, not an account-blocking notice.
+                return MECH_TYPE["extortion"]
         for n in TYPE_PRIORITY:
             if n in found:
                 return MECH_TYPE[n]
