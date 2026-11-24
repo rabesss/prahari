@@ -26,6 +26,28 @@ Genuine bank debit alerts, OTP notifications, bill reminders, and telecom adviso
 
 \newpage
 
+## Related Products and Gap Analysis
+
+India already has strong anti-scam tools, but none of the ones below explains a suspicious message in plain Hindi or English on a mid-range phone with no network. The table records what each product does, what Prahari borrows, and where Prahari is ahead or behind. Product facts are from the cited vendor or government pages (checked 24 Nov 2026).
+
+| Product | On-device or cloud | India / Hindi | What Prahari adopts | Prahari's gap / edge |
+|:--|:--|:--|:--|:--|
+| Google Messages Scam Detection; Enhanced protection (Oct 2026) [[G1](https://blog.google/security/new-android-scam-protections/), [G2](https://blog.google/security/staying-one-step-ahead-strengthening-androids-lead-in-scam-protection/)] | Standard mode on-device; Enhanced sends conversations with unknown senders to cloud Gemini (Private AI Compute); Gemini Nano link checks only on Pixel 10+ / Galaxy S26-class phones | Messages scam detection in 20+ countries; listed languages are English, Arabic, French, German, Portuguese and Spanish (Hindi not listed); no India date for Enhanced announced [[G3](https://techzei.com/google-messages-enhanced-scam-detection-india/)] | Pause-before-tapping checkpoint for links from non-contacts (Android 6+) | Edge: Hindi/Hinglish mechanisms and an explanation, fully offline on S23-class phones. Gap: Prahari is not the SMS app, so it cannot intercept links |
+| Pixel call Scam Detection; Samsung Scam Detection (One UI 9) [[G2](https://blog.google/security/staying-one-step-ahead-strengthening-androids-lead-in-scam-protection/), [S1](https://www.neoteo.com/en/samsung-names-japan-canada-and-india-for-scam-detection)] | On-device (Gemini Nano), live call audio | Pixel call detection is listed for India; Samsung lists India as planned | Two-level call alert (suspicious, then warning) for Call Guard | Gap: Prahari's Call Guard checks shared voice notes, not live calls, and is not on Android yet. Edge: works on phones outside these flagship lists |
+| Samsung Message Guard / Auto Blocker [[S2](https://candklab.com/en/blog/galaxy-spam-smishing-block-settings/)] | On-device sandbox for zero-click image exploits; blocks sideloading and USB attacks; AI smishing filter in Korea only | No India-trained text model | Blocking risky installs (an APK inspector is on the roadmap) | Edge: India-trained text detection with a reason for each verdict |
+| Truecaller Fraud Protection, caller ID, AI Call Scanner [[T1](https://corporate.truecaller.com/newsroom/press-release/28923657E2813595), [T2](https://www.truecaller.com/blog/features/protect-yourself-from-sms-scams-with-truecallers-fraud), [T3](https://www.truecaller.com/premium-terms-of-service)] | SMS fraud detection runs on-device ("all processing happens locally"); caller ID and the spam database are cloud and crowdsourced | Built for India: labels "Likely Fraud" and disables links until the sender is marked safe; fraud insurance and Family Protection need paid yearly plans | Persistent warning; links stay inert until the user confirms | Gap: Truecaller already filters SMS on-device at scale. Edge: Prahari says why a message is risky and what to do, needs no account or contact upload |
+| Airtel network spam and link protection [[A1](https://www.gsma.com/solutions-and-impact/technologies/security/scams/gsma_study/airtel-spam-detection-solution/)] | Network-side AI spam labels and DNS blocking of malicious links | India (operator service) | Phishing-feed idea (OpenPhish and PhishTank are optional technologies in the PS3 brief) as an offline snapshot | Edge: works on WhatsApp text, pasted text and with no network. Gap: no feed-based link reputation yet |
+| Bitdefender Scamio and Scam Protection [[B1](https://www.bitdefender.com/en-in/consumer/scam-protection)] | Cloud (chatbot for text, links, QR codes, screenshots) | Available in India; English | Screenshot check; warning when remote access is on during banking | Edge: offline and private. Gap: no screenshot OCR yet |
+| McAfee Scam Detector; Norton Genie [[M1](https://www.mcafee.com/en-us/scam-detector/), [N1](https://in.norton.com/feature/ai-scam-protection)] | Cloud; paid plans | English | QR scanning (Prahari already decodes QR photos on the phone) | Edge: Hindi, free, offline |
+| Sanchar Saathi Chakshu, 1930, cybercrime.gov.in; TRAI DLT headers and 1600-series numbers for BFSI calls [[D1](https://sancharsaathi.gov.in/sfc/), [D2](https://www.trai.gov.in/sites/default/files/2025-11/Direction_19112025.pdf)] | Government reporting portals and telecom rules | India | Vetted steps route users to Chakshu, 1930 and cybercrime.gov.in; a sender-header check is planned | Gap: Prahari does not file the report. Edge: tells the user, on the spot, which channel fits |
+
+**Where Prahari stands.** Its distinct combination is: (1) Indian scam mechanisms in English, Hindi and Hinglish; (2) a plain-language explanation and vetted next steps for every verdict; (3) no network at all at inference, on a phone that is not a current flagship. Its main gaps against shipping products are that it does not sit in the message or call path, has no link reputation feed, and its false-alarm rate on hard benign notices (Results) is still high.
+
+### Related Work
+
+- **Saavalainen (2026), "On-Device Phishing Explanation Generation Using Small Language Models"**, University of Helsinki ([hdl.handle.net/10138/638168](http://hdl.handle.net/10138/638168)). Gemma 3n-E2B-it ran zero-shot on an Android phone (LiteRT-LM) on Finnish SMS: it missed 15 of 41 dangerous messages (63.4% recall) against 2 of 41 for a cloud model (95.1%), with more unsupported details. The thesis concludes that small models "appear more suitable as part of a broader detection and explanation pipeline than as standalone phishing detectors", which is Prahari's design: detectors decide, Llama 3.2 1B explains.
+- **ElZemity et al. (2026), "Agentic Knowledge Distillation: Autonomous Training of Small Language Models for SMS Threat Detection"** ([arXiv:2602.10869](https://arxiv.org/abs/2602.10869)). LLM teachers train Qwen2.5-0.5B and SmolLM2-135M SMS classifiers, best at 94.31% accuracy and 96.25% recall. These are classifiers only, with no user-facing explanation; Prahari's detector layer plays this role with smaller classical models plus rules, and adds the explanation.
+
 ## Methodology
 
 ### Hybrid Two-Stage Architecture
@@ -243,7 +265,7 @@ The sealed holdout (84 malicious, 100 benign: 155 SMS-route [68 malicious, 87 be
 - **Regression test suite (`main` at `105f7e6`):** 896 candidate and LLM-safety tests pass on `105f7e6` and 904 on `b3d61f9` (`pytest candidates/BEST/tests bench/tests/test_llm_safety.py`, run 24 Nov 2026), including 39 live-monitor tests and about 120 Call Guard call-script cases, plus Android parity, bridge, and manifest permission checks in GitHub Actions CI [S11, S12].
 - **Leave-one-category-out (LOCO) check:** Holding out each of 32 visible synthetic Indian categories yielded pooled binary F1 **1.0** with fixed rules active (`uncertain` mapped to benign) — an internal sanity check on synthetic categories, not a real-world generalisation estimate [S4].
 
-## Responsible AI, Limitations, and Phase 2 Roadmap
+## Responsible AI, Limitations, and Roadmap
 
 ### Responsible AI and Privacy Posture
 
@@ -259,12 +281,20 @@ The sealed holdout (84 malicious, 100 benign: 155 SMS-route [68 malicious, 87 be
 4. **Missed hybrid scams & explanation limits:** 2/24 reviewer adversarial scams still bypass rules (typically mixing an official app mention with a secondary WhatsApp/unofficial link). PR #50's blind audits (pre-merge revisions) still rated 5 of 20 English explanations wrong (mostly repeating a wrong detector evidence phrase), Llama prose remains English (the Hindi summary is fixed text, not AI-written), and its stricter validator adds ~12% latency.
 5. **Network scope:** `bin/monitor` is Linux-only (Android 10+ blocks `/proc/net`), samples sockets at 0.5 s intervals rather than capturing raw packets, and is separate from the NSL-KDD feature-replay classifier; `bin/explain` reclassifies flow text with rules rather than explaining the NSL-KDD tree.
 
-### Phase 2 Roadmap (If Shortlisted)
+### Roadmap (Phase 2)
 
-1. **Phone speed, thermal behaviour and RAM:** find why the final build ran at half the r1 speed on the S23 (thermal trace, thread count, prompt length) and fix the lookalike-link stall; test a 6 GB mid-range Arm handset; shrink `max_context_len` KV cache (2048 -> 512) and reclaim native buffers between checks to eliminate memory creep and target `< 1.35 GB` PSS; measure battery and thermal behaviour over 20+ sustained checks.
-2. **Sub-5% genuine-notice FPR with consented data:** Expand consented, licensed Indian benign and multi-script scam corpora (Hindi, Hinglish, Marathi, Tamil, Telugu, Bengali), run a fresh single-shot blind holdout, and calibrate thresholds before introducing strictly opt-in notification screening.
-3. **Grounded multilingual explanations & usability testing:** Fine-tune or prompt-constrain Llama 3.2 1B for native Hindi explanations with automated fabrication/citation checks, run a fresh blind manual audit, and conduct structured comprehension tests with non-technical and elderly Indian users (including 200% font scaling and TalkBack).
-4. **Expanded Arm edge network monitoring:** Add permission-aware packet/flow feature extraction (e.g., eBPF/libpcap on Raspberry Pi 5 / Arm Linux gateways) unified with the trained flow model so live capture and ML flow scoring share one pipeline.
+1. **Link interstitial:** a pause-and-explain screen before a link from an SMS or chat opens. It requires Prahari to be chosen as the default link handler, which users must opt into.
+2. **Offline phishing-feed snapshot:** a periodically refreshed local copy of a feed such as OpenPhish or PhishTank, within each feed's licence terms; a snapshot goes stale between updates, so it supplements the rules rather than replacing them.
+3. **Screenshot OCR:** on-device text extraction from screenshots of chats and payment screens.
+4. **Notification-listener scanning** for WhatsApp, Telegram and SMS notifications, strictly opt-in, once false alarms on genuine notices are low enough.
+5. **AI-voice / voice-clone check** for shared voice notes.
+6. **Real-time Call Guard on the phone** (wired into the Android app), with a Hindi-capable ASR model.
+7. **More Indian languages** (Marathi, Tamil, Telugu, Bengali) with consented, licensed data and a fresh single-shot holdout.
+8. **Signed offline rule-pack updates** so new scam mechanisms ship without an app update and without a network call at check time.
+9. **Faster Arm kernels:** SME2 on newer Arm CPUs, phone NPUs, and Hailo accelerators on Arm Linux boards; also find why the final build ran at half the r1 speed on the S23 and fix the lookalike-link stall.
+10. **Bank "kill-switch" deep links:** one tap into the user's bank app to freeze a card or UPI, where banks expose such links.
+11. **APK inspector**, if it does not ship in Phase 1: check a downloaded `.apk` for remote-access and SMS-reading permissions before install.
+12. **Memory and usability:** shrink the KV cache (2048 -> 512 context), target under 1.35 GB PSS, test a 6 GB mid-range phone, and run comprehension tests with non-technical and elderly users (200% font, TalkBack).
 
 ## Sources, Provenance, and Licensing
 
