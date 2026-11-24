@@ -12,7 +12,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-from . import indicrules, mech, rules, upi
+from . import indicrules, mech, rules, sender, upi
 
 CAND = Path(__file__).resolve().parents[1]
 
@@ -544,7 +544,12 @@ class Explainer:
         self.load_ms = (time.time() - t0) * 1000
         self.model_name = self.cfg["model"]
 
-    def prompt(self, kind, inp, verdict, evidence):
+    def prompt(self, kind, inp, verdict, evidence, sender_reason=None, sender_id=None):
+        """sender_reason (sender.reason) is set only when a personal-mobile sender raised the item.
+
+        The opening then carries the vetted sender phrase and the fact is the vetted sender fact,
+        so the model only paraphrases them; the validator sees the sender number as item text.
+        """
         is_upi = _is_upi(kind, inp)
         eff_kind = "upi" if is_upi else kind
         snippet = upi.prompt_snippet(inp) if is_upi else (inp if len(inp) <= 320 else inp[:317] + "...")
@@ -552,6 +557,8 @@ class Explainer:
         # request it must decline. The real host still appears in the evidence for the reader.
         snippet = re.sub(r"(https?://[^\s<>\"']+)", lambda m: re.sub(r"(?<!\[)\.(?!\])", "[.]", m.group(0)), snippet)
         ev = compact_evidence(eff_kind, inp, evidence, verdict)
+        if sender_reason in sender.OPENING:
+            ev = [sender.OPENING[sender_reason]] + [e for e in ev if e != DEBIT_LINE and not sender.SENDER_LINE.startswith(e)][:1]
         # Evidence can quote attacker text (payee name, note, currency). Keep it on one line and
         # strip anything shaped like the verdict marker, which _prompt_verdict reads from the end.
         ev = [re.sub(r'"{2,}', '"', re.sub(r"(?i)verdict\s*:", "verdict -", re.sub(r"\s+", " ", re.sub(r"<\|[^|<>]{0,40}\|>", " ", str(e)))))[:160] for e in ev]
@@ -568,7 +575,7 @@ class Explainer:
         # The model's own sentence is grounded in one vetted fact for this kind of scam (or for
         # this benign reading). Asked for bare "advice", the 1B model filled the slot with stock
         # lines that were often false for the item ("do not click the link" with no link).
-        fact = key_fact(eff_kind, inp, verdict, ev)
+        fact = sender.SENDER_FACT if sender_reason in sender.OPENING else key_fact(eff_kind, inp, verdict, ev)
         user = (f"{KIND_WORD.get(eff_kind, 'Content')}:\n\"\"\"\n{snippet}\n\"\"\"\n"
                 f"Verdict: {VERDICT_WORD[verdict]}\n"
                 f"Start your answer with exactly: \"{opening}.\" "
@@ -580,7 +587,10 @@ class Explainer:
                 "<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + user +
                 "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n")
         _TAILS[built] = advice_for(eff_kind, verdict, inp)[0]
-        _CTX[built] = {"kind": eff_kind, "input": inp, "verdict": verdict, "fact": fact, "evidence": list(ev)}
+        ctx_input = f"{inp}\nSent from a personal mobile number {sender_id}" if sender_reason in sender.OPENING else inp
+        _CTX[built] = {"kind": eff_kind, "input": ctx_input, "verdict": verdict, "fact": fact, "evidence": list(ev)}
+        if sender_reason in sender.OPENING:
+            _CTX[built]["sender_raised"] = sender_reason
         return built
 
     def generate(self, prompt):
@@ -1322,6 +1332,45 @@ def _has_link(inp):
     return bool(LINK_WORDS.search(inp or ""))
 
 
+# A personal-mobile sender raised the item: a sentence that vouches for the sender contradicts it.
+_V_SENDER_TRUST = re.compile(
+    r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe)\b[^.;!?]{0,30}?"
+    r"\b(?:number|sender|source|id|header|bank|caller)\b|"
+    r"\b(?:number|sender|source|id|header)\b[^.;!?]{0,40}?\b(?:is|was|looks|seems|appears|can be|should be|must be)\b[^.;!?]{0,40}?"
+    r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe|real)\b|"
+    r"\b(?:trust\w*)\b[^.;!?]{0,20}\b(?:number|sender|source|caller|message)\b|"
+    r"\breal\s+(?:bank\s+)?(?:sender|number|bank|caller|id|source)\b|"
+    r"\b(?:sent|came|comes|is|was|it'?s) (?:directly |straight |really |right )?from (?:the|your|a real|the real|an official) bank\b", re.I)
+
+# The general rule itself ("Banks use registered sender IDs, not mobile numbers") is a paraphrase.
+_V_SENDER_RULE = re.compile(r"\b(?:banks?|government|govt|they)\b[\w\s]{0,30}?\bregistered sender ids?\b"
+                            r"[\s,;-]{0,4}(?:and\s+|but\s+)?(?:not|never|instead of)\b(?:(?!\b(?:and|but|so|this|that|it|which|while|though)\b)[\w\s-]){0,30}", re.I)
+
+# Advice is exempt unless it points at this item's sender ("use this verified sender").
+_V_THIS_SENDER = re.compile(r"\b(?:this|that|it)\s+(?:\w+\s+){0,2}(?:sender|number|caller|source|id|header)\b|"
+                            r"\b(?:the|a|an)\s+(?:\w+\s+){0,2}sender\b", re.I)
+_V_TRUST_WORD = re.compile(r"\b(?:verified|genuine|legit\w*|authentic|trust\w*|registered|official|safe|real)\b", re.I)
+_V_TRUST_NEG = re.compile(r"(?:\b(?:not|never|isn't|wasn't|aren't)\b|\bno\b(?!\s+doubt)|n't)\s+"
+                          r"(?:(?!(?:and|but|so|yet|or|while|though)\b)\w+\s+){0,3}$", re.I)
+
+
+_V_BANK_ORIGIN = re.compile(r"\b(?:sent|came|comes|is|was|it'?s) (?:directly |straight |really |right )?from (?:the|your|a real|the real|an official) bank\b", re.I)
+
+
+def _vouches(clause):
+    """True when a sender claim in the clause vouches for the sender: a trust word inside the matched
+    claim that is not itself negated ("not verified" does not vouch; "verified and not a scam"
+    does), or an un-negated "sent from your bank"."""
+    for m in _V_SENDER_TRUST.finditer(clause):
+        origin = _V_BANK_ORIGIN.match(clause, m.start())
+        if origin and not _V_TRUST_NEG.search(clause[:m.start()]):
+            return True
+        for w in _V_TRUST_WORD.finditer(clause, m.start(), m.end()):
+            if not _V_TRUST_NEG.search(clause[:w.start()]):
+                return True
+    return False
+
+
 def unsupported(sent, ctx):
     """The reason a generated sentence is not backed by the item, or None."""
     inp = ctx.get("input") or ""
@@ -1331,6 +1380,10 @@ def unsupported(sent, ctx):
     low_inp = inp.lower().replace("[.]", ".")
     if re.search(r"[ऀ-ॿ]", sent):
         return "script_mixing"
+    if ctx.get("sender_raised") and any(
+            _V_SENDER_TRUST.search(c) and (not _V_ADVICE.search(c) or _V_THIS_SENDER.search(c)) and _vouches(c)
+            for c in _clauses(_V_SENDER_RULE.sub(" ", sent))):
+        return "sender_contradiction"
     if _V_FIRST_PERSON.search(sent):
         # "I checked the official app", "my top priority": the model claiming actions it never took.
         return "first_person"
