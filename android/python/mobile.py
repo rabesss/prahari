@@ -39,7 +39,12 @@ class BridgeExplainer(llm.Explainer):
         self.runner = runner
         self.last_stats = None
     def _run(self, prompt):
-        data = json.loads(str(self.runner.generate(prompt)))
+        raw = str(self.runner.generate(prompt))
+        try:
+            data = json.loads(raw)
+        except ValueError as exc:
+            # Not a model-text failure: keep it out of explain()'s detector-text fallback.
+            raise RuntimeError('unreadable reply from the Android runner') from exc
         self.last_stats = data.get('stats') or {}
         if data.get('timed_out'):
             raise ExplainTimeout('Llama time budget used up')
@@ -347,6 +352,20 @@ _FLOW_GUESS = 'traffic that looks like a routine update or a scheduled backup'
 _FLOW_CLEAR = 'No risk found for this network event: the detector found no attack pattern in it'
 
 
+_OPEN_MARK = 'Start your answer with exactly: "'
+_OPEN_END = '." Then write one more sentence'
+
+
+def _opening(prompt):
+    """The prompt's required opening. llm._forced_sentence stops at the first double quote, so an
+    evidence line that quotes a payee name ("Support") would lose the verdict; read up to the fixed
+    text that follows the opening instead."""
+    tail = prompt.rsplit(_OPEN_MARK, 1)
+    if len(tail) == 2 and _OPEN_END in tail[1]:
+        return tail[1].split(_OPEN_END, 1)[0].rstrip(' .')
+    return llm._forced_sentence(prompt).rstrip(' .')
+
+
 def detector_text(kind, text, lab, ev):
     """Fixed text from the detector alone: the prompt's required opening plus its vetted key fact.
 
@@ -355,11 +374,16 @@ def detector_text(kind, text, lab, ev):
     can quote a negated event ("no 200 different ports ...") or guess "routine update or backup".
     """
     prompt = BridgeExplainer(None).prompt(kind, text, lab, ev)
-    opening = llm._forced_sentence(prompt).rstrip(' .')
+    opening = _opening(prompt)
     ctx = llm._CTX.get(prompt) or {}
     fact = ctx.get('fact') or ''
-    if kind == 'flow' and (lab == 0 or _FLOW_GUESS in opening):
-        opening = _FLOW_CLEAR
+    if kind == 'flow':
+        # The prompt's flow phrase is pattern-matched from the description and blind to negation
+        # ("No 200 different ports ..."). Fixed text uses the detector's own first evidence line,
+        # which the screen already shows, or a neutral line.
+        head = {1: 'This network event is DANGEROUS', 'uncertain': 'This network event needs a check'}.get(lab)
+        lead = str(ev[0]).strip().rstrip('.') if ev else ''
+        opening = _FLOW_CLEAR if head is None else (f'{head}: {lead}' if lead else head)
     out = opening + '.' + (' ' + fact if fact else '')
     try:
         checked, _report = llm.validate(out, opening, ctx, vetted=[fact] if fact else [])

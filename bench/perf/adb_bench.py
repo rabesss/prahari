@@ -537,11 +537,14 @@ def sample_row_y(xml_text: str) -> int | None:
 
 
 def stats_header_state(xml_text: str) -> str:
-    """'absent' (header not on screen), 'pending' (Llama still running) or 'done'."""
+    """'absent' (header not on screen), 'pending' (Llama still running), 'fallback' (the stage ended
+    with the detector's fixed text and no usable Llama reply: "No AI text") or 'done'."""
     m = _STATS_DESC_RE.search(xml_text)
     if not m:
         return "absent"
     first_token = m.group(2).strip()
+    if first_token == "No AI text":
+        return "fallback"
     return "pending" if (not first_token or first_token.startswith("—") or first_token == "…") else "done"
 
 
@@ -643,15 +646,19 @@ def cmd_run(args: argparse.Namespace) -> int:
             time.sleep(1.0)
             stats_xml = dump_ui_xml(serial)
             state = stats_header_state(stats_xml)
-            if state == "done":
+            if state in ("done", "fallback"):
                 break
             if state == "absent" and "Check another" in stats_xml:
                 adb_out(serial, "shell", "input", "swipe", "540", "1600", "540", "500", "300")
         wall_s = round(time.monotonic() - t0, 2)
         polled = poller.stop()
         active_poller["p"] = None
-        status = "ok" if state == "done" else "timeout"
-        if status != "ok":
+        # A fallback check finished, but without Llama timing: keep it out of the completed aggregates.
+        status = {"done": "ok", "fallback": "detector-fallback"}.get(state, "timeout")
+        if status == "detector-fallback":
+            print(f"[adb_bench] WARNING: {check_id} finished with the detector's fixed text (no usable Llama reply)",
+                  file=sys.stderr)
+        elif status != "ok":
             print(f"[adb_bench] ERROR: {check_id} did not finish within {args.check_timeout_s:.0f} s "
                   f"(stats header state: {state}); its numbers are incomplete", file=sys.stderr)
 
