@@ -1,0 +1,93 @@
+\usepackage{fontspec}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{parskip}
+\usepackage{etoolbox}
+
+% Clean palette matching Prahari's UI indigo + slate
+\definecolor{prahariIndigo}{HTML}{1E3A8A}
+\definecolor{prahariSlate}{HTML}{334155}
+\definecolor{prahariMuted}{HTML}{64748B}
+\definecolor{prahariBorder}{HTML}{CBD5E1}
+\definecolor{prahariBg}{HTML}{F8FAFC}
+\definecolor{prahariLink}{HTML}{1D4ED8}
+
+% Typography: IBM Plex Sans + JetBrains Mono (with Devanagari fallback if needed)
+\setmainfont{IBM Plex Sans}[
+  UprightFont = *,
+  BoldFont = * Bold,
+  ItalicFont = * Italic,
+  BoldItalicFont = * Bold Italic
+]
+\setmonofont{JetBrains Mono}[Scale=0.84]
+\newfontfamily\devanagarifont[Script=Devanagari]{Noto Sans Devanagari}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=prahariLink,
+  urlcolor=prahariLink,
+  citecolor=prahariLink,
+  pdftitle={Prahari: Offline Threat Triage on Arm — Bharat AI-SoC 2026-27 PS3 Phase 1 Report},
+  pdfauthor={Prahari contributors}
+}
+
+% Section heading styling
+\titleformat{\section}
+  {\Large\bfseries\color{prahariIndigo}}
+  {\thesection}{0.6em}{}[\vspace{2pt}{\color{prahariBorder}\titlerule[0.6pt]}]
+\titleformat{\subsection}
+  {\large\bfseries\color{prahariSlate}}
+  {\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{prahariSlate}}
+  {\thesubsubsection}{0.4em}{}
+
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\titlespacing*{\subsubsection}{0pt}{7pt}{3pt}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari — Arm Bharat AI-SoC Challenge 2026–27 (PS3)}
+\fancyhead[R]{\footnotesize\color{prahariMuted}Phase 1 Technical Report}
+\fancyfoot[L]{\footnotesize\color{prahariMuted}Built with Llama (Llama 3.2 Community License)}
+\fancyfoot[R]{\footnotesize\color{prahariMuted}Page \thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{prahariBorder}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrule}{\hbox to\headwidth{\color{prahariBorder}\leaders\hrule height \footrulewidth\hfill}}
+
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[L]{\footnotesize\color{prahariMuted}Built with Llama (Llama 3.2 Community License)}
+  \fancyfoot[R]{\footnotesize\color{prahariMuted}Page \thepage\ of \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+% Compact lists and table polish
+\setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
+\renewcommand{\arraystretch}{1.18}
+\AtBeginEnvironment{longtable}{\small}
+\AtBeginEnvironment{tabular}{\small}
+
+% Subtle shaded code blocks and clean line wrapping for long paths/symbols
+\definecolor{shadecolor}{HTML}{F1F5F9}
+\BeforeBeginEnvironment{verbatim}{\small}
+\setlength{\emergencystretch}{3em}
+
+% Keep figures where placed when possible
+\makeatletter
+\def\fps@figure{H}
+\makeatother

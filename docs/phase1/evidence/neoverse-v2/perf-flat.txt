@@ -1,0 +1,65 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cpu-clock:pppH'
+# Event count (approx.): 22444444220
+#
+# Overhead  Command  Shared Object                                 Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+# ........  .......  ............................................  .........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    23.27%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp4x8_qsi4c32p4x8_16x4x32_opt32_neon_i8mm
+    20.57%  python   libexecutorch_backend_xnnpack.so              [.] kai_kernel_matmul_clamp_f32_qai8dxp1x8_qsi4c32p4x8_1x4x32_neon_dotprod
+     7.88%  python   [kernel.kallsyms]                             [k] __pi_clear_page
+     5.63%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_matmul_clamp_f32_qai8dxp1x8_qsi8cxp4x8_1x4_neon_dotprod
+     5.13%  python   python3.12                                    [.] _PyEval_EvalFrameDefault
+     3.20%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_rhs_pack_nxk_qsi4c32p_qsu4c32s1s0
+     1.89%  python   libscipy_openblas-b7e2810b.so                 [.] blas_thread_server
+     1.89%  python   libscipy_openblas64_-f552eb69.so              [.] blas_thread_server
+     1.17%  python   python3.12                                    [.] gc_collect_main
+     0.77%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_rhs_pack_nxk_qsi8cxp_qsi8cx_neon
+     0.68%  python   libexecutorch_backend_xnnpack.so              [.] kai_run_lhs_quant_pack_qai8dxp_f32
+     0.68%  python   python3.12                                    [.] _PyObject_Malloc
+     0.68%  python   python3.12                                    [.] deduce_unreachable
+     0.68%  python   python3.12                                    [.] visit_reachable
+     0.63%  python   libc.so.6                                     [.] __memcpy_generic
+     0.59%  python   python3.12                                    [.] visit_decref
+     0.50%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b00
+     0.45%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000112e0c
+     0.45%  python   python3.12                                    [.] PyDict_SetDefault
+     0.45%  python   python3.12                                    [.] _PyObject_Free
+     0.41%  python   [kernel.kallsyms]                             [k] _raw_spin_unlock_irqrestore
+     0.41%  python   python3.12                                    [.] sre_ucs1_match
+     0.36%  python   libcustom_ops_aot_lib.so                      [.] torch::executor::native::sdpa::impl::cpu_flash_attention<float, 32l, 512l>(executorch::runtime::KernelRuntimeContext&, executorch::runtime::etensor::Tensor&, executorch::runtime::etensor::Tensor const&, executorch::runtime::etensor::Tensor const&, executorch::runtime::etensor::Tensor const&, double, bool, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<double> const&, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<executorch::runtime::etensor::Tensor> const&, std::optional<executorch::runtime::etensor::Tensor> const&, torch::executor::native::SeqDim, long, long)::{lambda(long, long)#3}::operator()
+     0.36%  python   python3.12                                    [.] type_new
+     0.32%  python   [kernel.kallsyms]                             [k] _raw_spin_unlock_irq
+     0.32%  python   libcustom_ops_aot_lib.so                      [.] 0x00000000000a7c88
+     0.32%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b0c
+     0.32%  python   libexecutorch_threadpool.so                   [.] 0x000000000002a684
+     0.27%  python   libc.so.6                                     [.] __memset_zva64
+     0.27%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8b18
+     0.27%  python   libexecutorch_backend_xnnpack.so              [.] 0x0000000000107b18
+     0.27%  python   python3.12                                    [.] _PyCode_New
+     0.27%  python   python3.12                                    [.] dict_traverse
+     0.27%  python   python3.12                                    [.] inflate_fast
+     0.23%  python   libc.so.6                                     [.] _int_free
+     0.23%  python   libcustom_ops_aot_lib.so                      [.] 0x00000000000a3ea0
+     0.23%  python   libexecutorch_backend_xnnpack.so              [.] executorch::backends::xnnpack::delegate::convertF32TensorToBF16
+     0.23%  python   python3.12                                    [.] _PyPegen_expect_token
+     0.23%  python   python3.12                                    [.] r_object
+     0.18%  python   [kernel.kallsyms]                             [k] get_mem_cgroup_from_mm
+     0.18%  python   [kernel.kallsyms]                             [k] tlb_flush
+     0.18%  python   libcustom_ops_aot_lib.so                      [.] 0x00000000000a7dd8
+     0.18%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef93c
+     0.18%  python   python3.12                                    [.] PyDict_GetItemWithError
+     0.18%  python   python3.12                                    [.] list_dealloc
+     0.14%  python   libc.so.6                                     [.] __GI___pthread_mutex_unlock_usercnt
+     0.14%  python   libc.so.6                                     [.] __aarch64_swp4_rel
+     0.14%  python   libc.so.6                                     [.] _int_malloc
+     0.14%  python   libcustom_ops_aot_lib.so                      [.] 0x00000000000a3ea4
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] memcpy@plt
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8af4
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000e8af8
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000ef870
+     0.14%  python   libexecutorch_backend_xnnpack.so              [.] 0x00000000000efa64

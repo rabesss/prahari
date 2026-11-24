@@ -1,11 +1,25 @@
-# Phase 1 submission checklist
+# Phase 1 Submission Checklist
 
-The owner submits the entry and decides repository visibility. Confirm the final form, access, formats, deadline and time zone with the organiser before submission.
+- **Submission deadline:** **Wednesday, 25 November 2026, 11:59 PM IST**, per the owner's Phase 1 form notes (the older challenge-page snapshot in `docs/challenge-brief.md` says 23 November; trust the live form). ONE submission only — **the owner alone** flips repo visibility and submits the form.
+- **Required form deliverables:**
+  1. **PUBLIC GitHub repository URL** containing code, documentation, and final report (`https://github.com/rabesss/arm-bharat-ai-soc`).
+  2. **PUBLIC 2-minute demo video** (1080p, 16:9, MP4) showcasing real-time on-device operation on target Arm hardware (see [demo-video.md](demo-video.md)).
+  3. **Final technical report PDF** (`<= 10 MB`, `docs/phase1/report.pdf`) detailing methodology, results, hardware utilization, and optimization techniques.
 
-- [ ] Prepare source code on GitHub with setup instructions, the application, a demonstration video and the technical report. Confirm the application format and any outstanding real-device requirements; the Linux application is Python and the Android app has demonstrated model generation on an Android 14 x86_64 emulator; a physical Arm phone run is pending.
-- [ ] Deadline: the organiser email says **25 November 2026**, while the [website](https://arm-education.github.io/Arm-Developer-Labs/Bharat_AI_SoC_2026_27.html) still says **23 November 2026**. The cutoff time and time zone are unknown. Confirm the actual deadline and cutoff.
-- [ ] Build the report PDF from the repository root with `pandoc docs/phase1/report.md -o docs/phase1/report.pdf --pdf-engine=xelatex --resource-path=docs/phase1:.`, as documented in the root README. Review the rendered PDF; it is ignored by Git and must not be committed.
-- [ ] Decide repository visibility and ensure judges can access the chosen source and application. Judges must obtain model access through Hugging Face and follow the Llama 3.2 licence and access terms; weights are not included in the repository.
-- [ ] Verify Llama 3.2 Community License notices, including **Built with Llama**, and applicable acceptable-use and model-access terms. Verify each dataset attribution and licence in [DATA.md](../../candidates/BEST/DATA.md), including NSL-KDD's stated research-use status. Verify ExecuTorch and Chaquopy licence notices for the Android app before distributing it.
-- [ ] Freeze the source commit, build the report PDF from it, and record the commit SHA and SHA-256 hashes of the report, application, model files and video in a submission manifest kept outside that commit (so the recorded SHA stays valid). Paste the manifest into the submission form notes.
-- [ ] Report links point to `main` on GitHub; judges need repository access (see visibility above) for them to open.
+## Pre-submission checklist (owner execution order)
+
+- [ ] **1. Merge final parallel feature PRs into `main`:** Wait for integration of `fp-fix-neon`, `feat/arm-perf`, `feat/upi-qr`, `feat/call-guard`, and `feat/hindi-explain` (whichever pass CI and measurement gates).
+- [ ] **2. Final docs/report refresh & PDF rebuild:** Rebase `docs/phase1-final` on final `main`, absorb only merged & measured results into `README.md`, `docs/phase1/report.md`, `docs/phase1/EVIDENCE.md`, and `docs/phase1/LIMITATIONS.md`, run `python3 docs/phase1/build_report.py`, visually inspect every page of `docs/phase1/report.pdf`, confirm `< 10 MB` and green CI, and merge into `main`.
+- [ ] **3. Complete release-audit cleanups before making repo public** (see [RELEASE-AUDIT.md](RELEASE-AUDIT.md)):
+  - [x] Remove `docs/design/COMPETE.md` and `docs/design/RATING-r1.md` from the tree (done on `docs/phase1-final`); optionally scrub them from history via `git filter-repo` (RELEASE-AUDIT §5).
+  - [ ] Add a root `LICENSE` file (e.g., MIT or Apache-2.0) or explicit copyright notice.
+  - [ ] Decide whether to rewrite personal Gmail in commit `721209c7bf` and whether to remove internal scratch notes (`AGENTS.md`, `docs/BRAINSTORM.md`, `research/QUESTIONS.md`).
+  - [ ] Run `gitleaks detect --source . --no-banner --redact` and confirm zero real secrets.
+- [ ] **4. Verify third-party licences & attributions:** Confirm **Built with Llama** and Llama 3.2 Community License links, CC BY 4.0 dataset citations and the NSL-KDD citation (UNB requires citing the dataset and Tavallaee et al. 2009) in `candidates/BEST/DATA.md`, and zero weights/raw datasets in Git.
+- [ ] **5. Record & verify the 2-minute 1080p 16:9 MP4 demo video** following [demo-video.md](demo-video.md):
+  - [ ] Download final green `arm64-v8a` APK from `main` CI (`prahari-debug-apk`), install on physical Samsung Galaxy S23 (RTL), stage verified `.pte`/`tokenizer.model`, enable **Airplane Mode (`✈`)**, and record live checks + `SecurityException` + Arm Linux `--demo` / `bin/monitor`.
+  - [ ] Confirm `1920x1080`, `16:9`, `<= 120 s`, H.264 + AAC audio via `ffprobe`.
+  - [ ] Upload to a **PUBLIC** link and verify playback in an **incognito browser window** (no login wall).
+- [ ] **6. Flip GitHub repository to PUBLIC** and verify in an **incognito browser window** that `README.md`, `docs/phase1/report.pdf`, and all screenshots render cleanly with zero 404 links.
+- [ ] **7. Freeze submission manifest (keep outside the frozen commit):** Record final `main` commit SHA and SHA-256 digests of `docs/phase1/report.pdf`, final `prahari-debug-apk`, demo MP4, and model files (`ab7b7ebf…` / `82e9d319…`).
+- [ ] **8. Submit ONCE on the Phase 1 form well before 11:59 PM IST on Wed 25 Nov 2026** and save the confirmation receipt.

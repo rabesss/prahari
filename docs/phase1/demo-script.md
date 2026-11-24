@@ -1,3 +1,5 @@
+> Superseded for the Phase 1 video by [demo-video.md](demo-video.md); kept for the earlier emulator shot list.
+
 # Prahari demo v2 shot list — about 3:00
 
 This is a production plan, not evidence of a finished recording or physical-phone operation. The Android detector and Llama have run end to end on an Android 14 x86_64 emulator; a physical Arm phone run is pending. Rehearse and show actual results and timing. Do not show hidden data or item-level hidden predictions, or open a suspicious link.

@@ -1,0 +1,227 @@
+{
+ "holdout": "India final holdout v1.1, n=184, sha256 b206052bc857f97e81b56caa9a53af45768ecc917e5973a060bdd7ad73a1b648 (data not published)",
+ "metric_note": "conservative: uncertain counts as an error on both classes",
+ "checkpoints": {
+  "PR #21 baseline": {
+   "combined": {
+    "n": 184,
+    "positives": 84,
+    "negatives": 100,
+    "tp": 62,
+    "fp_conservative": 29,
+    "fn_conservative": 22,
+    "precision": 0.6813,
+    "recall": 0.7381,
+    "f1": 0.7086,
+    "fpr": 0.29
+   },
+   "sms": {
+    "n": 155,
+    "positives": 68,
+    "negatives": 87,
+    "uncertain": 3,
+    "confusion_decided": {
+     "tp": 50,
+     "fp": 21,
+     "tn": 64,
+     "fn": 17
+    },
+    "conservative": {
+     "precision": 0.6849,
+     "recall": 0.7353,
+     "f1": 0.7092,
+     "fpr": 0.2644
+    }
+   },
+   "injection": {
+    "n": 29,
+    "positives": 16,
+    "negatives": 13,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 12,
+     "fp": 6,
+     "tn": 7,
+     "fn": 4
+    },
+    "conservative": {
+     "precision": 0.6667,
+     "recall": 0.75,
+     "f1": 0.7059,
+     "fpr": 0.4615
+    }
+   }
+  },
+  "gen51 (round-3 freeze)": {
+   "combined": {
+    "n": 184,
+    "positives": 84,
+    "negatives": 100,
+    "tp": 77,
+    "fp_conservative": 31,
+    "fn_conservative": 7,
+    "precision": 0.713,
+    "recall": 0.9167,
+    "f1": 0.8021,
+    "fpr": 0.31
+   },
+   "sms": {
+    "n": 155,
+    "positives": 68,
+    "negatives": 87,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 63,
+     "fp": 29,
+     "tn": 58,
+     "fn": 5
+    },
+    "conservative": {
+     "precision": 0.6848,
+     "recall": 0.9265,
+     "f1": 0.7875,
+     "fpr": 0.3333
+    }
+   },
+   "injection": {
+    "n": 29,
+    "positives": 16,
+    "negatives": 13,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 14,
+     "fp": 2,
+     "tn": 11,
+     "fn": 2
+    },
+    "conservative": {
+     "precision": 0.875,
+     "recall": 0.875,
+     "f1": 0.875,
+     "fpr": 0.1538
+    }
+   }
+  },
+  "main before PR #42 (23 Nov 17:25)": {
+   "combined": {
+    "n": 184,
+    "positives": 84,
+    "negatives": 100,
+    "tp": 78,
+    "fp_conservative": 35,
+    "fn_conservative": 6,
+    "precision": 0.6903,
+    "recall": 0.9286,
+    "f1": 0.7919,
+    "fpr": 0.35
+   },
+   "sms": {
+    "n": 155,
+    "positives": 68,
+    "negatives": 87,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 63,
+     "fp": 33,
+     "tn": 54,
+     "fn": 5
+    },
+    "conservative": {
+     "precision": 0.6562,
+     "recall": 0.9265,
+     "f1": 0.7683,
+     "fpr": 0.3793
+    }
+   },
+   "injection": {
+    "n": 29,
+    "positives": 16,
+    "negatives": 13,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 15,
+     "fp": 2,
+     "tn": 11,
+     "fn": 1
+    },
+    "conservative": {
+     "precision": 0.8824,
+     "recall": 0.9375,
+     "f1": 0.9091,
+     "fpr": 0.1538
+    }
+   }
+  },
+  "main 1eb8916 (after PR #42), re-scored 23 Nov 2026": {
+   "combined": {
+    "n": 184,
+    "positives": 84,
+    "negatives": 100,
+    "tp": 78,
+    "fp_conservative": 37,
+    "fn_conservative": 6,
+    "precision": 0.6783,
+    "recall": 0.9286,
+    "f1": 0.7839,
+    "fpr": 0.37
+   },
+   "sms": {
+    "n": 155,
+    "positives": 68,
+    "negatives": 87,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 63,
+     "fp": 35,
+     "tn": 52,
+     "fn": 5
+    },
+    "conservative": {
+     "precision": 0.6429,
+     "recall": 0.9265,
+     "f1": 0.759,
+     "fpr": 0.4023
+    }
+   },
+   "injection": {
+    "n": 29,
+    "positives": 16,
+    "negatives": 13,
+    "uncertain": 0,
+    "confusion_decided": {
+     "tp": 15,
+     "fp": 2,
+     "tn": 11,
+     "fn": 1
+    },
+    "conservative": {
+     "precision": 0.8824,
+     "recall": 0.9375,
+     "f1": 0.9091,
+     "fpr": 0.1538
+    }
+   }
+  },
+  "PR #48 at 80cc558 (scored once by the fp-fix thread after review; detector code identical to main 28bdb6b)": {
+   "sms": {
+    "precision": 0.6923,
+    "recall": 0.9265,
+    "f1": 0.7925,
+    "fpr": 0.3218
+   },
+   "injection": {
+    "precision": 0.8824,
+    "recall": 0.9375,
+    "f1": 0.9091,
+    "fpr": 0.1538
+   },
+   "combined": {
+    "precision": 0.7222,
+    "recall": 0.9286,
+    "f1": 0.8125,
+    "fpr": 0.3
+   }
+  }
+ },
+ "note_pr48": "The PR #48 entry has aggregate metrics only (source: the fp-fix thread result file); counts: SMS 28/87 false alarms, 63/68 scams caught."
+}
