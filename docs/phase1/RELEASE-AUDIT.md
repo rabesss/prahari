@@ -1,5 +1,6 @@
 # Release Audit: Public-Repository Readiness (`rabesss/arm-bharat-ai-soc`)
 
+- **Re-checked 24 Nov 2026 on `main` `28bdb6b` (after PRs #48–#51):** `gitleaks git --log-opts=--all` over all 474 local commits found only the same public-hash false positives; the author-email list is unchanged (one personal-Gmail commit).
 - **Audited commit:** `1eb8916` (`docs/phase1-final`, branched from `main`). First pass scanned the 177 commits reachable from `main`; a second `gitleaks git --log-opts=--all` pass on 23 Nov 2026 covered all 197 local commits (every branch, including the parallel feature branches).
 - **Audit date:** 23 November 2026
 - **Scope:** Full Git history (all commits, messages, headers, blobs, tags) and working tree — secrets/credentials, personal information (PII), licences/attributions, large files, hidden/third-party data leakage, and content unsuitable for a public competition repository.
@@ -9,7 +10,7 @@
 
 | Category | Status | Summary |
 |---|---|---|
-| **Secrets, tokens & private keys** | **PASS (Safe)** | Zero real secrets in any commit or the working tree. Two `gitleaks` false positives, both public model SHA-256 digests: the tokenizer hash in `README.md` (commit `19038f4c`) and the Whisper model hash in `candidates/BEST/triage/asr.py` (commit `5a4231dd`, only in a local T3 checkpoint ref, never pushed). |
+| **Secrets, tokens & private keys** | **PASS (Safe)** | Zero real secrets in any commit or the working tree. Two `gitleaks` false positives, both public model SHA-256 digests: the tokenizer hash in `README.md` (commit `19038f4c`) and the Whisper model hash in `candidates/BEST/triage/asr.py` (commits `5a4231dd` and `5a12e297`; the latter is on `main` since PR #49). |
 | **Model weights & third-party raw data** | **PASS (Safe)** | Zero `.pte`, `.bin`, `.safetensors`, `.apk`, `.mp4`, or raw third-party datasets in history or tree. |
 | **Large files & repo size** | **PASS (Safe)** | Working tree is 15 MB; largest blob in full history is `1.92 MB` (`url.joblib`). Zero files > 2 MB. |
 | **Licences & attributions** | **ACTION NEEDED (High)** | Llama 3.2 attribution + dataset/runtime licences updated in `README.md` and `docs/phase1/report.md`, **but no root `LICENSE` file exists yet** (owner decision). |
@@ -32,7 +33,7 @@
 
 **Findings:**
 - **Zero real secrets found** in any commit, commit message, source file, config file, or `.joblib` artifact.
-- **Second false positive (all-refs pass):** `generic-api-key` on `candidates/BEST/triage/asr.py:37` in commit `5a4231dd` (only in a local T3 checkpoint ref, never pushed): the pinned public SHA-256 of the Arm `whisper-tiny-int8-xnnpack-executorch` model, not a credential.
+- **Second false positive (all-refs pass):** `generic-api-key` on `candidates/BEST/triage/asr.py:37` in commits `5a4231dd` and `5a12e297` (on `main` since PR #49, so it also shows in a working-tree scan): the pinned public SHA-256 of the Arm `whisper-tiny-int8-xnnpack-executorch` model, not a credential.
 - **Evidence bundle added on this branch (`docs/phase1/evidence/`):** raw S23 and Neoverse-V2 logs plus aggregate sealed-holdout scores were scanned before commit (`gitleaks dir`: no leaks). The cloud box's ephemeral hostname was replaced with `<box>`; no holdout item text, logcat, or `perf.data` is included.
 - **One confirmed false positive:** `gitleaks` (`generic-api-key`) flags `README.md` (`Tokenizer: \`82e9d319...\``) in commit `19038f4c` and HEAD because the word `Tokenizer` precedes a 64-character hex string. This is the public SHA-256 digest of Meta's `tokenizer.model`, not a credential. Rewording the label in `README.md` to `tokenizer.model SHA-256` resolves the working-tree scanner hit; the historical commit hit is benign.
 - **Test fixtures verified synthetic:**

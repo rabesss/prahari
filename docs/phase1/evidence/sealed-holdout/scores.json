@@ -201,6 +201,27 @@
      "fpr": 0.1538
     }
    }
+  },
+  "PR #48 at 80cc558 (scored once by the fp-fix thread after review; detector code identical to main 28bdb6b)": {
+   "sms": {
+    "precision": 0.6923,
+    "recall": 0.9265,
+    "f1": 0.7925,
+    "fpr": 0.3218
+   },
+   "injection": {
+    "precision": 0.8824,
+    "recall": 0.9375,
+    "f1": 0.9091,
+    "fpr": 0.1538
+   },
+   "combined": {
+    "precision": 0.7222,
+    "recall": 0.9286,
+    "f1": 0.8125,
+    "fpr": 0.3
+   }
   }
- }
+ },
+ "note_pr48": "The PR #48 entry has aggregate metrics only (source: the fp-fix thread result file); counts: SMS 28/87 false alarms, 63/68 scams caught."
 }

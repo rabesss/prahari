@@ -1,6 +1,6 @@
 # Evidence ledger
 
-Updated: 23 November 2026 (`main` commit `1eb8916`, through PR #43). Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
+Updated: 24 November 2026 (`main` commit `28bdb6b`, through PR #51). Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
 
 ## Core architecture, datasets, and historical baselines (`[S1]`–`[S7]`)
 
@@ -53,3 +53,15 @@ Measured **23 November 2026** on Debian 12, Linux 6.1.155, `aarch64`, ARM Neover
 | PR #42: False-alarm reduction & both holdouts | Merged (PR #42, merge `802c32e`) | Independent India dev set v3 (authored blind): tuning (`n=159`) F1 0.781 -> 1.000; **held-back (`n=81`, unseen)** F1 0.761 -> **0.889**, recall 0.794 -> **0.941**, FPR 0.213 -> **0.128**. Oracle project sets: SMS F1 0.922 -> **0.925**, Indic F1 0.950 -> **0.969** (FPR 0.044 -> **0.031**), adversarial 22/24 caught / 5/13 harmless flagged, India v2 0.839, 240 BEST + 54 safety tests pass. **Post-PR #42 sealed final holdout (`n=184`, re-scored on `1eb8916` with the controller script, `docs/phase1/evidence/sealed-holdout/scores.json`):** combined F1 **0.784**, recall **0.929**, combined FPR **0.37**, **SMS-route FPR 0.402** (35/87; injection FPR 0.154 [2/13]). |
 | PR #43: Android round-2 UX | Merged (PR #43, merge `1eb8916`) | Share-sheet (`ACTION_SEND`, `ACTION_PROCESS_TEXT`), `EN / Hindi` toggle (`strings_hi.json`, `hindi_steps.json`), offline TTS (`Listen`), quoted evidence spans (defanged links, masked OTPs), safety-filter replacement badge, opt-in redacted local history, pure-Python QR decoder (`android/python/qrdec.py`). Verified on Android 14 x86_64 emulator; pending physical S23 re-test. |
 | Exploratory v1 India challenge SHA-256 | Historical | `135222ee67a84cca28252df6207c5d62fcefeb313755bc000e0d7b979e095a67` (`bench/challenge/india_challenge_v1.jsonl`); previously exposed, exploratory only. |
+
+## Merged `main` improvements PR #46–#51 (`[S12]`)
+
+| Claim | Status | Evidence and qualification |
+|:--|:--|:--|
+| PR #48: SMS false-alarm fix | Merged (merge `7efa778`) | `candidates/BEST/triage/mech.py` contact gate + negated-warning clearing; `research/fpfix/README.md`. Re-run on `28bdb6b` (24 Nov, `research/fpfix/score.py`) matches the PR: v3_test (81) FPR 0.000 / recall 0.941 / F1 0.970; fp_val_v1 (240) 0.120 / 1.000 / 0.909; v4_tune (161) 0.172 / 0.926 / 0.857; v3_tune (159) 0 / 1 / 1. **Sealed holdout scored once at `80cc558`:** SMS FPR 0.402 -> **0.322** (35 -> 28 of 87), recall 0.926 unchanged; combined F1 0.784 -> **0.813**, FPR 0.370 -> **0.300**, recall 0.929 (`docs/phase1/evidence/sealed-holdout/scores.json`; use disclosed in `research/LOG.md`). `detect.predict_text`, `mech.py`, `rules.py` and the model artifacts are unchanged between `80cc558` and `28bdb6b`, so the score applies to `main`. `bin/eval` was not rerun. |
+| PR #49: Call Guard preview | Merged (merge `1df1278`) | `triage/{asr,callrules,callguard}.py`, `bin/callguard`, `docs/call-guard.md`. Off unless `PRAHARI_CALL_GUARD=1`. Oracle N1, 4 synthetic clips: ASR 3.2–5.0 s/clip, 6.8–13.3 s/call with Llama, peak RSS 832 MiB (ASR) / 2,611 MiB (ASR + Llama); raw `candidates/BEST/artifacts/callguard_demo_*neoverse_n1*.json` + `.meta.json`. Not run on a phone. Whisper as a second model: `research/QUESTIONS.md` item 9. |
+| PR #50: Grounded explanations, validator, Hindi summary | Merged (merge `e0adb82`) | `triage/llm.py` (`key_fact`, `validate`), `triage/explain_hi.py`; audits in `research/explain-audit.md` (3 × 20 fresh items; EN wrong 3->5, 5->5, 3->5; HI accessibility 4.5->6.3, 3.5->5.45, 4.05->6.4). Latency +12% (interleaved A/B, 57 dev items). |
+| PR #46 via #51: UPI QR checker | Merged (merge `28bdb6b`) | `triage/upi.py`, `tests/test_upi.py`; `bin/predict --task upi`; Linux app and Android hooks. |
+| Test suite on `28bdb6b` | Measured 24 Nov | `pytest candidates/BEST/tests bench/tests/test_llm_safety.py`: 896 passed. |
+| PR #44 (Arm perf harness), PR #45 (Android round 3) | **TODO — not merged** | Fill in only after merge and measurement. |
+
