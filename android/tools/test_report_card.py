@@ -64,6 +64,7 @@ assert rc.category('sms', 'Pay 50000 or we will hurt your family', 'an extortion
 assert rc.category('sms', 'Send USDT to this wallet to unlock your account', 'a crypto payment scam') == 'other'
 assert rc.category('sms', 'Double your money: invest in our crypto trading plan', 'a crypto payment scam') == 'investment'
 assert rc.category('sms', 'Your parcel is held at customs, pay Rs 1500 fee', 'an advance-fee scam') == 'police_govt'
+assert rc.category('sms', 'Courier delivery: pay 99 rupees fee to release your parcel now', 'an advance-fee scam') == 'other'
 assert rc.category('sms', 'You won a lucky draw, pay Rs 999 to release the prize', 'an advance-fee scam') == 'job_offer'
 assert rc.category('sms', 'Pay Rs 999 processing fee today', 'an advance-fee scam') == 'other'
 assert rc.category('sms', 'Install AnyDesk, your bank account will be blocked', 'a remote-access app scam') == 'kyc_payment'
@@ -85,10 +86,18 @@ assert rc.defang('Rs.2,450 e.g. 9:30') == 'Rs.2,450 e.g. 9:30'
 once = rc.defang('http://a.b.top and c.d.in')
 assert rc.defang(once) == once, once
 assert rc.link_origin('Open http://Sbi-KYC.top/verify?mob=9876543210&name=Asha now') == 'hxxp://sbi-kyc[.]top'
-assert rc.link_origin('go to www.evil.top/x?id=1') == 'www[.]evil[.]top'
+assert rc.link_origin('go to www.evil.top/x?id=1') == 'evil[.]top'
 assert rc.link_origin('http://user:pw@evil.top:8080/x') == 'hxxp://evil[.]top'
-assert rc.link_origin('http://asha.9876543210.evil.top/') == ''  # a host with a number in it is left out
+assert rc.link_origin('http://asha.9876543210.evil.top/') == 'hxxp://evil[.]top'  # subdomains are dropped
+assert rc.link_origin('https://alice-smith.98-76-54-32-10.example.com/reset') == 'hxxps://example[.]com'
+assert rc.link_origin('http://x.sbl-help.co.in/a') == 'hxxp://sbl-help[.]co[.]in'
+assert rc.link_origin('http://x.sbi.co.in/a') == ''  # only official links: nothing to avoid
+assert rc.link_origin('http://98765-43210.top/') == ''  # a number in the registered name itself
 assert rc.link_origin('no link here') == ''
+assert rc.link_origin('http://98-765-432-10.evil.top/x') == 'hxxp://evil[.]top'  # numbered subdomain dropped
+assert rc.link_origin('http://98-765-432-10.top/x') == ''  # a number split by hyphens in the name
+assert rc.link_origin('https://secure.भारत/verify') == 'hxxps://secure[.]भारत'  # IDN kept
+assert rc.mask('OTP 123456 to 9876543210, Rs 499') == 'OTP •••••• to ••••••••••, Rs 499'
 print('defanging passed')
 
 # Sender only when given; medium from the source hint.
@@ -124,6 +133,25 @@ assert 'श्रेणी:' in hi_report and '(KYC and Payment related to Bank 
 assert 'नकली KYC या खाता जांच' in hi_report  # scam type from the bundled Hindi table
 assert 'पैसे चले गए? 1930 पर कॉल करें / cybercrime.gov.in' in hi_report
 assert 'http://' not in hi_report
+# UPI quotes come raw from the payload: the report masks them too.
+upi_report = rc.report_text('en', 'upi', 'upi://pay?pa=9876543210@ybl&tn=share%20OTP%20123456', 'a UPI QR payment scam',
+                            ['the UPI ID 9876543210@ybl is a personal number', 'the note asks for a PIN or OTP'],
+                            ['pa=9876543210@ybl', 'share OTP 123456 for refund'], 'qr', DAY)
+assert '123456' not in upi_report and '9876543210' not in upi_report, upi_report
+assert 'Medium: QR code' in upi_report
+_url_from = rc.report_text('en', 'sms', 'From: https://fraud.example\nPay now', 'a scam message', [], [])
+assert 'https://' not in _url_from and 'fraud.example' not in _url_from
+assert rc.sender('Meeting\nfrom: 10 AM to 11 AM') == ''
+assert rc.sender('ID-123456 is your ID') == ''
+assert rc.sender('From: +919812345678\nPay now') == '+919812345678'
+_t0 = time.perf_counter(); rc.sender('\n' * 20000 + 'x'); assert time.perf_counter() - _t0 < 0.5
+# The family link skips an official link quoted before the scam one.
+assert rc.link_origin('Details at www.onlinesbi.sbi. To update call or http://sbi-kyc-update.top/x') == 'hxxp://sbi-kyc-update[.]top'
+# A bank scam that only quotes a helpline stays a bank scam; a support desk makes it customer care.
+assert rc.category('sms', 'Your SBI account will be blocked, update KYC. Toll free 1800112211', 'an account-blocking scam') == 'kyc_payment'
+assert rc.category('sms', 'Bank customer care: share OTP to unblock', 'OTP or PIN theft') == 'customer_care'
+assert rc.card('sms', 'SBI debit. For helpline call 9876543210', 0, '', [], [], raised=True)['category'] == 'kyc_payment'
+assert '(SMS या WhatsApp)' in rc.family_text('hi', 'sms', 'Update KYC http://a-b.top', 'a fake KYC or account check', 1)
 print('report template passed')
 
 # Family message: no body, sender, name, numbers, path or query; cautious for SUSPICIOUS.
@@ -132,7 +160,7 @@ for lang in ('en', 'hi'):
         fam = rc.family_text(lang, 'sms', KYC, 'a fake KYC or account check', lab, 'sms')
         for leak in ('Asha', 'VM-SBIBNK', '482910', '9876543210', '/u', 'm=', 'OTP 4', 'Dear'):
             assert leak not in fam, (leak, fam)
-        assert 'hxxp://sbi-kyc[.]in-verify[.]top' in fam
+        assert 'hxxp://in-verify[.]top' in fam and 'sbi-kyc' not in fam
         assert '1930' in fam
         assert len(fam) < 400, len(fam)
 assert rc.family_text('en', 'sms', KYC, 'a fake KYC or account check', 1).startswith('Scam warning: I got a fake bank, KYC or bill payment message')

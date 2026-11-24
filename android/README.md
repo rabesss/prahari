@@ -70,15 +70,18 @@ verdict never depends on them, and neither sends anything by itself.
 
 * **Copy report** puts a short plain-text report on the clipboard for the Sanchar Saathi Chakshu form:
   the medium, the Chakshu category, the sender (only when the shared text names it), the date, up to
-  three evidence lines with short quotes (codes masked, links defanged as `hxxp://` and `[.]`), and
+  three evidence lines with short quotes (4+ digit runs masked, links defanged as `hxxp://` and
+  `[.]`; the clipboard entry is marked sensitive so Android hides its preview), and
   "Already lost money? Call 1930 / cybercrime.gov.in". The category is one of the 11 in the
   [Sanchar Saathi FAQ](https://sancharsaathi.gov.in/) and comes from the detector's scam type, with
   text cues only to name the impersonated party; a mechanism that does not fix a category maps to
   "Any Other Suspected Fraud". Nothing is submitted.
 * **Send to family** (परिवार को बताएं) opens the Android share sheet (`ACTION_SEND`) with a short
-  warning in the app language: what the scam is, one safety step, and the link as scheme and host
-  only, defanged. It never carries the message body, the sender, names or numbers, and a host with
-  a run of four or more digits is left out. The user picks the app and the person; no contacts
+  warning in the app language: what the scam is, one safety step, and the link's registered domain
+  only (`hxxp://in-verify[.]top` for `http://sbi-kyc.in-verify.top/u?m=...`), defanged. Subdomains,
+  paths and queries are dropped because a scammer can personalise them per victim, and a domain
+  that still carries a number is left out. It never carries the message body, the sender, names or
+  numbers. The user picks the app and the person; no contacts
   permission is used, and Prahari is excluded from the chooser.
 
 The medium is a hint only: QR scan, or the sharing app reported by the optional Android referrer

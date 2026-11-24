@@ -454,7 +454,7 @@ kyc_text = 'Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-
 kyc = json.loads(mobile.verdict('sms', kyc_text, 'whatsapp'))
 assert kyc['level'] == 'danger' and kyc['report_card']['category'] == 'kyc_payment', kyc.get('report_card')
 assert 'Medium: WhatsApp' in kyc['report_card']['report_en']
-assert 'hxxp://sbi-kyc[.]in-verify[.]top' in kyc['report_card']['family_en']
+assert 'hxxp://in-verify[.]top' in kyc['report_card']['family_en']
 assert json.loads(mobile.verdict('sms', kyc_text))['report_card']['category'] == 'kyc_payment'
 assert 'Medium: SMS or WhatsApp message' in json.loads(mobile.verdict('sms', kyc_text, 'bogus'))['report_card']['report_en']
 assert 'report_card' not in upi_merch and 'report_card' in upi_scam and 'report_card' in upi_unknown

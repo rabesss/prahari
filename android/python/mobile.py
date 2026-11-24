@@ -7,7 +7,10 @@ import types
 from pathlib import Path
 import numpy as np
 import portable
-import report_card
+try:
+    import report_card
+except Exception:  # the report card is an aid; a broken module must not stop checks
+    report_card = None
 
 # detect imports joblib at module level, but Android never loads pickles: the
 # detectors below use exported portable parameters. Chaquopy ships no joblib,
@@ -262,6 +265,8 @@ def _report_card(kind, text, lab, scam, ev, quotes, actions, source):
 
     report_card is for a SCAM or SUSPICIOUS result. report_card_raised is only for a bank alert
     that the app itself raises to SUSPICIOUS because it names its own link or number."""
+    if report_card is None:
+        return {}
     try:
         card = report_card.card(kind, text, lab, scam, ev, quotes, source)
         if card:
