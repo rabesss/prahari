@@ -134,8 +134,8 @@ DETECTION = [
     # label, n, recall, fpr, f1, group
     ("SMS", "1,162", None, None, 0.925, "dev"),
     ("URL", "7,997", 0.988, 0.000, 0.994, "dev"),
-    ("Indic", "320", None, 0.031, 0.969, "dev"),
-    ("Flow", "22.5k", 0.757, 0.030, 0.850, "dev"),
+    ("Indian\neval", "320", None, 0.031, 0.969, "dev"),
+    ("NSL-KDD\nflow", "22.5k", 0.757, 0.030, 0.850, "dev"),
     ("v3", "81", 0.941, 0.000, 0.970, "held"),
     ("Blind\nvalidation", "240", 1.000, 0.107, 0.918, "held"),
     ("v4", "79", 0.969, 0.298, 0.805, "held"),
@@ -259,7 +259,6 @@ def build_arm_perf_chart() -> Path:
     ax1b.spines["right"].set_color(SLATE_LIGHT)
     ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=5,
                   capsize=3, label="Item time, wall latency (s)", zorder=4)
-    ax1b.set_ylabel("Item time, wall latency (s)", color=SLATE_DARK)
     ax1b.set_ylim(0, 4.95)
     ax1b.set_yticks([0, 1, 2, 3])
     ax1b.tick_params(axis="y", colors=SLATE, labelcolor=SLATE_DARK)
@@ -267,7 +266,7 @@ def build_arm_perf_chart() -> Path:
     # corner is empty, and the offset clears the 4-thread error bar and its cap.
     for xi, v in zip(x + 0.18, V2_ITEM_WALL):
         ax1b.text(xi + 0.12, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
-                  fontweight="bold", bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none", alpha=0.92),
+                  fontweight="bold", bbox=dict(boxstyle="round,pad=0.15", fc="white", ec=GRID, lw=0.6, alpha=1.0),
                   zorder=5)
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax1b.get_legend_handles_labels()
@@ -289,7 +288,11 @@ def build_arm_perf_chart() -> Path:
     ax2.tick_params(axis="y", length=0)
     ax2.set_xlim(0, 115)
     ax2.set_ylim(-0.55, len(names) - 0.45)
-    ax2.set_xlabel("Decode speed (tok/s); item time (wall latency) after each value")
+    ax2.set_xlabel("Decode speed (tok/s) and item wall latency (s)")
+    # The bars are descriptive: the note sits in the empty lower-right corner of the panel.
+    ax2.text(113, -0.35, "Different builds and sessions;\nnot a controlled comparison.\nFinal gated S23 pass: Table 5.",
+             ha="right", va="bottom", fontsize=FT, color=SLATE_DARK, style="italic", linespacing=1.35,
+             bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=GRID, lw=0.6), zorder=5)
     for b, v, l in zip(hb, tps, lat):
         cy = b.get_y() + b.get_height() / 2
         label = f"{v:.1f} tok/s · {l:.2f} s"
@@ -314,7 +317,7 @@ def build_eval_chart() -> Path:
     0.44 apart, width 0.30) so a label centred over one bar clears the neighbouring bar.
     An FPR that was not recorded is printed as an em dash; the caption explains it.
     """
-    fig, ax = plt.subplots(figsize=(FIG_W, 3.5), dpi=DPI, layout="constrained")
+    fig, ax = plt.subplots(figsize=(FIG_W, 3.0), dpi=DPI, layout="constrained")
     _style_ax(ax)
     labels = [f"{d[0]}\nn={d[1]}" for d in DETECTION]
     f1 = [d[4] for d in DETECTION]
@@ -351,7 +354,7 @@ def build_eval_chart() -> Path:
 
 def build_memory_chart() -> Path:
     """Galaxy S23 dumpsys meminfo PSS breakdown after a KYC check."""
-    fig, ax = plt.subplots(figsize=(FIG_W, 2.9), dpi=DPI, layout="constrained")
+    fig, ax = plt.subplots(figsize=(FIG_W, 2.5), dpi=DPI, layout="constrained")
     _style_ax(ax, grid_axis="x")
     names = [r[0] for r in MEM_ROWS]
     mib = [r[1] / 1024 for r in MEM_ROWS]
@@ -394,11 +397,12 @@ def build_overview_chart() -> Path:
     w = 0.38
     rb = a.bar(x - w / 2, [r[2] for r in held], width=w, color=INDIGO, label="Recall", zorder=3)
     fb = a.bar(x + w / 2, [r[3] for r in held], width=w, color=AMBER, label="FPR", zorder=3)
+    # Every value label is horizontal and sits just above its bar.
     for bar, v in zip(rb, [r[2] for r in held]):
-        a.text(bar.get_x() + bar.get_width() / 2, v - 0.03, f"{v:.2f}", ha="center", va="top", rotation=90,
-               fontsize=FT, color="white", fontweight="bold")
+        a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom",
+               fontsize=FT, color=INDIGO, fontweight="bold")
     for bar, v in zip(fb, [r[3] for r in held]):
-        a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom", rotation=90,
+        a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom",
                fontsize=FT, color=AMBER_TEXT, fontweight="bold")
     a.set_xticks(x, [f"{r[0]}\nn={r[1]}" for r in held])
     a.tick_params(axis="x", length=0)
@@ -423,7 +427,8 @@ def build_overview_chart() -> Path:
     b.set_ylim(-0.55, len(vals) - 0.45 + 0.75)
     b.set_xlim(0, 3.6)
     b.set_xticks([0, 1, 2, 3])
-    b.set_xlabel("Total time per check (s)")
+    b.set_xlabel("Total time per check (s)\nDifferent builds and sessions, not a\ncontrolled comparison; gated pass: Table 5",
+                 linespacing=1.4)
     b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT,
            color=INDIGO, fontweight="bold")
     b.set_title("Galaxy S23, warm KYC check", loc="left")
@@ -452,13 +457,10 @@ def build_overview_chart() -> Path:
     db = d.barh(yd, [r[1] for r in rows], height=0.6, color=[r[2] for r in rows], zorder=3)
     for bar, r in zip(db, rows):
         cy = bar.get_y() + bar.get_height() / 2
-        if r[1] > 1000:
-            d.text(r[1] - 30, cy, f"{r[1]:,.0f}", ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
-        else:
-            d.text(r[1] + 30, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+        d.text(r[1] + 40, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
     d.set_yticks(yd, [r[0] for r in rows])
     d.tick_params(axis="y", length=0)
-    d.set_xlim(0, 2000)
+    d.set_xlim(0, 2450)
     d.set_xticks([0, 500, 1000, 1500, 2000])
     d.set_xlabel("MiB after a KYC check")
     d.set_title("Galaxy S23 memory", loc="left")

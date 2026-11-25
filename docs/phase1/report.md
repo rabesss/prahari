@@ -1,13 +1,13 @@
 ---
 title: "Prahari: Offline On-Device Threat, Phishing and Scam Triage on Arm"
-subtitle: "Arm Bharat AI-SoC Challenge 2026–27 (PS3) — Phase 1 Technical Report"
-author: "Prahari contributors"
+subtitle: "Phase 1 Technical Report · Arm Bharat AI-SoC Student Challenge 2026–27 · Problem Statement 3"
+author: "Team Prahari"
 date: "25 November 2026"
 ---
 
 ## Abstract {.unnumbered}
 
-Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users, built for Problem Statement 3 of the Arm Bharat AI-SoC Challenge 2026–27. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs, prompt-injection attempts and network events on the device. Llama 3.2 1B Instruct, quantized to 4-bit integers (INT4) with quantization-aware LoRA training (QLoRA) and running through ExecuTorch XNNPACK on the Arm CPU, then explains the structured evidence in plain language next to vetted safety steps. On a Samsung Galaxy S23 phone, a warm KYC check takes a median 1.857 s at 32.5 tok/s decode, and the app declares no network permission. On Arm Neoverse-V2, a whole-process profile places 54.17% of sampled CPU time inside Arm KleidiAI kernels. We report every holdout, including an independently authored but repeatedly scored sealed set (n = 184) on which the false-positive rate (FPR) is still 0.300 (30 of 100 genuine messages). Prahari is strictly advisory: inference and storage stay on the device, and content leaves the app only when the user chooses to share a warning or copy a report. Built with Llama.
+Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users, built for Problem Statement 3 of the Arm Bharat AI-SoC Challenge 2026–27. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs and prompt-injection attempts on the device, and network events on Arm Linux. Llama 3.2 1B Instruct, quantized to 4-bit integers (INT4) with quantization-aware LoRA training (QLoRA) and running through ExecuTorch XNNPACK on the Arm CPU, then explains the structured evidence in plain language next to vetted safety steps; when no reply passes deterministic checks, the app shows labelled fixed text instead. On a Samsung Galaxy S23 phone, a warm KYC check takes a median 1.857 s at 32.5 tok/s decode, and the app declares no network permission. On Arm Neoverse-V2, a whole-process profile places 54.17% of sampled CPU time inside Arm KleidiAI kernels. We report every holdout, including an independently authored but repeatedly scored sealed set (n = 184) on which the false-positive rate (FPR) is still 0.300 (30 of 100 genuine messages). Prahari is strictly advisory: inference and storage stay on the device, and content leaves the app only when the user chooses to share a warning or copy a report. Built with Llama.
 
 **Keywords:** on-device AI, scam detection, phishing, Arm, KleidiAI, ExecuTorch, Llama 3.2, India, privacy
 
@@ -17,10 +17,11 @@ Indian smartphone users routinely receive fraudulent messages built around famil
 
 The detection problem is hard because genuine bank debit alerts, OTP notifications, bill reminders and telecom advisories share the same vocabulary ("OTP", "Rs", "UPI", "account", "KYC", "blocked") across English, Devanagari Hindi and Romanised Hinglish. This motivates the design: a keyword filter would be expected to flag legitimate alerts, and a cloud-LLM wrapper would send private banking texts off the device. Following the PS3 brief and mentor guidance [A1], Prahari keeps all inference local on Arm hardware and asks *what the sender wants the recipient to do*, which separates scams from benign informational notices.
 
+\needspace{5\baselineskip}
 This report makes four contributions:
 
 1. **A hybrid detect-then-explain pipeline.** Deterministic classifiers and Indian-context mechanism rules decide the verdict; Llama 3.2 1B only explains the structured evidence.
-2. **An on-device Arm deployment.** The full pipeline runs on a Samsung Galaxy S23 phone and on Arm Linux through ExecuTorch XNNPACK, with profiled execution inside Arm KleidiAI `kai_*` kernels.
+2. **An on-device Arm deployment.** The measured message and link detect-and-explain pipeline runs on a Samsung Galaxy S23 phone and on Arm Linux through ExecuTorch XNNPACK, with profiled execution inside Arm KleidiAI `kai_*` kernels. Call Guard (voice notes) is a Linux preview whose Android prototype is not yet wired into the app, and the live network monitor is Linux-only.
 3. **Verified offline operation.** The Android app declares no `INTERNET` permission and was tested in Airplane Mode; on Linux, inference passes with the network namespace cut [A9, A10].
 4. **An honest evaluation.** We report the development sets and every holdout with counts and confidence intervals, including an independently authored sealed set that was scored repeatedly during development, together with its remaining false alarms.
 
@@ -55,13 +56,13 @@ India already has strong anti-scam tools. Among the products in Table 2, none do
 
 Table: Documented features of related products. Offline: inference without a network (Partial: some modes send data to the cloud). India rails: Hindi/India support or routing to Indian reporting channels. Explains: plain-language reason for a verdict. Link/QR: link or QR-code checking. "No" means not documented in the cited sources.
 
-![Results at a glance. Detection recall and FPR on the held-back and sealed sets, warm latency on the Galaxy S23, Llama 3.2 1B decode throughput on Neoverse-V2, and Galaxy S23 memory. All values appear in Tables 1, 5, 6 and 7 and Section 5.4; the memory panel's "everything else" bar (175 MiB) is derived as total PSS minus native heap.](img/fig-overview.png){#fig:overview width=6.5in}
+![Results at a glance. Detection recall and FPR on the held-back and sealed sets, warm latency on the Galaxy S23, Llama 3.2 1B decode throughput on Neoverse-V2, and Galaxy S23 memory. The Galaxy S23 latency bars come from different builds and sessions and are not a controlled comparison; Table 5 gives the final build's gated pass (2.611 s). All values appear in Tables 1, 5, 6 and 7 and Section 5.4; the memory panel's "everything else" bar (175 MiB) is total PSS minus native heap.](img/fig-overview.png){#fig:overview width=6.5in}
 
 The closest products split along the same line. Google Messages runs standard scam detection on-device, but its Enhanced mode sends conversations with unknown senders to cloud Gemini, and Hindi is not among its listed languages. Truecaller filters SMS on-device at scale for India, while its caller ID and spam database are cloud and crowdsourced. In their documented modes, Scamio, McAfee and Norton answer questions about texts, links and QR codes in the cloud and in English; on-device or Hindi support is not established by their pages.
 
 Research points the same way. Saavalainen [17] ran Gemma 3n-E2B-it zero-shot on an Android phone on Finnish SMS: it missed 15 of 41 dangerous messages (63.4% recall) against 2 of 41 for a cloud model (95.1%), and produced more unsupported details. The thesis concludes that small models "appear more suitable as part of a broader detection and explanation pipeline than as standalone phishing detectors". ElZemity et al. [18] distil LLM teachers into Qwen2.5-0.5B and SmolLM2-135M SMS classifiers, reaching 94.31% accuracy and 96.25% recall, but give the user no explanation.
 
-Prahari fills the gap between these lines of work: detectors decide, as in [18], and Llama 3.2 1B only explains, as [17] recommends. Its distinct combination is Indian scam mechanisms in English, Hindi and Hinglish; vetted next steps (Chakshu, 1930, cybercrime.gov.in) for every verdict, with an attempted plain-language explanation for every risky one (or labelled fixed text when no reply passes the checks); and no network at inference. Its main gaps are equally clear. Prahari does not sit in the message or call path, has no link-reputation feed (only rules, including a typosquat list of 56 Indian official domains), and its false-alarm rate on hard benign notices is still high (Section 6.1).
+Prahari fills the gap between these lines of work: detectors decide, as in [18], and Llama 3.2 1B only explains, as [17] recommends. Its distinct combination is Indian scam mechanisms in English, Hindi and Hinglish; vetted next steps (Chakshu, 1930, cybercrime.gov.in) for every verdict, plus an on-device explanation that is either checked AI text or clearly labelled fixed text (Section 3.3); and no network at inference. Its main gaps are equally clear. Prahari does not sit in the message or call path, has no link-reputation feed (only rules, including a typosquat list of 56 Indian official domains), and its false-alarm rate on hard benign notices is still high (Section 6.1).
 
 ## System Design and Methodology
 
@@ -98,7 +99,8 @@ The second sentence is grounded. The prompt carries one vetted, advice-led key f
 - A generated sentence is dropped if it claims a link, number, device or domain the item lacks, makes an unsupported OTP, payment, app or KYC claim, hedges against a \vlabel{NO RISK} verdict, or is vague, first-person, overclaiming or mixed-script. The vetted fact replaces it.
 - \vlabel{NO RISK} openings assert only the absence of elements that are actually absent, and never cite an overruled risk signal.
 - Repeated sentences are removed, and generated questions (such as *"Can I help you with something else?"*) are stripped or replaced by the scam type's vetted step.
-- If no model text survives, the explanation is reported as failed rather than passed off as model output.
+
+Each check therefore ends in one of three explanation outcomes, and the app labels which one the user sees. (1) Accepted AI text, marked "AI-written and can be wrong". (2) The detector's fixed text, marked as not written by AI, when every reply fails the checks, Llama runs out of time, or gating skips Llama for a \vlabel{NO RISK} result. (3) A notice that no explanation is available, when the model is missing, fails to load or raises an error; the Linux CLI prints "Explanation unavailable" whenever no reply passes the checks. The verdict and the vetted steps are shown in all three cases.
 
 Hindi mode shows a fixed-text Hindi summary built from the detector result and labelled as not AI-written. The 1B model cannot write usable Hindi, so the Llama explanation stays in English.
 
@@ -106,7 +108,7 @@ Hindi mode shows a fixed-text Hindi summary built from the detector result and l
 
 The Android app is fully offline. It uses a Kotlin UI, Chaquopy 17.2.0 (Python 3.10, NumPy 1.26.2) and the ExecuTorch Android 1.5.1 AAR. It declares no `INTERNET` permission, checked automatically on every build, and disables backup. Messages arrive through the Android share sheet or text selection; the app offers an EN/Hindi toggle, offline text-to-speech over the vetted verdict and steps, quoted evidence with defanged URLs and masked OTPs, opt-in redacted local history (off by default), and an on-device QR photo decoder that needs no camera or storage permission [A7].
 
-Later additions extend coverage to Indian payment and device scams. A UPI QR checker parses `upi://` links offline and flags collect requests, payee mismatches and "scan to receive" lures. A typosquat check flags near copies of 56 Indian official domains and direct `.apk` downloads. *Copy report* drafts a masked, defanged Chakshu report and *Send to family* shares a short warning with no message details. An amber banner appears when AnyDesk, TeamViewer, AirDroid or RustDesk is installed during a bank, UPI or OTP scam. A sender check raises a bank-style SMS from a personal mobile number to at least \vlabel{SUSPICIOUS}. A Call Guard preview, behind a flag, transcribes a shared voice note with Arm's INT8 Whisper Tiny on the CPU and applies digital-arrest call rules. The newest Android features (report card and family share, screen-sharing banner, sender check, the app side of the typosquat check) and earlier interface additions (OTP masking, official-channel verdicts, opt-in history, font scale 2.0) were checked on an Android 14 emulator, not on the phone, so they carry no Arm timings [A18].
+Later additions extend coverage to Indian payment and device scams. A UPI QR checker parses `upi://` links offline and flags collect requests, payee mismatches and "scan to receive" lures. A typosquat check flags near copies of 56 Indian official domains and direct `.apk` downloads. *Copy report* drafts a masked, defanged Chakshu report and *Send to family* shares a short warning with no message details. An amber banner appears when AnyDesk, TeamViewer, AirDroid or RustDesk is installed during a bank, UPI or OTP scam. A sender check raises a bank-style SMS from a personal mobile number to at least \vlabel{SUSPICIOUS}. Call Guard, a Linux preview behind a flag, transcribes a shared voice note with Arm's INT8 Whisper Tiny on the CPU and applies digital-arrest call rules; its Android prototype compiles with the app but has no entry point in the UI and has not run on a phone. The newest Android features (report card and family share, screen-sharing banner, sender check, the app side of the typosquat check) and earlier interface additions (OTP masking, official-channel verdicts, opt-in history, font scale 2.0) were checked on an Android 14 emulator, not on the phone, so they carry no Arm timings [A18].
 
 On Linux, a CLI runs an 8-item demo benchmark and a loopback-only web UI serves the same pipeline. A rootless live monitor samples `/proc/net/tcp`, `/proc/net/tcp6` and `/proc/net/snmp` every 0.5 s, without root or packet capture, to flag port scans, repeated login-port connects, half-open floods, periodic beacons and failed-connect bursts; it feeds these descriptions to the flow rules and an optional Llama explanation. The monitor is Linux-only (Android 10+ restricts `/proc/net`) and is separate from the NSL-KDD replay path [A11].
 
@@ -124,7 +126,7 @@ Table 3 summarises the data. Public sets are split with grouping to prevent leak
 | Project Indian set (visible) | Original | 256 / 64 / 320 | Indian-context model |
 | India v2, v3, v4 sets | Original | v2 400; v3 159 + 81; v4 161 + 79 | Tuning + held-back test |
 | Blind validation set | CC0 | 240 (150 genuine, 90 scam) | False-alarm check |
-| Sealed holdout | Original | 184 (155 SMS + 29 injection) | Final test |
+| Sealed holdout | Original | 184 (155 SMS + 29 injection) | Repeatedly scored holdout |
 
 Table: Datasets, licences and splits (train / dev / eval unless noted; "159 + 81" is tuning + held-back). Table 7 reports the eval splits of the first three rows and of the visible Indian set, the held-back parts of v3 and v4, and the last two rows.
 
@@ -165,7 +167,7 @@ We measured Prahari on three Arm targets with separate workloads and measurement
 
 ### Galaxy S23 phone
 
-The phone is a Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2 / SM8550, Android 14, `arm64-v8a`; CPU flags include `asimddp`, `i8mm` and `bf16`). The APK used ExecuTorch Android with XNNPACK, declared no `INTERNET` permission, and the model and tokenizer matched their pinned hashes on the device. Table 5 gives the final measured build, run in two passes over six built-in samples (a cold KYC check, two warm KYC checks, a bill reminder, an official link and a lookalike link): first with Llama on every item, then with flagged-only gating. The model was preloaded before each pass, and the totals exclude that preload [A17].
+The phone is a Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2 / SM8550, Android 14, `arm64-v8a`; CPU flags include `asimddp`, `i8mm` and `bf16`). The APK used ExecuTorch Android with XNNPACK, declared no `INTERNET` permission, and the model and tokenizer matched their pinned hashes on the device. Table 5 gives the final measured build, run in two passes over six built-in samples (a cold KYC check, two warm KYC checks, a bill reminder, an official link and a lookalike link): first with Llama on every item, then with flagged-only gating. The model was preloaded before each pass, and the totals exclude that preload. All phone timings are app-reported telemetry, and temperatures are battery readings [A17].
 
 
 | Check (final build) | TTFT | Decode | Total |
@@ -179,12 +181,16 @@ The phone is a Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2 / SM8550, Androi
 
 Table: Galaxy S23 app telemetry, final build. The model was preloaded before each pass; warm checks exclude preload. The six-item p90 is over a synthetic mix that includes a cold check and a fallback, not a production tail estimate. TTFT is time to first token; prefill was 165.0 tok/s (all-items) and 113.8 tok/s (gated). "—": not reported.
 
-The first on-phone run (23 November) was faster: 6 ms detector, 510 ms TTFT, 43.4 tok/s decode and 1.20 s per warm KYC check, and 1.42 s for the same check in Airplane Mode; an intermediate build measured 2.90 s and ~22 tok/s. The latest run warmed from 41.7 °C to 45.1 °C. The gated pass always ran second and hotter, so its slower KYC times may be thermal, but the cause was not tested; they do not measure the effect of gating, and throttling itself was not measured. For the lookalike link, Llama ran but no reply passed validation, so the app showed the detector's fixed text, labelled as not AI-written [A9, A14, A17].
+The first on-phone run (23 November) was faster: 6 ms detector, 510 ms TTFT, 43.4 tok/s decode and 1.20 s per warm KYC check, and 1.42 s for the same check in Airplane Mode; an intermediate build measured 2.90 s and ~22 tok/s. In the latest run the battery temperature rose from 41.7 °C to 45.1 °C. The gated pass always ran second and hotter, so its slower KYC times may be thermal, but the cause was not tested; they do not measure the effect of gating, and throttling itself was not measured. For the lookalike link, Llama ran but no reply passed validation, so the app showed the detector's fixed text, labelled as not AI-written [A9, A14, A17].
 
 ### Neoverse-V2 and Neoverse-N1
 
 Table 6 shows thread scaling on Neoverse-V2 (Debian 12, 8 vCPUs, 15 GiB RAM, ExecuTorch 1.6.0). Each setting ran three processes × six items; values are means of the three run means [A10]. The 2-vCPU Neoverse-N1 evaluation baseline, on a 28-item suite, reached 83.1 tok/s prefill, 19.9 tok/s decode and 3.84 s per item [A8].
 
+Going from 1 to 8 threads raised decode 4.07× and prefill 6.19× on Neoverse-V2, bringing mean per-item turnaround below 1 s. At 2 threads, V2 delivered 2.57× the prefill and 2.33× the decode of the 2-vCPU N1 VM. The two machines ran under different conditions, so this ratio is descriptive and does not separate `i8mm`/KleidiAI from core design or memory bandwidth. Figure 3 plots the V2 thread scaling next to the per-target throughput.
+
+
+\needspace{10\baselineskip}
 
 | Neoverse-V2 threads | TTFT | Prefill | Decode | Item wall |
 |:------------------------|-----------:|-------------:|-------------:|----------:|
@@ -196,9 +202,8 @@ Table 6 shows thread scaling on Neoverse-V2 (Debian 12, 8 vCPUs, 15 GiB RAM, Exe
 
 Table: Llama 3.2 1B INT4 on Neoverse-V2 (means over 3 runs × 6 items; the first item of each run is cold). The 4-thread TTFT varied widely (± 373.0 ms).
 
-Going from 1 to 8 threads raised decode 4.07× and prefill 6.19× on Neoverse-V2, bringing mean per-item turnaround below 1 s. At 2 threads, V2 delivered 2.57× the prefill and 2.33× the decode of the 2-vCPU N1 VM. The two machines ran under different conditions, so this ratio is descriptive and does not separate `i8mm`/KleidiAI from core design or memory bandwidth. Figure 3 plots the V2 thread scaling next to the per-target throughput.
 
-![Arm performance. (A) Neoverse-V2 ExecuTorch thread scaling (1–8 threads, mean ± SD over 3 runs × 6 items). (B) Llama 3.2 1B INT4 decode throughput and item wall latency on the three Arm targets, including the first, intermediate and final Galaxy S23 builds measured on separate workloads, so the bars are descriptive rather than a controlled comparison.](img/fig-arm-perf.png){#fig:arm-perf width=6.5in}
+![Arm performance. (A) Neoverse-V2 ExecuTorch thread scaling (1–8 threads, mean ± SD over 3 runs × 6 items). (B) Llama 3.2 1B INT4 decode throughput and item wall latency on the three Arm targets, including the first, intermediate and final Galaxy S23 builds. The bars come from different builds and sessions and are not a controlled comparison; Table 5 gives the final build's gated pass.](img/fig-arm-perf.png){#fig:arm-perf width=6.5in}
 
 ### Arm kernel evidence
 
@@ -208,9 +213,11 @@ The KleidiAI kernels are present in the ExecuTorch XNNPACK build (517 `kai_` sym
 
 On the Galaxy S23, `dumpsys meminfo` after a KYC check reported 1,744,842 KiB (1,704 MiB) total PSS and 1,867,396 KiB (1,824 MiB) RSS. PSS (proportional set size) splits shared pages among the processes that map them; RSS (resident set size) counts them in full, so RSS is the larger. The measured native heap was 1,566,056 KiB (1,529 MiB), 89.8% of PSS computed from the KiB values (rounded MiB give 89.7%). Model weights, the XNNPACK workspace and the KV cache are the expected contributors to that heap; `dumpsys` does not break it down, so their split was not measured. Figure 4 shows the measured categories.
 
-Peak sampled memory in the latest run was 1,795.3 MiB PSS / 1,907.9 MiB RSS. On disk, the APK plus model and tokenizer take 1.147 GiB. Runner RSS on Neoverse-V2 was 2,392.1 MiB after generation, and the N1 VM peaked at 2.05 GB of cgroup memory. This footprint leaves little headroom on 4–6 GB phones, and the eight checks of the first phone session are too few to show long-run stability [A9, A13].
-
 ![Galaxy S23 memory. `dumpsys meminfo` PSS by category after a KYC check. The native heap is 89.8% of 1.66 GiB total PSS; Llama weights, XNNPACK workspace and KV cache are its expected contributors, not a measured split.](img/fig-memory.png){#fig:memory width=6.5in}
+
+Peak sampled memory in the latest run was 1,795.3 MiB PSS / 1,907.9 MiB RSS; memory was polled every 500 ms, so shorter spikes may be missed. On disk, the APK plus model and tokenizer take 1.147 GiB. Runner RSS on Neoverse-V2 was 2,392.1 MiB after generation, and the N1 VM peaked at 2.05 GB of cgroup memory. This footprint leaves little headroom on 4–6 GB phones, and the eight checks of the first phone session are too few to show long-run stability [A9, A13].
+
+\needspace{9\baselineskip}
 
 ## Results
 
@@ -220,6 +227,8 @@ We report detection first, then explanation quality and functional verification.
 
 Table 7 reports the detector on every benchmark we hold, with conservative scoring (Section 3.5). The first four rows are eval splits reused during development and are optimistic; the last four were kept out of tuning to different degrees [A8, A12].
 
+The holdouts differ mainly in how often genuine messages raise false alarms. A contact gate lets a text-model score flag a message only when the reader is given something to act on (a non-official link, number or chat handle, a request, a payment order or a threat). With it, the v3 split went from 6 to zero observed false alarms (0/47), and with later negation fixes the blind validation set fell from 31 to 16 of 150, both with recall unchanged. Zero observed false alarms on 47 genuine messages is still compatible with an FPR of up to 0.076.
+
 
 | Set | n | Recall | F1 | FPR (false alarms / genuine; 95% CI) |
 |:----------------------------------|------:|-------:|-------:|:-----------------------------|
@@ -227,16 +236,19 @@ Table 7 reports the detector on every benchmark we hold, with conservative scori
 | URL eval split | 7,997 | 0.988 | 0.994 | 0.000 (0/4,000; 0.000–0.001) |
 | Indian eval split (visible set) | 320 | — | 0.969 | 0.031 (5/160; 0.013–0.071) |
 | NSL-KDD flow replay (`KDDTest+`) | 22,544 | 0.757 | 0.850 | 0.030 (294/9,711; 0.027–0.034) |
-| India v3 held-back split | 81 | 0.941 | 0.970 | 0.000 (0/47; 0.000–0.076) |
-| Blind validation set | 240 | 1.000 | 0.918 | 0.107 (16/150; 0.067–0.166) |
-| India v4 held-back split | 79 | 0.969 | 0.805 | 0.298 (14/47; 0.187–0.440) |
-| Sealed holdout (repeatedly scored) | 184 | 0.929 | 0.812 | 0.300 (30/100; 0.219–0.396) |
+| India v3 held-back split^a^ | 81 | 0.941 | 0.970 | 0.000 (0/47; 0.000–0.076) |
+| Blind validation set^b^ | 240 | 1.000 | 0.918 | 0.107 (16/150; 0.067–0.166) |
+| India v4 held-back split^c^ | 79 | 0.969 | 0.805 | 0.298 (14/47; 0.187–0.440) |
+| Sealed holdout^d^ | 184 | 0.929 | 0.812 | 0.300 (30/100; 0.219–0.396) |
 
-Table: Detection results with conservative scoring. "—": not recorded for that set. Counts for the URL, Indian and flow rows come from the evaluation records; the Indian count is FPR × 160 genuine items.
+Table: Detection results with conservative scoring. Development exposure: ^a^ used as a check during later fixes; ^b^ false alarms read after the first scoring, never tuned on; ^c^ never seen by the fixing work, scored once per candidate; ^d^ scored at several checkpoints (Table 8) and its false alarms read. "—": not recorded. The Indian count is FPR × 160 genuine items. The 95% intervals reflect binomial count uncertainty only; they do not account for adaptive selection or represent field-population uncertainty.
 
-The holdouts differ mainly in how often genuine messages raise false alarms. A contact gate lets a text-model score flag a message only when the reader is given something to act on (a non-official link, number or chat handle, a request, a payment order or a threat). With it, the v3 split went from 6 to zero observed false alarms (0/47), and with later negation fixes the blind validation set fell from 31 to 16 of 150, both with recall unchanged. Zero observed false alarms on 47 genuine messages is still compatible with an FPR of up to 0.076.
 
 On the v4 split, which the fixing work never saw, false alarms remain on advisories, bank and OTP alerts, delivery notices and links to small-business sites. The sealed holdout is harder still: every link in it uses a `.example` placeholder, which the gate treats as a contact and the domain rules call risky. As a result 28 of 87 genuine SMS (FPR 0.322; 95% CI 0.233–0.426) are still flagged, mostly advisories carrying such a link, family chats warning about scams, and doorstep or self-check messages [A12, A15].
+
+Figure 5 plots conservative F1 and FPR for every benchmark in Table 7, so the gap between the development sets and the held-back sets is visible at once.
+
+![Detection performance. Conservative F1 and FPR for each benchmark in Table 7; the held-back and sealed sets on the right carry most of the remaining false alarms. "—" = FPR not recorded (SMS eval split). The sealed bar is the combined FPR; its SMS route alone is 0.322 (28/87).](img/fig-eval-summary.png){#fig:eval width=6.5in}
 
 Table 8 shows how the sealed-holdout numbers moved as components were added; injection-route FPR stayed at 0.154 (2 of 13) after the rules-and-text-model freeze [A8, A15].
 
@@ -248,32 +260,27 @@ Table 8 shows how the sealed-holdout numbers moved as components were added; inj
 | After further recall tuning | 0.929 | 0.370 (37) | 0.784 |
 | Current detector (contact gate, negation handling) | 0.929 | 0.300 (30) | 0.812 |
 
-Table: Sealed holdout (n = 184; 100 genuine) at successive detector configurations. Each checkpoint is a further use of the same set.
+Table: Sealed holdout (n = 184; 100 genuine) at successive checkpoints, each a further use of the same set.
 
-Figure 5 plots conservative F1 and FPR for every benchmark in Table 7, so the gap between the development sets and the held-back sets is visible at once.
-
-![Detection performance. Conservative F1 and FPR for each benchmark in Table 7; the held-back and sealed sets on the right carry most of the remaining false alarms. "—" = FPR not recorded (SMS eval split). The sealed bar is the combined FPR; its SMS route alone is 0.322 (28/87).](img/fig-eval-summary.png){#fig:eval width=6.5in}
 
 ### Explanation quality
 
-We audited generated English explanations blind, rating each as correct, weak or wrong (Table 9). The three fresh-item audits each used 20 new items written by an AI agent that saw no project code or data. An LLM judge (OpenAI GPT-6.1 Terra) saw each item with the before and after outputs as an unlabelled, shuffled A/B pair and applied a fixed rubric; for Hindi it rated correctness and accessibility for a Hindi-only older reader (0–10). "Before" is the build without grounded facts and the Hindi summary; "after" adds them, with the same detector [A12].
+We audited generated English explanations blind, rating each as correct, weak or wrong (Table 9). The three fresh-item audits each used 20 new items written by an AI agent that saw no project code or data. An LLM judge (OpenAI GPT-6.1 Terra) saw each item with the before and after outputs as an unlabelled, shuffled A/B pair and applied a fixed rubric; for Hindi it rated correctness and accessibility for a Hindi-only older reader (0–10). "Before" is the build without grounded facts and the Hindi summary; "after" adds them, with the same detector [A12]. The initial audit used a different judge (Google Gemini 4 Neon) and items, and recorded only one side. No human audit was done on the fresh items.
 
-
-Grounding did not reduce wrong English explanations (3, 5, 3 → 5, 5, 5); most remaining errors repeat a wrong detector evidence phrase. Hindi improved from no correct summaries to 5–9 of 20, but 4–7 per audit were still wrong, mostly by translating that same evidence.
-
-In the last row, a wording fix moved the regenerated audit 3 items from 8/2/10 to 9/4/7 (false input claims 9 → 6), but the gain came from `.example`-domain wording that real SMS never contain, so it overstates real-world improvement [A15].
-
-\needspace{10\baselineskip}
-
-| Audit (20 items each) | English before | English after | Hindi correctness | Hindi accessibility |
-|:-----------------------------------|----------:|----------:|------------------:|-----------:|
+| Audit (20 items each) | English before | English after | Hindi correct | Hindi access |
+|:-----------------------------------|--------------:|--------------:|-----------------:|--------------:|
 | Initial audit (Gemini judge) | — | 5 / 8 / 7 | — | — |
 | Fresh-item audit 1 | 11 / 6 / 3 | 8 / 7 / 5 | 0/20/0 → 9/7/4 | 4.50 → 6.30 |
 | Fresh-item audit 2 | 6 / 9 / 5 | 11 / 4 / 5 | 0/20/0 → 5/9/6 | 3.50 → 5.45 |
 | Fresh-item audit 3 | 5 / 12 / 3 | 10 / 5 / 5 | 0/18/2 → 7/6/7 | 4.05 → 6.40 |
 | Audit 3 items, later build | 8 / 2 / 10 | 9 / 4 / 7 | — | — |
 
-Table: Blind explanation audits, counts of correct / weak / wrong. Hindi columns are before → after. The initial audit used a different LLM judge (Google Gemini 4 Neon) and items, and only one side was recorded. The last row regenerates the audit 3 items on a later build, before → after a wording fix, with the same judge. No human audit was done on the fresh items.
+Table: Blind explanation audits: correct / weak / wrong counts; Hindi access is a 0–10 score; arrows show before → after.
+
+
+Grounding did not reduce wrong English explanations (3, 5, 3 → 5, 5, 5); most remaining errors repeat a wrong detector evidence phrase. Hindi improved from no correct summaries to 5–9 of 20, but 4–7 per audit were still wrong, mostly by translating that same evidence.
+
+In the last row, a wording fix moved the regenerated audit 3 items from 8/2/10 to 9/4/7 (false input claims 9 → 6), but the gain came from `.example`-domain wording that real SMS never contain, so it overstates real-world improvement [A15].
 
 
 ### Verification
@@ -282,11 +289,9 @@ A regression suite of 1,355 detector and LLM-safety tests passes on the current 
 
 ## Responsible AI, Limitations and Future Work
 
-Prahari handles private messages and gives safety advice, so its privacy design and its limits matter as much as its scores.
-
 ### Responsible AI and privacy
 
-Prahari is private by construction. The Android APK requests no `INTERNET` permission, sets `allowBackup="false"`, sends no telemetry and runs every model on the phone, so messages, OTPs and bank alerts are not sent anywhere unless the user chooses to share a warning or copy a report; history is off by default and redacted when enabled. The design is advisory: vetted English and Hindi steps and the official reporting channels (Sanchar Saathi Chakshu, the 1930 helpline and cybercrime.gov.in) always appear above the AI card, which warns that it "can be wrong", and a benign result reads "\vlabel{NO RISK FOUND} — still verify", never "safe". The entrant used AI-assisted tools for mockups, Hindi copy review, coding and code review, and checked every architecture choice, measurement and safety text personally [A7].
+Prahari is private by construction. The Android APK requests no `INTERNET` permission, disables backup (`allowBackup` is false), sends no telemetry and runs every model on the phone, so messages, OTPs and bank alerts are not sent anywhere unless the user chooses to share a warning or copy a report; history is off by default and redacted when enabled. The design is advisory: vetted English and Hindi steps and the official reporting channels (Sanchar Saathi Chakshu, the 1930 helpline and cybercrime.gov.in) always appear above the AI card, which warns that it "can be wrong", and a benign result reads "\vlabel{NO RISK FOUND} — still verify", never "safe". The entrant used AI-assisted tools for mockups, Hindi copy review, coding and code review, and checked every architecture choice, measurement and safety text personally [A7].
 
 ### Limitations
 
@@ -306,7 +311,7 @@ Prahari is private by construction. The Android APK requests no `INTERNET` permi
 
 ## Conclusion
 
-Prahari shows that useful scam triage can run entirely on an Arm phone: deterministic detectors and Indian-context rules decide, Llama 3.2 1B only explains, and the whole pipeline runs offline on a Samsung Galaxy S23 phone and Arm Linux through ExecuTorch XNNPACK.
+Prahari shows that useful scam triage can run entirely on an Arm phone: deterministic detectors and Indian-context rules decide, Llama 3.2 1B only explains, and the measured message and link pipeline runs offline on a Samsung Galaxy S23 phone and on Arm Linux through ExecuTorch XNNPACK.
 
 On the phone, a warm KYC check takes a median 1.857 s (two checks) with no network permission. On Neoverse-V2, the 8-thread runner averages 0.980 s per item. Separately, a whole-process profile of a 2-thread run put 54.17% of sampled CPU time in KleidiAI kernels. On the v3 held-back split the detector reaches F1 0.970 with zero observed false alarms (0/47; 95% CI 0.000–0.076).
 
@@ -368,62 +373,57 @@ External sources are numbered in order of first citation. Project evidence is ci
 
 \RefsEnd
 
+\needspace{6\baselineskip}\vspace{6pt}
+
 ## Appendix A: Artifact and Provenance Index {.unnumbered}
 
-\RefsBegin
+Table 10 lists the evidence behind each A-numbered citation; paths are relative to the repository root.
 
-Each label names the project evidence behind a claim in the text. All paths are relative to the repository root.
+| Label | Evidence | Repository path |
+|:------|:------------------------------------------|:------------------------------------------|
+| A1 | Official challenge brief (PS3) and IIT Delhi PS3 mentoring guidance | \path{docs/challenge-brief.md} |
+| A2 | Detector, rules and app server | \path{candidates/BEST/} (\path{REPORT.md}, \path{DATA.md}, \path{app/server.py}, \path{triage/*.py}) |
+| A3 | Historical evaluation with half credit for uncertain verdicts, superseded by conservative scoring | \path{research/evals/20261111-075405-best-confirm/} |
+| A4 | Research log, leave-one-category-out check and data preparation | \path{research/LOG.md}, \path{research/REPORT.md}, \path{research/stress/loco.py}, \path{eval/prep_data.py} |
+| A5 | ExecuTorch 1.6.0 XNNPACK `kai_` symbol inspection on Arm Linux (517 symbols) | \path{docs/phase1/EVIDENCE.md} |
+| A6 | Dataset sources, attributions and licences | \path{candidates/BEST/DATA.md} |
+| A7 | Android app, CI manifest and permission audits, emulator screenshots | \path{android/}, \path{.github/workflows/android.yml}, \path{docs/phase1/EVIDENCE.md} |
+| A8 | Neoverse-N1 evaluations, sealed-holdout scores with counts, initial 20-item explanation audit | \path{docs/phase1/evidence/sealed-holdout/scores.json}, \path{docs/phase1/EVIDENCE.md} |
+| A9 | Galaxy S23 first run (23 Nov 2026): device properties, hash checks, Airplane Mode checks, `dumpsys meminfo` | \path{docs/phase1/evidence/galaxy-s23/}, \path{docs/phase1/img/s23-*.png} |
+| A10 | Neoverse-V2 benchmark (23 Nov 2026): `perf` KleidiAI profile, thread scaling, `unshare -n` offline proof | \path{docs/phase1/evidence/neoverse-v2/} |
+| A11 | Live Linux connection monitor and its 39 tests; explanation honesty fixes, India v3 held-back results and Android UX update (23 Nov 2026) | \path{candidates/BEST/triage/live.py}, \path{candidates/BEST/bin/monitor}, \path{candidates/BEST/tests/test_live.py}, \path{docs/phase1/EVIDENCE.md} |
+| A12 | SMS false-alarm fix and blind validation set; Call Guard preview; grounded explanations, Hindi summary and audits; v4 set; UPI QR checker and emulator captures (24 Nov 2026) | \path{research/fpfix/}, \path{docs/call-guard.md}, \path{research/explain-audit.md}, \path{research/v4-heldout/RESULTS.md}, \path{research/app-r3-verify/} |
+| A13 | Performance methodology, optimisations and harness (16 harness tests) | \path{docs/perf/}, \path{docs/perf/evidence/}, \path{bench/perf/} |
+| A14 | Galaxy S23 final run (24 Nov 2026): per-check results, memory, battery, hashes, demo clips | \path{docs/perf/s23-final-20261124.md}, \path{evidence/galaxy-s23-20261124/} |
+| A15 | Validation gate and explanation re-judgement; report card, remote-access app banner, APK-link check | \path{bin/validate}, \path{docs/validation-gate.md}, \path{android/python/report_card.py}, \path{android/app/src/main/java/in/prahari/app/RemoteApps.kt}, \path{docs/typosquat.md} |
+| A16 | Sender check and lookalike-link statistics | \path{docs/sender-check.md}, \path{candidates/BEST/triage/sender.py}, \path{evidence/galaxy-s23-20261124/} |
+| A17 | Galaxy S23 gating run on the release APK | \path{docs/perf/s23-gating-20261124.md}, \path{docs/perf/evidence/galaxy-s23-gating-20261124/retry/} |
+| A18 | Emulator feature check and two failed S23 sessions on 25 Nov 2026 (same APK as A17) | \path{evidence/android-emulator-20261125/summary.md}, \path{evidence/galaxy-s23-20261125/} |
 
-**[A1]** Official Bharat AI-SoC Challenge 2026–27 brief, PS3 (\path{docs/challenge-brief.md}), and IIT Delhi PS3 mentoring guidance.
+Table: Project evidence index.
 
-**[A2]** Detector, rules and app server: \path{candidates/BEST/} (\path{REPORT.md}, \path{DATA.md}, \path{app/server.py}, \path{triage/*.py}).
+## Appendix B: Reproducibility Card {.unnumbered}
 
-**[A3]** Historical baseline evaluation with half credit for uncertain verdicts, superseded by conservative scoring: \path{research/evals/20261111-075405-best-confirm/}.
+The steps below rebuild the Linux detector, its explanations and the validation gate from the public repository on an aarch64 machine. Table 11 then pins the released artifacts and the detector checkpoints behind every reported result.
 
-**[A4]** Research log, leave-one-category-out check and data preparation: \path{research/LOG.md}, \path{research/REPORT.md}, \path{research/stress/loco.py}, \path{eval/prep_data.py}.
 
-**[A5]** ExecuTorch 1.6.0 XNNPACK `kai_` symbol inspection on Arm Linux (517 symbols): \path{docs/phase1/EVIDENCE.md}.
+1. **Install.** With Python 3.12: `python3.12 -m venv .venv`, `. .venv/bin/activate`, `pip install -r candidates/BEST/requirements.txt` and `pip install 'huggingface_hub[cli]'`.
+2. **Fetch the model.** Accept the Llama 3.2 licence [24] on the model page, then run `hf download executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET --local-dir "$PWD/.venv/models/qlora"`. Check both files against Table 11 with `sha256sum`, and point a local model registry at them as the repository README shows. ExecuTorch 1.6.0 runs Linux inference.
+3. **Validate.** `bin/validate` scores the committed sets and runs the test suites; add `--baseline BEFORE.json` to fail on any recall drop or FPR rise. Sets that are not in the repository are reported as not scored; `--sealed` scores the sealed set, once per frozen candidate.
+4. **Run the demo.** `candidates/BEST/bin/app --selftest`, then `candidates/BEST/bin/app --demo --out .venv/demo.json` (8 items: SMS, URL, UPI, flow, injection).
 
-**[A6]** Dataset sources, attributions and licences: \path{candidates/BEST/DATA.md}.
-
-**[A7]** Android app (\path{android/}), CI manifest and permission audits (\path{.github/workflows/android.yml}), emulator screenshots (\path{docs/phase1/EVIDENCE.md}).
-
-**[A8]** Neoverse-N1 evaluations, sealed-holdout scores with counts (\path{docs/phase1/evidence/sealed-holdout/scores.json}) and the initial 20-item explanation audit (\path{docs/phase1/EVIDENCE.md}).
-
-**[A9]** Galaxy S23 first device run (23 Nov 2026): device properties, hash checks, timed checks in Airplane Mode, `dumpsys meminfo` (\path{docs/phase1/evidence/galaxy-s23/}, \path{docs/phase1/img/s23-*.png}).
-
-**[A10]** Neoverse-V2 benchmark (23 Nov 2026): `perf` KleidiAI profile, thread scaling and `unshare -n` offline proof (\path{docs/phase1/evidence/neoverse-v2/}).
-
-**[A11]** Live Linux connection monitor, explanation honesty fixes, India v3 held-back set and Android UX update (merged 23 Nov 2026).
-
-**[A12]** SMS false-alarm fix and blind validation set (\path{research/fpfix/}), Call Guard preview (\path{docs/call-guard.md}), grounded explanations, Hindi summary and audits (\path{research/explain-audit.md}), v4 set (\path{research/v4-heldout/RESULTS.md}), UPI QR checker and emulator captures (\path{research/app-r3-verify/}); merged 24 Nov 2026.
-
-**[A13]** Performance methodology, optimisations and harness: \path{docs/perf/}, \path{docs/perf/evidence/}, \path{bench/perf/} (16 harness tests).
-
-**[A14]** Galaxy S23 final run (24 Nov 2026): \path{docs/perf/s23-final-20261124.md}, \path{evidence/galaxy-s23-20261124/} (per-check results, memory, battery, hashes, demo clips).
-
-**[A15]** Validation gate (\path{bin/validate}, \path{docs/validation-gate.md}), including the explanation re-judgement; report card (\path{android/python/report_card.py}), remote-access app banner (\path{RemoteApps.kt}) and APK-link check (\path{docs/typosquat.md}).
-
-**[A16]** Sender check (\path{docs/sender-check.md}, \path{candidates/BEST/triage/sender.py}) and lookalike-link stats (\path{evidence/galaxy-s23-20261124/}).
-
-**[A17]** Galaxy S23 gating run on the release APK: \path{docs/perf/s23-gating-20261124.md}, \path{docs/perf/evidence/galaxy-s23-gating-20261124/retry/}.
-
-**[A18]** Emulator feature check (\path{evidence/android-emulator-20261125/summary.md}) and two failed S23 sessions on 25 Nov (\path{evidence/galaxy-s23-20261125/}); same APK as [A17].
-
-\RefsEnd
-
+\needspace{24\baselineskip}
 
 | Item | Value |
 |:----------------------|:--------------------------------------------------------------|
 | Repository | <https://github.com/rabesss/prahari> |
-| Android APK release | <https://github.com/rabesss/prahari/releases/tag/phase1-apk-5b59ee2> (built from commit `5b59ee2fcaaa2b6153f9a302abb76a1aac5dd317`) |
-| APK SHA-256 | `88f6a53285c04ef8e0fb7766b05da716dbdc22a4b11112e731b70165e3d07862` |
-| Model SHA-256 | `ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac` (Llama 3.2 1B QLoRA INT4 `.pte`) |
-| Tokenizer SHA-256 | `82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55` (`tokenizer.model`) |
-| Detector evaluated | Commit `75993f19c590144d2369fcfb70d430429daa7990` (Tables 7 and 8) |
-| Prerequisites | Python 3.12 with \path{candidates/BEST/requirements.txt}; model files from Hugging Face after accepting the Llama 3.2 licence [24]; ExecuTorch 1.6.0 for Linux inference |
-| CLI demo | `candidates/BEST/bin/app --demo --out .venv/demo.json` (8 items: SMS, URL, UPI, flow, injection) |
-| Validation gate | `bin/validate`; add `--baseline BEFORE.json` to fail on any recall drop or FPR rise; pass `--sealed` to score the sealed set, once per frozen candidate |
+| Android APK release | <https://github.com/rabesss/prahari/releases/tag/phase1-apk-5b59ee2>, built from commit \path{5b59ee2fcaaa2b6153f9a302abb76a1aac5dd317} |
+| APK SHA-256 | \path{88f6a53285c04ef8e0fb7766b05da716dbdc22a4b11112e731b70165e3d07862} |
+| Model SHA-256 | \path{ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac} (file \path{Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte}) |
+| Tokenizer SHA-256 | \path{82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55} (file \path{tokenizer.model}) |
+| Current detector checkpoint | Commit \path{75993f19c590144d2369fcfb70d430429daa7990}: Table 7 held-back, blind and sealed rows and the last row of Table 8 (\path{docs/validation-gate.md}) |
+| Earlier checkpoints, Table 8 | Rows 1–3 are the first, second and fourth checkpoint entries (initial baseline; rules + text model freeze; commit 7368067) in \path{docs/phase1/evidence/sealed-holdout/scores.json} |
+| Reused eval rows, Table 7 | SMS and Indian eval splits: the false-alarm reduction entry in \path{docs/phase1/EVIDENCE.md}; URL: the typosquat-check gate run in the same file; flow: \path{candidates/BEST/REPORT.md} |
 | Data not in the repository | v3 and v4 held-back splits and the sealed holdout (hashes pinned in \path{eval/validate.py}); their rows in Tables 7 and 8 cannot be re-run from the repository alone |
 
 Table: Reproducibility card.
