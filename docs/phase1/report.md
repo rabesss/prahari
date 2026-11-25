@@ -177,7 +177,7 @@ Table: Llama 3.2 1B INT4 on Arm Linux. V2 rows are means over 3 runs × 6 items;
 
 Going from 1 to 8 threads raised decode 4.07× and prefill 6.19× on Neoverse-V2, bringing mean per-item turnaround below 1 s. At 2 threads, V2 delivered 2.57× the prefill and 2.33× the decode of the 2-vCPU N1 VM. The two machines ran under different conditions, so this ratio is descriptive and does not separate `i8mm`/KleidiAI from core design or memory bandwidth [S10].
 
-![Left: Neoverse-V2 ExecuTorch thread scaling (1–8 threads, mean ± SD over 3 runs × 6 items). Right: Llama 3.2 1B INT4 decode throughput and item latency on the three Arm targets, including the three Galaxy S23 runs, with the Neoverse-V2 KleidiAI `perf` breakdown.](img/fig-arm-perf.png){#fig:arm-perf width=98%}
+![(A) Neoverse-V2 ExecuTorch thread scaling (1–8 threads, mean ± SD over 3 runs × 6 items). (B) Llama 3.2 1B INT4 decode throughput and item latency on the three Arm targets, including the three Galaxy S23 runs, with the Neoverse-V2 KleidiAI `perf` breakdown.](img/fig-arm-perf.png){#fig:arm-perf width=98%}
 
 ### Arm kernel evidence
 
@@ -222,7 +222,7 @@ Table: Sealed final holdout (n = 184) at successive detector configurations.
 
 Figure 3 plots F1 against FPR for all benchmarks, alongside the Galaxy S23 memory breakdown, in which the native heap holding Llama 3.2 1B and the ExecuTorch XNNPACK runtime accounts for 89.8% of 1.66 GiB total PSS.
 
-![Left: conservative F1 vs. FPR across benchmarks. Right: Samsung Galaxy S23 `dumpsys meminfo` PSS breakdown; the native heap (Llama 3.2 1B + ExecuTorch XNNPACK) is 89.8% of 1.66 GiB total PSS.](img/fig-eval-summary.png){#fig:eval width=98%}
+![(A) conservative F1 vs. FPR across benchmarks. (B) Samsung Galaxy S23 `dumpsys meminfo` PSS breakdown; the native heap (Llama 3.2 1B + ExecuTorch XNNPACK) is 89.8% of 1.66 GiB total PSS.](img/fig-eval-summary.png){#fig:eval width=98%}
 
 ### Explanation quality
 

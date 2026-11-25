@@ -241,7 +241,7 @@ def build_pdf() -> None:
         str(REPORT_MD),
         "-o",
         str(REPORT_PDF),
-        "--from=markdown+pipe_tables+grid_tables+fenced_code_blocks+backtick_code_blocks+yaml_metadata_block+link_attributes-implicit_figures",
+        "--from=markdown+pipe_tables+grid_tables+fenced_code_blocks+backtick_code_blocks+yaml_metadata_block+link_attributes",
         "--pdf-engine=xelatex",
         f"--include-in-header={HEADER_TEX}",
         f"--resource-path={PHASE1}:{REPO}",
