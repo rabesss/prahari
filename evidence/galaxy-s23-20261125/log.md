@@ -14,3 +14,11 @@ Times are IST (UTC+05:30), 25 Nov 2026.
 - 15:05: RDB stopped and the local Hindsight API service restarted; port 8888 was again listening on the Hindsight API.
 - 15:06: Samsung Developer showed the Sign in link. Browser policy blocked access to site-data settings, so cookie clearing was not verified or completed.
 - 15:08: After the account instruction changed, the dedicated Samsung account was signed in again. The reservation list showed “No devices detected!” Site data was left intact.
+
+## Retry on a different unit
+
+- 15:12: With 80 RTL credits available, reserved Android 14 Galaxy S23 `SM-S911B-IN4` for 30 minutes; the balance became 78 credits.
+- The RTL client repeatedly timed out while opening Remote Debug Bridge. Reloading the unresponsive view ended the live test; Samsung then showed “Getting ready to restart” and temporarily disabled re-entry. Re-entered the same reservation without additional credits once Start became available.
+- The re-entered RTL client again timed out on the bridge control and screenshots. ADB never listed the device. The 5 MiB transfer probe therefore could not run and no throughput value was measured; neither the APK nor the model was sent to this unit.
+- 15:28: The web client reported “All ongoing tests have ended.” RDB was stopped and the Hindsight service restarted. The reservation was still in Samsung's restart state while attempting return.
+- 15:32: Samsung's Return device action completed, and Reservations showed “No devices detected!”. Hindsight was active and listening on port 8888; the Samsung account remained signed in.
