@@ -18,8 +18,9 @@ detectors running ahead of the language model.
 > **Which build was measured:** every number below predates PRs #46–#51 (UPI QR, call guard, Hindi
 > explanations, false-positive fixes). Those PRs add detectors and prompts for new input types but do not
 > change the model, runtime, quantisation or decoding settings, so the existing SMS/URL/flow paths should run
-> at similar speeds. A fresh S23 session on the final APK ([`s23-rtl-runbook.md`](s23-rtl-runbook.md))
-> confirms this for the submitted build.
+> at similar speeds. A later S23 session on the `5b59ee2` APK ([`s23-gating-20261124.md`](s23-gating-20261124.md)) measured
+> 1.857 s and 32.5 tok/s for warm KYC, slower than the 23 Nov r1 run; conditions differed, samples are small and
+> the cause is not established.
 
 ## Consolidated Cross-Device Performance Table
 

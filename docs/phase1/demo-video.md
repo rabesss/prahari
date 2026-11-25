@@ -10,7 +10,7 @@
 
 ---
 
-> **Already recorded (PR #60):** real-time S23 clips of the round-3 build in Airplane Mode (parcel scam, SBI alert, UPI link, Hindi KYC) are in `evidence/galaxy-s23-20261124/video/` (hashes in `sha256.txt`). They can be cut into the 0:10–1:18 segment instead of re-recording. Review the parcel clip's displayed advice first, as the capture notes ask; the SBI and UPI files have a still-frame tail (originals in `video/original/`). Avoid the lookalike-link sample in a live take: on the round-3 build its Llama replies failed the checks; builds with PR #69 show the detector's fixed text instead, which has not been re-run on the phone.
+> **Already recorded (PR #60):** real-time S23 clips of the round-3 build in Airplane Mode (parcel scam, SBI alert, UPI link, Hindi KYC) are in `evidence/galaxy-s23-20261124/video/` (hashes in `sha256.txt`). They can be cut into the 0:10–1:18 segment instead of re-recording. Review the parcel clip's displayed advice first, as the capture notes ask; the SBI and UPI files have a still-frame tail (originals in `video/original/`). Avoid the lookalike-link sample in a live take: on the round-3 build its Llama replies failed the checks; builds with PR #69 show the detector's fixed text instead, and the later S23 run of the `5b59ee2` APK showed that labelled fallback in 5.0–6.4 s.
 
 ## 1. Pre-flight setup (do BEFORE hitting Record)
 
