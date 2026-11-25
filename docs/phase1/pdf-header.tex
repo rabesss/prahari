@@ -11,7 +11,6 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{enumitem}
-\usepackage{mdframed}
 \usepackage{parskip}
 \usepackage{etoolbox}
 
@@ -39,9 +38,12 @@
   linkcolor=prahariLink,
   urlcolor=prahariLink,
   citecolor=prahariLink,
-  pdftitle={Prahari: Offline Scam Triage on Arm},
+  pdftitle={Prahari: Offline On-Device Threat, Phishing and Scam Triage on Arm},
   pdfauthor={Team Prahari}
 }
+% Pandoc's own \hypersetup (after this header) would copy the byline into pdfauthor; reset it.
+\AtBeginDocument{\hypersetup{pdftitle={Prahari: Offline On-Device Threat, Phishing and Scam Triage on Arm},
+  pdfauthor={Team Prahari}}}
 
 % Section heading styling
 \titleformat{\section}
@@ -58,11 +60,12 @@
 \titlespacing*{\subsection}{0pt}{12pt}{4pt}
 \titlespacing*{\subsubsection}{0pt}{7pt}{3pt}
 
-% Header and footer: short title as the running head, page number only in the footer
+% Header and footer: the short name "Prahari" as the running head (the cover carries the full
+% title), page number only in the footer
 \pagestyle{fancy}
 \setlength{\headheight}{21.5pt}  % fancyhdr needs 21.3pt for the running head at 11 pt
 \fancyhf{}
-\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari: Offline Scam Triage on Arm}
+\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari}
 \fancyfoot[C]{\footnotesize\color{prahariMuted}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -157,7 +160,7 @@
   {\fontsize{21}{26}\selectfont\bfseries\color{prahariIndigo}\@title\par}
   \ifdefined\@subtitle\vspace{6pt}{\large\color{prahariSlate}\@subtitle\par}\fi
   \vspace{8pt}
-  {\small\color{prahariMuted}\@author\hspace{1.2em}|\hspace{1.2em}\@date\par}
+  {\small\color{prahariMuted}\@author{} · \@date\par}
   \vspace{6pt}{\color{prahariBorder}\rule{\linewidth}{0.6pt}}\par
   \endgroup
   \vspace{10pt}}
@@ -166,12 +169,16 @@
 % Subtle shaded code blocks and clean line wrapping for long paths/symbols
 \definecolor{shadecolor}{HTML}{F1F5F9}
 % Code blocks: light grey padded box with space around it
-\mdfdefinestyle{prahariCode}{backgroundcolor=prahariBg, linecolor=prahariBorder, linewidth=0.5pt,
-  innertopmargin=3pt, innerbottommargin=3pt, innerleftmargin=6pt, innerrightmargin=6pt,
-  skipabove=4pt, skipbelow=3pt, leftmargin=0pt, rightmargin=0pt, nobreak=true}
-% The box never splits and never leaves the line that introduces it at the foot of a page.
-\BeforeBeginEnvironment{verbatim}{\par\nobreak\begin{mdframed}[style=prahariCode]\small}
-\AfterEndEnvironment{verbatim}{\end{mdframed}}
+% The box is set in a minipage inside an \fcolorbox, placed as one unbreakable line right after a
+% \nobreak, so it never splits and never leaves the line that introduces it at the foot of a page.
+% (mdframed, used before, adds a legal page break ahead of the box.)
+\newsavebox{\prahariCodeBox}
+\BeforeBeginEnvironment{verbatim}{\par\nobreak\vspace{4pt}\nobreak
+  \begin{lrbox}{\prahariCodeBox}\begin{minipage}{\dimexpr\linewidth-12pt-1pt\relax}\small}
+\AfterEndEnvironment{verbatim}{\end{minipage}\end{lrbox}%
+  \par\nobreak\noindent{\setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.5pt}%
+  \fcolorbox{prahariBorder}{prahariBg}{\vbox{\kern3pt\hbox{\hspace{6pt}\usebox{\prahariCodeBox}\hspace{6pt}}\kern3pt}}}%
+  \par\vspace{3pt}}
 \setlength{\emergencystretch}{3em}
 
 % Float placement: figures float to the top or bottom of a nearby page so text fills the gaps
@@ -201,8 +208,10 @@
 
 % Names never break at a hyphen: no hyphenation inside these words, and no breaks at explicit
 % hyphens (Neoverse-V2, Indian-context); cross-references use non-breaking spaces in report.md.
-\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy Table Tables Figure Figures Section Sections Appendix}
+\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy Table Tables Figure Figures Section Sections Appendix India}
 \exhyphenpenalty=10000
+% A page never ends on a hyphenated line, so no word is split across two pages.
+\brokenpenalty=10000
 
 % Glyphs missing from the body font
 \usepackage{newunicodechar}
@@ -221,11 +230,21 @@
 % Verdict labels: one consistent small-caps style (capitals and lowercase both set as small caps)
 \newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
 
-% References and Appendix A: hanging-indent entries, no bullets, URLs and paths break anywhere
+% References: each entry starts with \refl{n}, a label box as wide as the widest label ("[24]"
+% plus a space); the hanging indent equals that width, so continuation lines start under the title.
+\newlength{\prahariRefLabelW}
 \newcommand{\RefsBegin}{\par\begingroup\fontsize{9.6}{11.6}\selectfont\setlength{\parskip}{1.5pt plus 1pt}\setlength{\parindent}{0pt}%
-  \raggedright\everypar{\hangindent=2.4em\hangafter=1}}
+  \settowidth{\prahariRefLabelW}{\textbf{[24]}\hspace{0.5em}}%
+  \raggedright\everypar{\hangindent=\prahariRefLabelW\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
+\newcommand{\refl}[1]{\makebox[\prahariRefLabelW][l]{\textbf{[#1]}}\ignorespaces}
 \urlstyle{same}
+% \refurl{host/path} prints https://host/path as a link. "https://" is boxed, so the URL never
+% breaks inside or after the scheme; inside the rest it breaks only after / . _ ? = & (never at a
+% hyphen or inside a word). A space before it gives the line a normal break point.
+\newcommand{\refurl}[1]{\begingroup\def\UrlBreaks{\do\/\do\.\do\_\do\?\do\=\do\&}\def\UrlBigBreaks{}%
+  \def\UrlOrds{\do\*\do\-\do\~\do\'\do\"\do\:}%
+  \href{https://#1}{\mbox{https://}\nolinkurl{#1}}\endgroup}
 % File paths break only after "/" (never inside a word); hashes may break anywhere.
 \DeclareUrlCommand\path{\urlstyle{tt}\def\UrlBreaks{\do\/}\def\UrlBigBreaks{}\def\UrlNoBreaks{}}
 \DeclareUrlCommand\hash{\urlstyle{tt}}

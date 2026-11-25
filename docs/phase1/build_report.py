@@ -180,10 +180,10 @@ DETECTION = [
     # label, n, recall, fpr, f1, group
     ("SMS", "1,162", None, None, 0.925, "dev"),
     ("URL", "7,997", 0.988, 0.000, 0.994, "dev"),
-    ("Indian\neval", "320", None, 0.031, 0.969, "dev"),
-    ("NSL-KDD\nflow", "22.5k", 0.757, 0.030, 0.850, "dev"),
+    ("Indian eval", "320", None, 0.031, 0.969, "dev"),
+    ("NSL-KDD", "22.5k", 0.757, 0.030, 0.850, "dev"),
     ("v3", "81", 0.941, 0.000, 0.970, "held"),
-    ("Blind\nvalidation", "240", 1.000, 0.107, 0.918, "held"),
+    ("Blind set", "240", 1.000, 0.107, 0.918, "held"),
     ("v4", "79", 0.969, 0.298, 0.805, "held"),
     ("Sealed", "184", 0.929, 0.300, 0.812, "held"),
 ]
@@ -238,15 +238,16 @@ def build_architecture_chart() -> Path:
     h1, h2, h3 = 0.86, 0.70, 0.74
 
     hy = H - 0.12
-    ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE, weight="bold")
-    ax.text(c2x + c2w / 2, hy, "DETECT (decides the verdict)", ha="center", va="center", fontsize=FT, color=INDIGO, weight="bold")
+    # All three column headers share one slate colour; indigo is reserved for the DETECT boxes.
+    ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
+    ax.text(c2x + c2w / 2, hy, "DETECT (decides the verdict)", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
     ax.text(c3x + c3w / 2, hy, "EXPLAIN (on the device)", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
 
     box(c1x, r1 - h1 / 2, c1w, h1, "SMS, link or UPI QR", "Android app or\nLinux CLI / UI", LIGHT_BG, BOX_EDGE)
     box(c1x, r2 - h2 / 2, c1w, h2, "Live socket monitor", "/proc/net/tcp, snmp", LIGHT_BG, BOX_EDGE)
     box(c1x, r3 - h3 / 2, c1w, h3, "NSL-KDD flow record", "bin/predict --task flow", LIGHT_BG, BOX_EDGE)
 
-    box(c2x, r1 - h1 / 2, c2w, h1, "Stage 1: detectors", "Classifiers + Indian-context\nrules, 0.42 ms per item", INDIGO_LIGHT, INDIGO, INDIGO)
+    box(c2x, r1 - h1 / 2, c2w, h1, "Stage 1: detectors", "Classifiers + Indian-context\nrules; 0.42 ms/item\non Neoverse-N1", INDIGO_LIGHT, INDIGO, INDIGO)
     box(c2x, r2 - h2 / 2, c2w, h2, "Flow text rules", "live network events", INDIGO_LIGHT, INDIGO, INDIGO)
     box(c2x, r3 - h3 / 2, c2w, h3, "Intrusion path", "HistGradientBoosting\n+ 3 intrusion rules", INDIGO_LIGHT, INDIGO, INDIGO)
 
@@ -293,7 +294,7 @@ def build_arm_perf_chart() -> Path:
     ax1.set_xlim(-0.5, 3.85)
     ax1.set_xlabel("ExecuTorch XNNPACK threads on Arm Neoverse-V2")
     ax1.set_ylabel("Decode speed (tok/s)", color=INDIGO)
-    ax1.set_ylim(0, 165)
+    ax1.set_ylim(0, 130)
     ax1.set_yticks([0, 40, 80, 120])
     ax1.tick_params(axis="y", labelcolor=INDIGO)
     # Decode values sit just above each bar; the latency axis is scaled so every latency marker
@@ -321,8 +322,9 @@ def build_arm_perf_chart() -> Path:
                   fontweight="bold", zorder=5)
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax1b.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="upper left", ncol=2, frameon=True, facecolor="white", edgecolor=GRID,
-               borderaxespad=0.3)
+    # The legend sits above the plot frame, outside the axes, so it never covers a bar or marker.
+    ax1.legend(h1 + h2, l1 + l2, loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=2, frameon=False,
+               borderaxespad=0.2, handlelength=1.6, columnspacing=1.2)
     sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4", x=0.01, ha="left",
                   fontsize=FTITLE, fontweight="bold", color=INK)
 
@@ -340,10 +342,7 @@ def build_arm_perf_chart() -> Path:
     ax2.set_xlim(0, 158)
     ax2.set_ylim(-0.55, len(names) - 0.45)
     ax2.set_xlabel("Decode speed (tok/s)")
-    # The bars are descriptive: the note sits in the empty lower-right corner of the panel.
-    ax2.text(156, -0.35, "Different builds and\nsessions; not a controlled\ncomparison. Gated pass:\nTable 6.",
-             ha="right", va="bottom", fontsize=FT, color=SLATE_DARK, style="italic", linespacing=1.35,
-             bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=GRID, lw=0.6), zorder=5)
+    # No in-plot note: the figure caption states that the bars are not a controlled comparison.
     for b, v, l in zip(hb, tps, lat):
         cy = b.get_y() + b.get_height() / 2
         label = f"{v:.1f} tok/s · {l:.2f} s"
@@ -369,20 +368,26 @@ def build_eval_chart() -> Path:
     0.44 apart, width 0.30) so a label centred over one bar clears the neighbouring bar.
     An FPR that was not recorded is printed as an em dash; the caption explains it.
     """
-    fig, ax = plt.subplots(figsize=(FIG_W, 2.85), dpi=DPI, layout="constrained")
+    fig, ax = plt.subplots(figsize=(FIG_W, 3.0), dpi=DPI, layout="constrained")
     _style_ax(ax)
     labels = [f"{d[0]}\nn={d[1]}" for d in DETECTION]
     f1 = [d[4] for d in DETECTION]
     fpr = [d[3] for d in DETECTION]
     # Held-back groups are shifted right by GAP so the divider clears the labels beside it.
-    GAP = 0.4
+    GAP = 0.3
     x = np.array([i + (GAP if d[5] == "held" else 0.0) for i, d in enumerate(DETECTION)])
     off, w = 0.22, 0.30
     b1 = ax.bar(x - off, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
     b2 = ax.bar(x + off, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
     ax.axvline(3.5 + GAP / 2, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
-    ax.text(1.5, 1.115, "Development sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
-    ax.text(5.5 + GAP, 1.115, "Held-back sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
+    # Group labels sit above the plot frame, each over a bracket spanning its group's bars.
+    tr = ax.get_xaxis_transform()  # x in data units, y in axes fraction
+    for lo, hi, name in ((0, 3, "Development sets"), (4, 7, "Held-back sets")):
+        x0, x1 = x[lo] - off - w / 2, x[hi] + off + w / 2
+        ax.plot([x0, x0, x1, x1], [1.03, 1.06, 1.06, 1.03], transform=tr, color=SLATE_LIGHT, lw=0.9,
+                clip_on=False)
+        ax.text((x0 + x1) / 2, 1.08, name, transform=tr, ha="center", va="bottom", fontsize=FT,
+                color=SLATE, style="italic")
     texts, owners = [], []
     for b, v in zip(b1, f1):
         texts.append(ax.text(b.get_x() + b.get_width() / 2, v + 0.015, f"{v:.3f}", ha="center", va="bottom",
@@ -393,10 +398,12 @@ def build_eval_chart() -> Path:
         texts.append(ax.text(b.get_x() + b.get_width() / 2, base + 0.015, txt, ha="center", va="bottom",
                              fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=4))
         owners.append(b)
-    ax.set_xticks(x, labels)
+    # Two-line tick labels (set name / n) at 10 pt, the smallest size used in any figure, so the
+    # longest names ("Indian eval", "NSL-KDD") clear each other.
+    ax.set_xticks(x, labels, fontsize=10)
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.6, x[-1] + 0.6)
-    ax.set_ylim(0, 1.19)
+    ax.set_xlim(-0.64, x[-1] + 0.5)
+    ax.set_ylim(0, 1.2)
     ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_ylabel("Score or rate")
     fig.legend(*ax.get_legend_handles_labels(), loc="outside upper center", ncol=2, frameon=False)
@@ -467,7 +474,7 @@ def build_overview_chart() -> Path:
                               va="bottom", fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=5))
         a_owners.append(bar)
     # Short one-word set names keep each tick label to two lines at 10 pt.
-    a.set_xticks(x, [f"{r[0].split(chr(10))[0]}\nn={r[1]}" for r in held])
+    a.set_xticks(x, [f"{r[0].split()[0]}\nn={r[1]}" for r in held])
     a.tick_params(axis="x", length=0)
     a.set_ylim(0, 1.32)
     a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
