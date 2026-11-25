@@ -1,0 +1,12 @@
+Android Emulator 37.3.10, system image system-images;android-34;google_apis;x86_64 (r14), AVD device pixel_6
+ro.build.version.release=14
+ro.build.version.sdk=34
+ro.product.model=sdk_gphone64_x86_64
+ro.product.cpu.abilist=x86_64,arm64-v8a
+ro.dalvik.vm.native.bridge=libndk_translation.so
+ro.ndk_translation.version=0.2.3
+APK: app-debug.apk from CI run 45398563324 (commit 5b59ee2), sha256 88f6a53285c04ef8e0fb7766b05da716dbdc22a4b11112e731b70165e3d07862
+primaryCpuAbi=arm64-v8a
+versionName=0.1-spike
+INTERNET permission requested: 0
+RustDesk APK used for #66: rustdesk-1.5.3-aarch64-signed.apk (official GitHub release), sha256 6b3aca1a7e68c3f80e5abe7ec3bea3e5ff445a03cf77131ff79a1ee4270288ff, installed for one check then uninstalled
