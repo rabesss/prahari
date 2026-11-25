@@ -1,6 +1,6 @@
 # Android emulator run of the #64, #66, #67 and #70 features (25 Nov 2026)
 
-On 25 Nov both Galaxy S23 Remote Test Lab sessions failed before the app could be installed
+On 25 Nov both Samsung Galaxy S23 phone sessions failed before the app could be installed
 ([../galaxy-s23-20261125/summary.md](../galaxy-s23-20261125/summary.md)). The same features were
 then run on an Android 14 emulator instead. The emulator ran the **same APK that was measured on the
 S23 on 24 Nov**: `app-debug.apk` from CI run 45398563324 (commit `5b59ee2`), SHA-256 `88f6a532…`.

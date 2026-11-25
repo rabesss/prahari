@@ -80,7 +80,7 @@ the runs, so per-clip times vary, and the slow rows were not investigated furthe
   process drops from about 82 to about 18 prefill tokens/s. `asr.py` now imports it first. Those runs are
   recorded under `import_order_check` in the `.meta.json` file.
 
-**Not measured:** Galaxy S23 or any physical phone. That needs a Remote Test Lab session. Android
+**Not measured:** Galaxy S23 or any physical phone. That needs a phone session. Android
 numbers must not be quoted from these Linux results.
 
 ## Android (preview, not wired into the UI)

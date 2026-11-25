@@ -7,7 +7,7 @@ verification procedures, and exact artefact provenance backing [`docs/perf/READM
 
 | Target | Silicon & Microarchitecture | Cores & RAM | Arm ISA Flags Verified | OS & Runtime | Model Artefact |
 |---|---|---|---|---|---|
-| **Samsung Galaxy S23** (`SM-S911B`, RTL Noida) | Qualcomm SM8550 (Snapdragon 8 Gen 2; `0xd46` Cortex-A510 + `0xd4d` Cortex-A715 (the 60-line `/proc/cpuinfo` excerpt in `device.txt` shows only these two part numbers)) | 8-core Armv9 SoC | `asimd`, `asimddp`, `i8mm`, `bf16`, `fphp`, `asimdhp` (`/proc/cpuinfo`) | Android 14, `arm64-v8a`, `org.pytorch:executorch-android:1.5.1` + XNNPACK, Chaquopy 17.2.0 (Python 3.10, NumPy 1.26.2) | `Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte` (`ab7b7ebf…`) + `tokenizer.model` (`82e9d319…`) |
+| **Samsung Galaxy S23** (`SM-S911B`) | Qualcomm SM8550 (Snapdragon 8 Gen 2; `0xd46` Cortex-A510 + `0xd4d` Cortex-A715 (the 60-line `/proc/cpuinfo` excerpt in `device.txt` shows only these two part numbers)) | 8-core Armv9 SoC | `asimd`, `asimddp`, `i8mm`, `bf16`, `fphp`, `asimdhp` (`/proc/cpuinfo`) | Android 14, `arm64-v8a`, `org.pytorch:executorch-android:1.5.1` + XNNPACK, Chaquopy 17.2.0 (Python 3.10, NumPy 1.26.2) | `Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte` (`ab7b7ebf…`) + `tokenizer.model` (`82e9d319…`) |
 | **Arm Neoverse-V2 Linux** (Sail Arm size L) | Arm Neoverse-V2 `r0p1` (single NUMA node, 512 KiB L1d/L1i, 16 MiB L2, 36 MiB L3) | 8 online vCPUs (56 offline), 15 GiB RAM, 0 swap | `asimd`, `asimddp`, `i8mm`, `bf16`, `fphp`, `asimdhp` (no `sve`/`sve2` exposed) | Debian 12, Linux 6.1.155 `aarch64`, Python 3.12.16, ExecuTorch 1.6.0, Torch 2.15.0+cpu, scikit-learn 1.9.1 | Exact same `.pte` & `tokenizer.model` (hashes verified) |
 | **Oracle A1 Arm Neoverse-N1** (shared cloud VM) | Arm Neoverse-N1 (Ampere Altra) | 2 vCPUs, ~11 GiB RAM | `aarch64` (no `i8mm`/`bf16`; Armv8.2-A) | Ubuntu 24.04, Python 3.12, ExecuTorch 1.6.0, Torch CPU, scikit-learn 1.9.1 | Exact same `.pte` & `tokenizer.model` (hashes verified) |
 
@@ -67,8 +67,8 @@ Additional inference kernels observed in the same profile: ExecuTorch `cpu_flash
   `libexecutorch_backend_xnnpack.so` (plus `56` in `libexecutorch_kernels_torchao.so`, `47` in
   `libexecutorch_kernels_optimized.so`, `47` in `libcustom_ops_aot_lib.so`); `perf` was not run on N1.
 - **Samsung Galaxy S23 (`executorch-android:1.5.1` Maven AAR):** The shipped `lib/arm64-v8a/libexecutorch.so`
-  (`8.64 MiB`) embeds `XnnpackBackend` but is stripped of internal function symbols, and unrooted RTL
-  devices do not permit `perf record`. S23 hardware (`SM8550`) exposes `asimddp`, `i8mm`, and `bf16` and
+  (`8.64 MiB`) embeds `XnnpackBackend` but is stripped of internal function symbols, and the unrooted phone
+  does not permit `perf record`. S23 hardware (`SM8550`) exposes `asimddp`, `i8mm`, and `bf16` and
   executes the exact same `.pte` via XNNPACK at `38.6–43.4 tok/s`, while kernel-level `kai_*` dispatch
   proof comes from Neoverse-V2 Linux above.
 
@@ -84,7 +84,7 @@ Additional inference kernels observed in the same profile: ExecuTorch `cpu_flash
 
 | Claim / Dataset | Primary Source Artifact / Log | Date | Status / Caveat |
 |---|---|---|---|
-| Galaxy S23 per-check metrics, airplane mode, `dumpsys meminfo`, device CPU flags | RTL run 8 capture (`REPORT.md`, `device.txt`, `device-sha256.txt`, `meminfo.txt`, `*-stats.xml`, `*-stats.png`, `prove-offline.png`); committed at [`evidence/galaxy-s23-rtl-run8/`](evidence/galaxy-s23-rtl-run8/REPORT.md) | 2026-11-23 | Re-verified by `bench/perf/adb_bench.py parse-dir`; pre-PR#41 APK (had bank repeat & link question bugs fixed in PR #41); warm-2 card not expanded |
+| Galaxy S23 per-check metrics, airplane mode, `dumpsys meminfo`, device CPU flags | Phone run 8 capture (`REPORT.md`, `device.txt`, `device-sha256.txt`, `meminfo.txt`, `*-stats.xml`, `*-stats.png`, `prove-offline.png`); committed at [`evidence/galaxy-s23-rtl-run8/`](evidence/galaxy-s23-rtl-run8/REPORT.md) | 2026-11-23 | Re-verified by `bench/perf/adb_bench.py parse-dir`; pre-PR#41 APK (had bank repeat & link question bugs fixed in PR #41); warm-2 card not expanded |
 | Arm Neoverse-V2 thread scaling (1/2/4/8T), KleidiAI `perf` 54.17%, `unshare -n` offline proof | Sail Arm L capture (`REPORT.md`, `out/env.txt`, `out/hashes.txt`, `out/threads.csv`, `out/thread-*-*.{log,jsonl}`, `out/perf-flat.txt`, `out/perf-report.txt`, `out/offline-proof.txt`); committed at [`evidence/neoverse-v2/`](evidence/neoverse-v2/REPORT.md) (`perf.data` binaries, pip/apt logs not committed) | 2026-11-23 | 3 repeats × 6 visible items on one box; 4T repeat-3 had a cold item-1 spike |
 | Oracle Neoverse-N1 round-3 confirmation (`ctl-conf51`), PR #28 review-2, PR #30 | Committed [`research/evals/ledger.jsonl`](../../research/evals/ledger.jsonl), [`research/LOG.md`](../../research/LOG.md), [`docs/phase1/EVIDENCE.md`](../phase1/EVIDENCE.md) | 2026-11-21 | Shared 2-vCPU cloud VM (`±15–30%` co-tenant load swing); systemd cgroup `memory.peak` includes page cache |
 | Oracle Neoverse-N1 round-2 `best-confirm` & prompt compaction trajectory (`222→199→137→130` tok) | Committed [`research/evals/20261111-075405-best-confirm/details.json`](../../research/evals/20261111-075405-best-confirm/details.json) and earlier round-2 `details.json` stamps (`gen2-full-r2`, `gen2-full-r2b`, `best-final`, `gen11-full`) | 2026-11-10 – 11-11 | Mixed host load across days; token counts are deterministic |

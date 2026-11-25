@@ -2,7 +2,7 @@
 
 - **Form requirements:** **PUBLIC** 2-minute video (`<= 2:00`), **1080p (1920×1080)**, **16:9**, **MP4**, clearly showcasing the **real-time functioning of Prahari on target Arm hardware**.
 - **Core PS3 mentor guidance covered on camera:**
-  1. Physical Arm hardware live (Samsung Galaxy S23 `SM-S911B`, `arm64-v8a` via Samsung Remote Test Lab) — not an x86 emulator.
+  1. Physical Arm hardware live (Samsung Galaxy S23 `SM-S911B`, `arm64-v8a`) — not an x86 emulator.
   2. Real offline proof: **Airplane Mode ON (`✈`)** + live Android **`SecurityException`** (`NO INTERNET` permission).
   3. Legitimate bank/OTP notices handled carefully (not blindly screamed as malicious).
   4. **Llama 3.2 1B via ExecuTorch** generating live explanations on-device (~2.6–3.2 s/check on the S23 with the round-3 build; 1.2–1.5 s with the earlier r1 APK).
@@ -14,9 +14,9 @@
 
 ## 1. Pre-flight setup (do BEFORE hitting Record)
 
-### A. Physical Samsung Galaxy S23 (Samsung Remote Test Lab)
-1. Reserve a **Samsung Galaxy S23 (`SM-S911B`, Android 14, `arm64-v8a`)** in Samsung Remote Test Lab (30+ min slot so it won't expire mid-take).
-2. Start the RTL Remote Debug Bridge (`./rdb`) and connect via **Remote Debug Bridge → Connect** in the RTL browser tab. Approve USB debugging on the phone screen.
+### A. Physical Samsung Galaxy S23 phone
+1. Prepare a **Samsung Galaxy S23 phone (`SM-S911B`, Android 14, `arm64-v8a`)** for a 30+ min session so it won't expire mid-take.
+2. Connect the phone for ADB debugging. Approve USB debugging on the phone screen.
 3. Verify device identity and set `ANDROID_SERIAL` from `adb devices -l`:
    ```sh
    adb devices -l
@@ -40,7 +40,7 @@
    - `Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte` SHA-256: `ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac`
    - `tokenizer.model` SHA-256: `82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55`
 5. **Warm up once before recording** (run KYC sample once so the OS page cache and model load are warm, the APK from `5b59ee2` then took about 1.9 s per warm check on 24 Nov evening (2.6–3.0 s for the earlier round-3 build); a hot phone is slower; return to Home).
-6. **Turn Airplane Mode ON** (either tap the Quick Settings tile on screen or run `adb shell cmd connectivity airplane-mode enable` and verify `adb shell settings get global airplane_mode_on` returns `1`). Confirm the **airplane icon (`✈`)** is clearly visible in the S23 status bar! *(Note: Samsung RTL stays connected over USB/RDB even in airplane mode; do not run `svc power stayon true` as it can drop RDB — set display timeout to 10 minutes via Settings instead.)*
+6. **Turn Airplane Mode ON** (either tap the Quick Settings tile on screen or run `adb shell cmd connectivity airplane-mode enable` and verify `adb shell settings get global airplane_mode_on` returns `1`). Confirm the **airplane icon (`✈`)** is clearly visible in the S23 status bar! *(Note: The phone session stayed connected over the debug connection even in airplane mode; do not run `svc power stayon true` as it can drop the connection — set display timeout to 10 minutes via Settings instead.)*
 
 ### B. Arm Linux terminal clip (recorded separately and spliced at 1:18–1:44)
 Prepare a clean 1080p dark terminal (16–18 pt JetBrains Mono, 16:9 window) on your Arm Linux host (`aarch64`, e.g., Oracle Neoverse-N1 or Neoverse-V2) with the repo checked out at the final submission commit and `HC_PY` / `HC_MODEL_REGISTRY` exported:
@@ -61,7 +61,7 @@ candidates/BEST/bin/monitor --seconds 6
 
 ### C. Recording canvas & OBS / screen-capture settings
 - **Resolution:** `1920×1080` (16:9), **30 fps**, H.264 (`yuv420p`), AAC stereo audio (`48 kHz`, `192 kbps`).
-- **Layout for S23 segments:** Place the Samsung RTL Galaxy S23 phone mirror cleanly on the left/center-left (~45% width, crisp portrait frame, status bar with `✈` icon clearly readable!) and a clean dark side panel on the right showing:
+- **Layout for S23 segments:** Place the Samsung Galaxy S23 phone mirror cleanly on the left/center-left (~45% width, crisp portrait frame, status bar with `✈` icon clearly readable!) and a clean dark side panel on the right showing:
   - Device badge: `Samsung Galaxy S23 (SM-S911B) · Snapdragon 8 Gen 2 · arm64-v8a · Android 14`
   - Runtime badge: `Llama 3.2 1B INT4 QLoRA · ExecuTorch XNNPACK · Airplane Mode ON`
   - Live scenario title (e.g., `1/3 Offline Permission Proof`, `2/3 KYC Scam SMS`, `3/3 Genuine Bank Debit Alert`)
@@ -74,7 +74,7 @@ candidates/BEST/bin/monitor --seconds 6
 | Time | Duration | Visual on screen (1920×1080, 16:9) | Spoken narration (read calmly, leave beats for live generation) |
 |:--|--:|:--|:--|
 | **0:00–0:10** | 10 s | **Title card** over subtle Prahari UI preview: *"Prahari — Offline Scam & Phishing Triage on Arm · Bharat AI-SoC 2026–27 (PS3)"* + badges: `Llama 3.2 1B · ExecuTorch · Arm64 · Built with Llama`. | *"Hi. This is Prahari — an offline, on-device scam and phishing assistant built for Indian smartphone users with Llama 3.2 1B running through ExecuTorch on Arm."* |
-| **0:10–0:28** | 18 s | **Physical Galaxy S23 (RTL live screen).** Zoom callout highlights **Airplane icon (`✈`)** in status bar and `SM-S911B · arm64-v8a` badge. Tap **Offline / Prove it's offline** → screen immediately displays `NO INTERNET / blocked by Android` and `SecurityException: Permission denied (missing INTERNET permission?)` in `12 ms`. | *"We're running live on a physical Samsung Galaxy S23 over Remote Test Lab, with airplane mode switched on. Prahari declares no Android Internet permission at all. When we tap 'Prove it's offline', Android blocks an HTTPS test immediately with a SecurityException, because the app has no network permission. Detection and the Llama explanation both run on this phone."* |
+| **0:10–0:28** | 18 s | **Physical Galaxy S23 (live phone screen).** Zoom callout highlights **Airplane icon (`✈`)** in status bar and `SM-S911B · arm64-v8a` badge. Tap **Offline / Prove it's offline** → screen immediately displays `NO INTERNET / blocked by Android` and `SecurityException: Permission denied (missing INTERNET permission?)` in `12 ms`. | *"We're running live on a physical Samsung Galaxy S23, with airplane mode switched on. Prahari declares no Android Internet permission at all. When we tap 'Prove it's offline', Android blocks an HTTPS test immediately with a SecurityException, because the app has no network permission. Detection and the Llama explanation both run on this phone."* |
 | **0:28–1:00** | 32 s | **Live KYC Scam SMS on Galaxy S23 (Airplane Mode `✈` still visible).** Tap **KYC scam SMS** sample → tap **Check**. Show **real-time** completion, about 2 s (no cut!). Result appears: red **`DANGEROUS / खतरनाक`**, numbered bilingual steps (1. Don't open link, 2. Check bank app, 3. Report on Sanchar Saathi Chakshu), Chakshu & 1930 buttons. Scroll down to show evidence chips, **Explained on this phone by Llama 3.2** card with fallibility warning, and expand **On-device stats** (APK from `5b59ee2`, 24 Nov evening: `~13–16 ms` detector, `~0.9 s` first token, `~32 tok/s`, `Total ~1.9 s`, `ExecuTorch · XNNPACK`, `CPU ABI: arm64-v8a`; read out whatever the card shows). *(Final APK: briefly tap `हिंदी` (chrome, steps and the Hindi summary switch; Llama's sentence stays English) and `Listen`, then tap `EN` again before the next shot.)* | *"Now let's test a fake SBI KYC suspension SMS — completely offline. A lightweight local detector classifies the scam mechanism in a few tens of milliseconds, and Llama 3.2 1B writes a plain-language explanation right on the phone's Arm CPU in about two seconds. Safe steps come first in English and Hindi, with one-tap Sanchar Saathi Chakshu and 1930 helpline actions, followed by quoted evidence and the AI summary."* |
 | **1:00–1:18** | 18 s | **Legitimate Bank Alert & Safe Notice on Galaxy S23 (Airplane Mode `✈`).** Tap **Check another** → select **Bank debit alert** (or genuine bill reminder) → tap **Check**. Show the amber **`CHECK THIS ALERT`** banner ("Looks like a bank alert. Scammers copy these, so check it in your bank app.") — or slate-blue **`NO RISK FOUND — still verify`** on the bill reminder. Show completion in about 2 s. | *"Real bank and OTP alerts share words with scams, so Prahari avoids blindly screaming 'scam' on everyday notices. A genuine-looking bank debit alert is shown as a cautious verification check, directing the user straight to their official bank app."* |
 | **1:18–1:44** | 26 s | **Arm Linux Terminal (`aarch64`) + KleidiAI & Live Monitor overlay.** Cut to crisp terminal: `uname -m` (`aarch64`), run `candidates/BEST/bin/app --demo` showing SMS, URL, flow, and prompt-injection verdicts + Llama stats; then brief terminal clip of `bin/monitor --seconds 6` catching `scan_demo.py --open` as a port scan without root. Small bottom-right metric card: **Arm Neoverse-V2:** `54.17% CPU in KleidiAI i8mm/dotprod kernels (perf)`, `1.73 s/item @ 2T`, `104.6 tok/s @ 8T`, `unshare -n offline verified`. | *"The same pipeline runs natively on Arm Linux. Here `bin/app --demo` triages SMS, lookalike URLs, network events, and prompt injection locally, while `bin/monitor` watches live Linux TCP connections without root to flag a port scan. Profiling on Arm Neoverse-V2 confirmed over 54 percent of CPU samples run directly inside Arm KleidiAI int8 kernels, scaling past 100 tokens per second across 8 threads."* |
@@ -104,12 +104,12 @@ candidates/BEST/bin/monitor --seconds 6
    - `duration <= 120.0` seconds
    - `codec_name=h264` and `aac`
    - `sha256sum prahari-phase1-demo-1080p.mp4` recorded in your submission manifest.
-4. **Clean up RTL device after recording:**
+4. **Clean up phone after recording:**
    ```sh
    adb shell cmd connectivity airplane-mode disable
    adb uninstall in.prahari.app
    ```
-   Close the Samsung Remote Test Lab session cleanly in the browser.
+   Close the phone session cleanly in the browser.
 5. **Upload & verify public playback:**
    - Upload `prahari-phase1-demo-1080p.mp4` to a **PUBLIC** URL (YouTube Public or Unlisted if accepted, or public Google Drive/direct link — check exact wording on the Phase 1 form; "PUBLIC" means viewable without sign-in!).
    - Open the final link in a **private/incognito browser window** to confirm it plays immediately at 1080p with clear audio before pasting into the one-shot submission form.

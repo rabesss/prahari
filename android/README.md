@@ -39,8 +39,8 @@ The joblib pickles record scikit-learn 1.9.1. Chaquopy's [Android wheel index](h
 
 ## Remote phone checklist
 
-1. On a computer with `adb` on `PATH` and the model files locally available, reserve an arm64 Galaxy phone in Samsung Remote Test Lab, open its web client and download its Remote Debug Bridge (RDB) client. Extract it and run `./rdb` on Linux (or run `rdb.exe` on Windows); leave it running. See [Samsung's RDB instructions](https://developer.samsung.com/remotetestlab/docs/70/tests-on-devices).
-2. In the RTL web client choose **Remote Debug Bridge → Connect**, approve the USB debugging prompt, then run `adb devices -l`. Set the actual serial shown by that command, e.g. `export ANDROID_SERIAL=localhost:PORT`; do not guess the port. Check `adb shell getprop ro.product.model`, `adb shell getprop ro.product.cpu.abilist`, and `adb shell getprop ro.build.version.sdk` (arm64 and API 28+ required).
+1. On a computer with `adb` on `PATH` and the model files locally available, connect an arm64 Samsung Galaxy S23 phone using the available device connection.
+2. Approve the USB debugging prompt on the phone, then run `adb devices -l`. Set the actual serial shown by that command, e.g. `export ANDROID_SERIAL=localhost:PORT`; do not guess the port. Check `adb shell getprop ro.product.model`, `adb shell getprop ro.product.cpu.abilist`, and `adb shell getprop ro.build.version.sdk` (arm64 and API 28+ required).
 3. Download and unzip the CI APK artifact on the computer. Install and launch once to create the app-specific directory:
 
    ```sh

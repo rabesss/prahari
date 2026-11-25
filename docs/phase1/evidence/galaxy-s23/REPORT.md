@@ -1,6 +1,6 @@
-# Samsung RTL run 8 — real-device inference
+# Samsung Galaxy S23 phone run 8 — real-device inference
 
-Date: 2026-11-23, Asia/Kolkata. Samsung Galaxy S23 SM-S911B-IN4 in Noida, Android 14; ADB properties: SM-S911B, Samsung, Qualcomm SM8550, CPU ABI arm64-v8a (also armeabi-v7a, armeabi). See `device.txt`.
+Date: 2026-11-23, Asia/Kolkata. Samsung Galaxy S23 SM-S911B-IN4, Android 14; ADB properties: SM-S911B, Samsung, Qualcomm SM8550, CPU ABI arm64-v8a (also armeabi-v7a, armeabi). See `device.txt`.
 
 The app was installed by ADB and both transferred files matched their expected device-side SHA-256 hashes (`device-sha256.txt`). Llama 3.2 1B INT4 produced explanations for KYC, bank debit alert, lookalike link, and port scan on this phone. The app reported ExecuTorch / XNNPACK and CPU ABI arm64-v8a on each expanded stats card. KYC was DANGEROUS, bank debit alert SUSPICIOUS, and the link and port scan DANGEROUS. The bank explanation repeated its opening sentence, and the link explanation included the unrelated phrase “Can I help you with something else?” These are visible generation-quality defects. These results demonstrate execution on this one device, not broad accuracy or performance across phones.
 

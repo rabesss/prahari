@@ -47,7 +47,7 @@
 | Absolute home-directory paths in `research/evals/` | Relative (`candidates/...`) in every commit. Future `bin/eval` runs still write absolute paths, so relativise new summaries before publishing them. |
 | Personal name | None in the tree or in commit messages on `main`; the report author is "Prahari contributors". |
 | Measurement-host paths (`/var/tmp/arm-bharat-ai-soc-*`) in `models/registry.json`, `eval/`, `bench/` | Not personal; documented in the README as host-specific. |
-| Raw S23 and Neoverse-V2 captures (`docs/perf/evidence/`, `evidence/galaxy-s23-20261124/`) | Unedited by design except the cloud box hostname (`<box>`). They include the test phone's `logcat.txt` and device properties of a Samsung Remote Test Lab phone; no account, e-mail or serial was found. |
+| Raw S23 and Neoverse-V2 captures (`docs/perf/evidence/`, `evidence/galaxy-s23-20261124/`) | Unedited by design except the cloud box hostname (`<box>`). They include the test phone's `logcat.txt` and device properties of a Samsung Galaxy S23 phone; no account, e-mail or serial was found. |
 | Superseded candidate directories (`candidates/BEST_prev_*`, `gen*`, `indic1`) | Harmless; optional cleanup. |
 
 ## 4. Note for local clones

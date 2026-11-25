@@ -18,7 +18,7 @@
   - [x] Run `gitleaks detect --source . --no-banner --redact` and confirm zero real secrets (25 Nov, gitleaks 8.30.1 over `main` history and the tree: only the two public SHA-256 model digests listed in RELEASE-AUDIT §1).
 - [ ] **4. Verify third-party licences & attributions:** Confirm **Built with Llama** and Llama 3.2 Community License links, CC BY 4.0 dataset citations and the NSL-KDD citation (UNB requires citing the dataset and Tavallaee et al. 2009) in `candidates/BEST/DATA.md`, and zero weights/raw datasets in Git.
 - [ ] **5. Record & verify the 2-minute 1080p 16:9 MP4 demo video** following [demo-video.md](demo-video.md):
-  - [ ] Download final green `arm64-v8a` APK from `main` CI (`prahari-debug-apk`), install on physical Samsung Galaxy S23 (RTL), stage verified `.pte`/`tokenizer.model`, enable **Airplane Mode (`✈`)**, and record live checks + `SecurityException` + Arm Linux `--demo` / `bin/monitor`.
+  - [ ] Download final green `arm64-v8a` APK from `main` CI (`prahari-debug-apk`), install on physical Samsung Galaxy S23 phone, stage verified `.pte`/`tokenizer.model`, enable **Airplane Mode (`✈`)**, and record live checks + `SecurityException` + Arm Linux `--demo` / `bin/monitor`.
   - [ ] Confirm `1920x1080`, `16:9`, `<= 120 s`, H.264 + AAC audio via `ffprobe`.
   - [ ] Upload to a **PUBLIC** link and verify playback in an **incognito browser window** (no login wall).
 - [ ] **6. Flip GitHub repository to PUBLIC** and verify in an **incognito browser window** that `README.md`, `docs/phase1/report.pdf`, and all screenshots render cleanly with zero 404 links.

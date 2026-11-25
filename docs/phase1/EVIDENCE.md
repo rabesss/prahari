@@ -1,6 +1,6 @@
 # Evidence ledger
 
-Updated: 24 November 2026 (`main` commit `ceca10c`, through PR #75, after the history rewrite; all commit SHAs here are post-rewrite). The fuller performance write-up and the unedited raw captures are in [`docs/perf/`](../perf/README.md); `docs/phase1/evidence/` keeps a smaller copy plus the sealed-holdout scores. **Physical phone:** RTL run 8 (23 Nov) used the r1 APK; the round-3 build was measured on 24 Nov (PR #60, `docs/perf/s23-final-20261124.md`, `evidence/galaxy-s23-20261124/`) and ran about half as fast. Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
+Updated: 24 November 2026 (`main` commit `ceca10c`, through PR #75, after the history rewrite; all commit SHAs here are post-rewrite). The fuller performance write-up and the unedited raw captures are in [`docs/perf/`](../perf/README.md); `docs/phase1/evidence/` keeps a smaller copy plus the sealed-holdout scores. **Physical phone:** run 8 (23 Nov) used the r1 APK; the round-3 build was measured on 24 Nov (PR #60, `docs/perf/s23-final-20261124.md`, `evidence/galaxy-s23-20261124/`) and ran about half as fast. Paths below are relative to the repository root unless noted. Commands inspect recorded evidence; they are not instructions to run hidden evaluation. No hidden rows or item-level holdout texts are committed.
 
 ## Core architecture, datasets, and historical baselines (`[S1]`–`[S7]`)
 
@@ -25,7 +25,7 @@ Updated: 24 November 2026 (`main` commit `ceca10c`, through PR #75, after the hi
 
 ## Physical Samsung Galaxy S23 run (`[S9]`)
 
-Measured **23 November 2026** (Asia/Kolkata) on a physical **Samsung Galaxy S23 (`SM-S911B-IN4` / `SM-S911B`, Qualcomm Snapdragon 8 Gen 2 `SM8550`, Android 14, CPU ABI `arm64-v8a`, flags include `asimddp`, `i8mm`, `bf16`)** via Samsung Remote Test Lab (Noida). Raw evidence: `docs/phase1/evidence/galaxy-s23/` (run report, `meminfo.txt`, device properties, on-device SHA-256 output, visible text of every stats screen). App build: r1 `arm64-v8a` APK (ExecuTorch Android 1.5.1 XNNPACK, Chaquopy 17.2.0). Both `.pte` and `tokenizer.model` SHA-256 hashes verified on-device prior to testing.
+Measured **23 November 2026** (Asia/Kolkata) on a physical **Samsung Galaxy S23 (`SM-S911B-IN4` / `SM-S911B`, Qualcomm Snapdragon 8 Gen 2 `SM8550`, Android 14, CPU ABI `arm64-v8a`, flags include `asimddp`, `i8mm`, `bf16`)**. Raw evidence: `docs/phase1/evidence/galaxy-s23/` (run report, `meminfo.txt`, device properties, on-device SHA-256 output, visible text of every stats screen). App build: r1 `arm64-v8a` APK (ExecuTorch Android 1.5.1 XNNPACK, Chaquopy 17.2.0). Both `.pte` and `tokenizer.model` SHA-256 hashes verified on-device prior to testing.
 
 | Claim | Status | Evidence and qualification |
 |:--|:--|:--|

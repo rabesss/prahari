@@ -64,7 +64,7 @@ median 122.5 prompt / 28 generated tokens, `_unsafe_reset_threadpool(n)` before 
 - **Decode scaling (1T → 8T, warm):** `25.69 → 104.31 tok/s` (**4.06×**; memory-bandwidth-bound INT4 matrix-vector multiply saturates earlier than prefill).
 - **Neoverse-N1 vs Neoverse-V2 at 2 threads (indicative only, not a controlled comparison):** prefill `82.54 → 210.6 tok/s` (~2.6×), decode `~20 → 46.7 tok/s` (~2.3×). The N1 figures come from `bin/eval` on a shared VM (28 items, median ~130 prompt tokens, co-tenant load) and the V2 figures from 6 demo items on a dedicated box, so workload and conditions differ. On a like-for-like whole-process basis (start-up + model load + all items ÷ n), N1 took 3.79–4.79 s/item (median 3.85) and V2 2.485 s/item, about 1.55×. V2 exposes `i8mm` (used by the KleidiAI prefill kernel above); N1 does not.
 
-## Samsung Galaxy S23 Per-Check Breakdown (RTL Run 8, 2026-11-23)
+## Samsung Galaxy S23 Per-Check Breakdown (phone run 8, 2026-11-23)
 
 All values extracted verbatim from `*-stats.xml` UI dumps and `meminfo.txt` on physical Galaxy S23
 (`SM-S911B`, Qualcomm SM8550, Android 14, `arm64-v8a`):
@@ -95,5 +95,5 @@ All values extracted verbatim from `*-stats.xml` UI dumps and `meminfo.txt` on p
 
 - [`methodology.md`](methodology.md) — Hardware inventory, KleidiAI `perf` dispatch proof (`54.17%`), offline verification tiers, and complete artefact provenance table.
 - [`optimisations.md`](optimisations.md) — Honest inventory of shipped, optional/benchmarked, experimental, and deliberately omitted optimisations with measured effects.
-- [`s23-rtl-runbook.md`](s23-rtl-runbook.md) — What is already captured vs what a fresh 30-minute Galaxy S23 RTL session adds, with exact step-by-step commands.
+- [`s23-rtl-runbook.md`](s23-rtl-runbook.md) — What is already captured vs what a fresh 30-minute Galaxy S23 phone session adds, with exact step-by-step commands.
 - [`../../bench/perf/README.md`](../../bench/perf/README.md) — Reproducible Arm Linux and Android (`adb`) benchmark harness guide.
