@@ -82,9 +82,9 @@
 \setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
 \renewcommand{\arraystretch}{1.18}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
-% Body tables are 9.3 pt; \AppendixTables (placed before Appendix A) sets the appendix tables to 9.8 pt,
-% close to the body text, since they are reference material read line by line.
-\newcommand{\prahariTableFont}{\fontsize{9.3}{11.1}\selectfont}
+% Body tables are 9.6 pt, close to the 10.5 pt body text; \AppendixTables (placed before Appendix A)
+% sets the appendix tables to 9.6 pt, since they are reference material read line by line.
+\newcommand{\prahariTableFont}{\fontsize{9.6}{11.4}\selectfont}
 % Body tables never split across pages: every row end acts as \\* (no page break) and the whole
 % table is one chunk. \AppendixTables lets the long appendix index break between rows again.
 \makeatletter
@@ -94,7 +94,7 @@
   \def\crcr{\LT@crcr\noalign{\nobreak}}\let\cr\crcr
   \LT@t@bularcr}
 \let\LT@tabularcr\prahariLTcrKeep
-\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.8}{11.8}\selectfont}%
+\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.6}{11.4}\selectfont}%
   \let\LT@tabularcr\prahariLTcrOrig}
 % \KeepTables turns the no-split rule back on (for the short reproducibility card)
 \newcommand{\KeepTables}{\let\LT@tabularcr\prahariLTcrKeep}
@@ -131,11 +131,14 @@
 % centred) keeps the shading and rules inside the text block.
 % Inside a longtable the rules are plain \hrule lines in \noalign, which span the full text width,
 % so they line up exactly with the row shading.
+% A hand-written table with a two-row header and no continuation head starts shading at row 4:
+% \def\prahariZebraStart{4} inside a group around it.
+\def\prahariZebraStart{5}
 \newcommand{\prahariLTrule}[4]{\noalign{\vskip#3{\color{#2}\hrule height #1}\vskip#4}}
 \AtBeginEnvironment{longtable}{\prahariTableFont\setlength{\tabcolsep}{5pt}%
   % Pandoc emits the caption, first head and the continuation head (its "(continued)" caption and
   % header row) as rows 1-4: shading starts at the first data row (row 5, white), then alternates.
-  \rowcolors{5}{white}{prahariZebra}%
+  \rowcolors{\prahariZebraStart}{white}{prahariZebra}%
   \addtolength{\linewidth}{-2\tabcolsep}%
   \def\toprule{\prahariLTrule{\heavyrulewidth}{prahariIndigo}{0pt}{\belowrulesep}}%
   \def\midrule{\prahariLTrule{\lightrulewidth}{prahariBorder}{\aboverulesep}{\belowrulesep}}%
@@ -161,12 +164,15 @@
 
 % Title block: left-aligned, indigo bar, metadata on one line
 \makeatletter
+% Pandoc's template would append the subtitle inside \@title (its \providecommand yields to this one),
+% leaving no room to space it; keep it separate and set it 8 pt below the title.
+\newcommand{\subtitle}[1]{\gdef\@subtitle{#1}}
 \renewcommand{\maketitle}{%
   \thispagestyle{plain}%
   \begingroup\raggedright
   {\color{prahariIndigo}\rule{\linewidth}{3pt}}\par\vspace{10pt}
   {\fontsize{21}{26}\selectfont\bfseries\color{prahariIndigo}\@title\par}
-  \ifdefined\@subtitle\vspace{6pt}{\large\color{prahariSlate}\@subtitle\par}\fi
+  \ifdefined\@subtitle\vspace{8pt}{\large\bfseries\color{prahariIndigo}\@subtitle\par}\fi
   \vspace{8pt}
   {\small\color{prahariMuted}\@author{} · \@date\par}
   \vspace{6pt}{\color{prahariBorder}\rule{\linewidth}{0.6pt}}\par
@@ -216,7 +222,7 @@
 
 % Names never break at a hyphen: no hyphenation inside these words, and no breaks at explicit
 % hyphens (Neoverse-V2, Indian-context); cross-references use non-breaking spaces in report.md.
-\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy Table Tables Figure Figures Section Sections Appendix India}
+\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy Gemini Table Tables Figure Figures Section Sections Appendix India}
 \exhyphenpenalty=10000
 % A page never ends on a hyphenated line, so no word is split across two pages.
 \brokenpenalty=10000
@@ -241,7 +247,7 @@
 % References: each entry starts with \refl{n}, a label box as wide as the widest label ("[24]"
 % plus a space); the hanging indent equals that width, so continuation lines start under the title.
 \newlength{\prahariRefLabelW}
-\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.6}{11.6}\selectfont\setlength{\parskip}{1.5pt plus 1pt}\setlength{\parindent}{0pt}%
+\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.4}{11.2}\selectfont\setlength{\parskip}{1.5pt plus 1pt}\setlength{\parindent}{0pt}%
   \settowidth{\prahariRefLabelW}{\textbf{[24]}\hspace{0.5em}}%
   \raggedright\everypar{\hangindent=\prahariRefLabelW\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
@@ -256,6 +262,17 @@
 % File paths break only after "/" (never inside a word); hashes may break anywhere.
 \DeclareUrlCommand\path{\urlstyle{tt}\def\UrlBreaks{\do\/}\def\UrlBigBreaks{}\def\UrlNoBreaks{}}
 \DeclareUrlCommand\hash{\urlstyle{tt}}
+% \fpath{...} in a list of files: the path is kept whole when it fits the column, so a list breaks only
+% between files; a path longer than the column still breaks after "/".
+\newcommand{\fpath}[1]{\sbox0{\path{#1}}\ifdim\wd0>\linewidth\path{#1}\else\mbox{\usebox0}\fi}
+
+% Worked-example box: light frame, unbreakable, set at the table font size.
+\usepackage[most]{tcolorbox}
+\newtcolorbox{prahariExample}[1]{enhanced, breakable=false, colback=prahariBg, colframe=prahariBorder,
+  boxrule=0.6pt, arc=2pt, left=7pt, right=7pt, top=5pt, bottom=5pt, before skip=8pt, after skip=8pt,
+  fonttitle=\bfseries\color{prahariIndigo}, coltitle=prahariIndigo, colbacktitle=prahariBg,
+  title={#1}, attach title to upper={\par\smallskip}, fontupper=\prahariTableFont\raggedright\setlength{\parskip}{3pt},
+  float=tbp}
 
 % Pandoc writes \label{...} after each heading. In vertical mode the label's whatsit made the
 % following glue a legal page break, so headings could be stranded at a page bottom. Forbid it.

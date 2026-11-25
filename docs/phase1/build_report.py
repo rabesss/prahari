@@ -154,14 +154,16 @@ V2_ITEM_SD = np.array([0.031, 0.002, 0.377, 0.015])
 # Llama 3.2 1B INT4 decode speed and per-item wall latency on each Arm target, top to bottom.
 # Coloured by device: Neoverse-V2 indigo, Neoverse-N1 slate grey, Galaxy S23 builds teal
 # (intermediate lighter).
+# The printed item time keeps the precision of its source (Tables 1, 6 and 7, Sections 5.1-5.2), so
+# each value reads the same here as in the text.
 ARM_TARGETS = [
-    ("V2, 8 threads", 104.6, 0.98, INDIGO),
-    ("V2, 2 threads", 46.7, 1.73, INDIGO),
-    ("S23 first, warm", 43.4, 1.20, TEAL),
-    ("S23 first, airplane", 39.0, 1.42, TEAL),
-    ("S23 intermediate", 21.5, 2.90, TEAL_LIGHT),
-    ("S23 final", 32.5, 1.86, TEAL),
-    ("N1, 2 vCPU", 19.9, 3.84, N1_SLATE),
+    ("V2, 8 threads", 104.6, "0.980", INDIGO),
+    ("V2, 2 threads", 46.7, "1.728", INDIGO),
+    ("S23 first, warm", 43.4, "1.20", TEAL),
+    ("S23 first, airplane", 39.0, "1.42", TEAL),
+    ("S23 intermediate", 21.5, "2.90", TEAL_LIGHT),
+    ("S23 final", 32.5, "1.857", TEAL),
+    ("N1, 2 vCPU", 19.9, "3.84", N1_SLATE),
 ]
 
 # Galaxy S23 warm KYC check, total time per item (s), by build (Section 5, Table 6): label,
@@ -277,16 +279,16 @@ def build_arm_perf_chart() -> Path:
     """(A) Neoverse-V2 thread scaling; (B) decode speed and item wall latency on every Arm target.
 
     The panels are separate subfigures so each gets its own width: B's long target names do
-    not push A's plot area to the right. At 5.5 in tall it still fits on one page with its
+    not push A's plot area to the right. At 5.05 in tall it still fits on one page with its
     surrounding text; every label is at least 10 pt.
     """
-    fig = plt.figure(figsize=(FIG_W, 5.5), dpi=DPI, layout="constrained")
+    fig = plt.figure(figsize=(FIG_W, 5.05), dpi=DPI, layout="constrained")
     fig.get_layout_engine().set(h_pad=0.06, hspace=0.03)
     sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.15])
 
     # Panel A: two side-by-side plots sharing the thread axis. Decode speed is drawn as bars and
     # item wall latency as its own line plot, so the latency series never sits on the bars.
-    ax1, ax1b = sf_a.subplots(1, 2, width_ratios=[1.3, 1.0])
+    ax1, ax1b = sf_a.subplots(1, 2, width_ratios=[1.1, 1.0])
     x = np.arange(len(V2_THREADS))
     thread_ticks = [str(t) for t in V2_THREADS]
 
@@ -308,16 +310,15 @@ def build_arm_perf_chart() -> Path:
                   mew=1.0, capsize=3, zorder=4)
     ax1b.set_xticks(x, thread_ticks)
     ax1b.tick_params(axis="x", length=0)
-    ax1b.set_xlim(-0.4, 4.05)
+    ax1b.set_xlim(-0.5, 3.5)
     ax1b.set_xlabel("Threads")
     ax1b.set_ylabel("Item wall latency (s)")
     ax1b.set_ylim(0, 3.6)
     ax1b.set_yticks([0, 1, 2, 3])
-    # The line falls to the right, so the upper right of each point is empty: every label sits there,
-    # a fixed offset right of the point and high enough above its error bar to clear the next
-    # point's error bar cap.
+    # Every label is centred above its own marker, clear of the top of its error bar; the 2-thread
+    # label sits higher so the steep segment from the 1-thread point does not cross it.
     for xi, v, sd in zip(x, V2_ITEM_WALL, V2_ITEM_SD):
-        ax1b.text(xi + 0.1, v + sd + 0.25, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
+        ax1b.text(xi, v + sd + (0.42 if xi == 1 else 0.14), f"{v:.3f} s", ha="center", va="bottom", fontsize=FT, color=SLATE_DARK,
                   fontweight="bold", zorder=5)
     sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4 (ExecuTorch XNNPACK)", x=0.01,
                   ha="left", fontsize=FTITLE, fontweight="bold", color=INK)
@@ -339,7 +340,7 @@ def build_arm_perf_chart() -> Path:
     # No in-plot note: the figure caption states that the bars are not a controlled comparison.
     for b, v, l in zip(hb, tps, lat):
         cy = b.get_y() + b.get_height() / 2
-        label = f"{v:.1f} tok/s · {l:.2f} s"
+        label = f"{v:.1f} tok/s · {l} s"
         ax2.text(v + 1.5, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
     families = [Patch(color=INDIGO, label="Neoverse-V2"), Patch(color=N1_SLATE, label="Neoverse-N1"),
                 Patch(color=TEAL, label="Galaxy S23"), Patch(color=TEAL_LIGHT, label="S23 intermediate")]
@@ -379,7 +380,7 @@ def build_eval_chart() -> Path:
     Every value label is horizontal and centred a fixed 0.02 above its own bar; none is nudged.
     The bars of a group are spread apart (centres 0.50 apart, width 0.24) so a label wider than
     its bar still clears the neighbouring bar; the build fails if any label touches another bar.
-    An FPR that was not recorded is printed as n/r; the caption explains it.
+    An FPR that was not recorded is printed as an em dash, as in Table 8; the caption explains it.
     """
     fig, ax = plt.subplots(figsize=(FIG_W, 2.6), dpi=DPI, layout="constrained")
     _style_ax(ax)
@@ -408,13 +409,14 @@ def build_eval_chart() -> Path:
                              fontsize=FT, color=INDIGO, fontweight="bold", zorder=4))
         owners.append(bar)
     for bar, v in zip(b2, fpr):
-        txt, base = ("n/r", 0.0) if v is None else (f"{v:.3f}", v)
+        txt, base = ("—", 0.0) if v is None else (f"{v:.3f}", v)
         texts.append(ax.text(bar.get_x() + bar.get_width() / 2, base + 0.02, txt, ha="center", va="bottom",
                              fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=4))
         owners.append(bar)
     ax.set_xticks(x, labels, fontsize=10)
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(x[0] - 0.55, x[-1] + 0.55)
+    # Extra room on the left so the first value label (0.925) clears the y axis.
+    ax.set_xlim(x[0] - 0.75, x[-1] + 0.6)
     ax.set_ylim(0, 1.2)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel("Score or rate")
@@ -460,14 +462,25 @@ def build_memory_chart() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Figure: results at a glance (2x2)
+# Figure: results at a glance (three panels)
 # ---------------------------------------------------------------------------
 
+def _inside(fig: plt.Figure, ax: plt.Axes, texts, pad_pt: float = 1.0) -> list[str]:
+    """Return the labels whose rendered extent leaves the axes' plot area."""
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    box = ax.get_window_extent(r)
+    pad = pad_pt * fig.dpi / 72
+    return [t.get_text() for t in texts
+            if (lambda b: b.x0 < box.x0 + pad or b.x1 > box.x1 - pad or b.y1 > box.y1 - pad)(t.get_window_extent(r))]
+
+
 def build_overview_chart() -> Path:
-    """One-page visual summary: detection, S23 latency, Neoverse-V2 throughput, S23 memory.
+    """One-figure summary: held-back detection, S23 warm latency by build, Neoverse-V2 decode speed.
 
     Figure 1 sits on the first pages, so its type is set larger than the other figures (11.5 pt
-    labels, 12 pt titles), close to the 10.5 pt body text as printed.
+    labels), close to the 10.5 pt body text as printed. Memory has its own figure (Figure 4), so it is
+    not repeated here.
     """
     with plt.rc_context({"font.size": FT1, "xtick.labelsize": FT1, "ytick.labelsize": FT1,
                          "axes.labelsize": FT1, "legend.fontsize": FT1, "axes.titlesize": 12.5}):
@@ -475,97 +488,87 @@ def build_overview_chart() -> Path:
 
 
 def _build_overview_chart() -> Path:
-    fig, axs = plt.subplots(2, 2, figsize=(FIG_W, 5.6), dpi=DPI, layout="constrained")
-    fig.get_layout_engine().set(h_pad=0.1, w_pad=0.1, hspace=0.08, wspace=0.06)
-    (a, b), (c, d) = axs
+    fig = plt.figure(figsize=(FIG_W, 4.45), dpi=DPI, layout="constrained")
+    fig.get_layout_engine().set(h_pad=0.08, w_pad=0.08, hspace=0.07, wspace=0.05)
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 1.0], width_ratios=[1.15, 1.0])
+    a = fig.add_subplot(gs[0, :])
+    b = fig.add_subplot(gs[1, 0])
+    c = fig.add_subplot(gs[1, 1])
 
-    # (a) Detection on the held-back sets.
+    # (a) Detection on the held-back sets, across the full width so every label (three decimals,
+    # as in Table 8) has room: within a group the recall and FPR labels clear the other bar.
     _style_ax(a)
     held = [r for r in DETECTION if r[5] == "held"]
+    names = {"v3": "India v3 split", "Blind set": "Blind set", "v4": "India v4 split", "Sealed": "Sealed holdout"}
     x = np.arange(len(held))
-    # Bars are narrower than their spacing so the FPR labels (wider than a bar) clear the
-    # tall recall bar beside them; _keep_clear nudges any label that would still touch one.
-    w, off = 0.30, 0.20
+    w, off = 0.28, 0.20
     rb = a.bar(x - off, [r[2] for r in held], width=w, color=INDIGO, label="Recall", zorder=3)
     fb = a.bar(x + off, [r[3] for r in held], width=w, color=AMBER, label="FPR", zorder=3)
-    # Every value label is horizontal and sits just above its bar; _keep_clear (after layout)
-    # nudges any label that would touch the neighbouring bar.
     a_texts, a_owners = [], []
     for bar, v in zip(rb, [r[2] for r in held]):
-        a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center",
+        a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.025, f"{v:.3f}", ha="center",
                               va="bottom", fontsize=FT1, color=INDIGO, fontweight="bold"))
         a_owners.append(bar)
     for bar, v in zip(fb, [r[3] for r in held]):
-        a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center",
+        a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.025, f"{v:.3f}", ha="center",
                               va="bottom", fontsize=FT1, color=AMBER_TEXT, fontweight="bold", zorder=5))
         a_owners.append(bar)
-    # Short one-word set names keep each tick label to two lines at 10 pt.
-    a.set_xticks(x, [f"{r[0].split()[0]}\nn={r[1]}" for r in held])
+    a.set_xticks(x, [f"{names[r[0]]}\nn = {r[1]}" for r in held])
     a.tick_params(axis="x", length=0)
-    a.set_ylim(0, 1.32)
-    a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    a.legend(loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.02))
+    a.set_xlim(-0.62, len(held) - 0.38)
+    a.set_ylim(0, 1.2)
+    a.set_yticks([0, 0.5, 1.0])
     a.set_ylabel("Recall or FPR")
     a.set_title("Detection on held-back sets", loc="left")
+    a.legend(loc="lower right", bbox_to_anchor=(1.0, 0.98), ncol=2, frameon=False, borderaxespad=0.0,
+             handlelength=1.1, columnspacing=1.0)
 
-    # (b) Galaxy S23 warm KYC check latency. Horizontal bars so every build name fits on
-    # one line without hyphenation.
+    # (b) Galaxy S23 warm KYC check latency. Horizontal bars so every build name fits on one line.
     _style_ax(b)
-    names = [s[0] for s in S23_LATENCY]
+    bnames = [s[0] for s in S23_LATENCY]
     vals = [s[1] for s in S23_LATENCY]
     yb = np.arange(len(vals))[::-1]
     b.axvspan(1.0, 2.0, color=INDIGO_LIGHT, ec="#C7D2FE", lw=0.8, zorder=1)
     bb = b.barh(yb, vals, height=0.62, color=[s[3] for s in S23_LATENCY], zorder=3)
+    b_texts = []
     for bar, s in zip(bb, S23_LATENCY):
         if s[4]:
             bar.set_hatch(s[4])
             bar.set_edgecolor("white")
             bar.set_linewidth(0)
-        b.text(s[1] + 0.07, bar.get_y() + bar.get_height() / 2, s[2], ha="left", va="center",
-               fontsize=FT1, color=INK, fontweight="bold")
-    b.set_yticks(yb, names)
+        b_texts.append(b.text(s[1] + 0.07, bar.get_y() + bar.get_height() / 2, s[2], ha="left", va="center",
+                              fontsize=FT1, color=INK, fontweight="bold"))
+    b.set_yticks(yb, bnames)
     b.tick_params(axis="y", length=0)
-    b.set_ylim(-0.55, len(vals) - 0.45 + 0.75)
-    b.set_xlim(0, 3.75)
-    b.set_xticks([0, 1, 2, 3])
+    b.set_ylim(-0.55, len(vals) - 0.45 + 1.0)
+    b.set_xlim(0, 4.3)
+    b.set_xticks([0, 1, 2, 3, 4])
     b.set_xlabel("Total time per check (s)")
-    b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT1,
-           color=INDIGO, fontweight="bold")
-    b.set_title("Galaxy S23 KYC check", loc="left")
+    b_texts.append(b.text(1.5, len(vals) - 0.45 + 0.5, "1–2 s target", ha="center", va="center", fontsize=FT1,
+                          color=INDIGO, fontweight="bold"))
+    b.set_title("Galaxy S23 warm KYC check", loc="left")
 
     # (c) Neoverse-V2 decode speed vs threads.
     _style_ax(c)
     c.errorbar(V2_THREADS, V2_DECODE, yerr=V2_DECODE_SD, fmt="o-", color=INDIGO, lw=2, ms=6, capsize=3, zorder=3)
+    c_texts = []
     for t, v in zip(V2_THREADS, V2_DECODE):
-        c.text(t, v + 7, f"{v:.1f}", ha="center", va="bottom", fontsize=FT1, color=INDIGO, fontweight="bold")
+        c_texts.append(c.text(t, v + 7, f"{v:.1f}", ha="center", va="bottom", fontsize=FT1, color=INDIGO,
+                              fontweight="bold"))
     c.set_xscale("log", base=2)
     c.set_xticks(V2_THREADS, [str(t) for t in V2_THREADS])
     c.minorticks_off()
-    c.set_xlim(0.8, 10)
-    c.set_ylim(0, 130)
+    c.set_xlim(0.7, 11.5)
+    c.set_ylim(0, 132)
     c.set_xlabel("Threads")
     c.set_ylabel("Decode speed (tok/s)")
-    c.set_title("Neoverse-V2 decode speed", loc="left")
-
-    # (d) Galaxy S23 memory.
-    _style_ax(d)
-    total_mib = MEM_TOTAL_KIB / 1024
-    native = MEM_ROWS[0][1] / 1024
-    rows = [("Total RSS", MEM_RSS_MIB, SLATE_LIGHT), ("Total PSS", total_mib, SLATE),
-            ("Native heap", native, INDIGO), ("Everything\nelse", total_mib - native, INDIGO_MID)]
-    yd = np.arange(len(rows))[::-1]
-    db = d.barh(yd, [r[1] for r in rows], height=0.6, color=[r[2] for r in rows], zorder=3)
-    for bar, r in zip(db, rows):
-        cy = bar.get_y() + bar.get_height() / 2
-        d.text(r[1] + 40, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT1, color=INK, fontweight="bold")
-    d.set_yticks(yd, [r[0] for r in rows])
-    d.tick_params(axis="y", length=0)
-    d.set_xlim(0, 2450)
-    d.set_xticks([0, 1000, 2000])
-    d.set_xlabel("MiB after a KYC check")
-    d.set_title("Galaxy S23 memory", loc="left")
+    c.set_title("Neoverse-V2 decode", loc="left")
 
     _keep_clear(fig, a_texts, a_owners)
+    bad = _overlaps(fig, a_texts, a_owners) + _inside(fig, a, a_texts) + _inside(fig, b, b_texts) \
+        + _inside(fig, c, c_texts)
+    if bad:
+        raise RuntimeError(f"Figure 1 labels touch another bar or leave their panel: {bad}")
     return _save(fig, "fig-overview.png")
 
 
