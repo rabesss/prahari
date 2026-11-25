@@ -81,7 +81,7 @@
 \setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
 \renewcommand{\arraystretch}{1.22}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
-\AtBeginEnvironment{longtable}{\footnotesize\setlength{\tabcolsep}{5pt}\rowcolors{2}{white}{prahariZebra}}
+\AtBeginEnvironment{longtable}{\fontsize{7.8}{9.6}\selectfont\setlength{\tabcolsep}{5pt}\rowcolors{2}{white}{prahariZebra}}
 \AtBeginEnvironment{tabular}{\footnotesize}
 % Table rules: heavy indigo frame, light slate inner rule (booktabs + colortbl)
 \usepackage{colortbl}
@@ -120,7 +120,33 @@
 \BeforeBeginEnvironment{verbatim}{\small}
 \setlength{\emergencystretch}{3em}
 
-% Keep figures where placed when possible
-\makeatletter
-\def\fps@figure{H}
-\makeatother
+% Float placement: keep figures near their text and avoid near-empty float pages
+\floatplacement{figure}{htbp}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+
+% Captions: figure and table captions share one style; table captions sit above
+\usepackage{caption}
+\captionsetup{font={small,sf}, labelfont={bf,color=prahariIndigo}, labelsep=period, justification=raggedright, singlelinecheck=false}
+\captionsetup[figure]{position=below, skip=6pt}
+\captionsetup[table]{position=above, skip=4pt}
+
+% Page breaking: no widows/orphans, pages may end short rather than stretch
+\widowpenalty=10000
+\clubpenalty=10000
+\displaywidowpenalty=10000
+\raggedbottom
+
+% Longtable spacing (font set in the \AtBeginEnvironment hook above)
+\setlength{\LTpre}{6pt}
+\setlength{\LTpost}{6pt}
+
+% Glyphs missing from the body font
+\usepackage{newunicodechar}
+\newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{≥}{\ensuremath{\geq}}
+\newunicodechar{≤}{\ensuremath{\leq}}
