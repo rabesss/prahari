@@ -13,3 +13,4 @@ Times are IST (UTC+05:30), 25 Nov 2026.
 - 15:04: RTL web client reported “All ongoing tests have ended.” The reservation page subsequently showed the device “Getting ready to restart”; its final release status is reported separately.
 - 15:05: RDB stopped and the local Hindsight API service restarted; port 8888 was again listening on the Hindsight API.
 - 15:06: Samsung Developer showed the Sign in link. Browser policy blocked access to site-data settings, so cookie clearing was not verified or completed.
+- 15:08: After the account instruction changed, the dedicated Samsung account was signed in again. The reservation list showed “No devices detected!” Site data was left intact.
