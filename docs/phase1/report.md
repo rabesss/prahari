@@ -7,7 +7,7 @@ date: "24 November 2026"
 
 ## Abstract {.unnumbered}
 
-Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users, built for Problem Statement 3 of the Arm Bharat AI-SoC Challenge 2026–27 [S1]. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs, prompt-injection attempts and network events on the device. Llama 3.2 1B Instruct (INT4 QLoRA), running through ExecuTorch XNNPACK on the Arm CPU, then explains the structured evidence in plain language next to vetted safety steps [S2, S9, S10]. On a Samsung Galaxy S23 phone, a warm KYC check takes a median 1.857 s at 32.5 tok/s decode, and the app declares no network permission. On Arm Neoverse-V2, 54.17% of sampled CPU time runs inside Arm KleidiAI kernels. We report every holdout, including a sealed final set (n = 184) where the false-positive rate remains 0.300. Prahari is strictly advisory and never sends user content to a cloud service. Built with Llama.
+Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users, built for Problem Statement 3 of the Arm Bharat AI-SoC Challenge 2026–27 [S1]. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs, prompt-injection attempts and network events on the device. Llama 3.2 1B Instruct (INT4 QLoRA), running through ExecuTorch XNNPACK on the Arm CPU, then explains the structured evidence in plain language next to vetted safety steps [S2, S9, S10]. On a Samsung Galaxy S23 phone, a warm KYC check takes a median 1.857 s at 32.5 tok/s decode, and the app declares no network permission. On Arm Neoverse-V2, 54.17% of sampled CPU time runs inside Arm KleidiAI kernels. We report every holdout, including a sealed final set (n = 184) where the false-positive rate remains 0.300. Prahari is strictly advisory: inference and storage stay on the device, and content leaves the app only when the user chooses to share a warning or copy a report. Built with Llama.
 
 **Keywords:** on-device AI, scam detection, phishing, Arm, KleidiAI, ExecuTorch, Llama 3.2, India, privacy
 
@@ -22,7 +22,7 @@ This report makes four contributions:
 1. **A hybrid detect-then-explain pipeline.** Deterministic classifiers and Indian-context mechanism rules decide the verdict; Llama 3.2 1B only explains the structured evidence.
 2. **An on-device Arm deployment.** The full pipeline runs on a Samsung Galaxy S23 phone and on Arm Linux through ExecuTorch XNNPACK, with profiled execution inside Arm KleidiAI `kai_*` kernels [S9, S10].
 3. **Verified offline operation.** The Android app declares no `INTERNET` permission and was tested in Airplane Mode; on Linux, inference passes with the network namespace cut [S9, S10].
-4. **An honest evaluation.** We report development sets and every holdout, including a sealed final set scored once, together with its remaining false alarms [S8, S11, S12, S15].
+4. **An honest evaluation.** We report development sets and every holdout, including an independently authored sealed set that was scored repeatedly during development, together with its remaining false alarms [S8, S11, S12, S15].
 
 Table 1 summarises the headline results; later sections give the full measurements and caveats.
 
@@ -32,7 +32,7 @@ Table 1 summarises the headline results; later sections give the full measuremen
 | Linux throughput | 0.98 s/item, 104.6 tok/s | Neoverse-V2, 8 threads |
 | KleidiAI share of CPU time | 54.17% | Neoverse-V2, `perf` |
 | India v3 held-back set | F1 0.970, FPR 0.000 | n = 81 |
-| Sealed final holdout | F1 0.812, FPR 0.300 | n = 184, scored once |
+| Sealed final holdout | F1 0.812, FPR 0.300 | n = 184, scored repeatedly |
 
 Table: Key Phase 1 results. Phone timings come from two warm KYC checks per pass; the sealed-set false alarms are discussed in the evaluation section.
 
@@ -57,7 +57,7 @@ The closest products split along the same line. Google Messages runs standard sc
 
 Research points the same way. Saavalainen (2026) ran Gemma 3n-E2B-it zero-shot on an Android phone on Finnish SMS: it missed 15 of 41 dangerous messages (63.4% recall) against 2 of 41 for a cloud model (95.1%), and produced more unsupported details. The thesis concludes that small models "appear more suitable as part of a broader detection and explanation pipeline than as standalone phishing detectors" ([hdl.handle.net/10138/638168](http://hdl.handle.net/10138/638168)). ElZemity et al. (2026) distil LLM teachers into Qwen2.5-0.5B and SmolLM2-135M SMS classifiers, reaching 94.31% accuracy and 96.25% recall ([arXiv:2602.10869](https://arxiv.org/abs/2602.10869)), but give the user no explanation.
 
-Prahari fills the gap between these lines of work: detectors decide, as in ElZemity et al., and Llama 3.2 1B only explains, as Saavalainen recommends. Its distinct combination is Indian scam mechanisms in English, Hindi and Hinglish; vetted next steps (Chakshu, 1930, cybercrime.gov.in) for every verdict with a plain-language explanation for every risky one; and no network at inference on a phone that is not a current flagship. Its main gaps are equally clear. Prahari does not sit in the message or call path, has no link-reputation feed (only rules, including a typosquat list of 56 Indian official domains), and its false-alarm rate on hard benign notices is still high (Section Results).
+Prahari fills the gap between these lines of work: detectors decide, as in ElZemity et al., and Llama 3.2 1B only explains, as Saavalainen recommends. Its distinct combination is Indian scam mechanisms in English, Hindi and Hinglish; vetted next steps (Chakshu, 1930, cybercrime.gov.in) for every verdict with an attempted plain-language explanation for every risky one (falling back to labelled fixed text when no generated reply passes the checks); and no network at inference on a phone that is not a current flagship. Its main gaps are equally clear. Prahari does not sit in the message or call path, has no link-reputation feed (only rules, including a typosquat list of 56 Indian official domains), and its false-alarm rate on hard benign notices is still high (Section Results).
 
 
 ## System Design and Methodology
@@ -129,7 +129,7 @@ All headline detection numbers use conservative metrics: `uncertain` counts as a
 
 Prahari targets an interactive response of about 1–2 s and a bounded memory footprint on CPU-only Arm SoCs. Five engineering choices get it there; each is listed with its measured effect.
 
-**Detector-first cascade.** Classical classifiers and mechanism rules make the decision, and Llama 3.2 1B only explains evidence that is already verified. The detectors run in 0.42 ms/item on Arm Linux and in 5–17 ms warm for text checks on the Galaxy S23 (183 ms for the lookalike-URL check, 255 ms for the cold first check) [S2, S9]. The verdict stays the detector's even if generation is skipped or fails, so the language model never sits on the classification path.
+**Detector-first cascade.** Classical classifiers and mechanism rules make the decision, and Llama 3.2 1B only explains the evidence the detectors produced. The detectors run in 0.42 ms/item on Arm Linux and in 5–17 ms warm for text checks on the Galaxy S23 (183 ms for the lookalike-URL check, 255 ms for the cold first check) [S2, S9]. The verdict stays the detector's even if generation is skipped or fails, so the language model never sits on the classification path.
 
 **Low-bit weight quantization.** Prahari deploys the official ExecuTorch Llama 3.2 1B Instruct QLoRA INT4 export: group-32 symmetric INT4 weights with 8-bit dynamic per-channel activations, in a ~1.18 GB `.pte` file. On the Neoverse-N1 baseline it reached ~83.1 tok/s prefill and 19.9 tok/s decode, against ~58–63 tok/s and 12–13.5 tok/s for the SpinQuant export under mixed host load, so QLoRA INT4 was kept [S2, S4].
 
@@ -158,7 +158,7 @@ The phone is a Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2 / SM8550, Androi
 
 Table: Galaxy S23 app telemetry for the latest measured build (prefill 165.0 tok/s all-items, 113.8 tok/s gated). "—" means not reported for this run; on the earlier build warm text detectors took 5–17 ms.
 
-The first on-phone run (23 November) was faster: 6 ms detector, 510 ms first token, 43.4 tok/s decode and 1.20 s per warm KYC check, and 1.42 s for the same check in Airplane Mode; an intermediate build measured 2.90 s and ~22 tok/s. The latest run warmed from 41.7 °C to 45.1 °C. The gated pass always ran second and hotter, so its slower KYC times are most likely thermal; they do not measure the effect of gating, and throttling itself was not measured. Two warm checks per pass and a p90 over six items are small samples. For the lookalike link, Llama ran but no reply passed validation, so the app showed the detector's fixed text, labelled as not AI-written [S9, S14, S17].
+The first on-phone run (23 November) was faster: 6 ms detector, 510 ms first token, 43.4 tok/s decode and 1.20 s per warm KYC check, and 1.42 s for the same check in Airplane Mode; an intermediate build measured 2.90 s and ~22 tok/s. The latest run warmed from 41.7 °C to 45.1 °C. The gated pass always ran second and hotter, so its slower KYC times may be thermal, but the cause was not tested; they do not measure the effect of gating, and throttling itself was not measured. Two warm checks per pass and a p90 over six items are small samples. For the lookalike link, Llama ran but no reply passed validation, so the app showed the detector's fixed text, labelled as not AI-written [S9, S14, S17].
 
 ### Neoverse-V2 and Neoverse-N1
 
@@ -249,7 +249,7 @@ A regression suite of 1,355 detector and LLM-safety tests passes on the current 
 
 ### Responsible AI and privacy
 
-Prahari is private by construction. The Android APK requests no `INTERNET` permission, sets `allowBackup="false"`, sends no telemetry and runs every model on the phone, so messages, OTPs and bank alerts never leave the device; history is off by default and redacted when enabled. The design is advisory: vetted English and Hindi steps and the official reporting channels (Sanchar Saathi Chakshu, the 1930 helpline and cybercrime.gov.in) always appear above the AI card, which warns that it "can be wrong", and a benign result reads "NO RISK FOUND — still verify", never "safe". The entrant used AI-assisted tools for mockups, Hindi copy review, coding and code review, and checked every architecture choice, measurement and safety text personally [S7].
+Prahari is private by construction. The Android APK requests no `INTERNET` permission, sets `allowBackup="false"`, sends no telemetry and runs every model on the phone, so messages, OTPs and bank alerts are not sent anywhere unless the user chooses to share a warning or copy a report; history is off by default and redacted when enabled. The design is advisory: vetted English and Hindi steps and the official reporting channels (Sanchar Saathi Chakshu, the 1930 helpline and cybercrime.gov.in) always appear above the AI card, which warns that it "can be wrong", and a benign result reads "NO RISK FOUND — still verify", never "safe". The entrant used AI-assisted tools for mockups, Hindi copy review, coding and code review, and checked every architecture choice, measurement and safety text personally [S7].
 
 ### Limitations
 
@@ -327,7 +327,7 @@ All paths are relative to the repository root.
 | Android APK | GitHub release `phase1-apk-5b59ee2`, SHA-256 `88f6a532…` |
 | Model files (SHA-256) | Llama 3.2 1B QLoRA INT4 `.pte` `ab7b7ebf…`; tokenizer `tokenizer.model` `82e9d319…` |
 | CLI demo | `candidates/BEST/bin/app --demo --out .venv/demo.json` (8 items: SMS, URL, UPI, flow, injection) |
-| Validation gate | `bin/validate` (add `--baseline` to fail on any recall drop or FPR rise; sealed set only with `--sealed`) |
+| Validation gate | `bin/validate` (add `--baseline BEFORE.json` to fail on any recall drop or FPR rise; sealed set only with `--sealed`) |
 | Model licence | Llama 3.2 weights fetched separately under Meta's Community License |
 
 Table: Reproducibility card.

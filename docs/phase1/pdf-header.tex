@@ -150,3 +150,9 @@
 \newunicodechar{→}{\ensuremath{\rightarrow}}
 \newunicodechar{≥}{\ensuremath{\geq}}
 \newunicodechar{≤}{\ensuremath{\leq}}
+
+% Keep headings with the text that follows
+\usepackage{needspace}
+\usepackage{etoolbox}
+\pretocmd{\section}{\needspace{4\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{3\baselineskip}}{}{}
