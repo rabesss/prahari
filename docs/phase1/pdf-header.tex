@@ -43,17 +43,17 @@
 
 % Section heading styling
 \titleformat{\section}
-  {\Large\bfseries\color{prahariIndigo}}
-  {\thesection}{0.6em}{}[\vspace{2pt}{\color{prahariBorder}\titlerule[0.6pt]}]
+  {\fontsize{15}{19}\selectfont\bfseries\color{prahariIndigo}}
+  {\makebox[1.6em][l]{\color{prahariMuted}\thesection}}{0.2em}{}[\vspace{3pt}{\color{prahariIndigo}\titlerule[1.1pt]}]
 \titleformat{\subsection}
-  {\large\bfseries\color{prahariSlate}}
-  {\thesubsection}{0.5em}{}
+  {\fontsize{11.5}{14.5}\selectfont\bfseries\color{prahariSlate}}
+  {{\color{prahariMuted}\thesubsection}}{0.6em}{}
 \titleformat{\subsubsection}
   {\normalsize\bfseries\color{prahariSlate}}
   {\thesubsubsection}{0.4em}{}
 
-\titlespacing*{\section}{0pt}{14pt}{6pt}
-\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\titlespacing*{\section}{0pt}{18pt}{8pt}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
 \titlespacing*{\subsubsection}{0pt}{7pt}{3pt}
 
 % Header and footer
@@ -78,9 +78,41 @@
 
 % Compact lists and table polish
 \setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
-\renewcommand{\arraystretch}{1.18}
-\AtBeginEnvironment{longtable}{\small}
-\AtBeginEnvironment{tabular}{\small}
+\renewcommand{\arraystretch}{1.22}
+\definecolor{prahariZebra}{HTML}{F1F5F9}
+\AtBeginEnvironment{longtable}{\footnotesize\setlength{\tabcolsep}{5pt}\rowcolors{2}{white}{prahariZebra}}
+\AtBeginEnvironment{tabular}{\footnotesize}
+% Table rules: heavy indigo frame, light slate inner rule (booktabs + colortbl)
+\usepackage{colortbl}
+\setlength{\heavyrulewidth}{0.9pt}
+\setlength{\lightrulewidth}{0.4pt}
+\setlength{\aboverulesep}{2.5pt}
+\setlength{\belowrulesep}{3pt}
+\let\prahariOldToprule\toprule
+\let\prahariOldMidrule\midrule
+\let\prahariOldBottomrule\bottomrule
+\renewcommand{\toprule}{\arrayrulecolor{prahariIndigo}\prahariOldToprule}
+\renewcommand{\midrule}{\arrayrulecolor{prahariBorder}\prahariOldMidrule}
+\renewcommand{\bottomrule}{\arrayrulecolor{prahariIndigo}\prahariOldBottomrule}
+
+% Body rhythm: slightly open leading, paragraph space instead of indents
+\linespread{1.08}
+\setlength{\parskip}{5pt plus 1pt}
+
+% Title block: left-aligned, indigo bar, metadata on one line
+\makeatletter
+\renewcommand{\maketitle}{%
+  \thispagestyle{plain}%
+  \begingroup\raggedright
+  {\color{prahariIndigo}\rule{\linewidth}{3pt}}\par\vspace{10pt}
+  {\fontsize{21}{26}\selectfont\bfseries\color{prahariIndigo}\@title\par}
+  \ifdefined\@subtitle\vspace{6pt}{\large\color{prahariSlate}\@subtitle\par}\fi
+  \vspace{8pt}
+  {\small\color{prahariMuted}\@author\hspace{1.2em}|\hspace{1.2em}\@date\par}
+  \vspace{6pt}{\color{prahariBorder}\rule{\linewidth}{0.6pt}}\par
+  \endgroup
+  \vspace{10pt}}
+\makeatother
 
 % Subtle shaded code blocks and clean line wrapping for long paths/symbols
 \definecolor{shadecolor}{HTML}{F1F5F9}
