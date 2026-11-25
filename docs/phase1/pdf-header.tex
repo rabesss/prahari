@@ -24,7 +24,7 @@
 \definecolor{prahariLink}{HTML}{1D4ED8}
 
 % Typography: IBM Plex Sans + JetBrains Mono (with Devanagari fallback if needed)
-\setmainfont{Noto Serif}[Scale=0.94]
+\setmainfont{Noto Serif}[Scale=0.955]
 \setsansfont{IBM Plex Sans}[
   UprightFont = *,
   BoldFont = * Bold,
@@ -39,7 +39,7 @@
   linkcolor=prahariLink,
   urlcolor=prahariLink,
   citecolor=prahariLink,
-  pdftitle={Prahari: Offline Threat Triage on Arm — Bharat AI-SoC 2026-27 PS3 Phase 1 Report},
+  pdftitle={Prahari: Offline Scam Triage on Arm},
   pdfauthor={Team Prahari}
 }
 
@@ -60,9 +60,9 @@
 
 % Header and footer: short title as the running head, page number only in the footer
 \pagestyle{fancy}
-\setlength{\headheight}{19pt}  % fancyhdr needs 18.65pt for the running head
+\setlength{\headheight}{21.5pt}  % fancyhdr needs 21.3pt for the running head at 11 pt
 \fancyhf{}
-\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari: On-Device Scam Triage on Arm}
+\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari: Offline Scam Triage on Arm}
 \fancyfoot[C]{\footnotesize\color{prahariMuted}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -77,10 +77,10 @@
 
 % Compact lists and table polish
 \setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
-\renewcommand{\arraystretch}{1.22}
+\renewcommand{\arraystretch}{1.18}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
-% Body tables are 8.8 pt; \AppendixTables (placed before Appendix A) raises the appendix tables to 9.5 pt.
-\newcommand{\prahariTableFont}{\fontsize{8.8}{10.6}\selectfont}
+% Body tables are 9.3 pt; \AppendixTables (placed before Appendix A) sets the appendix tables to 9.4 pt.
+\newcommand{\prahariTableFont}{\fontsize{9.3}{11.1}\selectfont}
 % Body tables never split across pages: every row end acts as \\* (no page break) and the whole
 % table is one chunk. \AppendixTables lets the long appendix index break between rows again.
 \makeatletter
@@ -90,7 +90,7 @@
   \def\crcr{\LT@crcr\noalign{\nobreak}}\let\cr\crcr
   \LT@t@bularcr}
 \let\LT@tabularcr\prahariLTcrKeep
-\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.1}{10.9}\selectfont}%
+\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.4}{11.2}\selectfont}%
   \let\LT@tabularcr\prahariLTcrOrig}
 % \KeepTables turns the no-split rule back on (for the short reproducibility card)
 \newcommand{\KeepTables}{\let\LT@tabularcr\prahariLTcrKeep}
@@ -144,9 +144,9 @@
 \renewcommand{\bottomrule}{\arrayrulecolor{prahariIndigo}\prahariOldBottomrule}
 
 % Body rhythm: slightly open leading, paragraph space instead of indents
-\linespread{1.08}
+\linespread{1.03}
 \frenchspacing
-\setlength{\parskip}{5pt plus 1pt}
+\setlength{\parskip}{4pt plus 1pt}
 
 % Title block: left-aligned, indigo bar, metadata on one line
 \makeatletter
@@ -201,7 +201,7 @@
 
 % Names never break at a hyphen: no hyphenation inside these words, and no breaks at explicit
 % hyphens (Neoverse-V2, Indian-context); cross-references use non-breaking spaces in report.md.
-\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy}
+\hyphenation{ExecuTorch Neoverse KleidiAI XNNPACK Airplane Prahari Truecaller Chaquopy Hinglish Llama Galaxy Table Tables Figure Figures Section Sections Appendix}
 \exhyphenpenalty=10000
 
 % Glyphs missing from the body font
@@ -222,7 +222,7 @@
 \newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
 
 % References and Appendix A: hanging-indent entries, no bullets, URLs and paths break anywhere
-\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.3}{11.3}\selectfont\setlength{\parskip}{2pt plus 1pt}\setlength{\parindent}{0pt}%
+\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.6}{11.6}\selectfont\setlength{\parskip}{1.5pt plus 1pt}\setlength{\parindent}{0pt}%
   \raggedright\everypar{\hangindent=2.4em\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
 \urlstyle{same}
@@ -236,3 +236,9 @@
   \let\prahariOrigLabel\label
   \renewcommand{\label}[1]{\prahariOrigLabel{#1}\ifvmode\nobreak\fi}}
 
+
+% Placed before an \item: forbids a page break before it, so a short final list item is never
+% stranded at the top of a new page (\item adds \@itempenalty, so \nopagebreak alone is not enough).
+\makeatletter
+\newcommand{\KeepWithPreviousItem}{\@itempenalty=10000\relax}
+\makeatother
