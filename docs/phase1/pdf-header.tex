@@ -83,7 +83,7 @@
 \renewcommand{\arraystretch}{1.18}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
 % Body tables are 9.6 pt, close to the 10.5 pt body text; \AppendixTables (placed before Appendix A)
-% sets the appendix tables to 9.2 pt, so the evidence index fits on one page.
+% sets the appendix tables to 9.8 pt with more open rows (the evidence index may run onto a second page).
 \newcommand{\prahariTableFont}{\fontsize{9.6}{11.4}\selectfont}
 % Body tables never split across pages: every row end acts as \\* (no page break) and the whole
 % table is one chunk. \AppendixTables lets the long appendix index break between rows again.
@@ -94,7 +94,8 @@
   \def\crcr{\LT@crcr\noalign{\nobreak}}\let\cr\crcr
   \LT@t@bularcr}
 \let\LT@tabularcr\prahariLTcrKeep
-\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.2}{11.0}\selectfont}%
+\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.8}{11.9}\selectfont}%
+  \renewcommand{\arraystretch}{1.44}%
   \let\LT@tabularcr\prahariLTcrOrig}
 % \KeepTables turns the no-split rule back on (for the short reproducibility card)
 \newcommand{\KeepTables}{\let\LT@tabularcr\prahariLTcrKeep}
@@ -223,6 +224,10 @@
 \captionsetup{font=small, labelfont={bf,color=prahariIndigo}, labelsep=period, justification=raggedright, singlelinecheck=false}
 \captionsetup[figure]{position=below, skip=6pt}
 \captionsetup[table]{position=above, skip=4pt}
+% A longtable is narrowed by 2\tabcolsep and centred (see the longtable hook), which left its caption
+% indented by \tabcolsep. Shift the caption left by that amount (the width is unchanged) so it is flush
+% with the table rules and with figure captions.
+\captionsetup[longtable]{margin={-5pt,5pt}}
 
 % Page breaking: no widows/orphans, pages may end short rather than stretch
 \widowpenalty=10000
@@ -246,9 +251,18 @@
 \newunicodechar{→}{\ensuremath{\rightarrow}}
 \newunicodechar{≥}{\ensuremath{\geq}}
 \newunicodechar{≤}{\ensuremath{\leq}}
+\newunicodechar{≈}{\ensuremath{\approx}}
 
 % Keep headings with the text that follows
 \usepackage{needspace}
+% needspace's own \penalty-100 (to wake the page builder) is, under \raggedbottom, the cheapest page
+% break on the page, so every \needspace ended its page early even when the space was there. Use a
+% zero penalty instead: it still runs the page builder but is no better a break than any other line.
+\makeatletter
+\renewcommand{\needspace}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\break\fi\endgroup}
+\makeatother
 \usepackage{etoolbox}
 % Every heading is followed by text (titlesec adds \nobreak; club penalties keep two lines).
 % With \raggedbottom, LaTeX's negative \@secpenalty made each heading a preferred page break,
@@ -259,10 +273,11 @@
 \newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
 
 % References: each entry starts with \refl{n}, a label box as wide as the widest label ("[25]"
-% plus a space); the hanging indent equals that width, so continuation lines start under the title.
+% plus a space and 5 pt more); the hanging indent equals that width, so continuation lines start
+% under the title. Set at 10 pt with open spacing between entries.
 \newlength{\prahariRefLabelW}
-\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.4}{11.2}\selectfont\setlength{\parskip}{2pt plus 1pt}\setlength{\parindent}{0pt}%
-  \settowidth{\prahariRefLabelW}{\textbf{[25]}\hspace{0.5em}}%
+\newcommand{\RefsBegin}{\par\begingroup\fontsize{10}{12.3}\selectfont\setlength{\parskip}{4pt plus 1pt}\setlength{\parindent}{0pt}%
+  \settowidth{\prahariRefLabelW}{\textbf{[25]}\hspace{0.5em}}\addtolength{\prahariRefLabelW}{5pt}%
   \raggedright\everypar{\hangindent=\prahariRefLabelW\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
 \newcommand{\refl}[1]{\makebox[\prahariRefLabelW][l]{\textbf{[#1]}}\ignorespaces}
@@ -306,7 +321,8 @@
 \renewcommand\@makefntext[1]{\noindent\hangindent=1.1em\makebox[1.1em][l]{\@makefnmark}#1}
 \makeatother
 
-% Centred unnumbered heading with the section's blue rule (used for the Abstract).
-\newcommand{\CentredHeading}[1]{\par\vspace{6pt}\pdfbookmark[1]{#1}{#1}%
-  {\centering\fontsize{15}{19}\selectfont\bfseries\color{prahariIndigo}#1\par}\nobreak\vspace{3pt}\nobreak
+% Unnumbered heading for the Abstract: left-aligned like the numbered section headings, with the
+% same size, colour and blue rule.
+\newcommand{\AbstractHeading}[1]{\par\vspace{6pt}\pdfbookmark[1]{#1}{#1}%
+  {\raggedright\fontsize{15}{19}\selectfont\bfseries\color{prahariIndigo}#1\par}\nobreak\vspace{3pt}\nobreak
   {\color{prahariIndigo}\rule{\linewidth}{1.1pt}}\par\nobreak\vspace{6pt}\nobreak}

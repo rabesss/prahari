@@ -197,8 +197,8 @@ MEM_ROWS = [
     ("Native heap", 1566056, INDIGO),
     ("Private other", 59764, TEAL),
     ("Graphics", 58676, INDIGO_MID),
-    ("Code (.so, .apk)", 37420, SLATE_LIGHT),
-    ("Java heap, system, stack", 11044 + 10566 + 1316, SLATE_DARK),
+    ("Code", 37420, SLATE_LIGHT),
+    ("Java/system/stack", 11044 + 10566 + 1316, SLATE_DARK),
 ]
 MEM_TOTAL_KIB = 1744842
 MEM_RSS_MIB = 1824
@@ -209,70 +209,99 @@ MEM_RSS_MIB = 1824
 # ---------------------------------------------------------------------------
 
 def build_architecture_chart() -> Path:
-    """Two-stage pipeline: inputs -> detectors (decide) -> on-device explanation or alert."""
-    W, H = FIG_W, 3.55
+    """Two-stage pipeline: inputs -> detectors (decide) -> fixed vetted steps and on-device explanation.
+
+    Stage 1 sends the verdict and the fixed vetted steps straight to the user (no LLM), and the typed
+    evidence to Stage 2, which only explains it. Every box keeps at least 6 pt between its text and its
+    edge; the build fails otherwise.
+    """
+    W, H = FIG_W, 3.62
     fig = plt.figure(figsize=(W, H), dpi=DPI)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W)
     ax.set_ylim(0, H)
     ax.axis("off")
+    boxes = []  # (x, y, w, h, [text artists]) for the padding check
 
     def box(x, y, w, h, title, sub, fc, ec, tc=INK):
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.08",
                                     fc=fc, ec=ec, lw=1.2))
         n_sub = sub.count("\n") + 1 if sub else 0
-        line = 0.175  # in, for 10 pt text with spacing
+        line = 0.185  # in, measured line pitch of 10.5 pt text at linespacing 1.25
         block = 0.21 + n_sub * line
         top = y + h / 2 + block / 2
-        ax.text(x + w / 2, top - 0.105, title, ha="center", va="center", fontsize=FS, weight="bold", color=tc)
+        arts = [ax.text(x + w / 2, top - 0.105, title, ha="center", va="center", fontsize=FS, weight="bold",
+                        color=tc)]
         if sub:
-            ax.text(x + w / 2, top - 0.21 - n_sub * line / 2, sub, ha="center", va="center",
-                    fontsize=FT, color=SLATE, linespacing=1.25)
+            arts.append(ax.text(x + w / 2, top - 0.21 - n_sub * line / 2, sub, ha="center", va="center",
+                                fontsize=FT, color=SLATE, linespacing=1.25))
+        boxes.append((x, y, w, h, arts))
 
     def arrow(x0, x1, y0, y1=None):
         ax.add_patch(FancyArrowPatch((x0, y0), (x1, y0 if y1 is None else y1), arrowstyle="-|>",
                                      mutation_scale=11, lw=1.3, color=SLATE, shrinkA=0, shrinkB=0))
 
-    # Columns (inches).
-    # The gap between DETECT and EXPLAIN is wide enough to label the live monitor's arrow.
-    c1x, c1w = 0.03, 1.56
-    c2x, c2w = 1.83, 1.90
-    c3x, c3w = 4.63, 1.70
+    # Columns (inches). Stage 1 and Stage 2 share one width; the inputs are only slightly narrower.
+    c1x, c1w = 0.03, 1.76
+    c2x, c2w = 2.00, 1.83
+    c3x, c3w = 4.50, 1.83
     # Row centres: rows 1-2 feed Stage 2; row 3 (intrusion path) ends in an alert.
-    r1, r2, r3 = 2.62, 1.68, 0.50
-    h1, h2, h3 = 0.86, 0.70, 0.74
+    r1, r2, r3 = 2.74, 1.66, 0.50
+    h1, h2, h3 = 1.16, 0.84, 0.82
 
-    hy = H - 0.12
+    hy = H - 0.13
     # All three column headers share one slate colour; indigo is reserved for the DETECT boxes.
     ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
     ax.text(c2x + c2w / 2, hy, "DETECT (decides the verdict)", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
-    ax.text(c3x + c3w / 2, hy, "EXPLAIN (on the device)", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
+    ax.text(c3x + c3w / 2, hy, "SHOW AND EXPLAIN", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
 
     box(c1x, r1 - h1 / 2, c1w, h1, "SMS, link or UPI QR", "Android app or\nLinux CLI / UI", LIGHT_BG, BOX_EDGE)
-    box(c1x, r2 - h2 / 2, c1w, h2, "Live socket monitor", "/proc/net/tcp, snmp", LIGHT_BG, BOX_EDGE)
-    box(c1x, r3 - h3 / 2, c1w, h3, "NSL-KDD flow record", "bin/predict --task flow", LIGHT_BG, BOX_EDGE)
+    box(c1x, r2 - h2 / 2, c1w, h2, "Live socket monitor", "/proc/net/tcp, snmp\n(Linux only)", LIGHT_BG, BOX_EDGE)
+    box(c1x, r3 - h3 / 2, c1w, h3, "NSL-KDD flow record", "bin/predict\n--task flow", LIGHT_BG, BOX_EDGE)
 
-    box(c2x, r1 - h1 / 2, c2w, h1, "Stage 1: detectors", "Classifiers + Indian-context\nrules; 0.42 ms/item\non Neoverse-N1", INDIGO_LIGHT, INDIGO, INDIGO)
-    box(c2x, r2 - h2 / 2, c2w, h2, "Flow text rules", "live network events", INDIGO_LIGHT, INDIGO, INDIGO)
+    box(c2x, r1 - h1 / 2, c2w, h1, "Stage 1: detectors", "Classifiers + Indian-\ncontext rules;\n0.42 ms/item on\nNeoverse-N1", INDIGO_LIGHT, INDIGO, INDIGO)
+    box(c2x, r2 - h2 / 2, c2w, h2, "Flow text rules", "live network\nevents", INDIGO_LIGHT, INDIGO, INDIGO)
     box(c2x, r3 - h3 / 2, c2w, h3, "Intrusion path", "HistGradientBoosting\n+ 3 intrusion rules", INDIGO_LIGHT, INDIGO, INDIGO)
 
-    s2_top, s2_bot = r1 + h1 / 2, r2 - h2 / 2
+    # Column 3: the fixed vetted steps (shown first, no LLM) above the Stage 2 explanation.
+    s1_top = r1 + h1 / 2
+    v_h = 0.60
+    v_y = s1_top - v_h
+    box(c3x, v_y, c3w, v_h, "Verdict + fixed steps", "vetted text (no LLM)", LIGHT_BG, SLATE, INK)
+    s2_top, s2_bot = v_y - 0.12, r2 - h2 / 2
     box(c3x, s2_bot, c3w, s2_top - s2_bot, "Stage 2: Llama 3.2 1B",
-        "QLoRA INT4 on\nExecuTorch\nXNNPACK, Arm CPU;\nexplains typed\nevidence, honesty\nand safety check;\nnever changes\nthe verdict",
+        "INT4, ExecuTorch\nXNNPACK, Arm CPU;\nexplains the evidence,\nnever the verdict",
         SLATE_BG, SLATE_DARK, SLATE_DARK)
     box(c3x, r3 - h3 / 2, c3w, h3, "Alert with evidence", "verdict and evidence\n(no LLM)", LIGHT_BG, SLATE, INK)
 
     g = 0.03
     for r in (r1, r2, r3):
         arrow(c1x + c1w + g, c2x - g, r)
-        arrow(c2x + c2w + g, c3x - g, r)
+    # Stage 1 feeds both the fixed steps and Stage 2; the flow and intrusion rows go straight across.
+    arrow(c2x + c2w + g, c3x - g, v_y + v_h / 2)
+    arrow(c2x + c2w + g, c3x - g, (r1 - h1 / 2 + s2_top) / 2)
+    arrow(c2x + c2w + g, c3x - g, r2)
+    arrow(c2x + c2w + g, c3x - g, r3)
     # The live monitor can add an optional Llama explanation (Section 3.4); label that arrow.
-    ax.text((c2x + c2w + c3x) / 2, r2 + 0.06, "optional\nexplanation", ha="center", va="bottom", fontsize=10,
-            color=SLATE, style="italic", linespacing=1.1)
+    ax.text((c2x + c2w + c3x) / 2, r2 + 0.06, "optional", ha="center", va="bottom", fontsize=10,
+            color=SLATE, style="italic")
 
     # Thin divider between the message/network path and the intrusion path.
-    ax.plot([0.04, W - 0.04], [1.08, 1.08], color=GRID, lw=1.0, ls="--", zorder=0)
+    ax.plot([0.04, W - 0.04], [1.075, 1.075], color=GRID, lw=1.0, ls="--", zorder=0)
 
+    # Every box keeps at least 6 pt of padding around its text.
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    pad = 6 / 72  # in
+    tight = []
+    for x, y, w, h, arts in boxes:
+        for t in arts:
+            bb = t.get_window_extent(rend).transformed(ax.transData.inverted())
+            if bb.x0 < x + pad or bb.x1 > x + w - pad or bb.y0 < y + pad or bb.y1 > y + h - pad:
+                tight.append(f"{t.get_text()!r}: text {bb.x0:.3f}-{bb.x1:.3f} x {bb.y0:.3f}-{bb.y1:.3f}, "
+                             f"box {x:.3f}-{x + w:.3f} x {y:.3f}-{y + h:.3f}")
+    if tight:
+        raise RuntimeError("Figure 2 box text has under 6 pt padding:\n" + "\n".join(tight))
     return _save(fig, "fig-architecture.png")
 
 
@@ -402,7 +431,9 @@ def _build_eval_chart() -> Path:
     fpr = [d[3] for d in DETECTION]
     # Bar-group centres: the development groups sit wider apart, since their tick labels
     # ("Indian eval", "n = 22,544") are longer; the held-back groups follow a gap (divider).
-    x = np.array([0.0, 1.18, 2.35, 3.58, 4.78, 5.78, 6.78, 7.78])
+    # The development and held-back groups are separated by an extra gap with the divider centred in
+    # it, so the NSL-KDD FPR label (0.030) and the v3 F1 label (0.970) both clear the divider.
+    x = np.array([0.0, 1.18, 2.38, 3.65, 5.05, 6.05, 7.05, 8.05])
     off, w = 0.25, 0.20
     b1 = ax.bar(x - off, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
     b2 = ax.bar(x + off, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
@@ -431,7 +462,7 @@ def _build_eval_chart() -> Path:
     ax.set_xticks(x, labels)
     ax.tick_params(axis="x", length=0, pad=5)
     # Extra room on the left so the first value label (0.925) clears the y axis.
-    ax.set_xlim(x[0] - 0.68, x[-1] + 0.54)
+    ax.set_xlim(x[0] - 0.60, x[-1] + 0.48)
     ax.set_ylim(0, 1.22)
     ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel("Score or rate")
@@ -439,6 +470,14 @@ def _build_eval_chart() -> Path:
     bad = _overlaps(fig, texts, owners)
     if bad:
         raise RuntimeError(f"Figure 5 value labels touch another bar: {bad}")
+    # No value label may touch the group divider.
+    div_x = ax.transData.transform(((x[3] + x[4]) / 2, 0))[0]
+    r0 = fig.canvas.get_renderer()
+    pad = 4 * fig.dpi / 72
+    near = [t.get_text() for t in texts
+            if (lambda e: e.x0 - pad < div_x < e.x1 + pad)(t.get_window_extent(r0))]
+    if near:
+        raise RuntimeError(f"Figure 5 value labels touch the group divider: {near}")
     # Neighbouring tick labels ("NSL-KDD / n = 22,544") must not touch each other.
     fig.canvas.draw()
     r = fig.canvas.get_renderer()
@@ -457,7 +496,7 @@ def build_memory_chart() -> Path:
     """Galaxy S23 dumpsys meminfo PSS breakdown after a KYC check, as one stacked strip.
 
     The strip is 1.25 in tall: the native heap carries its value inside the bar, and the four small
-    categories are named in a legend; Section 5.4 states every category's value in the text.
+    categories are named with their values (MiB, rounded) in the legend, as in Section 5.4.
     """
     fig, ax = plt.subplots(figsize=(FIG_W, 1.25), dpi=DPI, layout="constrained")
     fig.get_layout_engine().set(h_pad=0.02)
@@ -473,7 +512,7 @@ def build_memory_chart() -> Path:
             ax.text(left + v / 2, 0, f"Native heap {v:,.0f} MiB ({100 * v / total_mib:.1f}%)", ha="center",
                     va="center", fontsize=FT, color="white", fontweight="bold", zorder=4)
         else:
-            handles.append(Patch(color=col, label=name.replace("\n", " ")))
+            handles.append(Patch(color=col, label=f"{name} {v:.0f} MiB"))
         left += v
     ax.set_yticks([])
     ax.set_ylim(-0.45, 0.45)
