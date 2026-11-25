@@ -69,7 +69,7 @@ it after the RTL session finishes.
 
 ## 5. Flagged-Only Gating + Prefill: One Session (≤ 20 Minutes)
 
-**Status: pending S23 measurement.** The app now has flagged-only gating (About → *Explain NO RISK
+**Status: measured on 24 Nov with the APK from `5b59ee2` (PR #75, [`s23-gating-20261124.md`](s23-gating-20261124.md)).** The app now has flagged-only gating (About → *Explain NO RISK
 results with Llama*, off by default): a result shown as NO RISK gets the detector's fixed text
 and no Llama call; DANGEROUS and SUSPICIOUS results, and bank alerts the app relabels, always get
 Llama. Every check writes one `PrahariPerf` logcat line (numbers only, no checked text) with
