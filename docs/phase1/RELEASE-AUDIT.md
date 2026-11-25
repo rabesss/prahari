@@ -1,4 +1,4 @@
-# Release Audit: Public-Repository Readiness (`rabesss/arm-bharat-ai-soc`)
+# Release Audit: Public-Repository Readiness (`rabesss/prahari`)
 
 - **State audited:** `main` at `db72e92` (24 November 2026), after the history rewrite and force-push. Every commit SHA changed in that rewrite; the docs cite the new SHAs.
 - **Scope:** full Git history reachable from the remote branches, and the working tree: secrets and credentials, personal information, licences and attribution, large files, and content unsuitable for a public competition repository.

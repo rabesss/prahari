@@ -2,7 +2,7 @@
 
 - **Submission deadline:** **Wednesday, 25 November 2026, 11:59 PM IST**, per the owner's Phase 1 form notes; the live challenge page (re-checked 25 Nov) gives 25 November 2026 with no time of day. ONE submission only — **the repository owner alone** flips repo visibility and submits the form.
 - **Required form deliverables** (from the form notes and the guidelines e-mailed to the team leader; the public page lists only report, source code and demo):
-  1. **PUBLIC GitHub repository URL** containing code, documentation, and final report (`https://github.com/rabesss/arm-bharat-ai-soc`).
+  1. **PUBLIC GitHub repository URL** containing code, documentation, and final report (`https://github.com/rabesss/prahari`).
   2. **PUBLIC 2-minute demo video** (1080p, 16:9, MP4) showcasing real-time on-device operation on target Arm hardware (see [demo-video.md](demo-video.md)).
   3. **Final technical report PDF** (`<= 10 MB`, `docs/phase1/report.pdf`) detailing methodology, results, hardware utilization, and optimization techniques.
 

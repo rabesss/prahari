@@ -2,6 +2,8 @@
 
 Prahari is an offline, on-device scam, phishing, and network-anomaly triage assistant built for the **Arm Bharat AI-SoC Challenge 2026–27 (PS3)** using **Llama 3.2 1B Instruct (INT4 QLoRA)** running through **ExecuTorch** on Arm CPUs. Small local detectors and Indian-context mechanism rules classify messages, URLs, and network events first; Llama 3.2 1B turns that structured evidence into plain-language explanations and safety guidance without cloud inference. Results are advisory and can be wrong. **Built with Llama** ([Llama 3.2 Community License](https://www.llama.com/llama3_2/license/)).
 
+- **Android app (APK):** the arm64 debug build measured on the Galaxy S23 is attached to the [`phase1-apk-5b59ee2` release](https://github.com/rabesss/prahari/releases/tag/phase1-apk-5b59ee2) (SHA-256 `88f6a532…`); the model files are copied separately (see [android/README.md](android/README.md)).
+- **Development history:** this repository holds the complete commit history. The pull-request reviews and CI runs cited as `PR #NN` or by run number in the docs were in the private development repository; the merge commits are here under the same SHAs.
 - **Final Phase 1 report:** [docs/phase1/report.pdf](docs/phase1/report.pdf) ([Markdown source](docs/phase1/report.md), reproducible build via `python3 docs/phase1/build_report.py`)
 - **2-minute demo script:** [docs/phase1/demo-video.md](docs/phase1/demo-video.md)
 - **Hardware performance write-up & harness:** [docs/perf/README.md](docs/perf/README.md) (raw captures in [docs/perf/evidence/](docs/perf/evidence/README.md), harness in [bench/perf/](bench/perf/README.md))
