@@ -2,7 +2,7 @@
 
 # Prahari demo v2 shot list — about 3:00
 
-This is a production plan, not evidence of a finished recording or physical-phone operation. The Android detector and Llama have run end to end on an Android 14 x86_64 emulator; a physical Arm phone run is pending. Rehearse and show actual results and timing. Do not show hidden data or item-level hidden predictions, or open a suspicious link.
+This is a production plan, not evidence of a finished recording or physical-phone operation. The Android detector and Llama have run end to end on an Android 14 x86_64 emulator; when this earlier shot list was written a physical Arm phone run was still pending (it has since run on a Galaxy S23; see `demo-video.md`). Rehearse and show actual results and timing. Do not show hidden data or item-level hidden predictions, or open a suspicious link.
 
 | Time | Shot and narration |
 |:--|:--|
@@ -16,6 +16,6 @@ This is a production plan, not evidence of a finished recording or physical-phon
 | 1:52–2:05 | Scroll through evidence to the Llama card and its warning, then expand on-device stats. Point out that the displayed x86 timings are not Arm timings. |
 | 2:05–2:17 | Show the genuine-looking bank debit alert as SUSPICIOUS and its first step: “Didn't make this payment? Call 1930 and block the card or UPI in your bank app.” |
 | 2:17–2:40 | Select “Prove it's offline” and show the actual Android permission refusal. The app has no INTERNET permission; external dialler and browser actions use separate apps. Model files were staged beforehand. |
-| 2:40–3:00 | Summary: local detection and advisory explanations, false positives and missed scams, no live capture, and physical Arm phone testing still pending. |
+| 2:40–3:00 | Summary: local detection and advisory explanations, false positives and missed scams, no live capture, and physical Arm phone testing (pending when this list was written; since run on a Galaxy S23). |
 
 Android's offline proof reports an OS refusal only when the request encounters a permission error; show the actual outcome. A failed request for another reason is not permission proof. If separately demonstrating an Arm Linux egress block, an administrator must arrange and verify it while preserving the SSH/loopback control path; otherwise label that proof pending. Organiser acceptance of the cloud VM is unconfirmed.

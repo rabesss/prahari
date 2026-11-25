@@ -9,7 +9,7 @@
 ## Pre-submission checklist (owner execution order)
 
 - [x] **1. Merge final parallel feature PRs into `main`:** (done; no open PRs on 25 Nov) Wait for integration of `fp-fix-neon`, `feat/arm-perf`, `feat/upi-qr`, `feat/call-guard`, and `feat/hindi-explain` (whichever pass CI and measurement gates).
-- [x] **2. Final docs/report refresh & PDF rebuild:** (done through PR #76 and the 25 Nov readiness-audit PR) Rebase `docs/phase1-final` on final `main`, absorb only merged & measured results into `README.md`, `docs/phase1/report.md`, `docs/phase1/EVIDENCE.md`, and `docs/phase1/LIMITATIONS.md`, run `python3 docs/phase1/build_report.py`, visually inspect every page of `docs/phase1/report.pdf`, confirm `< 10 MB` and green CI, and merge into `main`.
+- [ ] **2. Final docs/report refresh & PDF rebuild:** (docs refreshed and PDF rebuilt through PR #76 and PR #77; the owner still visually checks every PDF page before submitting) Rebase `docs/phase1-final` on final `main`, absorb only merged & measured results into `README.md`, `docs/phase1/report.md`, `docs/phase1/EVIDENCE.md`, and `docs/phase1/LIMITATIONS.md`, run `python3 docs/phase1/build_report.py`, visually inspect every page of `docs/phase1/report.pdf`, confirm `< 10 MB` and green CI, and merge into `main`.
 - [x] **3. Complete release-audit cleanups before making repo public** (see [RELEASE-AUDIT.md](RELEASE-AUDIT.md)):
   - [x] Remove `docs/design/COMPETE.md` and `docs/design/RATING-r1.md` from the tree (done on `docs/phase1-final`); optionally scrub them from history via `git filter-repo` (RELEASE-AUDIT §5).
   - [x] Add the root MIT `LICENSE` and `THIRD_PARTY_NOTICES.md` (public-release cleanup PR).
