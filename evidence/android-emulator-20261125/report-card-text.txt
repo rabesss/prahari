@@ -1,0 +1,28 @@
+Input (SMS, no sender): Your SBI account 12345678 will be blocked today. Update KYC at http://sbi-kyc-update.top/verify or call 9000000001 now.
+Verdict: DANGEROUS
+
+===== report_en
+Suspected fraud report (for Sanchar Saathi Chakshu)
+Medium: SMS or WhatsApp message
+Category: KYC and Payment related to Bank / Electricity / Gas / Insurance etc
+Checked on: 25-11-2026
+Type: an account-blocking scam
+Evidence:
+- sends you to a lookalike page and asks you to act there
+- threatens to block, cut or freeze an account, SIM or connection: "account •••••••• will be blocked"
+- the domain sbi-kyc-update[.]top imitates 'sbi' on .top: "hxxp://sbi-kyc-update[.]top/verify"
+Checked offline on this phone by Prahari. Nothing was sent.
+Already lost money? Call 1930 / cybercrime.gov.in
+
+===== family_en
+Scam warning: I got a fake bank, KYC or bill payment message by SMS or WhatsApp. Prahari flagged it as a scam.
+Banks never ask for OTP, PIN or KYC by message or link. Use the official app.
+Do not open this link: hxxp://sbi-kyc-update[.]top
+If money is lost, call 1930 at once.
+
+===== family_hi
+ठगी की चेतावनी: नकली बैंक, KYC या बिल भुगतान वाला मैसेज (SMS या WhatsApp)। Prahari ने इसे ठगी बताया।
+बैंक मैसेज या लिंक से OTP, PIN या KYC नहीं मांगते। सिर्फ़ असली ऐप इस्तेमाल करें।
+यह लिंक न खोलें: hxxp://sbi-kyc-update[.]top
+पैसे चले गए हों तो तुरंत 1930 पर कॉल करें।
+
