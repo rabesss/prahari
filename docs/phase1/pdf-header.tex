@@ -83,7 +83,7 @@
 \renewcommand{\arraystretch}{1.18}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
 % Body tables are 9.6 pt, close to the 10.5 pt body text; \AppendixTables (placed before Appendix A)
-% sets the appendix tables to 9.6 pt, since they are reference material read line by line.
+% sets the appendix tables to 9.2 pt, so the evidence index fits on one page.
 \newcommand{\prahariTableFont}{\fontsize{9.6}{11.4}\selectfont}
 % Body tables never split across pages: every row end acts as \\* (no page break) and the whole
 % table is one chunk. \AppendixTables lets the long appendix index break between rows again.
@@ -94,7 +94,7 @@
   \def\crcr{\LT@crcr\noalign{\nobreak}}\let\cr\crcr
   \LT@t@bularcr}
 \let\LT@tabularcr\prahariLTcrKeep
-\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.6}{11.4}\selectfont}%
+\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.2}{11.0}\selectfont}%
   \let\LT@tabularcr\prahariLTcrOrig}
 % \KeepTables turns the no-split rule back on (for the short reproducibility card)
 \newcommand{\KeepTables}{\let\LT@tabularcr\prahariLTcrKeep}
@@ -108,6 +108,20 @@
 \ExplSyntaxOff
 \makeatother
 \setcounter{LTchunksize}{100}
+% A note set directly under a table (Table 8) must stay with it. longtable ends with a legal page
+% break (\penalty\z@) before \LTpost; \KeepNoteWithTable turns that one penalty into \@M.
+\makeatletter
+\def\prahariLTafterpen{\z@}
+% (\endlongtable holds expl3 code that etoolbox cannot retokenize, so its tokens are replaced
+% directly.)
+\ExplSyntaxOn
+\tl_replace_once:Nnn \endlongtable {\endgraf\penalty\z@\addvspace\LTpost}
+  {\endgraf\penalty\prahariLTafterpen\addvspace\LTpost}
+\tl_if_in:NnF \endlongtable {\prahariLTafterpen}
+  {\PackageWarning{prahari}{endlongtable~note~patch~failed}}
+\ExplSyntaxOff
+\newcommand{\KeepNoteWithTable}{\def\prahariLTafterpen{\@M}}
+\makeatother
 % A table that continues on a new page repeats its caption as "Table N. (continued)" above the
 % same header row. Pandoc puts the caption only in the first head; the rows after \endfirsthead
 % form the continuation head, so the caption is added at its start. \caption[] steps no counter
@@ -162,14 +176,14 @@
 \frenchspacing
 \setlength{\parskip}{4pt plus 1pt}
 
-% Title block: left-aligned, indigo bar, metadata on one line
+% Title block: centred, indigo bar, metadata on one line
 \makeatletter
 % Pandoc's template would append the subtitle inside \@title (its \providecommand yields to this one),
 % leaving no room to space it; keep it separate and set it 8 pt below the title.
 \newcommand{\subtitle}[1]{\gdef\@subtitle{#1}}
 \renewcommand{\maketitle}{%
   \thispagestyle{plain}%
-  \begingroup\raggedright
+  \begingroup\centering
   {\color{prahariIndigo}\rule{\linewidth}{3pt}}\par\vspace{10pt}
   {\fontsize{21}{26}\selectfont\bfseries\color{prahariIndigo}\@title\par}
   \ifdefined\@subtitle\vspace{8pt}{\large\bfseries\color{prahariIndigo}\@subtitle\par}\fi
@@ -244,11 +258,11 @@
 % Verdict labels: one consistent small-caps style (capitals and lowercase both set as small caps)
 \newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
 
-% References: each entry starts with \refl{n}, a label box as wide as the widest label ("[24]"
+% References: each entry starts with \refl{n}, a label box as wide as the widest label ("[25]"
 % plus a space); the hanging indent equals that width, so continuation lines start under the title.
 \newlength{\prahariRefLabelW}
-\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.4}{11.2}\selectfont\setlength{\parskip}{1.5pt plus 1pt}\setlength{\parindent}{0pt}%
-  \settowidth{\prahariRefLabelW}{\textbf{[24]}\hspace{0.5em}}%
+\newcommand{\RefsBegin}{\par\begingroup\fontsize{9.4}{11.2}\selectfont\setlength{\parskip}{2pt plus 1pt}\setlength{\parindent}{0pt}%
+  \settowidth{\prahariRefLabelW}{\textbf{[25]}\hspace{0.5em}}%
   \raggedright\everypar{\hangindent=\prahariRefLabelW\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
 \newcommand{\refl}[1]{\makebox[\prahariRefLabelW][l]{\textbf{[#1]}}\ignorespaces}
@@ -286,3 +300,13 @@
 \makeatletter
 \newcommand{\KeepWithPreviousItem}{\@itempenalty=10000\relax}
 \makeatother
+
+% Footnotes: the marker sits in a fixed-width box, so a space separates it from the note text.
+\makeatletter
+\renewcommand\@makefntext[1]{\noindent\hangindent=1.1em\makebox[1.1em][l]{\@makefnmark}#1}
+\makeatother
+
+% Centred unnumbered heading with the section's blue rule (used for the Abstract).
+\newcommand{\CentredHeading}[1]{\par\vspace{6pt}\pdfbookmark[1]{#1}{#1}%
+  {\centering\fontsize{15}{19}\selectfont\bfseries\color{prahariIndigo}#1\par}\nobreak\vspace{3pt}\nobreak
+  {\color{prahariIndigo}\rule{\linewidth}{1.1pt}}\par\nobreak\vspace{6pt}\nobreak}
