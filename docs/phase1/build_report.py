@@ -29,7 +29,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib import patheffects
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Patch
 import numpy as np
 
@@ -70,6 +69,7 @@ FIG_W = 6.36
 FT = 10.5    # tick labels, value labels, notes
 FS = 11.0    # axis labels
 FTITLE = 11.5
+FT1 = 11.5   # Figure 1 (results at a glance) labels, set larger than the rest
 DPI = 220
 
 plt.rcParams.update({
@@ -189,11 +189,12 @@ DETECTION = [
 ]
 
 # Galaxy S23 dumpsys meminfo App Summary (KiB), sum 1,744,842 KiB = 1,704 MiB total PSS.
+# Two hues for the two largest categories (indigo, teal) and one grey for the small ones.
 MEM_ROWS = [
     ("Native heap", 1566056, INDIGO),
-    ("Private other", 59764, INDIGO_MID),
-    ("Graphics", 58676, SLATE),
-    ("Code (.so, .apk)", 37420, SLATE),
+    ("Private other", 59764, TEAL),
+    ("Graphics", 58676, SLATE_LIGHT),
+    ("Code (.so, .apk)", 37420, SLATE_LIGHT),
     ("Java heap, system\nand stack", 11044 + 10566 + 1316, SLATE_LIGHT),
 ]
 MEM_TOTAL_KIB = 1744842
@@ -283,50 +284,43 @@ def build_arm_perf_chart() -> Path:
     fig.get_layout_engine().set(h_pad=0.06, hspace=0.03)
     sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.15])
 
-    # Panel A
-    ax1 = sf_a.subplots()
-    _style_ax(ax1)
+    # Panel A: two side-by-side plots sharing the thread axis. Decode speed is drawn as bars and
+    # item wall latency as its own line plot, so the latency series never sits on the bars.
+    ax1, ax1b = sf_a.subplots(1, 2, width_ratios=[1.3, 1.0])
     x = np.arange(len(V2_THREADS))
-    # Bars and latency markers share the tick positions, so each marker sits over its own bar.
-    bars = ax1.bar(x, V2_DECODE, width=0.5, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
-                   error_kw={"ecolor": INK, "lw": 0.9}, label="Decode speed (tok/s)", zorder=3)
-    ax1.set_xticks(x, [f"{t} thread{'s' if t > 1 else ''}" for t in V2_THREADS])
-    ax1.set_xlim(-0.5, 3.85)
-    ax1.set_xlabel("ExecuTorch XNNPACK threads on Arm Neoverse-V2")
-    ax1.set_ylabel("Decode speed (tok/s)", color=INDIGO)
-    ax1.set_ylim(0, 130)
+    thread_ticks = [str(t) for t in V2_THREADS]
+
+    _style_ax(ax1)
+    bars = ax1.bar(x, V2_DECODE, width=0.56, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
+                   error_kw={"ecolor": INK, "lw": 0.9}, zorder=3)
+    ax1.set_xticks(x, thread_ticks)
+    ax1.tick_params(axis="x", length=0)
+    ax1.set_xlabel("Threads")
+    ax1.set_ylabel("Decode speed (tok/s)")
+    ax1.set_ylim(0, 125)
     ax1.set_yticks([0, 40, 80, 120])
-    ax1.tick_params(axis="y", labelcolor=INDIGO)
-    # Decode values sit just above each bar; the latency axis is scaled so every latency marker
-    # and its error bar stays below the value label.
-    for b, v in zip(bars, V2_DECODE):
-        ax1.text(b.get_x() + b.get_width() / 2, v + 3, f"{v:.1f}", ha="center", va="bottom",
+    for b_, v, sd in zip(bars, V2_DECODE, V2_DECODE_SD):
+        ax1.text(b_.get_x() + b_.get_width() / 2, v + sd + 3, f"{v:.1f}", ha="center", va="bottom",
                  fontsize=FT, color=INDIGO, fontweight="bold")
 
-    ax1b = ax1.twinx()
-    ax1b.spines["top"].set_visible(False)
-    ax1b.spines["left"].set_visible(False)
-    ax1b.spines["right"].set_color(SLATE_LIGHT)
-    halo = [patheffects.withStroke(linewidth=3.2, foreground="white")]
-    ax1b.errorbar(x, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=6, mec="white",
-                  mew=1.0, capsize=3, label="Item time, wall latency (s)", zorder=4,
-                  path_effects=halo)
-    ax1b.set_ylim(0, 6.6)
-    ax1b.set_ylabel("Item wall latency (s)", color=SLATE_DARK)
+    _style_ax(ax1b)
+    ax1b.errorbar(x, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s-", color=SLATE_DARK, lw=1.6, ms=6, mec="white",
+                  mew=1.0, capsize=3, zorder=4)
+    ax1b.set_xticks(x, thread_ticks)
+    ax1b.tick_params(axis="x", length=0)
+    ax1b.set_xlim(-0.4, 4.05)
+    ax1b.set_xlabel("Threads")
+    ax1b.set_ylabel("Item wall latency (s)")
+    ax1b.set_ylim(0, 3.6)
     ax1b.set_yticks([0, 1, 2, 3])
-    ax1b.tick_params(axis="y", colors=SLATE, labelcolor=SLATE_DARK)
-    # Labels sit above and to the right of each point: the line falls to the right, so that
-    # corner is empty, and the offset clears the 4-thread error bar and its cap.
-    for xi, v in zip(x, V2_ITEM_WALL):
-        ax1b.text(xi + 0.27, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
+    # The line falls to the right, so the upper right of each point is empty: every label sits there,
+    # a fixed offset right of the point and high enough above its error bar to clear the next
+    # point's error bar cap.
+    for xi, v, sd in zip(x, V2_ITEM_WALL, V2_ITEM_SD):
+        ax1b.text(xi + 0.1, v + sd + 0.25, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
                   fontweight="bold", zorder=5)
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax1b.get_legend_handles_labels()
-    # The legend sits above the plot frame, outside the axes, so it never covers a bar or marker.
-    ax1.legend(h1 + h2, l1 + l2, loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=2, frameon=False,
-               borderaxespad=0.2, handlelength=1.6, columnspacing=1.2)
-    sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4", x=0.01, ha="left",
-                  fontsize=FTITLE, fontweight="bold", color=INK)
+    sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4 (ExecuTorch XNNPACK)", x=0.01,
+                  ha="left", fontsize=FTITLE, fontweight="bold", color=INK)
 
     # Panel B
     ax2 = sf_b.subplots()
@@ -361,25 +355,45 @@ def build_arm_perf_chart() -> Path:
 # Figure: detection (F1 vs FPR)
 # ---------------------------------------------------------------------------
 
+def _overlaps(fig: plt.Figure, texts, bars, pad_pt: float = 2.0) -> list[str]:
+    """Return the labels whose rendered extent touches a bar other than their own."""
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    pad = pad_pt * fig.dpi / 72
+    bad = []
+    for t, own in zip(texts, bars):
+        tb = t.get_window_extent(r)
+        for bar in bars:
+            if bar is own:
+                continue
+            bb = bar.get_window_extent(r)
+            if tb.x0 < bb.x1 + pad and tb.x1 > bb.x0 - pad and tb.y0 < bb.y1 + pad and tb.y1 > bb.y0 - pad:
+                bad.append(t.get_text())
+                break
+    return bad
+
+
 def build_eval_chart() -> Path:
     """Conservative F1 and FPR on every benchmark (Table 8).
 
-    Value labels are horizontal. Within each group the two bars are spread apart (centres
-    0.44 apart, width 0.30) so a label centred over one bar clears the neighbouring bar.
-    An FPR that was not recorded is printed as an em dash; the caption explains it.
+    Every value label is horizontal and centred a fixed 0.02 above its own bar; none is nudged.
+    The bars of a group are spread apart (centres 0.50 apart, width 0.24) so a label wider than
+    its bar still clears the neighbouring bar; the build fails if any label touches another bar.
+    An FPR that was not recorded is printed as n/r; the caption explains it.
     """
-    fig, ax = plt.subplots(figsize=(FIG_W, 3.0), dpi=DPI, layout="constrained")
+    fig, ax = plt.subplots(figsize=(FIG_W, 2.6), dpi=DPI, layout="constrained")
     _style_ax(ax)
     labels = [f"{d[0]}\nn={d[1]}" for d in DETECTION]
     f1 = [d[4] for d in DETECTION]
     fpr = [d[3] for d in DETECTION]
-    # Held-back groups are shifted right by GAP so the divider clears the labels beside it.
-    GAP = 0.3
-    x = np.array([i + (GAP if d[5] == "held" else 0.0) for i, d in enumerate(DETECTION)])
-    off, w = 0.22, 0.30
+    # Extra space after "Indian eval" (its long name) and before the held-back groups (divider).
+    GAP_NSL, GAP = 0.25, 0.35
+    x = np.array([i + (GAP_NSL if i >= 3 else 0.0) + (GAP if d[5] == "held" else 0.0)
+                  for i, d in enumerate(DETECTION)])
+    off, w = 0.25, 0.24
     b1 = ax.bar(x - off, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
     b2 = ax.bar(x + off, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
-    ax.axvline(3.5 + GAP / 2, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
+    ax.axvline((x[3] + x[4]) / 2, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
     # Group labels sit above the plot frame, each over a bracket spanning its group's bars.
     tr = ax.get_xaxis_transform()  # x in data units, y in axes fraction
     for lo, hi, name in ((0, 3, "Development sets"), (4, 7, "Held-back sets")):
@@ -389,25 +403,25 @@ def build_eval_chart() -> Path:
         ax.text((x0 + x1) / 2, 1.08, name, transform=tr, ha="center", va="bottom", fontsize=FT,
                 color=SLATE, style="italic")
     texts, owners = [], []
-    for b, v in zip(b1, f1):
-        texts.append(ax.text(b.get_x() + b.get_width() / 2, v + 0.015, f"{v:.3f}", ha="center", va="bottom",
+    for bar, v in zip(b1, f1):
+        texts.append(ax.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.3f}", ha="center", va="bottom",
                              fontsize=FT, color=INDIGO, fontweight="bold", zorder=4))
-        owners.append(b)
-    for b, v in zip(b2, fpr):
+        owners.append(bar)
+    for bar, v in zip(b2, fpr):
         txt, base = ("n/r", 0.0) if v is None else (f"{v:.3f}", v)
-        texts.append(ax.text(b.get_x() + b.get_width() / 2, base + 0.015, txt, ha="center", va="bottom",
+        texts.append(ax.text(bar.get_x() + bar.get_width() / 2, base + 0.02, txt, ha="center", va="bottom",
                              fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=4))
-        owners.append(b)
-    # Two-line tick labels (set name / n) at 10 pt, the smallest size used in any figure, so the
-    # longest names ("Indian eval", "NSL-KDD") clear each other.
+        owners.append(bar)
     ax.set_xticks(x, labels, fontsize=10)
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.64, x[-1] + 0.5)
+    ax.set_xlim(x[0] - 0.55, x[-1] + 0.55)
     ax.set_ylim(0, 1.2)
-    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel("Score or rate")
     fig.legend(*ax.get_legend_handles_labels(), loc="outside upper center", ncol=2, frameon=False)
-    _keep_clear(fig, texts, owners)
+    bad = _overlaps(fig, texts, owners)
+    if bad:
+        raise RuntimeError(f"Figure 5 value labels touch another bar: {bad}")
     return _save(fig, "fig-eval-summary.png")
 
 
@@ -416,8 +430,11 @@ def build_eval_chart() -> Path:
 # ---------------------------------------------------------------------------
 
 def build_memory_chart() -> Path:
-    """Galaxy S23 dumpsys meminfo PSS breakdown after a KYC check."""
-    fig, ax = plt.subplots(figsize=(FIG_W, 2.35), dpi=DPI, layout="constrained")
+    """Galaxy S23 dumpsys meminfo PSS breakdown after a KYC check.
+
+    The totals sit in the panel title row, outside the plot, so no axis line or tick crosses them.
+    """
+    fig, ax = plt.subplots(figsize=(FIG_W, 2.5), dpi=DPI, layout="constrained")
     _style_ax(ax)
     names = [r[0] for r in MEM_ROWS]
     mib = [r[1] / 1024 for r in MEM_ROWS]
@@ -436,10 +453,9 @@ def build_memory_chart() -> Path:
             ax.text(v - 20, cy, label, ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
         else:
             ax.text(v + 20, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
-    ax.text(0.985, 0.06,
-            f"Total PSS {total_mib:,.0f} MiB (1.66 GiB)\nTotal RSS {MEM_RSS_MIB:,} MiB (1.78 GiB)",
-            transform=ax.transAxes, ha="right", va="bottom", fontsize=FT, color=INK,
-            bbox=dict(boxstyle="round,pad=0.4", fc=INDIGO_LIGHT, ec=INDIGO, lw=0.8))
+    ax.set_title("Galaxy S23 memory", loc="left")
+    ax.set_title(f"Total PSS {total_mib:,.0f} MiB · total RSS {MEM_RSS_MIB:,} MiB", loc="right",
+                 fontsize=FT, fontweight="normal", color=INDIGO)
     return _save(fig, "fig-memory.png")
 
 
@@ -448,8 +464,18 @@ def build_memory_chart() -> Path:
 # ---------------------------------------------------------------------------
 
 def build_overview_chart() -> Path:
-    """One-page visual summary: detection, S23 latency, Neoverse-V2 throughput, S23 memory."""
-    fig, axs = plt.subplots(2, 2, figsize=(FIG_W, 5.5), dpi=DPI, layout="constrained")
+    """One-page visual summary: detection, S23 latency, Neoverse-V2 throughput, S23 memory.
+
+    Figure 1 sits on the first pages, so its type is set larger than the other figures (11.5 pt
+    labels, 12 pt titles), close to the 10.5 pt body text as printed.
+    """
+    with plt.rc_context({"font.size": FT1, "xtick.labelsize": FT1, "ytick.labelsize": FT1,
+                         "axes.labelsize": FT1, "legend.fontsize": FT1, "axes.titlesize": 12.5}):
+        return _build_overview_chart()
+
+
+def _build_overview_chart() -> Path:
+    fig, axs = plt.subplots(2, 2, figsize=(FIG_W, 5.6), dpi=DPI, layout="constrained")
     fig.get_layout_engine().set(h_pad=0.1, w_pad=0.1, hspace=0.08, wspace=0.06)
     (a, b), (c, d) = axs
 
@@ -467,11 +493,11 @@ def build_overview_chart() -> Path:
     a_texts, a_owners = [], []
     for bar, v in zip(rb, [r[2] for r in held]):
         a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center",
-                              va="bottom", fontsize=FT, color=INDIGO, fontweight="bold"))
+                              va="bottom", fontsize=FT1, color=INDIGO, fontweight="bold"))
         a_owners.append(bar)
     for bar, v in zip(fb, [r[3] for r in held]):
         a_texts.append(a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center",
-                              va="bottom", fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=5))
+                              va="bottom", fontsize=FT1, color=AMBER_TEXT, fontweight="bold", zorder=5))
         a_owners.append(bar)
     # Short one-word set names keep each tick label to two lines at 10 pt.
     a.set_xticks(x, [f"{r[0].split()[0]}\nn={r[1]}" for r in held])
@@ -496,22 +522,22 @@ def build_overview_chart() -> Path:
             bar.set_edgecolor("white")
             bar.set_linewidth(0)
         b.text(s[1] + 0.07, bar.get_y() + bar.get_height() / 2, s[2], ha="left", va="center",
-               fontsize=FT, color=INK, fontweight="bold")
+               fontsize=FT1, color=INK, fontweight="bold")
     b.set_yticks(yb, names)
     b.tick_params(axis="y", length=0)
     b.set_ylim(-0.55, len(vals) - 0.45 + 0.75)
     b.set_xlim(0, 3.75)
     b.set_xticks([0, 1, 2, 3])
     b.set_xlabel("Total time per check (s)")
-    b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT,
+    b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT1,
            color=INDIGO, fontweight="bold")
-    b.set_title("Galaxy S23, warm KYC check", loc="left")
+    b.set_title("Galaxy S23 KYC check", loc="left")
 
     # (c) Neoverse-V2 decode speed vs threads.
     _style_ax(c)
     c.errorbar(V2_THREADS, V2_DECODE, yerr=V2_DECODE_SD, fmt="o-", color=INDIGO, lw=2, ms=6, capsize=3, zorder=3)
     for t, v in zip(V2_THREADS, V2_DECODE):
-        c.text(t, v + 7, f"{v:.1f}", ha="center", va="bottom", fontsize=FT, color=INDIGO, fontweight="bold")
+        c.text(t, v + 7, f"{v:.1f}", ha="center", va="bottom", fontsize=FT1, color=INDIGO, fontweight="bold")
     c.set_xscale("log", base=2)
     c.set_xticks(V2_THREADS, [str(t) for t in V2_THREADS])
     c.minorticks_off()
@@ -531,7 +557,7 @@ def build_overview_chart() -> Path:
     db = d.barh(yd, [r[1] for r in rows], height=0.6, color=[r[2] for r in rows], zorder=3)
     for bar, r in zip(db, rows):
         cy = bar.get_y() + bar.get_height() / 2
-        d.text(r[1] + 40, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+        d.text(r[1] + 40, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT1, color=INK, fontweight="bold")
     d.set_yticks(yd, [r[0] for r in rows])
     d.tick_params(axis="y", length=0)
     d.set_xlim(0, 2450)

@@ -7,11 +7,15 @@ date: "25 November 2026"
 
 ## Abstract {.unnumbered}
 
-Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs and prompt-injection attempts on the device, and network events on Arm Linux. Llama 3.2 1B Instruct, quantised to 4-bit integers (INT4) with quantisation-aware LoRA training (QLoRA) and run through ExecuTorch XNNPACK on the Arm CPU, then explains that evidence in plain language beside vetted safety steps. The app labels which of three outcomes the user sees: checked AI text, the detector's fixed text when no reply passes deterministic checks, or "explanation unavailable" when the model is missing or raises an error. On a Samsung Galaxy S23 phone, whose app declares no network permission, a warm KYC check in the all-items pass takes a median 1.857\ s at 32.5\ tok/s decode (2.611\ s in the later, hotter gated pass). On Arm Neoverse-V2, a whole-process profile places 54.17% of sampled CPU time inside Arm KleidiAI kernels. We report every holdout, including an independently authored but repeatedly scored sealed set (n\ =\ 184), where the false-positive rate (FPR) is still 0.300 (30 of 100 benign items: 87 genuine SMS-route and 13 benign prompt-injection-route items) and 0.322 (28 of 87) on genuine SMS alone. Prahari is strictly advisory: inference and storage stay on the device, and content leaves the app only when the user chooses to share a warning or copy a report. Built with Llama.[^llama]
+Prahari is an offline cybersecurity triage assistant for Indian smartphone and Arm Linux users. Compact classical models and transparent Indian-context mechanism rules classify suspicious SMS and WhatsApp-style messages, phishing URLs and prompt-injection attempts on the device, and network events on Arm Linux. Meta's INT4 QLoRA release of Llama 3.2 1B Instruct (described by Meta as quantisation-aware training with LoRA adaptors), run through ExecuTorch XNNPACK on the Arm CPU, then explains that evidence in plain language beside vetted safety steps. The app labels which of three outcomes the user sees: checked AI text, the detector's fixed text when no reply passes deterministic checks, or "explanation unavailable" when the model is missing or raises an error. On a Samsung Galaxy S23 phone, whose app declares no network permission, a warm KYC check in the all-items pass takes a median 1.857\ s at 32.5\ tok/s decode (2.611\ s in the later, hotter gated pass). On Arm Neoverse-V2, a whole-process profile places 54.17% of sampled CPU time inside Arm KleidiAI kernels. We report every holdout, including an independently authored but repeatedly scored sealed set (n\ =\ 184), where the false-positive rate (FPR) is still 0.300 (30 of 100 benign items: 87 genuine SMS-route and 13 benign prompt-injection-route items) and 0.322 (28 of 87) on genuine SMS alone. Prahari is strictly advisory: inference and storage stay on the device, and content leaves the app only when the user chooses to share a warning or copy a report. Built with Llama.[^llama]
 
 [^llama]: Llama 3.2 is licensed under the Llama 3.2 Community License [24].
 
+\begingroup\raggedright
+
 **Keywords:** on-device AI, scam detection, phishing, Arm, KleidiAI, ExecuTorch, Llama 3.2, India, privacy
+
+\endgroup
 
 ## Introduction
 
@@ -134,11 +138,11 @@ Table 4 summarises the data. Public sets are split with grouping to prevent lea
 | NSL-KDD [22] | UNB, with citation | 113,273 / 12,700 / 22,544 | Flow model (shifted test) |
 | Indian and Hinglish seeds [23] | \mbox{Apache-2.0}, CC BY 4.0 | 136 train rows | Indian-context model |
 | Project Indian set (visible) | Original | 256 / 64 / 320 | Indian-context model |
-| India v2, v3, v4 sets | Original | v2 400; v3 159 + 81; v4 161 + 79 | Tuning + held-back test |
+| India v2, v3, v4 sets | Original | v2\ 400; v3\ 159\ +\ 81; v4\ 161\ +\ 79 | Tuning + held-back test |
 | Blind validation set | CC0 | 240 (150 genuine, 90 scam) | False-alarm check |
-| Sealed holdout | Original | 184 (155 SMS + 29 injection) | Repeatedly scored holdout |
+| Sealed holdout | Original | 184 (155 SMS\ +\ 29 injection) | Repeatedly scored holdout |
 
-Table: Datasets, licences and splits (train / dev / eval unless noted; "159 + 81" is tuning + held-back). Table 8 reports the eval splits of the first three rows and of the visible Indian set, the held-back parts of v3 and v4, and the last two rows.
+Table: Datasets, licences and splits (train / dev / eval unless noted; "159\ +\ 81" is tuning\ +\ held-back). Table 8 reports the eval splits of the first three rows and of the visible Indian set, the held-back parts of v3 and v4, and the last two rows.
 
 
 The Indian test sets are synthetic, with no real user messages, so they do not establish field performance. Each was written outside the detector work:
@@ -161,7 +165,7 @@ Table 5 lists the six engineering choices behind these numbers, separating the 
 
 
 | **Technique** | **Rationale** | **Measured effect** | **Not measured** |
-|:-----------------|:----------------|:-----------------------------------|:--------------------|
+|:--------------------|:---------------|:---------------------------------------|:--------------------|
 | Detector-first cascade | Keep the LLM off the verdict path | Detectors 0.42\ ms/item on Neoverse-N1; 5–17\ ms warm, 183\ ms URL (S23) | End-to-end gain over an LLM classifier |
 | QLoRA INT4 weights (group-32, 8-bit dynamic activations) | Fit phone memory; faster decode | 19.9 vs 12–13.5\ tok/s decode over SpinQuant INT4 (N1, mixed host load); 1.18\ GB `.pte` | FP16 baseline (size only computed) |
 | KleidiAI kernels via XNNPACK | Use `i8mm` and `dotprod` | 54.17% of CPU samples in `kai_*` (V2, 2 threads) | On/off speedup; dispatch on the phone |
@@ -215,7 +219,7 @@ Going from 1 to 8 threads raised decode 4.07× and prefill 6.19× on Neoverse-V2
 Table: Llama 3.2 1B INT4 on Neoverse-V2 (means over 3 runs × 6 items; the first item of each run is cold). The 4-thread TTFT varied widely (± 373.0\ ms).
 
 
-![Arm performance. (A) Neoverse-V2 ExecuTorch thread scaling (1–8 threads, mean ± SD of three per-run means, each over six items). (B) Llama 3.2 1B INT4 decode throughput and item wall latency on the three Arm targets, including the first, intermediate and final Galaxy S23 builds (V2 and N1 are Neoverse-V2 and Neoverse-N1). The bars come from different builds and sessions and are not a controlled comparison; Table 6 gives the final build's gated pass.](img/fig-arm-perf.pdf){#fig:arm-perf width=100%}
+![Arm performance. (A) Neoverse-V2 ExecuTorch thread scaling: decode speed (left) and item wall latency (right) at 1–8 threads, mean ± SD of three per-run means, each over six items. (B) Llama 3.2 1B INT4 decode throughput and item wall latency on the three Arm targets, including the first, intermediate and final Galaxy S23 builds (V2 and N1 are Neoverse-V2 and Neoverse-N1). The bars come from different builds and sessions and are not a controlled comparison; Table 6 gives the final build's gated pass.](img/fig-arm-perf.pdf){#fig:arm-perf width=100%}
 
 ### Arm kernel evidence
 
@@ -241,7 +245,7 @@ The holdouts differ mainly in how often genuine messages raise false alarms. A c
 On the v4 split, which the fixing work never saw, false alarms remain on advisories, bank and OTP alerts, delivery notices and links to small-business sites. The sealed holdout is harder still: every link in it uses a `.example` placeholder, which the gate treats as a contact and the domain rules call risky. As a result 28 of 87 genuine SMS (FPR 0.322; 95% CI 0.233–0.426) are still flagged, mostly advisories carrying such a link, family chats warning about scams, and doorstep or self-check messages [A12, A15].
 
 | **Set** | **n** | **Recall** | **F1** | **FPR (false alarms / benign; 95% CI)** |
-|:----------------------------------|------:|-------:|-------:|:-----------------------------|
+|:----------------------------------|------:|-------:|-------:|-----------------------------:|
 | SMS eval split | 1,162 | — | 0.925 | — |
 | URL eval split | 7,997 | 0.988 | 0.994 | 0.000 (0/4,000; 0.000–0.001) |
 | Indian eval split (visible set) | 320 | — | 0.969 | 0.031 (5/160; 0.013–0.071) |
@@ -416,7 +420,25 @@ Table: Project evidence index.
 
 ## Appendix B: Reproducibility Card {.unnumbered}
 
-The steps below rebuild the Linux detector, its explanations and the validation gate on an aarch64 machine from the public repository at the git tag `phase1-report`, the revision this report describes. They reproduce the pipeline, not every number: the held-back results in Table 8 (v3 and v4 held-back splits, sealed holdout) also need the detector at checkpoint 75993f1 (`git checkout 75993f1` in the same clone) and datasets that are not in the repository. Table 12 pins the released artifacts and every checkpoint behind a reported result.
+The steps below rebuild the Linux detector, its explanations and the validation gate on an aarch64 machine from the public repository at the git tag `phase1-report`, the revision this report describes. They reproduce the pipeline, not every number: the held-back results in Table 8 (v3 and v4 held-back splits, sealed holdout) also need the detector at checkpoint \mbox{\hash{75993f1}} (`git checkout 75993f1` in the same clone) and datasets that are not in the repository. Table 12 pins the released artifacts and every checkpoint behind a reported result.
+
+
+\KeepTables
+
+| **Item** | **Value** |
+|:----------------------|:--------------------------------------------------------------|
+| Repository | \refurl{github.com/rabesss/prahari} |
+| Report revision | Git tag `phase1-report` (`git checkout phase1-report`) |
+| Android APK release | \refurl{github.com/rabesss/prahari/releases/tag/phase1-apk-5b59ee2}, built from commit \hash{5b59ee2fcaaa2b6153f9a302abb76a1aac5dd317} |
+| APK SHA-256 | \hash{88f6a53285c04ef8e0fb7766b05da716dbdc22a4b11112e731b70165e3d07862} |
+| Model SHA-256 | \hash{ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac} (file \path{Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte}) |
+| Tokenizer SHA-256 | \hash{82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55} (file \path{tokenizer.model}) |
+| Detector checkpoint used for held-back results | Commit \hash{75993f19c590144d2369fcfb70d430429daa7990}: Table 8 held-back, blind and sealed rows and the last row of Table 9 (\path{docs/validation-gate.md}) |
+| Earlier checkpoints, Table 9 | Rows 1–3 are the first, second and fourth checkpoint entries (initial baseline; rules + text model freeze; commit \hash{7368067}) in \path{docs/phase1/evidence/sealed-holdout/scores.json} |
+| Reused eval rows, Table 8 | SMS and Indian eval splits: the false-alarm reduction entry in \path{docs/phase1/EVIDENCE.md}; URL: the typosquat-check gate run in the same file; flow: \path{candidates/BEST/REPORT.md} |
+| Data not in the repository | v3 and v4 held-back splits and the sealed holdout (hashes pinned in \path{eval/validate.py}); their rows in Tables 8 and 9 cannot be re-run from the repository alone |
+
+Table: Reproducibility card.
 
 
 \begingroup\raggedright
@@ -437,7 +459,7 @@ The steps below rebuild the Linux detector, its explanations and the validation 
     pip install 'huggingface_hub[cli]'
     ```
 
-3. **Fetch the model.** The Llama 3.2 model is gated on Hugging Face: request access on the model page, accept the Llama 3.2 licence [24] and authenticate with `hf auth login` (never commit the token). Download both files, check them against Table 12 with `sha256sum`, and point a local model registry at them as the README shows. ExecuTorch 1.6.0 runs Linux inference.
+3. **Fetch the model.** The Llama 3.2 model is gated on Hugging Face: request access on the model page, accept the Llama 3.2 licence [24] and authenticate with `hf auth login` (never commit the token). Download both files and check them against Table 12 with `sha256sum`. ExecuTorch 1.6.0 runs Linux inference.
 
     ```
     hf auth login
@@ -445,9 +467,16 @@ The steps below rebuild the Linux detector, its explanations and the validation 
     hf download "$M" --local-dir "$PWD/.venv/models/qlora"
     ```
 
-4. **Validate.** `bin/validate` scores the committed sets and runs the test suites; add `--baseline BEFORE.json` to fail on any recall drop or FPR rise. Sets that are not in the repository are reported as not scored; `--sealed` scores the sealed set, once per frozen candidate.
+4. **Point the model registry at it.** Run the short Python snippet in the README section "Run on aarch64 Linux", which copies `models/registry.json` to `.venv/prahari-registry.json` with the downloaded file paths (the tracked file stays untouched), then export the copy as `HC_MODEL_REGISTRY`, exactly as the README does:
 
-5. **Run the demo.** Run the self-test, then the 8-item demo (SMS, URL, UPI, flow, injection). The demo can exit with status 1 when the lookalike-link explanation fails validation; it still prints the detector verdict and "Explanation unavailable" (see README).
+    ```
+    export HC_PY="$PWD/.venv/bin/python" \
+      HC_MODEL_REGISTRY="$PWD/.venv/prahari-registry.json"
+    ```
+
+5. **Validate.** `bin/validate` scores the committed sets and runs the test suites; add `--baseline BEFORE.json` to fail on any recall drop or FPR rise. Sets that are not in the repository are reported as not scored; `--sealed` scores the sealed set, once per frozen candidate.
+
+6. **Run the demo.** Run the self-test, then the 8-item demo (SMS, URL, UPI, flow, injection). The demo can exit with status 1 when the lookalike-link explanation fails validation; it still prints the detector verdict and "Explanation unavailable" (see README).
 
     ```
     candidates/BEST/bin/app --selftest
@@ -455,22 +484,3 @@ The steps below rebuild the Linux detector, its explanations and the validation 
     ```
 
 \endgroup
-
-\KeepTables
-
-| **Item** | **Value** |
-|:----------------------|:--------------------------------------------------------------|
-| Repository | \refurl{github.com/rabesss/prahari} |
-| Report revision | Git tag `phase1-report` (`git checkout phase1-report`) |
-| Android APK release | \refurl{github.com/rabesss/prahari/releases/tag/phase1-apk-5b59ee2}, built from commit \hash{5b59ee2fcaaa2b6153f9a302abb76a1aac5dd317} |
-| APK SHA-256 | \hash{88f6a53285c04ef8e0fb7766b05da716dbdc22a4b11112e731b70165e3d07862} |
-| Model SHA-256 | \hash{ab7b7ebf97421c7770ad97d4abfdf8650a7d9f9dc1ce9a0c4663d49f7b7a08ac} (file \path{Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte}) |
-| Tokenizer SHA-256 | \hash{82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55} (file \path{tokenizer.model}) |
-| Detector checkpoint used for held-back results | Commit \hash{75993f19c590144d2369fcfb70d430429daa7990}: Table 8 held-back, blind and sealed rows and the last row of Table 9 (\path{docs/validation-gate.md}) |
-| Earlier checkpoints, Table 9 | Rows 1–3 are the first, second and fourth checkpoint entries (initial baseline; rules + text model freeze; commit 7368067) in \path{docs/phase1/evidence/sealed-holdout/scores.json} |
-| Reused eval rows, Table 8 | SMS and Indian eval splits: the false-alarm reduction entry in \path{docs/phase1/EVIDENCE.md}; URL: the typosquat-check gate run in the same file; flow: \path{candidates/BEST/REPORT.md} |
-| Data not in the repository | v3 and v4 held-back splits and the sealed holdout (hashes pinned in \path{eval/validate.py}); their rows in Tables 8 and 9 cannot be re-run from the repository alone |
-
-Table: Reproducibility card.
-
-

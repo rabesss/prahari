@@ -82,7 +82,8 @@
 \setlist{itemsep=2pt, topsep=3pt, parsep=1pt}
 \renewcommand{\arraystretch}{1.18}
 \definecolor{prahariZebra}{HTML}{F1F5F9}
-% Body tables are 9.3 pt; \AppendixTables (placed before Appendix A) sets the appendix tables to 9.4 pt.
+% Body tables are 9.3 pt; \AppendixTables (placed before Appendix A) sets the appendix tables to 9.8 pt,
+% close to the body text, since they are reference material read line by line.
 \newcommand{\prahariTableFont}{\fontsize{9.3}{11.1}\selectfont}
 % Body tables never split across pages: every row end acts as \\* (no page break) and the whole
 % table is one chunk. \AppendixTables lets the long appendix index break between rows again.
@@ -93,7 +94,7 @@
   \def\crcr{\LT@crcr\noalign{\nobreak}}\let\cr\crcr
   \LT@t@bularcr}
 \let\LT@tabularcr\prahariLTcrKeep
-\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.4}{11.2}\selectfont}%
+\newcommand{\AppendixTables}{\renewcommand{\prahariTableFont}{\fontsize{9.8}{11.8}\selectfont}%
   \let\LT@tabularcr\prahariLTcrOrig}
 % \KeepTables turns the no-split rule back on (for the short reproducibility card)
 \newcommand{\KeepTables}{\let\LT@tabularcr\prahariLTcrKeep}
@@ -107,6 +108,13 @@
 \ExplSyntaxOff
 \makeatother
 \setcounter{LTchunksize}{100}
+% A table that continues on a new page repeats its caption as "Table N. (continued)" above the
+% same header row. Pandoc puts the caption only in the first head; the rows after \endfirsthead
+% form the continuation head, so the caption is added at its start. \caption[] steps no counter
+% and adds no list entry. Short body tables never break, so they never show it.
+\makeatletter
+\def\endfirsthead{\LT@end@hd@ft\LT@firsthead\caption[]{(continued)}\tabularnewline}
+\makeatother
 % The last foot (bottom rule) is also used as the page foot, so its height is reserved on every page.
 % Without this, a table that ends exactly at the foot of a page left an empty repeated header on
 % the next page.
@@ -125,9 +133,9 @@
 % so they line up exactly with the row shading.
 \newcommand{\prahariLTrule}[4]{\noalign{\vskip#3{\color{#2}\hrule height #1}\vskip#4}}
 \AtBeginEnvironment{longtable}{\prahariTableFont\setlength{\tabcolsep}{5pt}%
-  % Pandoc emits the caption, first head and head as rows 1-3: shading starts at the first data
-  % row (row 4, white), then alternates.
-  \rowcolors{4}{prahariZebra}{white}%
+  % Pandoc emits the caption, first head and the continuation head (its "(continued)" caption and
+  % header row) as rows 1-4: shading starts at the first data row (row 5, white), then alternates.
+  \rowcolors{5}{white}{prahariZebra}%
   \addtolength{\linewidth}{-2\tabcolsep}%
   \def\toprule{\prahariLTrule{\heavyrulewidth}{prahariIndigo}{0pt}{\belowrulesep}}%
   \def\midrule{\prahariLTrule{\lightrulewidth}{prahariBorder}{\aboverulesep}{\belowrulesep}}%
