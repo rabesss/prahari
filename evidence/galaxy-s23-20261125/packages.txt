@@ -1,0 +1,8 @@
+com.anydesk.anydeskandroid absent
+com.teamviewer.quicksupport.market absent
+com.teamviewer.host.market absent
+com.teamviewer.teamviewer.market.mobile absent
+com.sand.airdroid absent
+com.sand.airsos absent
+com.sand.aircast absent
+com.carriez.flutter_hbb absent
