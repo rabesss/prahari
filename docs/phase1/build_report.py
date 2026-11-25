@@ -5,12 +5,12 @@ Run from anywhere in the repository:
     python3 docs/phase1/build_report.py                # charts + PDF
     python3 docs/phase1/build_report.py --charts-only  # charts only
 
-Outputs:
-    docs/phase1/img/fig-architecture.png
-    docs/phase1/img/fig-overview.png
-    docs/phase1/img/fig-arm-perf.png
-    docs/phase1/img/fig-eval-summary.png
-    docs/phase1/img/fig-memory.png
+Outputs (each figure as vector PDF, used by the report, and as PNG for Markdown viewers):
+    docs/phase1/img/fig-architecture.{pdf,png}
+    docs/phase1/img/fig-overview.{pdf,png}
+    docs/phase1/img/fig-arm-perf.{pdf,png}
+    docs/phase1/img/fig-eval-summary.{pdf,png}
+    docs/phase1/img/fig-memory.{pdf,png}
     docs/phase1/report.pdf
 
 All plotted numbers come directly from verified project artifacts documented in
@@ -29,7 +29,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from matplotlib import patheffects
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Patch
 import numpy as np
 
 PHASE1 = Path(__file__).resolve().parent
@@ -62,11 +63,11 @@ TEAL = "#0F766E"
 TEAL_LIGHT = "#5EB8AE"
 
 # Every figure is drawn 6.5 in wide, the width it is placed at in the PDF, so font sizes
-# below are the printed sizes. Nothing is smaller than 9 pt.
+# below are the printed sizes. Nothing is smaller than 10 pt.
 FIG_W = 6.5
-FT = 9.0     # tick labels, value labels, notes
-FS = 9.5     # axis labels
-FTITLE = 10.5
+FT = 10.0    # tick labels, value labels, notes
+FS = 10.5    # axis labels
+FTITLE = 11.0
 DPI = 220
 
 plt.rcParams.update({
@@ -80,6 +81,7 @@ plt.rcParams.update({
     "axes.titleweight": "bold",
     "axes.titlecolor": INK,
     "axes.labelcolor": SLATE,
+    "pdf.fonttype": 42,  # embed TrueType so figure text stays selectable and crisp
 })
 
 
@@ -95,17 +97,20 @@ def _style_ax(ax: plt.Axes, grid_axis: str = "y") -> None:
 
 
 def _save(fig: plt.Figure, name: str) -> Path:
+    """Write the figure as vector PDF (placed in the report) and as PNG; return the PDF path."""
     out = IMG_DIR / name
     fig.savefig(out, dpi=DPI, facecolor="white")
+    pdf = out.with_suffix(".pdf")
+    fig.savefig(pdf, facecolor="white", metadata={"CreationDate": None})
     plt.close(fig)
-    return out
+    return pdf
 
 
 # ---------------------------------------------------------------------------
 # Data. Every number below also appears in docs/phase1/report.md.
 # ---------------------------------------------------------------------------
 
-# Neoverse-V2 ExecuTorch XNNPACK thread scaling: 3 runs x 6 items, mean +/- SD (Table 5).
+# Neoverse-V2 ExecuTorch XNNPACK thread scaling: 3 runs x 6 items, mean +/- SD (Table 7).
 V2_THREADS = np.array([1, 2, 4, 8])
 V2_DECODE = np.array([25.69, 46.69, 75.89, 104.58])
 V2_DECODE_SD = np.array([0.16, 0.12, 0.43, 1.15])
@@ -115,13 +120,13 @@ V2_ITEM_SD = np.array([0.031, 0.002, 0.377, 0.015])
 # Llama 3.2 1B INT4 decode speed and per-item wall latency on each Arm target, top to bottom.
 # Coloured by device: Neoverse in indigo shades, Galaxy S23 builds in teal (intermediate lighter).
 ARM_TARGETS = [
-    ("Neoverse-V2 (8 threads)", 104.6, 0.98, INDIGO_DARK),
-    ("Neoverse-V2 (2 threads)", 46.7, 1.73, INDIGO),
-    ("S23 first build (warm)", 43.4, 1.20, TEAL),
-    ("S23 first build (Airplane Mode)", 39.0, 1.42, TEAL),
-    ("S23 intermediate build (warm)", 21.5, 2.90, TEAL_LIGHT),
-    ("S23 final build (warm)", 32.5, 1.86, TEAL),
-    ("Neoverse-N1 (2 vCPU)", 19.9, 3.84, INDIGO_MID),
+    ("V2, 8 threads", 104.6, 0.98, INDIGO),
+    ("V2, 2 threads", 46.7, 1.73, INDIGO),
+    ("S23 first, warm", 43.4, 1.20, TEAL),
+    ("S23 first, airplane", 39.0, 1.42, TEAL),
+    ("S23 intermediate", 21.5, 2.90, TEAL_LIGHT),
+    ("S23 final", 32.5, 1.86, TEAL),
+    ("N1, 2 vCPU", 19.9, 3.84, INDIGO_MID),
 ]
 
 # Galaxy S23 warm KYC check, total time per item (s), by build (Section 5).
@@ -132,7 +137,7 @@ S23_LATENCY = [
     ("Final", 1.857, TEAL),
 ]
 
-# Detection, conservative scoring (Table 6). FPR None = not recorded.
+# Detection, conservative scoring (Table 8). FPR None = not recorded.
 DETECTION = [
     # label, n, recall, fpr, f1, group
     ("SMS", "1,162", None, None, 0.925, "dev"),
@@ -174,12 +179,12 @@ def build_architecture_chart() -> Path:
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.08",
                                     fc=fc, ec=ec, lw=1.2))
         n_sub = sub.count("\n") + 1 if sub else 0
-        line = 0.16  # in, for 9 pt text with spacing
-        block = 0.19 + n_sub * line
+        line = 0.175  # in, for 10 pt text with spacing
+        block = 0.21 + n_sub * line
         top = y + h / 2 + block / 2
-        ax.text(x + w / 2, top - 0.095, title, ha="center", va="center", fontsize=9.5, weight="bold", color=tc)
+        ax.text(x + w / 2, top - 0.105, title, ha="center", va="center", fontsize=FS, weight="bold", color=tc)
         if sub:
-            ax.text(x + w / 2, top - 0.19 - n_sub * line / 2, sub, ha="center", va="center",
+            ax.text(x + w / 2, top - 0.21 - n_sub * line / 2, sub, ha="center", va="center",
                     fontsize=FT, color=SLATE, linespacing=1.25)
 
     def arrow(x0, x1, y0, y1=None):
@@ -192,7 +197,7 @@ def build_architecture_chart() -> Path:
     c3x, c3w = 4.28, 2.18
     # Row centres: rows 1-2 feed Stage 2; row 3 (intrusion path) ends in an alert.
     r1, r2, r3 = 2.62, 1.68, 0.50
-    h1, h2, h3 = 0.82, 0.66, 0.66
+    h1, h2, h3 = 0.86, 0.70, 0.74
 
     hy = H - 0.12
     ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE, weight="bold")
@@ -232,44 +237,49 @@ def build_arm_perf_chart() -> Path:
     """(A) Neoverse-V2 thread scaling; (B) decode speed and item wall latency on every Arm target.
 
     The panels are separate subfigures so each gets its own width: B's long target names do
-    not push A's plot area to the right. The figure is kept short (5.3 in) so it fits on one
-    page with its surrounding text.
+    not push A's plot area to the right. At 5.9 in tall it still fits on one page with its
+    surrounding text; every label is at least 10 pt.
     """
-    fig = plt.figure(figsize=(FIG_W, 5.3), dpi=DPI, layout="constrained")
+    fig = plt.figure(figsize=(FIG_W, 5.9), dpi=DPI, layout="constrained")
     fig.get_layout_engine().set(h_pad=0.06, hspace=0.03)
-    sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.02])
+    sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.15])
 
     # Panel A
     ax1 = sf_a.subplots()
     _style_ax(ax1)
     x = np.arange(len(V2_THREADS))
-    bars = ax1.bar(x - 0.18, V2_DECODE, width=0.36, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
+    # Bars and latency markers share the tick positions, so each marker sits over its own bar.
+    bars = ax1.bar(x, V2_DECODE, width=0.5, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
                    error_kw={"ecolor": INK, "lw": 0.9}, label="Decode speed (tok/s)", zorder=3)
     ax1.set_xticks(x, [f"{t} thread{'s' if t > 1 else ''}" for t in V2_THREADS])
-    ax1.set_xlim(-0.55, 3.75)
+    ax1.set_xlim(-0.5, 3.85)
     ax1.set_xlabel("ExecuTorch XNNPACK threads on Arm Neoverse-V2")
     ax1.set_ylabel("Decode speed (tok/s)", color=INDIGO)
     ax1.set_ylim(0, 165)
     ax1.set_yticks([0, 40, 80, 120])
     ax1.tick_params(axis="y", labelcolor=INDIGO)
+    # Decode values sit just above each bar; the latency axis is scaled so every latency marker
+    # and its error bar stays below the value label.
     for b, v in zip(bars, V2_DECODE):
-        ax1.text(b.get_x() + b.get_width() / 2, v + 4, f"{v:.1f}", ha="center", va="bottom",
+        ax1.text(b.get_x() + b.get_width() / 2, v + 3, f"{v:.1f}", ha="center", va="bottom",
                  fontsize=FT, color=INDIGO, fontweight="bold")
 
     ax1b = ax1.twinx()
     ax1b.spines["top"].set_visible(False)
     ax1b.spines["left"].set_visible(False)
     ax1b.spines["right"].set_color(SLATE_LIGHT)
-    ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=5,
-                  capsize=3, label="Item time, wall latency (s)", zorder=4)
-    ax1b.set_ylim(0, 4.95)
+    halo = [patheffects.withStroke(linewidth=3.2, foreground="white")]
+    ax1b.errorbar(x, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=6, mec="white",
+                  mew=1.0, capsize=3, label="Item time, wall latency (s)", zorder=4,
+                  path_effects=halo)
+    ax1b.set_ylim(0, 6.6)
     ax1b.set_ylabel("Item wall latency (s)", color=SLATE_DARK)
     ax1b.set_yticks([0, 1, 2, 3])
     ax1b.tick_params(axis="y", colors=SLATE, labelcolor=SLATE_DARK)
     # Labels sit above and to the right of each point: the line falls to the right, so that
     # corner is empty, and the offset clears the 4-thread error bar and its cap.
-    for xi, v in zip(x + 0.18, V2_ITEM_WALL):
-        ax1b.text(xi + 0.12, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
+    for xi, v in zip(x, V2_ITEM_WALL):
+        ax1b.text(xi + 0.29, v + 0.10, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
                   fontweight="bold", bbox=dict(boxstyle="round,pad=0.15", fc="white", ec=GRID, lw=0.6, alpha=1.0),
                   zorder=5)
     h1, l1 = ax1.get_legend_handles_labels()
@@ -290,20 +300,21 @@ def build_arm_perf_chart() -> Path:
     hb = ax2.barh(y, tps, height=0.66, color=cols, zorder=3)
     ax2.set_yticks(y, names)
     ax2.tick_params(axis="y", length=0)
-    ax2.set_xlim(0, 115)
+    ax2.set_xlim(0, 158)
     ax2.set_ylim(-0.55, len(names) - 0.45)
     ax2.set_xlabel("Decode speed (tok/s)")
     # The bars are descriptive: the note sits in the empty lower-right corner of the panel.
-    ax2.text(113, -0.35, "Different builds and sessions;\nnot a controlled comparison.\nFinal gated S23 pass: Table 5.",
+    ax2.text(156, -0.35, "Different builds and\nsessions; not a controlled\ncomparison. Gated pass:\nTable 6.",
              ha="right", va="bottom", fontsize=FT, color=SLATE_DARK, style="italic", linespacing=1.35,
              bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=GRID, lw=0.6), zorder=5)
     for b, v, l in zip(hb, tps, lat):
         cy = b.get_y() + b.get_height() / 2
         label = f"{v:.1f} tok/s · {l:.2f} s"
-        if v > 70:  # long bar: label inside, right-aligned
-            ax2.text(v - 2, cy, label, ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
-        else:
-            ax2.text(v + 1.5, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+        ax2.text(v + 1.5, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+    families = [Patch(color=INDIGO, label="Neoverse-V2"), Patch(color=TEAL, label="Galaxy S23"),
+                Patch(color=TEAL_LIGHT, label="S23 intermediate build"), Patch(color=INDIGO_MID, label="Neoverse-N1")]
+    ax2.legend(handles=families, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False,
+               handlelength=1.2, columnspacing=1.0, borderaxespad=0.2)
     sf_b.suptitle("B. Decode speed and item time (wall latency) on each Arm target", x=0.01, ha="left",
                   fontsize=FTITLE, fontweight="bold", color=INK)
 
@@ -315,7 +326,7 @@ def build_arm_perf_chart() -> Path:
 # ---------------------------------------------------------------------------
 
 def build_eval_chart() -> Path:
-    """Conservative F1 and FPR on every benchmark (Table 6).
+    """Conservative F1 and FPR on every benchmark (Table 8).
 
     Value labels are horizontal. Within each group the two bars are spread apart (centres
     0.44 apart, width 0.30) so a label centred over one bar clears the neighbouring bar.
@@ -411,11 +422,13 @@ def build_overview_chart() -> Path:
         a.text(bar.get_x() + bar.get_width() / 2, v + 0.03, f"{v:.2f}", ha="center", va="bottom",
                fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=5,
                bbox=dict(boxstyle="square,pad=0.08", fc="white", ec="none"))
-    a.set_xticks(x, [f"{r[0]}\nn={r[1]}" for r in held])
+    # Short one-word set names keep each tick label to two lines at 10 pt.
+    a.set_xticks(x, [f"{r[0].split(chr(10))[0]}\nn={r[1]}" for r in held])
     a.tick_params(axis="x", length=0)
     a.set_ylim(0, 1.32)
     a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     a.legend(loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.02))
+    a.set_ylabel("Recall or FPR")
     a.set_title("Detection on held-back sets", loc="left")
 
     # (b) Galaxy S23 warm KYC check latency. Horizontal bars so every build name fits on
