@@ -40,15 +40,18 @@ REPORT_PDF = PHASE1 / "report.pdf"
 HEADER_TEX = PHASE1 / "pdf-header.tex"
 MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB form limit
 
-# Palette (matches the report's indigo / amber / slate scheme).
+# Palette: indigo for measured values and the detector path, slate for context and
+# comparison bars. Amber (orange) is reserved for false positive rate (FPR) and is used
+# nowhere else in any figure.
 INDIGO = "#3730A3"
 INDIGO_DARK = "#1E1B4B"
 INDIGO_LIGHT = "#EEF2FF"
 INDIGO_MID = "#6366F1"
-AMBER = "#B45309"
-AMBER_LIGHT = "#FFFBEB"
-AMBER_TEXT = "#92400E"
+AMBER = "#B45309"       # FPR only
+AMBER_TEXT = "#92400E"  # FPR value labels only
 SLATE = "#475569"
+SLATE_DARK = "#334155"
+SLATE_BG = "#F1F5F9"
 SLATE_LIGHT = "#94A3B8"
 INK = "#0F172A"
 LIGHT_BG = "#F8FAFC"
@@ -107,22 +110,23 @@ V2_ITEM_WALL = np.array([2.792, 1.728, 1.470, 0.980])
 V2_ITEM_SD = np.array([0.031, 0.002, 0.377, 0.015])
 
 # Llama 3.2 1B INT4 decode speed and per-item wall latency on each Arm target, top to bottom.
+# Galaxy S23 builds: first, first (airplane) and final in blue, intermediate in grey.
 ARM_TARGETS = [
     ("Neoverse-V2 (8 threads)", 104.6, 0.98, INDIGO_DARK),
     ("Neoverse-V2 (2 threads)", 46.7, 1.73, INDIGO),
     ("S23 first build (warm)", 43.4, 1.20, INDIGO_MID),
     ("S23 first build (Airplane Mode)", 39.0, 1.42, INDIGO_MID),
-    ("S23 intermediate build (warm)", 21.5, 2.90, AMBER),
-    ("S23 final build (warm)", 32.5, 1.86, AMBER),
+    ("S23 intermediate build (warm)", 21.5, 2.90, SLATE_LIGHT),
+    ("S23 final build (warm)", 32.5, 1.86, INDIGO_MID),
     ("Neoverse-N1 (2 vCPU)", 19.9, 3.84, SLATE),
 ]
 
 # Galaxy S23 warm KYC check, total time per item (s), by build (Section 5).
 S23_LATENCY = [
-    ("First", 1.20),
-    ("First,\nairplane", 1.42),
-    ("Inter-\nmediate", 2.90),
-    ("Final", 1.857),
+    ("First", 1.20, INDIGO_MID),
+    ("First (airplane)", 1.42, INDIGO_MID),
+    ("Intermediate", 2.90, SLATE_LIGHT),
+    ("Final", 1.857, INDIGO_MID),
 ]
 
 # Detection, conservative scoring (Table 6). FPR None = not recorded.
@@ -133,14 +137,14 @@ DETECTION = [
     ("Indic", "320", None, 0.031, 0.969, "dev"),
     ("Flow", "22.5k", 0.757, 0.030, 0.850, "dev"),
     ("v3", "81", 0.941, 0.000, 0.970, "held"),
-    ("Blind val.", "240", 1.000, 0.107, 0.918, "held"),
+    ("Blind\nvalidation", "240", 1.000, 0.107, 0.918, "held"),
     ("v4", "79", 0.969, 0.298, 0.805, "held"),
     ("Sealed", "184", 0.929, 0.300, 0.812, "held"),
 ]
 
 # Galaxy S23 dumpsys meminfo App Summary (KiB), sum 1,744,842 KiB = 1,704 MiB total PSS.
 MEM_ROWS = [
-    ("Native heap\n(Llama + XNNPACK)", 1566056, INDIGO),
+    ("Native heap", 1566056, INDIGO),
     ("Private other", 59764, INDIGO_MID),
     ("Graphics", 58676, SLATE),
     ("Code (.so, .apk)", 37420, SLATE),
@@ -190,7 +194,7 @@ def build_architecture_chart() -> Path:
     hy = H - 0.12
     ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE, weight="bold")
     ax.text(c2x + c2w / 2, hy, "DETECT (decides the verdict)", ha="center", va="center", fontsize=FT, color=INDIGO, weight="bold")
-    ax.text(c3x + c3w / 2, hy, "EXPLAIN (on the device)", ha="center", va="center", fontsize=FT, color=AMBER, weight="bold")
+    ax.text(c3x + c3w / 2, hy, "EXPLAIN (on the device)", ha="center", va="center", fontsize=FT, color=SLATE_DARK, weight="bold")
 
     box(c1x, r1 - h1 / 2, c1w, h1, "SMS, link or UPI QR", "Android app or\nLinux CLI / UI", LIGHT_BG, BOX_EDGE)
     box(c1x, r2 - h2 / 2, c1w, h2, "Live socket monitor", "/proc/net/tcp, snmp", LIGHT_BG, BOX_EDGE)
@@ -203,7 +207,7 @@ def build_architecture_chart() -> Path:
     s2_top, s2_bot = r1 + h1 / 2, r2 - h2 / 2
     box(c3x, s2_bot, c3w, s2_top - s2_bot, "Stage 2: Llama 3.2 1B",
         "QLoRA INT4 on ExecuTorch\nXNNPACK, Arm CPU\nexplains typed evidence,\nhonesty and safety check;\nnever changes the verdict",
-        AMBER_LIGHT, AMBER, AMBER)
+        SLATE_BG, SLATE_DARK, SLATE_DARK)
     box(c3x, r3 - h3 / 2, c3w, h3, "Alert with evidence", "verdict and evidence (no LLM)", LIGHT_BG, SLATE, INK)
 
     g = 0.03
@@ -225,11 +229,12 @@ def build_arm_perf_chart() -> Path:
     """(A) Neoverse-V2 thread scaling; (B) decode speed and item wall latency on every Arm target.
 
     The panels are separate subfigures so each gets its own width: B's long target names do
-    not push A's plot area to the right.
+    not push A's plot area to the right. The figure is kept short (5.3 in) so it fits on one
+    page with its surrounding text.
     """
-    fig = plt.figure(figsize=(FIG_W, 6.9), dpi=DPI, layout="constrained")
-    fig.get_layout_engine().set(h_pad=0.08, hspace=0.04)
-    sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.08])
+    fig = plt.figure(figsize=(FIG_W, 5.3), dpi=DPI, layout="constrained")
+    fig.get_layout_engine().set(h_pad=0.06, hspace=0.03)
+    sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.02])
 
     # Panel A
     ax1 = sf_a.subplots()
@@ -238,10 +243,11 @@ def build_arm_perf_chart() -> Path:
     bars = ax1.bar(x - 0.18, V2_DECODE, width=0.36, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
                    error_kw={"ecolor": INK, "lw": 0.9}, label="Decode speed (tok/s)", zorder=3)
     ax1.set_xticks(x, [f"{t} thread{'s' if t > 1 else ''}" for t in V2_THREADS])
-    ax1.set_xlim(-0.55, 3.6)
+    ax1.set_xlim(-0.55, 3.75)
     ax1.set_xlabel("ExecuTorch XNNPACK threads on Arm Neoverse-V2")
     ax1.set_ylabel("Decode speed (tok/s)", color=INDIGO)
-    ax1.set_ylim(0, 150)
+    ax1.set_ylim(0, 165)
+    ax1.set_yticks([0, 40, 80, 120])
     ax1.tick_params(axis="y", labelcolor=INDIGO)
     for b, v in zip(bars, V2_DECODE):
         ax1.text(b.get_x() + b.get_width() / 2, v + 4, f"{v:.1f}", ha="center", va="bottom",
@@ -250,18 +256,23 @@ def build_arm_perf_chart() -> Path:
     ax1b = ax1.twinx()
     ax1b.spines["top"].set_visible(False)
     ax1b.spines["left"].set_visible(False)
-    ax1b.spines["right"].set_color(AMBER)
-    ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="o-", color=AMBER, lw=1.8, ms=5,
+    ax1b.spines["right"].set_color(SLATE_LIGHT)
+    ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=5,
                   capsize=3, label="Item time, wall latency (s)", zorder=4)
-    ax1b.set_ylabel("Item time, wall latency (s)", color=AMBER)
-    ax1b.set_ylim(0, 4.5)
-    ax1b.tick_params(axis="y", colors=SLATE, labelcolor=AMBER)
+    ax1b.set_ylabel("Item time, wall latency (s)", color=SLATE_DARK)
+    ax1b.set_ylim(0, 4.95)
+    ax1b.set_yticks([0, 1, 2, 3])
+    ax1b.tick_params(axis="y", colors=SLATE, labelcolor=SLATE_DARK)
+    # Labels sit above and to the right of each point: the line falls to the right, so that
+    # corner is empty, and the offset clears the 4-thread error bar and its cap.
     for xi, v in zip(x + 0.18, V2_ITEM_WALL):
-        ax1b.text(xi + 0.08, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=AMBER_TEXT,
-                  fontweight="bold", bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.9), zorder=5)
+        ax1b.text(xi + 0.12, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=SLATE_DARK,
+                  fontweight="bold", bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none", alpha=0.92),
+                  zorder=5)
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax1b.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="upper right", frameon=True, facecolor="white", edgecolor=GRID)
+    ax1.legend(h1 + h2, l1 + l2, loc="upper left", ncol=2, frameon=True, facecolor="white", edgecolor=GRID,
+               borderaxespad=0.3)
     sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4", x=0.01, ha="left",
                   fontsize=FTITLE, fontweight="bold", color=INK)
 
@@ -273,11 +284,11 @@ def build_arm_perf_chart() -> Path:
     lat = [t[2] for t in ARM_TARGETS]
     cols = [t[3] for t in ARM_TARGETS]
     y = np.arange(len(names))[::-1]
-    hb = ax2.barh(y, tps, height=0.62, color=cols, zorder=3)
+    hb = ax2.barh(y, tps, height=0.66, color=cols, zorder=3)
     ax2.set_yticks(y, names)
     ax2.tick_params(axis="y", length=0)
     ax2.set_xlim(0, 115)
-    ax2.set_ylim(-0.6, len(names) - 0.4)
+    ax2.set_ylim(-0.55, len(names) - 0.45)
     ax2.set_xlabel("Decode speed (tok/s); item time (wall latency) after each value")
     for b, v, l in zip(hb, tps, lat):
         cy = b.get_y() + b.get_height() / 2
@@ -297,40 +308,40 @@ def build_arm_perf_chart() -> Path:
 # ---------------------------------------------------------------------------
 
 def build_eval_chart() -> Path:
-    """Conservative F1 and FPR on every benchmark (Table 6)."""
-    fig, ax = plt.subplots(figsize=(FIG_W, 3.7), dpi=DPI, layout="constrained")
+    """Conservative F1 and FPR on every benchmark (Table 6).
+
+    Value labels are horizontal. Within each group the two bars are spread apart (centres
+    0.44 apart, width 0.30) so a label centred over one bar clears the neighbouring bar.
+    An FPR that was not recorded is printed as an em dash; the caption explains it.
+    """
+    fig, ax = plt.subplots(figsize=(FIG_W, 3.5), dpi=DPI, layout="constrained")
     _style_ax(ax)
     labels = [f"{d[0]}\nn={d[1]}" for d in DETECTION]
     f1 = [d[4] for d in DETECTION]
     fpr = [d[3] for d in DETECTION]
-    x = np.arange(len(DETECTION))
-    w = 0.38
-    b1 = ax.bar(x - w / 2, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
-    b2 = ax.bar(x + w / 2, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
-    ax.axvline(3.5, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
-    ax.text(1.5, 1.07, "Development sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
-    ax.text(5.5, 1.07, "Held-back and validation sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
+    # Held-back groups are shifted right by GAP so the divider clears the labels beside it.
+    GAP = 0.4
+    x = np.array([i + (GAP if d[5] == "held" else 0.0) for i, d in enumerate(DETECTION)])
+    off, w = 0.22, 0.30
+    b1 = ax.bar(x - off, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
+    b2 = ax.bar(x + off, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
+    ax.axvline(3.5 + GAP / 2, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
+    ax.text(1.5, 1.115, "Development sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
+    ax.text(5.5 + GAP, 1.115, "Held-back sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
     for b, v in zip(b1, f1):
-        ax.text(b.get_x() + b.get_width() / 2, v - 0.02, f"{v:.3f}", ha="center", va="top", rotation=90,
-                fontsize=FT, color="white", fontweight="bold", zorder=4)
-    for d, b, v in zip(DETECTION, b2, fpr):
-        cx = b.get_x() + b.get_width() / 2
-        if v is None:
-            txt, base = "not recorded", 0.0
-        elif d[0] == "Sealed":
-            txt, base = "0.300 (SMS 0.322)", v
-        else:
-            txt, base = (f"{v:.3f}" if v > 0 else "0"), v
-        ax.text(cx, base + 0.02, txt, ha="center", va="bottom", rotation=90, fontsize=FT,
+        ax.text(b.get_x() + b.get_width() / 2, v + 0.015, f"{v:.3f}", ha="center", va="bottom",
+                fontsize=FT, color=INDIGO, fontweight="bold", zorder=4)
+    for b, v in zip(b2, fpr):
+        txt, base = ("—", 0.0) if v is None else (f"{v:.3f}", v)
+        ax.text(b.get_x() + b.get_width() / 2, base + 0.015, txt, ha="center", va="bottom", fontsize=FT,
                 color=AMBER_TEXT, fontweight="bold", zorder=4)
     ax.set_xticks(x, labels)
     ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.55, len(x) - 0.45)
-    ax.set_ylim(0, 1.36)
+    ax.set_xlim(-0.6, x[-1] + 0.6)
+    ax.set_ylim(0, 1.19)
     ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_ylabel("Score or rate")
-    ax.legend(loc="upper center", ncol=2, frameon=True, facecolor="white", edgecolor=GRID,
-              bbox_to_anchor=(0.5, 1.0))
+    fig.legend(*ax.get_legend_handles_labels(), loc="outside upper center", ncol=2, frameon=False)
     return _save(fig, "fig-eval-summary.png")
 
 
@@ -362,7 +373,7 @@ def build_memory_chart() -> Path:
     ax.text(0.985, 0.06,
             f"Total PSS {total_mib:,.0f} MiB (1.66 GiB)\nTotal RSS {MEM_RSS_MIB:,} MiB (1.78 GiB)",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=FT, color=INK,
-            bbox=dict(boxstyle="round,pad=0.4", fc=AMBER_LIGHT, ec=AMBER, lw=0.8))
+            bbox=dict(boxstyle="round,pad=0.4", fc=INDIGO_LIGHT, ec=INDIGO, lw=0.8))
     return _save(fig, "fig-memory.png")
 
 
@@ -376,7 +387,7 @@ def build_overview_chart() -> Path:
     fig.get_layout_engine().set(h_pad=0.1, w_pad=0.1, hspace=0.08, wspace=0.06)
     (a, b), (c, d) = axs
 
-    # (a) Detection on the held-out sets.
+    # (a) Detection on the held-back sets.
     _style_ax(a)
     held = [r for r in DETECTION if r[5] == "held"]
     x = np.arange(len(held))
@@ -394,24 +405,27 @@ def build_overview_chart() -> Path:
     a.set_ylim(0, 1.32)
     a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     a.legend(loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.02))
-    a.set_title("Detection on held-out sets", loc="left")
+    a.set_title("Detection on held-back sets", loc="left")
 
-    # (b) Galaxy S23 warm KYC check latency.
-    _style_ax(b)
+    # (b) Galaxy S23 warm KYC check latency. Horizontal bars so every build name fits on
+    # one line without hyphenation.
+    _style_ax(b, grid_axis="x")
     names = [s[0] for s in S23_LATENCY]
     vals = [s[1] for s in S23_LATENCY]
-    xb = np.arange(len(vals))
-    band = b.axhspan(1.0, 2.0, color=INDIGO_LIGHT, ec="#C7D2FE", lw=0.8, zorder=1, label="1–2 s target")
-    b.legend(handles=[band], loc="upper left", frameon=False)
-    bb = b.bar(xb, vals, width=0.6, color=[INDIGO_MID, INDIGO_MID, AMBER, AMBER], zorder=3)
+    yb = np.arange(len(vals))[::-1]
+    b.axvspan(1.0, 2.0, color=INDIGO_LIGHT, ec="#C7D2FE", lw=0.8, zorder=1)
+    bb = b.barh(yb, vals, height=0.6, color=[s[2] for s in S23_LATENCY], zorder=3)
     for bar, v in zip(bb, vals):
-        b.text(bar.get_x() + bar.get_width() / 2, v + 0.06, f"{v:.2f} s", ha="center", va="bottom",
+        b.text(v + 0.07, bar.get_y() + bar.get_height() / 2, f"{v:.2f} s", ha="left", va="center",
                fontsize=FT, color=INK, fontweight="bold")
-    b.set_xticks(xb, names, fontsize=FT)
-    b.tick_params(axis="x", length=0)
-    b.set_ylim(0, 3.5)
-    b.set_xlabel("Build")
-    b.set_ylabel("Total time per check (s)")
+    b.set_yticks(yb, names)
+    b.tick_params(axis="y", length=0)
+    b.set_ylim(-0.55, len(vals) - 0.45 + 0.75)
+    b.set_xlim(0, 3.6)
+    b.set_xticks([0, 1, 2, 3])
+    b.set_xlabel("Total time per check (s)")
+    b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT,
+           color=INDIGO, fontweight="bold")
     b.set_title("Galaxy S23, warm KYC check", loc="left")
 
     # (c) Neoverse-V2 decode speed vs threads.
@@ -433,7 +447,7 @@ def build_overview_chart() -> Path:
     total_mib = MEM_TOTAL_KIB / 1024
     native = MEM_ROWS[0][1] / 1024
     rows = [("Total RSS", MEM_RSS_MIB, SLATE_LIGHT), ("Total PSS", total_mib, SLATE),
-            ("Native heap", native, INDIGO), ("Everything\nelse", total_mib - native, AMBER)]
+            ("Native heap", native, INDIGO), ("Everything\nelse", total_mib - native, INDIGO_MID)]
     yd = np.arange(len(rows))[::-1]
     db = d.barh(yd, [r[1] for r in rows], height=0.6, color=[r[2] for r in rows], zorder=3)
     for bar, r in zip(db, rows):

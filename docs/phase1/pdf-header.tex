@@ -31,7 +31,7 @@
   ItalicFont = * Italic,
   BoldItalicFont = * Bold Italic
 ]
-\setmonofont{JetBrains Mono}[Scale=0.84]
+\setmonofont{JetBrains Mono}[Scale=0.84, Ligatures=NoCommon, Contextuals=NoAlternate]
 \newfontfamily\devanagarifont[Script=Devanagari]{Noto Sans Devanagari}
 
 \hypersetup{
@@ -46,7 +46,7 @@
 % Section heading styling
 \titleformat{\section}
   {\fontsize{15}{19}\selectfont\bfseries\color{prahariIndigo}}
-  {\makebox[1.6em][l]{\color{prahariMuted}\thesection}}{0.2em}{}[\vspace{3pt}{\color{prahariIndigo}\titlerule[1.1pt]}]
+  {\makebox[1.6em][l]{\color{prahariMuted}\thesection}}{0.2em}{}[\nobreak\vspace{3pt}\nobreak{\color{prahariIndigo}\nobreak\titlerule[1.1pt]}\nobreak]
 \titleformat{\subsection}
   {\fontsize{11.5}{14.5}\selectfont\bfseries\color{prahariSlate}}
   {{\color{prahariMuted}\thesubsection}}{0.6em}{}
@@ -155,8 +155,10 @@
 % Keep headings with the text that follows
 \usepackage{needspace}
 \usepackage{etoolbox}
-\pretocmd{\section}{\needspace{4\baselineskip}}{}{}
-\pretocmd{\subsection}{\needspace{3\baselineskip}}{}{}
+% Every heading is followed by text (titlesec adds \nobreak; club penalties keep two lines).
+% With \raggedbottom, LaTeX's negative \@secpenalty made each heading a preferred page break,
+% ending pages early; set it to zero.
+\makeatletter\@secpenalty=0\makeatother
 
 % Verdict labels: one consistent small-caps style (capitals and lowercase both set as small caps)
 \newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
@@ -167,3 +169,10 @@
 \newcommand{\RefsEnd}{\par\endgroup}
 \urlstyle{same}
 \DeclareUrlCommand\path{\urlstyle{tt}}
+
+% Pandoc writes \label{...} after each heading. In vertical mode the label's whatsit made the
+% following glue a legal page break, so headings could be stranded at a page bottom. Forbid it.
+\AddToHook{begindocument/end}{%
+  \let\prahariOrigLabel\label
+  \renewcommand{\label}[1]{\prahariOrigLabel{#1}\ifvmode\nobreak\fi}}
+
