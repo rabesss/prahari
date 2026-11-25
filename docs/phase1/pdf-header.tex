@@ -61,7 +61,7 @@
 % Header and footer: short title as the running head, page number only in the footer
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari: Offline Threat Triage on Arm}
+\fancyhead[L]{\footnotesize\color{prahariMuted}Prahari: Offline Scam Triage on Arm}
 \fancyfoot[C]{\footnotesize\color{prahariMuted}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -130,7 +130,7 @@
 
 % Captions: figure and table captions share one style; table captions sit above
 \usepackage{caption}
-\captionsetup{font={small,sf}, labelfont={bf,color=prahariIndigo}, labelsep=period, justification=raggedright, singlelinecheck=false}
+\captionsetup{font=small, labelfont={bf,color=prahariIndigo}, labelsep=period, justification=raggedright, singlelinecheck=false}
 \captionsetup[figure]{position=below, skip=6pt}
 \captionsetup[table]{position=above, skip=4pt}
 
@@ -166,7 +166,9 @@
   \raggedright\everypar{\hangindent=2.4em\hangafter=1}}
 \newcommand{\RefsEnd}{\par\endgroup}
 \urlstyle{same}
-\DeclareUrlCommand\path{\urlstyle{tt}}
+% File paths break only after "/" (never inside a word); hashes may break anywhere.
+\DeclareUrlCommand\path{\urlstyle{tt}\def\UrlBreaks{\do\/}\def\UrlBigBreaks{}\def\UrlNoBreaks{}}
+\DeclareUrlCommand\hash{\urlstyle{tt}}
 
 % Pandoc writes \label{...} after each heading. In vertical mode the label's whatsit made the
 % following glue a legal page break, so headings could be stranded at a page bottom. Forbid it.

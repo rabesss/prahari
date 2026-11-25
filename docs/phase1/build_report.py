@@ -57,6 +57,9 @@ INK = "#0F172A"
 LIGHT_BG = "#F8FAFC"
 GRID = "#E2E8F0"
 BOX_EDGE = "#CBD5E1"
+# Galaxy S23 bars: one teal family (intermediate build a lighter shade); Neoverse bars stay indigo.
+TEAL = "#0F766E"
+TEAL_LIGHT = "#5EB8AE"
 
 # Every figure is drawn 6.5 in wide, the width it is placed at in the PDF, so font sizes
 # below are the printed sizes. Nothing is smaller than 9 pt.
@@ -110,23 +113,23 @@ V2_ITEM_WALL = np.array([2.792, 1.728, 1.470, 0.980])
 V2_ITEM_SD = np.array([0.031, 0.002, 0.377, 0.015])
 
 # Llama 3.2 1B INT4 decode speed and per-item wall latency on each Arm target, top to bottom.
-# Galaxy S23 builds: first, first (airplane) and final in blue, intermediate in grey.
+# Coloured by device: Neoverse in indigo shades, Galaxy S23 builds in teal (intermediate lighter).
 ARM_TARGETS = [
     ("Neoverse-V2 (8 threads)", 104.6, 0.98, INDIGO_DARK),
     ("Neoverse-V2 (2 threads)", 46.7, 1.73, INDIGO),
-    ("S23 first build (warm)", 43.4, 1.20, INDIGO_MID),
-    ("S23 first build (Airplane Mode)", 39.0, 1.42, INDIGO_MID),
-    ("S23 intermediate build (warm)", 21.5, 2.90, SLATE_LIGHT),
-    ("S23 final build (warm)", 32.5, 1.86, INDIGO_MID),
-    ("Neoverse-N1 (2 vCPU)", 19.9, 3.84, SLATE),
+    ("S23 first build (warm)", 43.4, 1.20, TEAL),
+    ("S23 first build (Airplane Mode)", 39.0, 1.42, TEAL),
+    ("S23 intermediate build (warm)", 21.5, 2.90, TEAL_LIGHT),
+    ("S23 final build (warm)", 32.5, 1.86, TEAL),
+    ("Neoverse-N1 (2 vCPU)", 19.9, 3.84, INDIGO_MID),
 ]
 
 # Galaxy S23 warm KYC check, total time per item (s), by build (Section 5).
 S23_LATENCY = [
-    ("First", 1.20, INDIGO_MID),
-    ("First (airplane)", 1.42, INDIGO_MID),
-    ("Intermediate", 2.90, SLATE_LIGHT),
-    ("Final", 1.857, INDIGO_MID),
+    ("First", 1.20, TEAL),
+    ("First (airplane)", 1.42, TEAL),
+    ("Intermediate", 2.90, TEAL_LIGHT),
+    ("Final", 1.857, TEAL),
 ]
 
 # Detection, conservative scoring (Table 6). FPR None = not recorded.
@@ -260,6 +263,7 @@ def build_arm_perf_chart() -> Path:
     ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="s--", color=SLATE_DARK, lw=1.6, ms=5,
                   capsize=3, label="Item time, wall latency (s)", zorder=4)
     ax1b.set_ylim(0, 4.95)
+    ax1b.set_ylabel("Item wall latency (s)", color=SLATE_DARK)
     ax1b.set_yticks([0, 1, 2, 3])
     ax1b.tick_params(axis="y", colors=SLATE, labelcolor=SLATE_DARK)
     # Labels sit above and to the right of each point: the line falls to the right, so that
@@ -288,7 +292,7 @@ def build_arm_perf_chart() -> Path:
     ax2.tick_params(axis="y", length=0)
     ax2.set_xlim(0, 115)
     ax2.set_ylim(-0.55, len(names) - 0.45)
-    ax2.set_xlabel("Decode speed (tok/s) and item wall latency (s)")
+    ax2.set_xlabel("Decode speed (tok/s)")
     # The bars are descriptive: the note sits in the empty lower-right corner of the panel.
     ax2.text(113, -0.35, "Different builds and sessions;\nnot a controlled comparison.\nFinal gated S23 pass: Table 5.",
              ha="right", va="bottom", fontsize=FT, color=SLATE_DARK, style="italic", linespacing=1.35,
@@ -335,7 +339,7 @@ def build_eval_chart() -> Path:
         ax.text(b.get_x() + b.get_width() / 2, v + 0.015, f"{v:.3f}", ha="center", va="bottom",
                 fontsize=FT, color=INDIGO, fontweight="bold", zorder=4)
     for b, v in zip(b2, fpr):
-        txt, base = ("—", 0.0) if v is None else (f"{v:.3f}", v)
+        txt, base = ("n/r", 0.0) if v is None else (f"{v:.3f}", v)
         ax.text(b.get_x() + b.get_width() / 2, base + 0.015, txt, ha="center", va="bottom", fontsize=FT,
                 color=AMBER_TEXT, fontweight="bold", zorder=4)
     ax.set_xticks(x, labels)
@@ -394,16 +398,19 @@ def build_overview_chart() -> Path:
     _style_ax(a)
     held = [r for r in DETECTION if r[5] == "held"]
     x = np.arange(len(held))
-    w = 0.38
-    rb = a.bar(x - w / 2, [r[2] for r in held], width=w, color=INDIGO, label="Recall", zorder=3)
-    fb = a.bar(x + w / 2, [r[3] for r in held], width=w, color=AMBER, label="FPR", zorder=3)
+    # Bars are narrower than their spacing so the FPR labels (wider than a bar) clear the
+    # tall recall bar beside them; FPR labels also sit on white boxes above everything.
+    w, off = 0.30, 0.20
+    rb = a.bar(x - off, [r[2] for r in held], width=w, color=INDIGO, label="Recall", zorder=3)
+    fb = a.bar(x + off, [r[3] for r in held], width=w, color=AMBER, label="FPR", zorder=3)
     # Every value label is horizontal and sits just above its bar.
     for bar, v in zip(rb, [r[2] for r in held]):
         a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom",
                fontsize=FT, color=INDIGO, fontweight="bold")
     for bar, v in zip(fb, [r[3] for r in held]):
-        a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom",
-               fontsize=FT, color=AMBER_TEXT, fontweight="bold")
+        a.text(bar.get_x() + bar.get_width() / 2, v + 0.03, f"{v:.2f}", ha="center", va="bottom",
+               fontsize=FT, color=AMBER_TEXT, fontweight="bold", zorder=5,
+               bbox=dict(boxstyle="square,pad=0.08", fc="white", ec="none"))
     a.set_xticks(x, [f"{r[0]}\nn={r[1]}" for r in held])
     a.tick_params(axis="x", length=0)
     a.set_ylim(0, 1.32)
@@ -427,8 +434,7 @@ def build_overview_chart() -> Path:
     b.set_ylim(-0.55, len(vals) - 0.45 + 0.75)
     b.set_xlim(0, 3.6)
     b.set_xticks([0, 1, 2, 3])
-    b.set_xlabel("Total time per check (s)\nDifferent builds and sessions, not a\ncontrolled comparison; gated pass: Table 5",
-                 linespacing=1.4)
+    b.set_xlabel("Total time per check (s)")
     b.text(1.5, len(vals) - 0.45 + 0.375, "1–2 s target", ha="center", va="center", fontsize=FT,
            color=INDIGO, fontweight="bold")
     b.set_title("Galaxy S23, warm KYC check", loc="left")
