@@ -7,6 +7,7 @@
 \usepackage{lastpage}
 \usepackage{titlesec}
 \usepackage{hyperref}
+\usepackage{xurl}
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{enumitem}
@@ -156,3 +157,13 @@
 \usepackage{etoolbox}
 \pretocmd{\section}{\needspace{4\baselineskip}}{}{}
 \pretocmd{\subsection}{\needspace{3\baselineskip}}{}{}
+
+% Verdict labels: one consistent small-caps style (capitals and lowercase both set as small caps)
+\newcommand{\vlabel}[1]{{\addfontfeature{Letters={SmallCaps,UppercaseSmallCaps}}\mbox{#1}}}
+
+% References and Appendix A: hanging-indent entries, no bullets, URLs and paths break anywhere
+\newcommand{\RefsBegin}{\par\begingroup\footnotesize\setlength{\parskip}{2.5pt plus 1pt}\setlength{\parindent}{0pt}%
+  \raggedright\everypar{\hangindent=2.4em\hangafter=1}}
+\newcommand{\RefsEnd}{\par\endgroup}
+\urlstyle{same}
+\DeclareUrlCommand\path{\urlstyle{tt}}

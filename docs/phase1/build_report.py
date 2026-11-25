@@ -2,11 +2,15 @@
 """Reproducibly generate report charts and build docs/phase1/report.pdf.
 
 Run from anywhere in the repository:
-    python3 docs/phase1/build_report.py
+    python3 docs/phase1/build_report.py                # charts + PDF
+    python3 docs/phase1/build_report.py --charts-only  # charts only
 
 Outputs:
+    docs/phase1/img/fig-architecture.png
+    docs/phase1/img/fig-overview.png
     docs/phase1/img/fig-arm-perf.png
     docs/phase1/img/fig-eval-summary.png
+    docs/phase1/img/fig-memory.png
     docs/phase1/report.pdf
 
 All plotted numbers come directly from verified project artifacts documented in
@@ -25,6 +29,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 import numpy as np
 
 PHASE1 = Path(__file__).resolve().parent
@@ -35,201 +40,416 @@ REPORT_PDF = PHASE1 / "report.pdf"
 HEADER_TEX = PHASE1 / "pdf-header.tex"
 MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB form limit
 
-INDIGO = "#1E3A8A"
-BLUE = "#2563EB"
-TEAL = "#0F766E"
-AMBER = "#D97706"
-RED = "#DC2626"
+# Palette (matches the report's indigo / amber / slate scheme).
+INDIGO = "#3730A3"
+INDIGO_DARK = "#1E1B4B"
+INDIGO_LIGHT = "#EEF2FF"
+INDIGO_MID = "#6366F1"
+AMBER = "#B45309"
+AMBER_LIGHT = "#FFFBEB"
+AMBER_TEXT = "#92400E"
 SLATE = "#475569"
+SLATE_LIGHT = "#94A3B8"
+INK = "#0F172A"
 LIGHT_BG = "#F8FAFC"
 GRID = "#E2E8F0"
+BOX_EDGE = "#CBD5E1"
+
+# Every figure is drawn 6.5 in wide, the width it is placed at in the PDF, so font sizes
+# below are the printed sizes. Nothing is smaller than 9 pt.
+FIG_W = 6.5
+FT = 9.0     # tick labels, value labels, notes
+FS = 9.5     # axis labels
+FTITLE = 10.5
+DPI = 220
+
+plt.rcParams.update({
+    "font.family": ["IBM Plex Sans", "DejaVu Sans"],
+    "font.size": FT,
+    "axes.titlesize": FTITLE,
+    "axes.labelsize": FS,
+    "xtick.labelsize": FT,
+    "ytick.labelsize": FT,
+    "legend.fontsize": FT,
+    "axes.titleweight": "bold",
+    "axes.titlecolor": INK,
+    "axes.labelcolor": SLATE,
+})
 
 
-def _style_ax(ax: plt.Axes) -> None:
+def _style_ax(ax: plt.Axes, grid_axis: str = "y") -> None:
     ax.set_facecolor(LIGHT_BG)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#94A3B8")
-    ax.spines["bottom"].set_color("#94A3B8")
-    ax.grid(axis="y", color=GRID, linewidth=0.8, zorder=0)
+    ax.spines["left"].set_color(SLATE_LIGHT)
+    ax.spines["bottom"].set_color(SLATE_LIGHT)
+    ax.grid(axis=grid_axis, color=GRID, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
+    ax.tick_params(colors=SLATE, labelcolor=INK)
 
+
+def _save(fig: plt.Figure, name: str) -> Path:
+    out = IMG_DIR / name
+    fig.savefig(out, dpi=DPI, facecolor="white")
+    plt.close(fig)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Data. Every number below also appears in docs/phase1/report.md.
+# ---------------------------------------------------------------------------
+
+# Neoverse-V2 ExecuTorch XNNPACK thread scaling: 3 runs x 6 items, mean +/- SD (Table 5).
+V2_THREADS = np.array([1, 2, 4, 8])
+V2_DECODE = np.array([25.69, 46.69, 75.89, 104.58])
+V2_DECODE_SD = np.array([0.16, 0.12, 0.43, 1.15])
+V2_ITEM_WALL = np.array([2.792, 1.728, 1.470, 0.980])
+V2_ITEM_SD = np.array([0.031, 0.002, 0.377, 0.015])
+
+# Llama 3.2 1B INT4 decode speed and per-item wall latency on each Arm target, top to bottom.
+ARM_TARGETS = [
+    ("Neoverse-V2 (8 threads)", 104.6, 0.98, INDIGO_DARK),
+    ("Neoverse-V2 (2 threads)", 46.7, 1.73, INDIGO),
+    ("S23 first build (warm)", 43.4, 1.20, INDIGO_MID),
+    ("S23 first build (Airplane Mode)", 39.0, 1.42, INDIGO_MID),
+    ("S23 intermediate build (warm)", 21.5, 2.90, AMBER),
+    ("S23 final build (warm)", 32.5, 1.86, AMBER),
+    ("Neoverse-N1 (2 vCPU)", 19.9, 3.84, SLATE),
+]
+
+# Galaxy S23 warm KYC check, total time per item (s), by build (Section 5).
+S23_LATENCY = [
+    ("First", 1.20),
+    ("First,\nairplane", 1.42),
+    ("Inter-\nmediate", 2.90),
+    ("Final", 1.857),
+]
+
+# Detection, conservative scoring (Table 6). FPR None = not recorded.
+DETECTION = [
+    # label, n, recall, fpr, f1, group
+    ("SMS", "1,162", None, None, 0.925, "dev"),
+    ("URL", "7,997", 0.988, 0.000, 0.994, "dev"),
+    ("Indic", "320", None, 0.031, 0.969, "dev"),
+    ("Flow", "22.5k", 0.757, 0.030, 0.850, "dev"),
+    ("v3", "81", 0.941, 0.000, 0.970, "held"),
+    ("Blind val.", "240", 1.000, 0.107, 0.918, "held"),
+    ("v4", "79", 0.969, 0.298, 0.805, "held"),
+    ("Sealed", "184", 0.929, 0.300, 0.812, "held"),
+]
+
+# Galaxy S23 dumpsys meminfo App Summary (KiB), sum 1,744,842 KiB = 1,704 MiB total PSS.
+MEM_ROWS = [
+    ("Native heap\n(Llama + XNNPACK)", 1566056, INDIGO),
+    ("Private other", 59764, INDIGO_MID),
+    ("Graphics", 58676, SLATE),
+    ("Code (.so, .apk)", 37420, SLATE),
+    ("Java heap, system\nand stack", 11044 + 10566 + 1316, SLATE_LIGHT),
+]
+MEM_TOTAL_KIB = 1744842
+MEM_RSS_MIB = 1824
+
+
+# ---------------------------------------------------------------------------
+# Figure: architecture
+# ---------------------------------------------------------------------------
+
+def build_architecture_chart() -> Path:
+    """Two-stage pipeline: inputs -> detectors (decide) -> on-device explanation or alert."""
+    W, H = FIG_W, 3.55
+    fig = plt.figure(figsize=(W, H), dpi=DPI)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, sub, fc, ec, tc=INK):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.08",
+                                    fc=fc, ec=ec, lw=1.2))
+        n_sub = sub.count("\n") + 1 if sub else 0
+        line = 0.16  # in, for 9 pt text with spacing
+        block = 0.19 + n_sub * line
+        top = y + h / 2 + block / 2
+        ax.text(x + w / 2, top - 0.095, title, ha="center", va="center", fontsize=9.5, weight="bold", color=tc)
+        if sub:
+            ax.text(x + w / 2, top - 0.19 - n_sub * line / 2, sub, ha="center", va="center",
+                    fontsize=FT, color=SLATE, linespacing=1.25)
+
+    def arrow(x0, x1, y0, y1=None):
+        ax.add_patch(FancyArrowPatch((x0, y0), (x1, y0 if y1 is None else y1), arrowstyle="-|>",
+                                     mutation_scale=11, lw=1.3, color=SLATE, shrinkA=0, shrinkB=0))
+
+    # Columns (inches).
+    c1x, c1w = 0.04, 1.62
+    c2x, c2w = 1.96, 2.02
+    c3x, c3w = 4.28, 2.18
+    # Row centres: rows 1-2 feed Stage 2; row 3 (intrusion path) ends in an alert.
+    r1, r2, r3 = 2.62, 1.68, 0.50
+    h1, h2, h3 = 0.82, 0.66, 0.66
+
+    hy = H - 0.12
+    ax.text(c1x + c1w / 2, hy, "INPUT", ha="center", va="center", fontsize=FT, color=SLATE, weight="bold")
+    ax.text(c2x + c2w / 2, hy, "DETECT (decides the verdict)", ha="center", va="center", fontsize=FT, color=INDIGO, weight="bold")
+    ax.text(c3x + c3w / 2, hy, "EXPLAIN (on the device)", ha="center", va="center", fontsize=FT, color=AMBER, weight="bold")
+
+    box(c1x, r1 - h1 / 2, c1w, h1, "SMS, link or UPI QR", "Android app or\nLinux CLI / UI", LIGHT_BG, BOX_EDGE)
+    box(c1x, r2 - h2 / 2, c1w, h2, "Live socket monitor", "/proc/net/tcp, snmp", LIGHT_BG, BOX_EDGE)
+    box(c1x, r3 - h3 / 2, c1w, h3, "NSL-KDD flow record", "bin/predict --task flow", LIGHT_BG, BOX_EDGE)
+
+    box(c2x, r1 - h1 / 2, c2w, h1, "Stage 1: detectors", "Classifiers + Indian-context\nrules, 0.42 ms per item", INDIGO_LIGHT, INDIGO, INDIGO)
+    box(c2x, r2 - h2 / 2, c2w, h2, "Flow text rules", "live network events", INDIGO_LIGHT, INDIGO, INDIGO)
+    box(c2x, r3 - h3 / 2, c2w, h3, "Intrusion path", "HistGradientBoosting\n+ 3 intrusion rules", INDIGO_LIGHT, INDIGO, INDIGO)
+
+    s2_top, s2_bot = r1 + h1 / 2, r2 - h2 / 2
+    box(c3x, s2_bot, c3w, s2_top - s2_bot, "Stage 2: Llama 3.2 1B",
+        "QLoRA INT4 on ExecuTorch\nXNNPACK, Arm CPU\nexplains typed evidence,\nhonesty and safety check;\nnever changes the verdict",
+        AMBER_LIGHT, AMBER, AMBER)
+    box(c3x, r3 - h3 / 2, c3w, h3, "Alert with evidence", "verdict and evidence (no LLM)", LIGHT_BG, SLATE, INK)
+
+    g = 0.03
+    for r in (r1, r2, r3):
+        arrow(c1x + c1w + g, c2x - g, r)
+        arrow(c2x + c2w + g, c3x - g, r)
+
+    # Thin divider between the message/network path and the intrusion path.
+    ax.plot([0.04, W - 0.04], [1.08, 1.08], color=GRID, lw=1.0, ls="--", zorder=0)
+
+    return _save(fig, "fig-architecture.png")
+
+
+# ---------------------------------------------------------------------------
+# Figure: Arm performance
+# ---------------------------------------------------------------------------
 
 def build_arm_perf_chart() -> Path:
-    """Two-panel Arm performance & KleidiAI utilization figure (stacked, sized for the text block)."""
-    # 7.0 in wide, placed at ~6.7 in, so 10 pt source text renders at ~9.5 pt.
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.0, 7.4), dpi=220, gridspec_kw={"height_ratios": [1.0, 1.05]})
-    fig.patch.set_facecolor("white")
-    FS, FT = 10.0, 9.5
+    """(A) Neoverse-V2 thread scaling; (B) decode speed and item wall latency on every Arm target.
 
-    # Panel A: Arm Neoverse-V2 thread scaling (3 repeats x 6 items, mean +/- SD)
-    threads = np.array([1, 2, 4, 8])
-    decode_tps = np.array([25.69, 46.69, 75.89, 104.58])
-    decode_sd = np.array([0.16, 0.12, 0.43, 1.15])
-    item_wall = np.array([2.792, 1.728, 1.470, 0.980])
-    item_sd = np.array([0.031, 0.002, 0.377, 0.015])
+    The panels are separate subfigures so each gets its own width: B's long target names do
+    not push A's plot area to the right.
+    """
+    fig = plt.figure(figsize=(FIG_W, 6.9), dpi=DPI, layout="constrained")
+    fig.get_layout_engine().set(h_pad=0.08, hspace=0.04)
+    sf_a, sf_b = fig.subfigures(2, 1, height_ratios=[1.0, 1.08])
 
+    # Panel A
+    ax1 = sf_a.subplots()
     _style_ax(ax1)
-    x = np.arange(len(threads))
-    bars = ax1.bar(x - 0.17, decode_tps, width=0.34, yerr=decode_sd, capsize=3, color=INDIGO, label="Decode speed (tok/s)", zorder=3)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels([f"{t}T" for t in threads], fontsize=FT)
-    ax1.set_xlim(-0.6, 3.75)
-    ax1.set_xlabel("ExecuTorch XNNPACK threadpool (Arm Neoverse-V2)", fontsize=FS, color=SLATE)
-    ax1.set_ylabel("Decode throughput (tok/s)", fontsize=FS, color=INDIGO)
-    ax1.set_ylim(0, 140)
-    ax1.tick_params(axis="y", labelcolor=INDIGO, labelsize=FT)
-    for b, v in zip(bars, decode_tps):
-        ax1.text(b.get_x() + b.get_width() / 2, v + 3.0, f"{v:.1f}", ha="center", va="bottom", fontsize=FT, color=INDIGO, fontweight="bold")
+    x = np.arange(len(V2_THREADS))
+    bars = ax1.bar(x - 0.18, V2_DECODE, width=0.36, yerr=V2_DECODE_SD, capsize=3, color=INDIGO,
+                   error_kw={"ecolor": INK, "lw": 0.9}, label="Decode speed (tok/s)", zorder=3)
+    ax1.set_xticks(x, [f"{t} thread{'s' if t > 1 else ''}" for t in V2_THREADS])
+    ax1.set_xlim(-0.55, 3.6)
+    ax1.set_xlabel("ExecuTorch XNNPACK threads on Arm Neoverse-V2")
+    ax1.set_ylabel("Decode speed (tok/s)", color=INDIGO)
+    ax1.set_ylim(0, 150)
+    ax1.tick_params(axis="y", labelcolor=INDIGO)
+    for b, v in zip(bars, V2_DECODE):
+        ax1.text(b.get_x() + b.get_width() / 2, v + 4, f"{v:.1f}", ha="center", va="bottom",
+                 fontsize=FT, color=INDIGO, fontweight="bold")
 
     ax1b = ax1.twinx()
     ax1b.spines["top"].set_visible(False)
-    ax1b.spines["right"].set_color(TEAL)
     ax1b.spines["left"].set_visible(False)
-    ax1b.errorbar(x + 0.17, item_wall, yerr=item_sd, fmt="o-", color=TEAL, linewidth=2.0, markersize=5.5, capsize=3, label="Item wall latency (s)", zorder=4)
-    ax1b.set_ylabel("Item wall latency (s)", fontsize=FS, color=TEAL)
-    ax1b.set_ylim(0, 4.2)
-    ax1b.tick_params(axis="y", labelcolor=TEAL, labelsize=FT)
-    # Latency labels sit to the right of each point, in the gap before the next bar group.
-    for xi, v in zip(x + 0.17, item_wall):
-        ax1b.text(xi + 0.09, v + 0.06, f"{v:.2f}s", ha="left", va="bottom", fontsize=FT, color=TEAL, fontweight="bold",
-                  bbox=dict(boxstyle="round,pad=0.12", facecolor="white", edgecolor="none", alpha=0.85), zorder=5)
-    ax1.set_title("A. Neoverse-V2 thread scaling (Llama 3.2 1B INT4)", fontsize=11, fontweight="bold", color="#0F172A", pad=8)
-
+    ax1b.spines["right"].set_color(AMBER)
+    ax1b.errorbar(x + 0.18, V2_ITEM_WALL, yerr=V2_ITEM_SD, fmt="o-", color=AMBER, lw=1.8, ms=5,
+                  capsize=3, label="Item time, wall latency (s)", zorder=4)
+    ax1b.set_ylabel("Item time, wall latency (s)", color=AMBER)
+    ax1b.set_ylim(0, 4.5)
+    ax1b.tick_params(axis="y", colors=SLATE, labelcolor=AMBER)
+    for xi, v in zip(x + 0.18, V2_ITEM_WALL):
+        ax1b.text(xi + 0.08, v + 0.12, f"{v:.2f} s", ha="left", va="bottom", fontsize=FT, color=AMBER_TEXT,
+                  fontweight="bold", bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.9), zorder=5)
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax1b.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="upper left", frameon=True, facecolor="white", edgecolor=GRID, fontsize=FT)
+    ax1.legend(h1 + h2, l1 + l2, loc="upper right", frameon=True, facecolor="white", edgecolor=GRID)
+    sf_a.suptitle("A. Neoverse-V2 thread scaling, Llama 3.2 1B INT4", x=0.01, ha="left",
+                  fontsize=FTITLE, fontweight="bold", color=INK)
 
-    # Panel B: Cross-target Arm comparison + KleidiAI CPU share callout
-    _style_ax(ax2)
-    targets = [
-        "Oracle N1 (2 vCPU)",
-        "S23 5b59ee2 (24 Nov eve, warm)",
-        "S23 round-3 build (24 Nov, warm)",
-        "S23 r1 APK (23 Nov, airplane)",
-        "S23 r1 APK (23 Nov, warm)",
-        "Neoverse-V2 (2T)",
-        "Neoverse-V2 (8T)",
-    ]
-    tps_vals = [19.9, 32.5, 21.5, 39.0, 43.4, 46.7, 104.6]
-    lat_vals = [3.84, 1.86, 2.90, 1.42, 1.20, 1.73, 0.98]
-    colors = [SLATE, "#B45309", AMBER, TEAL, BLUE, INDIGO, "#312E81"]
-    y = np.arange(len(targets))
+    # Panel B
+    ax2 = sf_b.subplots()
+    _style_ax(ax2, grid_axis="x")
+    names = [t[0] for t in ARM_TARGETS]
+    tps = [t[1] for t in ARM_TARGETS]
+    lat = [t[2] for t in ARM_TARGETS]
+    cols = [t[3] for t in ARM_TARGETS]
+    y = np.arange(len(names))[::-1]
+    hb = ax2.barh(y, tps, height=0.62, color=cols, zorder=3)
+    ax2.set_yticks(y, names)
+    ax2.tick_params(axis="y", length=0)
+    ax2.set_xlim(0, 115)
+    ax2.set_ylim(-0.6, len(names) - 0.4)
+    ax2.set_xlabel("Decode speed (tok/s); item time (wall latency) after each value")
+    for b, v, l in zip(hb, tps, lat):
+        cy = b.get_y() + b.get_height() / 2
+        label = f"{v:.1f} tok/s · {l:.2f} s"
+        if v > 70:  # long bar: label inside, right-aligned
+            ax2.text(v - 2, cy, label, ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
+        else:
+            ax2.text(v + 1.5, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+    sf_b.suptitle("B. Decode speed and item time (wall latency) on each Arm target", x=0.01, ha="left",
+                  fontsize=FTITLE, fontweight="bold", color=INK)
 
-    ax2.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
-    ax2.grid(axis="y", visible=False)
-    hbars = ax2.barh(y, tps_vals, height=0.6, color=colors, zorder=3)
-    ax2.set_yticks(y)
-    ax2.set_yticklabels(targets, fontsize=FT)
-    ax2.set_xlabel("Llama 3.2 1B INT4 decode speed (tok/s); item wall latency in brackets", fontsize=FS, color=SLATE)
-    ax2.set_xlim(0, 185)
-    ax2.set_ylim(-2.15, 6.6)  # empty band below the bars holds the KleidiAI callout
-    ax2.tick_params(axis="x", labelsize=FT)
-    for b, tps, lat in zip(hbars, tps_vals, lat_vals):
-        ax2.text(tps + 2.5, b.get_y() + b.get_height() / 2, f"{tps:.1f} tok/s ({lat:.2f} s)", va="center", ha="left", fontsize=FT, color="#0F172A", fontweight="bold")
-    ax2.set_title("B. Measured Arm hardware targets", fontsize=11, fontweight="bold", color="#0F172A", pad=8)
-    ax2.text(
-        0.985, 0.02,
-        "Neoverse-V2 perf (2T, 2,222 samples):\n54.17% CPU in KleidiAI kai_* kernels\n23.27% i8mm prefill · 20.57% dotprod",
-        transform=ax2.transAxes, ha="right", va="bottom", fontsize=9.0, color="#1E293B",
-        bbox=dict(boxstyle="round,pad=0.38", facecolor="#EFF6FF", edgecolor="#93C5FD", linewidth=0.8),
-    )
-
-    fig.tight_layout(pad=1.0, h_pad=1.6)
-    out = IMG_DIR / "fig-arm-perf.png"
-    fig.savefig(out, dpi=220)
-    plt.close(fig)
-    return out
+    return _save(fig, "fig-arm-perf.png")
 
 
-def build_eval_and_mem_chart() -> Path:
-    """Two-panel evaluation & Galaxy S23 memory breakdown figure (stacked, sized for the text block)."""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.0, 7.2), dpi=220, gridspec_kw={"height_ratios": [1.25, 0.9]})
-    fig.patch.set_facecolor("white")
-    FS, FT = 10.0, 9.5
+# ---------------------------------------------------------------------------
+# Figure: detection (F1 vs FPR)
+# ---------------------------------------------------------------------------
 
-    # Panel A: F1 & FPR across project sets, v3 held-back, fp_val_v1 and sealed holdout
-    _style_ax(ax1)
-    labels = [
-        "SMS\nn=1,162",
-        "URL\nn=7,997",
-        "Indic\nn=320",
-        "Flow\nn=22.5k",
-        "v3\nheld-back\nn=81",
-        "fp_val\nn=240",
-        "v4\nheld-back\nn=79",
-        "Sealed\nn=184",
-    ]
-    # Project sets: last bin/eval after PR #42. Holdouts/validation: main 105f7e6 (after PR #48).
-    f1_vals = [0.925, 0.994, 0.969, 0.850, 0.970, 0.918, 0.805, 0.812]
-    # Post-PR #42 SMS dev-set FPR was not recorded, so it is plotted as "n/r" rather than guessed.
-    fpr_vals = [float("nan"), 0.000, 0.031, 0.030, 0.000, 0.107, 0.298, 0.300]  # SMS-route sealed FPR=0.322 annotated
-
-    x = np.arange(len(labels))
+def build_eval_chart() -> Path:
+    """Conservative F1 and FPR on every benchmark (Table 6)."""
+    fig, ax = plt.subplots(figsize=(FIG_W, 3.7), dpi=DPI, layout="constrained")
+    _style_ax(ax)
+    labels = [f"{d[0]}\nn={d[1]}" for d in DETECTION]
+    f1 = [d[4] for d in DETECTION]
+    fpr = [d[3] for d in DETECTION]
+    x = np.arange(len(DETECTION))
     w = 0.38
-    b1 = ax1.bar(x - w / 2, f1_vals, width=w, color=INDIGO, label="Conservative F1", zorder=3)
-    b2 = ax1.bar(x + w / 2, np.nan_to_num(fpr_vals), width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
-    ax1.axvline(3.5, color="#94A3B8", linestyle="--", linewidth=0.9, zorder=2)
-    ax1.text(1.5, 1.04, "Project sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
-    ax1.text(5.5, 1.04, "Held-back / validation sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
-
-    # F1 values sit vertically inside the top of each (tall) F1 bar; FPR values stand vertically
-    # above each (short) FPR bar. Rotated labels are narrower than a bar, so they never overlap.
-    for b, v in zip(b1, f1_vals):
-        ax1.text(b.get_x() + b.get_width() / 2, v - 0.02, f"{v:.3f}", ha="center", va="top", rotation=90,
-                 fontsize=FT, color="white", fontweight="bold", zorder=4)
-    for idx, (b, v) in enumerate(zip(b2, fpr_vals)):
+    b1 = ax.bar(x - w / 2, f1, width=w, color=INDIGO, label="Conservative F1", zorder=3)
+    b2 = ax.bar(x + w / 2, [v or 0 for v in fpr], width=w, color=AMBER, label="False positive rate (FPR)", zorder=3)
+    ax.axvline(3.5, color=SLATE_LIGHT, ls="--", lw=0.9, zorder=2)
+    ax.text(1.5, 1.07, "Development sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
+    ax.text(5.5, 1.07, "Held-back and validation sets", ha="center", va="bottom", fontsize=FT, color=SLATE, style="italic")
+    for b, v in zip(b1, f1):
+        ax.text(b.get_x() + b.get_width() / 2, v - 0.02, f"{v:.3f}", ha="center", va="top", rotation=90,
+                fontsize=FT, color="white", fontweight="bold", zorder=4)
+    for d, b, v in zip(DETECTION, b2, fpr):
         cx = b.get_x() + b.get_width() / 2
-        if np.isnan(v):
-            txt, base = "n/r", 0.0
-        elif idx == 7:
+        if v is None:
+            txt, base = "not recorded", 0.0
+        elif d[0] == "Sealed":
             txt, base = "0.300 (SMS 0.322)", v
         else:
             txt, base = (f"{v:.3f}" if v > 0 else "0"), v
-        ax1.text(cx, base + 0.02, txt, ha="center", va="bottom", rotation=90, fontsize=FT, color="#92400E", fontweight="bold", zorder=4)
+        ax.text(cx, base + 0.02, txt, ha="center", va="bottom", rotation=90, fontsize=FT,
+                color=AMBER_TEXT, fontweight="bold", zorder=4)
+    ax.set_xticks(x, labels)
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(-0.55, len(x) - 0.45)
+    ax.set_ylim(0, 1.36)
+    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_ylabel("Score or rate")
+    ax.legend(loc="upper center", ncol=2, frameon=True, facecolor="white", edgecolor=GRID,
+              bbox_to_anchor=(0.5, 1.0))
+    return _save(fig, "fig-eval-summary.png")
 
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(labels, fontsize=8.6)
-    ax1.set_ylim(0, 1.36)
-    ax1.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-    ax1.set_xlim(-0.55, 7.55)
-    ax1.set_ylabel("Score / rate", fontsize=FS, color=SLATE)
-    ax1.tick_params(axis="y", labelsize=FT)
-    ax1.legend(loc="upper center", ncol=2, frameon=True, facecolor="white", edgecolor=GRID, fontsize=FT)
-    ax1.set_title("A. Detection F1 vs. false positive rate", fontsize=11, fontweight="bold", color="#0F172A", pad=8)
 
-    # Panel B: Galaxy S23 dumpsys meminfo PSS breakdown (KB -> MB)
-    _style_ax(ax2)
-    cats = ["Native Heap (Llama+XNNPACK)", "Private Other", "Graphics (EGL/GL)", "Code (.so/.apk/.jar)", "Java Heap, Sys & Stack"]
-    # dumpsys reports KiB; convert to MiB so the figure matches the GiB totals.
-    kib = [1566056, 59764, 58676, 37420, 11044 + 10566 + 1316]  # App Summary rows, sum 1,744,842 KiB
-    mb = [v / 1024 for v in kib]
-    cols = [INDIGO, BLUE, TEAL, AMBER, SLATE]
-    y = np.arange(len(cats))[::-1]
-    ax2.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
-    ax2.grid(axis="y", visible=False)
-    bars = ax2.barh(y, mb, height=0.6, color=cols, zorder=3)
-    ax2.set_yticks(y)
-    ax2.set_yticklabels(cats, fontsize=FT)
-    ax2.set_xlim(0, 2150)
-    ax2.set_xlabel("Proportional Set Size, PSS (MiB)", fontsize=FS, color=SLATE)
-    ax2.tick_params(axis="x", labelsize=FT)
-    for b, v in zip(bars, mb):
-        pct = 100.0 * v / (1744842 / 1024)
-        ax2.text(v + 24, b.get_y() + b.get_height() / 2, f"{v:,.0f} MiB ({pct:.1f}%)", va="center", ha="left", fontsize=FT, color="#0F172A", fontweight="bold")
-    ax2.set_title("B. Galaxy S23 memory footprint (dumpsys meminfo)", fontsize=11, fontweight="bold", color="#0F172A", pad=8)
-    ax2.text(
-        0.985, 0.05,
-        "TOTAL PSS: 1,704 MiB (1.66 GiB)\nTOTAL RSS: 1,824 MiB (1.78 GiB)\nSwapPss: 23 KiB · Native Heap: 89.8%",
-        transform=ax2.transAxes, ha="right", va="bottom", fontsize=9.0, color="#1E293B",
-        bbox=dict(boxstyle="round,pad=0.4", facecolor="#FEF3C7", edgecolor="#F59E0B", linewidth=0.8),
-    )
+# ---------------------------------------------------------------------------
+# Figure: Galaxy S23 memory
+# ---------------------------------------------------------------------------
 
-    fig.tight_layout(pad=1.0, h_pad=1.6)
-    out = IMG_DIR / "fig-eval-summary.png"
-    fig.savefig(out, dpi=220)
-    plt.close(fig)
-    return out
+def build_memory_chart() -> Path:
+    """Galaxy S23 dumpsys meminfo PSS breakdown after a KYC check."""
+    fig, ax = plt.subplots(figsize=(FIG_W, 2.9), dpi=DPI, layout="constrained")
+    _style_ax(ax, grid_axis="x")
+    names = [r[0] for r in MEM_ROWS]
+    mib = [r[1] / 1024 for r in MEM_ROWS]
+    cols = [r[2] for r in MEM_ROWS]
+    total_mib = MEM_TOTAL_KIB / 1024
+    y = np.arange(len(names))[::-1]
+    bars = ax.barh(y, mib, height=0.62, color=cols, zorder=3)
+    ax.set_yticks(y, names)
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlim(0, 1800)
+    ax.set_xlabel("Proportional set size, PSS (MiB)")
+    for b, v in zip(bars, mib):
+        cy = b.get_y() + b.get_height() / 2
+        label = f"{v:,.0f} MiB ({100 * v / total_mib:.1f}%)"
+        if v > 1000:
+            ax.text(v - 20, cy, label, ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
+        else:
+            ax.text(v + 20, cy, label, ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+    ax.text(0.985, 0.06,
+            f"Total PSS {total_mib:,.0f} MiB (1.66 GiB)\nTotal RSS {MEM_RSS_MIB:,} MiB (1.78 GiB)",
+            transform=ax.transAxes, ha="right", va="bottom", fontsize=FT, color=INK,
+            bbox=dict(boxstyle="round,pad=0.4", fc=AMBER_LIGHT, ec=AMBER, lw=0.8))
+    return _save(fig, "fig-memory.png")
+
+
+# ---------------------------------------------------------------------------
+# Figure: results at a glance (2x2)
+# ---------------------------------------------------------------------------
+
+def build_overview_chart() -> Path:
+    """One-page visual summary: detection, S23 latency, Neoverse-V2 throughput, S23 memory."""
+    fig, axs = plt.subplots(2, 2, figsize=(FIG_W, 5.9), dpi=DPI, layout="constrained")
+    fig.get_layout_engine().set(h_pad=0.1, w_pad=0.1, hspace=0.08, wspace=0.06)
+    (a, b), (c, d) = axs
+
+    # (a) Detection on the held-out sets.
+    _style_ax(a)
+    held = [r for r in DETECTION if r[5] == "held"]
+    x = np.arange(len(held))
+    w = 0.38
+    rb = a.bar(x - w / 2, [r[2] for r in held], width=w, color=INDIGO, label="Recall", zorder=3)
+    fb = a.bar(x + w / 2, [r[3] for r in held], width=w, color=AMBER, label="FPR", zorder=3)
+    for bar, v in zip(rb, [r[2] for r in held]):
+        a.text(bar.get_x() + bar.get_width() / 2, v - 0.03, f"{v:.2f}", ha="center", va="top", rotation=90,
+               fontsize=FT, color="white", fontweight="bold")
+    for bar, v in zip(fb, [r[3] for r in held]):
+        a.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.2f}", ha="center", va="bottom", rotation=90,
+               fontsize=FT, color=AMBER_TEXT, fontweight="bold")
+    a.set_xticks(x, [f"{r[0]}\nn={r[1]}" for r in held])
+    a.tick_params(axis="x", length=0)
+    a.set_ylim(0, 1.32)
+    a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    a.legend(loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.02))
+    a.set_title("Detection on held-out sets", loc="left")
+
+    # (b) Galaxy S23 warm KYC check latency.
+    _style_ax(b)
+    names = [s[0] for s in S23_LATENCY]
+    vals = [s[1] for s in S23_LATENCY]
+    xb = np.arange(len(vals))
+    band = b.axhspan(1.0, 2.0, color=INDIGO_LIGHT, ec="#C7D2FE", lw=0.8, zorder=1, label="1–2 s target")
+    b.legend(handles=[band], loc="upper left", frameon=False)
+    bb = b.bar(xb, vals, width=0.6, color=[INDIGO_MID, INDIGO_MID, AMBER, AMBER], zorder=3)
+    for bar, v in zip(bb, vals):
+        b.text(bar.get_x() + bar.get_width() / 2, v + 0.06, f"{v:.2f} s", ha="center", va="bottom",
+               fontsize=FT, color=INK, fontweight="bold")
+    b.set_xticks(xb, names, fontsize=FT)
+    b.tick_params(axis="x", length=0)
+    b.set_ylim(0, 3.5)
+    b.set_xlabel("Build")
+    b.set_ylabel("Total time per check (s)")
+    b.set_title("Galaxy S23, warm KYC check", loc="left")
+
+    # (c) Neoverse-V2 decode speed vs threads.
+    _style_ax(c)
+    c.errorbar(V2_THREADS, V2_DECODE, yerr=V2_DECODE_SD, fmt="o-", color=INDIGO, lw=2, ms=6, capsize=3, zorder=3)
+    for t, v in zip(V2_THREADS, V2_DECODE):
+        c.text(t, v + 7, f"{v:.1f}", ha="center", va="bottom", fontsize=FT, color=INDIGO, fontweight="bold")
+    c.set_xscale("log", base=2)
+    c.set_xticks(V2_THREADS, [str(t) for t in V2_THREADS])
+    c.minorticks_off()
+    c.set_xlim(0.8, 10)
+    c.set_ylim(0, 130)
+    c.set_xlabel("Threads")
+    c.set_ylabel("Decode speed (tok/s)")
+    c.set_title("Neoverse-V2 decode speed", loc="left")
+
+    # (d) Galaxy S23 memory.
+    _style_ax(d, grid_axis="x")
+    total_mib = MEM_TOTAL_KIB / 1024
+    native = MEM_ROWS[0][1] / 1024
+    rows = [("Total RSS", MEM_RSS_MIB, SLATE_LIGHT), ("Total PSS", total_mib, SLATE),
+            ("Native heap", native, INDIGO), ("Everything\nelse", total_mib - native, AMBER)]
+    yd = np.arange(len(rows))[::-1]
+    db = d.barh(yd, [r[1] for r in rows], height=0.6, color=[r[2] for r in rows], zorder=3)
+    for bar, r in zip(db, rows):
+        cy = bar.get_y() + bar.get_height() / 2
+        if r[1] > 1000:
+            d.text(r[1] - 30, cy, f"{r[1]:,.0f}", ha="right", va="center", fontsize=FT, color="white", fontweight="bold")
+        else:
+            d.text(r[1] + 30, cy, f"{r[1]:,.0f}", ha="left", va="center", fontsize=FT, color=INK, fontweight="bold")
+    d.set_yticks(yd, [r[0] for r in rows])
+    d.tick_params(axis="y", length=0)
+    d.set_xlim(0, 2000)
+    d.set_xticks([0, 500, 1000, 1500, 2000])
+    d.set_xlabel("MiB after a KYC check")
+    d.set_title("Galaxy S23 memory", loc="left")
+
+    return _save(fig, "fig-overview.png")
 
 
 def build_pdf() -> None:
@@ -284,9 +504,16 @@ def verify_pdf() -> None:
 
 def main() -> int:
     IMG_DIR.mkdir(parents=True, exist_ok=True)
-    f1 = build_arm_perf_chart()
-    f2 = build_eval_and_mem_chart()
-    print(f"Generated charts: {f1.relative_to(REPO)}, {f2.relative_to(REPO)}")
+    charts = [
+        build_architecture_chart(),
+        build_overview_chart(),
+        build_arm_perf_chart(),
+        build_eval_chart(),
+        build_memory_chart(),
+    ]
+    print("Generated charts: " + ", ".join(str(c.relative_to(REPO)) for c in charts))
+    if "--charts-only" in sys.argv[1:]:
+        return 0
     build_pdf()
     verify_pdf()
     return 0
