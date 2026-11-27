@@ -1,0 +1,73 @@
+Cmdline: /system/bin/simpleperf record --app in.prahari.app --add-meta-info app_type=debuggable --in-app --tracepoint-events /data/local/tmp/tracepoint_events --out-fd 3 --stop-signal-fd 4 -g --duration 30
+Arch: arm64
+Event: cpu-cycles (type 0, config 0)
+Samples: 71536
+Event count: 43914351673
+
+Overhead  Shared Object
+90.43%    base.apk!/lib/arm64-v8a/libexecutorch.so
+2.07%     [kernel.kallsyms]
+1.99%     /apex/com.android.art/lib64/libart.so
+1.09%     /system/lib64/libhwui.so
+1.03%     /apex/com.android.runtime/lib64/bionic/libc.so
+0.77%     /apex/com.android.runtime/lib64/bionic/libm.so
+0.72%     base.apk!/lib/arm64-v8a/libpython3.10.so
+0.71%     [JIT app cache]
+0.40%     /vendor/lib64/egl/libGLESv2_adreno.so
+0.13%     /system/lib64/libgui.so
+0.11%     /system/lib64/libandroidfw.so
+0.09%     [vdso]
+0.08%     /apex/com.android.art/lib64/libart-compiler.so
+0.06%     /system/lib64/libutils.so
+0.05%     /system/lib64/libbinder.so
+0.02%     /system/lib64/libandroid_runtime.so
+0.02%     /system/lib64/libui.so
+0.02%     /system/lib64/libminikin.so
+0.02%     /system/lib64/libc++.so
+0.02%     /system/lib64/libcutils.so
+0.01%     /vendor/lib64/libgsl.so
+0.01%     /vendor/lib64/egl/eglSubDriverAndroid.so
+0.01%     /apex/com.android.i18n/lib64/libicuuc.so
+0.01%     /system/lib64/libEGL.so
+0.01%     /vendor/lib64/vendor.qti.hardware.display.mapperextensions@1.3.so
+0.01%     /vendor/lib64/libadreno_utils.so
+0.01%     /system/lib64/libz.so
+0.01%     /vendor/lib64/hw/android.hardware.graphics.mapper@4.0-impl-qti-display.so
+0.01%     /vendor/lib64/libgrallocutils.so
+0.01%     /apex/com.android.vndk.v33/lib64/libc++.so
+0.01%     /system/lib64/libGLESv1_CM.so
+0.00%     /system/lib64/libandroid.so
+0.00%     /system/lib64/liblog.so
+0.00%     /apex/com.android.vndk.v33/lib64/libhidlbase.so
+0.00%     /system/lib64/libhidlbase.so
+0.00%     /system/lib64/libGLESv2.so
+0.00%     /system/lib64/libartpalette-system.so
+0.00%     /apex/com.android.os.statsd/lib64/libstatspull.so
+0.00%     /vendor/lib64/egl/libEGL_adreno.so
+0.00%     /system/lib64/libinput.so
+0.00%     /system/lib64/libgralloctypes.so
+0.00%     /data/data/in.prahari.app/files/chaquopy/bootstrap-native/arm64-v8a/java/chaquopy.so
+0.00%     /apex/com.android.art/lib64/libartbase.so
+0.00%     /system_ext/lib64/libpenguin_impl.so
+0.00%     /system/framework/arm64/boot.oat
+0.00%     /apex/com.android.i18n/lib64/libicu.so
+0.00%     /apex/com.android.art/lib64/libartpalette.so
+0.00%     /system/lib64/android.hardware.graphics.mapper@4.0.so
+0.00%     /apex/com.android.art/lib64/libdexfile.so
+0.00%     base.apk!/lib/arm64-v8a/libfbjni.so
+0.00%     /system/lib64/libpng.so
+0.00%     /apex/com.android.art/lib64/libopenjdk.so
+0.00%     /data/data/in.prahari.app/files/chaquopy/AssetFinder/stdlib-arm64-v8a/unicodedata.cpython-310.so
+0.00%     /data/data/in.prahari.app/files/chaquopy/AssetFinder/requirements/numpy/core/_multiarray_umath.so
+0.00%     /data/data/in.prahari.app/files/chaquopy/bootstrap-native/arm64-v8a/math.cpython-310.so
+0.00%     /system/lib64/libharfbuzz_ng.so
+0.00%     /system/lib64/libsync.so
+0.00%     /system/lib64/libnativedisplay.so
+0.00%     /apex/com.android.art/lib64/libc++.so
+0.00%     /apex/com.android.art/lib64/libjavacore.so
+0.00%     /vendor/lib64/libgralloccore.so
+0.00%     /apex/com.android.runtime/bin/linker64
+0.00%     /system/lib64/libnativewindow.so
+0.00%     /apex/com.android.runtime/lib64/bionic/libdl.so
+0.00%     /apex/com.android.art/lib64/libprofile.so
+0.00%     /apex/com.android.vndk.v33/lib64/libcutils.so
