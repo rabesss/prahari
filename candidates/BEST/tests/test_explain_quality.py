@@ -190,6 +190,15 @@ def _hindi_ready():
 hindi = pytest.mark.skipif(not _hindi_ready(), reason="explain_hi.json has no Hindi yet")
 
 
+@pytest.mark.parametrize("label", ["an account-blocking scam", "an account-blocking threat"])
+def test_account_blocking_advice_and_hindi_fact(label):
+    step = "Don't act on this message; check your account only in your bank's official app."
+    fact = "Don't act on this message; check your account only in the official app."
+    assert llm.TYPE_ADVICE[label][0] == step
+    assert llm.KEY_FACT[label] == fact
+    assert explain_hi.table()["facts"][fact] == "इस संदेश पर कोई कदम न उठाएँ; अपना खाता सिर्फ़ आधिकारिक ऐप में जाँचें।"
+
+
 @hindi
 def test_hindi_table_covers_every_static_phrase_and_fact():
     t = explain_hi.table()
