@@ -1,0 +1,360 @@
+{
+  "schema": "prahari-android-bench-v1",
+  "device_class": "android-arm64",
+  "source_note": "Live adb benchmark run",
+  "device": {
+    "model": "SM-S911B",
+    "manufacturer": "samsung",
+    "android_release": "14",
+    "sdk": "34",
+    "abilist": "arm64-v8a,armeabi-v7a,armeabi",
+    "soc_model": "SM8550",
+    "soc_manufacturer": "QTI",
+    "cpu_parts": [
+      "0xd46",
+      "0xd4d",
+      "0xd47"
+    ],
+    "isa_arm_features": [
+      "asimd",
+      "asimddp",
+      "asimdhp",
+      "bf16",
+      "fphp",
+      "i8mm"
+    ]
+  },
+  "dumpsys_meminfo": {},
+  "summary": {
+    "checks_total": 11,
+    "checks_incomplete": [
+      "kyc-warm-04",
+      "kyc-warm-05",
+      "kyc-warm-06",
+      "kyc-warm-07",
+      "kyc-warm-08",
+      "kyc-warm-09",
+      "kyc-warm-10"
+    ],
+    "checks_full_stats": 4,
+    "detector_ms_min_max": [
+      11.625,
+      257.473
+    ],
+    "ttft_ms_median": 603.5,
+    "ttft_ms_min_max": [
+      582.0,
+      712.0
+    ],
+    "decode_tps_median": 42.4,
+    "decode_tps_min_max": [
+      41.727,
+      43.609
+    ],
+    "total_s_median": 1.35,
+    "total_s_min_max": [
+      1.331,
+      2.141
+    ],
+    "app_pss_mb_min_max": [
+      1691.4,
+      1703.1
+    ],
+    "app_pss_growth_mb": 11.7,
+    "warm_kyc_ttft_ms_median": 583.0,
+    "warm_kyc_decode_tps_median": 42.5,
+    "warm_kyc_total_s_median": 1.33,
+    "prompt_tokens_median": 148.0,
+    "prefill_ms_median": 603.0,
+    "prefill_tps_median": 245.7,
+    "by_gating_mode": {
+      "all": {
+        "checks": 4,
+        "llama_skipped": 0,
+        "total_s_median_skipped": null,
+        "total_s_median_llama": 1.345,
+        "detector_ms_median": 12.4
+      }
+    }
+  },
+  "checks": [
+    {
+      "detector_ms": 257.473,
+      "first_token_ms": 712.0,
+      "decode_tps": 41.727,
+      "total_s": 2.141,
+      "app_memory_mb": 1691.4,
+      "backend_line": "Llama 3.2 1B INT4 \u00b7 ExecuTorch \u00b7 XNNPACK",
+      "cpu_abi": "arm64-v8a",
+      "stats_expanded": true,
+      "prompt_tokens": 148,
+      "prefill_ms": 712.0,
+      "prefill_tps": 207.865,
+      "llama_skipped": false,
+      "check": "kyc-cold",
+      "sample_label": "KYC scam SMS",
+      "gating_mode": "all",
+      "gating_mode_observed": "all",
+      "verdict_call_ms": 283.432,
+      "generated_tokens": 29,
+      "total_ms": 2141.0,
+      "fallback": null,
+      "perf_error": false,
+      "status": "ok",
+      "airplane_mode": true,
+      "airplane_mode_on_observed": "1",
+      "host_observed_wall_s": 12.74,
+      "mem_polled": {
+        "samples": 11,
+        "peak_pss_mib": 1781.0,
+        "peak_rss_mib": 1891.0,
+        "peak_native_pss_mib": 1616.1
+      },
+      "battery_before": {
+        "level_pct": 79,
+        "temp_c": 33.4
+      },
+      "battery_after": {
+        "level_pct": 79,
+        "temp_c": 34.0
+      }
+    },
+    {
+      "detector_ms": 12.531,
+      "first_token_ms": 624.0,
+      "decode_tps": 43.609,
+      "total_s": 1.356,
+      "app_memory_mb": 1703.0,
+      "backend_line": "Llama 3.2 1B INT4 \u00b7 ExecuTorch \u00b7 XNNPACK",
+      "cpu_abi": "arm64-v8a",
+      "stats_expanded": true,
+      "prompt_tokens": 148,
+      "prefill_ms": 623.0,
+      "prefill_tps": 237.56,
+      "llama_skipped": false,
+      "check": "kyc-warm-01",
+      "sample_label": "KYC scam SMS",
+      "gating_mode": "all",
+      "gating_mode_observed": "all",
+      "verdict_call_ms": 30.149,
+      "generated_tokens": 29,
+      "total_ms": 1356.0,
+      "fallback": null,
+      "perf_error": false,
+      "status": "ok",
+      "airplane_mode": true,
+      "airplane_mode_on_observed": "1",
+      "host_observed_wall_s": 12.36,
+      "mem_polled": {
+        "samples": 10,
+        "peak_pss_mib": 1706.1,
+        "peak_rss_mib": 1816.3,
+        "peak_native_pss_mib": 1530.2
+      },
+      "battery_before": {
+        "level_pct": 79,
+        "temp_c": 34.0
+      },
+      "battery_after": {
+        "level_pct": 79,
+        "temp_c": 34.3
+      }
+    },
+    {
+      "detector_ms": 12.354,
+      "first_token_ms": 582.0,
+      "decode_tps": 42.336,
+      "total_s": 1.334,
+      "app_memory_mb": 1702.7,
+      "backend_line": "Llama 3.2 1B INT4 \u00b7 ExecuTorch \u00b7 XNNPACK",
+      "cpu_abi": "arm64-v8a",
+      "stats_expanded": true,
+      "prompt_tokens": 148,
+      "prefill_ms": 582.0,
+      "prefill_tps": 254.296,
+      "llama_skipped": false,
+      "check": "kyc-warm-02",
+      "sample_label": "KYC scam SMS",
+      "gating_mode": "all",
+      "gating_mode_observed": "all",
+      "verdict_call_ms": 29.713,
+      "generated_tokens": 29,
+      "total_ms": 1334.0,
+      "fallback": null,
+      "perf_error": false,
+      "status": "ok",
+      "airplane_mode": true,
+      "airplane_mode_on_observed": "1",
+      "host_observed_wall_s": 12.46,
+      "mem_polled": {
+        "samples": 10,
+        "peak_pss_mib": 1705.6,
+        "peak_rss_mib": 1816.2,
+        "peak_native_pss_mib": 1530.4
+      },
+      "battery_before": {
+        "level_pct": 79,
+        "temp_c": 34.3
+      },
+      "battery_after": {
+        "level_pct": 79,
+        "temp_c": 34.5
+      }
+    },
+    {
+      "detector_ms": 11.625,
+      "first_token_ms": 583.0,
+      "decode_tps": 42.46,
+      "total_s": 1.331,
+      "app_memory_mb": 1703.1,
+      "backend_line": "Llama 3.2 1B INT4 \u00b7 ExecuTorch \u00b7 XNNPACK",
+      "cpu_abi": "arm64-v8a",
+      "stats_expanded": true,
+      "prompt_tokens": 148,
+      "prefill_ms": 583.0,
+      "prefill_tps": 253.859,
+      "llama_skipped": false,
+      "check": "kyc-warm-03",
+      "sample_label": "KYC scam SMS",
+      "gating_mode": "all",
+      "gating_mode_observed": "all",
+      "verdict_call_ms": 28.509,
+      "generated_tokens": 29,
+      "total_ms": 1331.0,
+      "fallback": null,
+      "perf_error": false,
+      "status": "ok",
+      "airplane_mode": true,
+      "airplane_mode_on_observed": "1",
+      "host_observed_wall_s": 12.17,
+      "mem_polled": {
+        "samples": 10,
+        "peak_pss_mib": 1705.9,
+        "peak_rss_mib": 1816.6,
+        "peak_native_pss_mib": 1530.4
+      },
+      "battery_before": {
+        "level_pct": 79,
+        "temp_c": 34.5
+      },
+      "battery_after": {
+        "level_pct": 79,
+        "temp_c": 34.7
+      }
+    },
+    {
+      "check": "kyc-warm-04",
+      "sample_label": "KYC scam SMS",
+      "status": "error: RuntimeError",
+      "airplane_mode": true,
+      "gating_mode": "all",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {},
+      "prompt_tokens": null,
+      "prefill_ms": null,
+      "prefill_tps": null,
+      "llama_skipped": null,
+      "gating_mode_observed": null,
+      "verdict_call_ms": null,
+      "generated_tokens": null,
+      "total_ms": null,
+      "fallback": null
+    },
+    {
+      "check": "kyc-warm-05",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-06",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-07",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-08",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-09",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    },
+    {
+      "check": "kyc-warm-10",
+      "sample_label": "KYC scam SMS",
+      "status": "airplane-not-confirmed",
+      "airplane_mode": false,
+      "airplane_mode_on_observed": "",
+      "detector_ms": null,
+      "first_token_ms": null,
+      "decode_tps": null,
+      "total_s": null,
+      "app_memory_mb": null,
+      "mem_polled": {}
+    }
+  ],
+  "passes": [
+    {
+      "gating_requested": "all",
+      "model_event": {
+        "event": "model",
+        "session": "5a0a89c9299b",
+        "seq": 1,
+        "state": "ready",
+        "gating": "all",
+        "load_ms": 2543
+      }
+    }
+  ],
+  "elapsed_s": 173.8
+}

@@ -1,0 +1,11 @@
+Samsung Galaxy S23 phone: dumpsys package in.prahari.app permission sections
+
+    requested permissions:
+      in.prahari.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+    install permissions:
+      in.prahari.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+    User 0: ceDataInode=10232 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false
+      installReason=0
+      firstInstallTime=2026-11-27 11:01:57
+      uninstallReason=0
+      runtime permissions:

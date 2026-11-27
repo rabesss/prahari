@@ -1,0 +1,4 @@
+--------- beginning of main
+{"event":"model","session":"5b5ef664d8af","seq":1,"state":"ready","gating":"all","load_ms":6410}
+{"event":"model","session":"5b5ef664d8af","seq":2,"state":"ready","gating":"all","load_ms":null}
+{"event":"result","session":"5b5ef664d8af","seq":3,"id":2,"kind":"sms","level":"danger","gating":"all","llama_skipped":false,"fallback":null,"error":false,"detector_ms":282.2026560024824,"verdict_call_ms":307.138594,"prompt_tokens":148,"prefill_ms":3138,"prefill_tps":47.1638,"first_token_ms":3144,"decode_tps":42.2125,"generated_tokens":29,"gen_wall_ms":3831,"total_ms":4613,"pss_mb":1791.5146484375,"retried":false}
