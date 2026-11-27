@@ -972,11 +972,11 @@ TYPE_ADVICE = {
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
         "Report the message or call on Sanchar Saathi Chakshu."]),
-    "an account-blocking threat": ("Ignore the threat; check your account in the bank app.", [
+    "an account-blocking threat": ("Don't act on this message; check your account only in your bank's official app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
         "Report the message or call on Sanchar Saathi Chakshu."]),
-    "an account-blocking scam": ("Ignore the threat; check your account in the bank app.", [
+    "an account-blocking scam": ("Don't act on this message; check your account only in your bank's official app.", [
         "Do not open the link or call the number in it.",
         "Check your account in the bank app or call the number on your card.",
         "Report the message or call on Sanchar Saathi Chakshu."]),
@@ -1170,8 +1170,8 @@ KEY_FACT = {
     "a crypto payment scam": "Never send crypto to someone who contacted you because it usually cannot be recovered.",
     "a safe-account transfer scam": "Never move money to a safe account because no bank or officer asks that.",
     "a fake police or customs threat": "Never pay anyone claiming to be police or customs because real officers do not collect money this way.",
-    "an account-blocking scam": "Ignore the threat and check your account only in the official app.",
-    "an account-blocking threat": "Ignore the threat and check your account only in the official app.",
+    "an account-blocking scam": "Don't act on this message; check your account only in the official app.",
+    "an account-blocking threat": "Don't act on this message; check your account only in the official app.",
     "a fake KYC or account check": "Never update KYC through a link or number from a message.",
     "a fake job or loan scam": "Never pay a fee upfront for a job or loan because upfront fees are a common scam trick.",
     "a fake job or task scam": "Never pay a deposit for a job or task because deposits are a common scam trick.",

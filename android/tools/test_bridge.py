@@ -372,6 +372,8 @@ print('hindi steps, link order, benign evidence and report buttons passed')
 kyc = ('Dear customer your SBI KYC is expiring, update at http://sbi-kyc.in-verify.top '
        'or the account will be blocked')
 tail = mobile.llm.advice_for('sms', 1, kyc)[0]
+assert tail == "Don't act on this message; check your account only in your bank's official app."
+assert mobile._actions_hi([tail]) == ['इस संदेश पर कोई कदम न उठाएँ; अपना खाता सिर्फ़ अपने बैंक के आधिकारिक ऐप में जाँचें।']
 assert tail and mobile.ends_with_replacement('This message is DANGEROUS. ' + tail, 'sms', 1, kyc)
 assert mobile.ends_with_replacement(
     'This message is DANGEROUS. Do not click the link or reply to the message.',
