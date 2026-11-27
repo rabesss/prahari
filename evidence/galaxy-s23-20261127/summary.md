@@ -21,3 +21,11 @@ The model transfer ended with an error and neither device-side model hash was ve
 The bundled arm64 `libexecutorch.so` has a dynamic symbol table but no full symbol table; `nm -D` and `strings` found no `kai_` names in the shipped arm64 libraries. This is a file inspection, not a CPU profile and not proof that no KleidiAI code is present.
 
 Phone-side removal of the test apps and files, restoration of airplane mode and screen timeout, and return of the phone could not be verified after the connection was lost.
+
+## Retry session
+
+A second Samsung Galaxy S23 phone (`SM-S911B`, `SM8550`, Android 14) was used. Before setup, the two test packages and the app's external files directory were absent, airplane mode was off, and the screen timeout was 300000 ms. All 18 model chunks were checked individually; the concatenated model and tokenizer matched the local SHA-256 values above on the phone. Airplane mode was then verified on. The battery temperature at the start of the attempted inference was 32.1 °C.
+
+The app's preload telemetry recorded `state: error` after 21 ms; the cause was not established. The model file created by concatenation was displayed with mode `660`, but the effect of this on app access was not verified. The phone connection was lost during the attempted access check. No model-ready event, inference, timing results, CPU profile, or new screen recording was obtained. The synthetic text was successfully selected and shown in the Android share sheet, where Prahari appeared in the app list; that rehearsal was not recorded.
+
+After the connection loss, phone-side cleanup and settings restoration could not be verified. The staged model, tokenizer and test apps may remain, and airplane mode and screen timeout may still be changed. The session could not be confirmed ended or returned.
